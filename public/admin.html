@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.497)</title>
+    <title>Nika Admin (V102.499)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -3684,6 +3684,11 @@
         #upnext-card .un-tile.un-do-new { border-left: 4px solid #6366f1; background: linear-gradient(180deg, #eef2ff, #fff); }
         #upnext-card .un-tile.un-live { opacity: .72; background: #f8fafc; }
         #upnext-card .un-cap.un-none { color: #4f46e5; }
+        /* V102.499: related quizzes under a topic nobody has a quiz for */
+        #upnext-card .un-rels { display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-width: 0; }
+        #upnext-card .un-relh { color: #4f46e5; margin-top: -2px; }
+        #upnext-card .un-rel { width: auto; min-height: 0; margin: 0; padding: 2px 7px; border: 1px solid #c7d2fe; border-radius: 8px; background: #eef2ff; color: #3730a3; font-size: 0.68em; font-weight: 700; text-align: left; line-height: 1.35; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+        #upnext-card .un-rel.on { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
         #upnext-card .un-n.hot { background: #ddd6fe; color: #4c1d95; box-shadow: 0 0 0 1px #a78bfa; }
         #upnext-card .un-cap { font-size: 0.72em; color: #64748b; font-weight: 700; margin-top: -2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
@@ -8185,7 +8190,7 @@
 <script src="dca-ai-trail.js?v=V102.390"></script>
 <script src="dxa-ai-trail.js?v=V102.389"></script>
 <script src="case-review-ai.js?v=V102.423"></script>
-<script src="up-next.js?v=V102.468"></script>
+<script src="up-next.js?v=V102.499"></script>
 <script src="rank-quiz.js?v=V102.484"></script>
     <script src="peds-dosing.js?v=V102.80"></script>
     <script src="bronchodilator-seed.js?v=V102.220"></script>
@@ -72354,7 +72359,7 @@ RULES:
             const r = window.quizTagCompletenessFrom(document.getElementById('quiz-system-select')?.value || '', document.getElementById('quiz-tags')?.value || '');
             if (r.complete) return Promise.resolve(true);
             return new Promise(resolve => {
-                window._qtx = { action, resolve, missing: r.missing, prop: null, error: '', model: window.qtxModel() };
+                window._qtx = { action, resolve, missing: r.missing, prop: null, error: '', model: window.qtxModel(), vendor: window.qtxVendorOf(window.qtxModel()) };
                 qtxRender('ask');
             });
         };
@@ -72464,19 +72469,37 @@ RULES:
             qtxRender('result');
         };
         // V102.471: the Save-time "AI suggests" dialog names its model and lets the admin pick one — local first (Ollama on this computer: nothing leaves it), remembered
-        window.QTX_MODELS = [['ol/local', 'Ollama · local', 'Runs on this computer — nothing leaves it'], ['gemini-3.8-flash', 'Flash 3.8', 'Gemini 3.8 Flash'], ['gemini-3.6-flash', 'Flash 3.6', 'Gemini 3.6 Flash'], ['gpt-4o-mini', '4o mini', 'GPT-4o mini']];
+        // V102.498: vendor first, then the model — [id, short label, tooltip, vendor]. Ids are the shared catalogue's (ai-model-ui.js); Grok is the audit-toolbar trial model, asked for here too.
+        window.QTX_MODELS = [
+            ['ol/local', 'Ollama · local', 'Runs on this computer — nothing leaves it', 'ollama'],
+            ['gemini-3.8-flash', 'Flash 3.8', 'Gemini 3.8 Flash', 'gemini'], ['as/gemini-3.5-flash-lite', 'Lite 3.5', 'Gemini 3.5 Flash-Lite', 'gemini'], ['as/gemini-4-argon', 'Argon 4', 'Gemini 4 Argon', 'gemini'],
+            ['gpt-6-luna', 'Luna 6', 'GPT 6 Luna', 'gpt'], ['gpt-5.6-terra', 'Terra 5.6', 'GPT 5.6 Terra', 'gpt'],
+            ['claude-haiku-5-5', 'Haiku 5.5', 'Claude Haiku 5.5', 'claude'], ['claude-sonnet-5-5', 'Sonnet 5.5', 'Claude Sonnet 5.5', 'claude'],
+            ['or/x-ai/grok-4.7', 'Grok 4.7', 'Grok 4.7 (via OpenRouter)', 'grok'],
+            ['or/deepseek/deepseek-v4.1-flash-1017', 'Flash V4.1', 'DeepSeek V4.1 Flash (via OpenRouter)', 'deepseek'], ['or/deepseek/deepseek-v4-pro-0813', 'Pro V4', 'DeepSeek V4 Pro (via OpenRouter)', 'deepseek'],
+            ['or/qwen/qwen3.8-flash', 'Flash 3.8', 'Qwen 3.8 Flash (via OpenRouter)', 'qwen'], ['or/qwen/qwen3.8-max-0902', 'Max 3.8', 'Qwen 3.8 Max (via OpenRouter)', 'qwen']
+        ];
+        // [vendor, name, logo file (assets/logos), dark disc behind a white logo]
+        window.QTX_VENDORS = [['ollama', 'Ollama', 'ollama-white.svg', true], ['gemini', 'Gemini', 'gemini-spark-color.svg'], ['gpt', 'GPT', 'openai-blossom-black.svg'], ['claude', 'Claude', 'claude-spark-clay.svg'],
+            ['grok', 'Grok', 'grok-white.svg', true], ['deepseek', 'DeepSeek', 'deepseek-color.svg'], ['qwen', 'Qwen', 'qwen-color.svg']];
+        window.qtxVendorOf = id => ((window.QTX_MODELS.find(x => x[0] === id) || [])[3]) || window.QTX_MODELS[0][3];
         window.qtxModel = function () { let m = ''; try { m = localStorage.getItem('quizTagAiModel') || ''; } catch (e) { /* none */ } return window.QTX_MODELS.some(x => x[0] === m) ? m : window.QTX_MODELS[0][0]; };
-        window.qtxModelName = id => ((window.QTX_MODELS.find(x => x[0] === id) || [])[1]) || String(id || '');
+        window.qtxModelName = id => { const m = window.QTX_MODELS.find(x => x[0] === id); if (!m) return String(id || ''); const v = window.QTX_VENDORS.find(x => x[0] === m[3]); return m[3] === 'ollama' ? m[1] : v[1] + ' ' + m[1]; };
         function qtxModelRow(sel) {
-            return '<div role="group" aria-label="AI model" style="display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:0 0 12px;"><span style="font-size:0.78em; font-weight:800; color:#64748b;">✨ Model</span>' +
-                window.QTX_MODELS.map(x => '<button type="button" onclick="qtxPick(\'' + x[0] + '\')" aria-pressed="' + (x[0] === sel) + '" title="' + escapeHtml(x[2]) + '" style="width:auto; min-height:0; padding:3px 10px; border-radius:999px; font-size:0.78em; font-weight:800; cursor:pointer; border:1px solid ' + (x[0] === sel ? '#4f46e5' : '#cbd5e1') + '; background:' + (x[0] === sel ? '#4f46e5' : '#fff') + '; color:' + (x[0] === sel ? '#fff' : '#475569') + ';">' + escapeHtml(x[1]) + '</button>').join('') + '</div>';
+            const st = window._qtx || {}, selVendor = window.qtxVendorOf(sel), shown = st.vendor || selVendor;
+            const vbtn = v => '<button type="button" onclick="qtxVendor(\'' + v[0] + '\')" aria-pressed="' + (v[0] === shown) + '" aria-label="' + v[1] + '" title="' + v[1] + (v[0] === selVendor ? ' · in use' : '') + '" style="position:relative; width:32px; min-height:0; height:32px; padding:0; margin:0; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; background:' + (v[3] ? '#1e293b' : '#fff') + '; border:' + (v[0] === shown ? '2px solid #4f46e5' : '1px solid #cbd5e1') + ';"><img src="assets/logos/' + v[2] + '" alt="" style="width:16px; height:16px;">' + (v[0] === selVendor ? '<i aria-hidden="true" style="position:absolute; right:-1px; top:-1px; width:9px; height:9px; border-radius:50%; background:#f97316; border:2px solid #fff;"></i>' : '') + '</button>';
+            const mbtn = x => '<button type="button" onclick="qtxPick(\'' + x[0] + '\')" aria-pressed="' + (x[0] === sel) + '" title="' + escapeHtml(x[2]) + '" style="width:auto; min-height:0; padding:3px 10px; border-radius:999px; font-size:0.78em; font-weight:800; cursor:pointer; border:1px solid ' + (x[0] === sel ? '#4f46e5' : '#cbd5e1') + '; background:' + (x[0] === sel ? '#4f46e5' : '#fff') + '; color:' + (x[0] === sel ? '#fff' : '#475569') + ';">' + escapeHtml(x[1]) + '</button>';
+            return '<div style="margin:0 0 12px;"><div role="group" aria-label="AI vendor" style="display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:0 0 8px;"><span style="font-size:0.78em; font-weight:800; color:#64748b;">✨ Model</span>' + window.QTX_VENDORS.map(vbtn).join('') + '</div>' +
+                '<div role="group" aria-label="AI model" style="display:flex; flex-wrap:wrap; align-items:center; gap:6px;">' + window.QTX_MODELS.filter(x => x[3] === shown).map(mbtn).join('') + '</div></div>';
         }
+        // a vendor tap only changes which models are listed — nothing re-runs, nothing is replaced
+        window.qtxVendor = function (v) { const st = window._qtx; if (!st || !window.QTX_VENDORS.some(x => x[0] === v)) return; st.vendor = v; qtxRender(st.view || 'ask'); };
         // a pick is remembered; on the result / error view it runs again with that model (the proposal is replaced)
         window.qtxPick = function (id) {
             const st = window._qtx;
             if (!st || !window.QTX_MODELS.some(x => x[0] === id)) return;
             try { localStorage.setItem('quizTagAiModel', id); } catch (e) { /* none */ }
-            st.model = id;
+            st.model = id; st.vendor = window.qtxVendorOf(id);
             if (st.view === 'result' || st.view === 'error') return window.qtxChoose('ai');
             qtxRender(st.view || 'ask');
         };

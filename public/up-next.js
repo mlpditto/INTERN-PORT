@@ -1,4 +1,5 @@
 // Admin ▸ Dashboard ▸ 🚀 Up next: five quizzes that could go live next — one strip, two sources, a chip rail to pick (All · 💬 · 🌱).
+//   V102.499: a topic the model finds NO strong match for now lists up to 3 RELATED quizzes (same area / disease family / drug class) as chips under it — e.g. "ยาทาโรคผิวหนัง" → Topical Corticosteroids · Seborrheic Dermatitis · Clotrimazole Powder-1 — instead of only "No quiz yet".
 //   💬 what interns asked for: the "next topic" they typed when they gave quiz feedback (quiz_feedback.nextTopic). Each topic is matched to an
 //      EXISTING quiz — by title / tag, and across languages by a cheap model (Thai topic ↔ English quiz title, one call a day per set, cached):
 //        inactive quiz → the tile is that quiz, ▶ goes live · live quiz → the tile is that quiz, ↗ opens it · no match → the topic itself, ＋ creates one.
@@ -50,7 +51,10 @@
                 const e = near.get(q.id) || { quiz: q, users: new Set(), at: 0, raws: [] };
                 t.users.forEach(u => e.users.add(u)); e.at = Math.max(e.at, t.at); e.raws.push(t.raw);
                 near.set(q.id, e);
-            } else loose.push({ kind: 'topic', src: '💬', title: t.raw, n: t.users.size, at: t.at, cap: ai && ai.done ? 'none' : '' });
+            } else {
+                const rel = ((ai && ai.rel && ai.rel[t.key]) || []).map(byId).filter(Boolean).slice(0, 3).map(x => ({ id: x.id, title: x.title, live: x.isActive === true }));
+                loose.push({ kind: 'topic', src: '💬', title: t.raw, n: t.users.size, at: t.at, rel, cap: ai && ai.done ? 'none' : '' });
+            }
         });
         const caption = (e) => { const r = e.raws.find(x => norm(x) !== norm(e.quiz.title)); return r || ''; };
         const reqs = [...near.values()].filter(e => e.quiz.isActive !== true).map(e => ({ kind: 'req', src: '💬', id: e.quiz.id, title: e.quiz.title, n: e.users.size, at: e.at, cap: caption(e) }));
@@ -77,15 +81,16 @@
         const titled = (quizzes || []).filter(q => q && q.isPoll !== true && norm(q.title)).slice(0, 250);
         // only topics the text match could not place need the model, and only the top few
         const open = topicsOf(feedback).filter(t => !titled.some(q => hits(t.key, q))).slice(0, 8);
-        if (!open.length || !titled.length) return { ids: {}, done: true };
+        if (!open.length || !titled.length) return { ids: {}, rel: {}, done: true };
         const sig = hash(open.map(t => t.key).join('|') + '#' + titled.map(q => q.id).join(','));
-        const ck = 'upNextMatch:' + dayKey() + ':' + sig;
+        const ck = 'upNextMatch2:' + dayKey() + ':' + sig;
         const hit = cacheGet(ck);
-        if (hit && hit.ids) return { ids: hit.ids, done: true };
+        if (hit && hit.ids) return { ids: hit.ids, rel: hit.rel || {}, done: true };
         const prompt = [
             'ROLE: match study topics that interns asked for to EXISTING quizzes. Topics may be Thai or English; quiz titles are mostly English.',
-            'Reply with PURE JSON only, no markdown: {"m":[{"t":<topic number>,"q":<quiz number>,"s":<0..1>}]}.',
-            'Add an entry only when the quiz clearly covers the topic\'s subject (same disease, drug class or skill). One quiz per topic at most; s >= 0.6 means a strong match. No match → leave the topic out.',
+            'Reply with PURE JSON only, no markdown: {"m":[{"t":<topic number>,"q":<quiz number>,"s":<0..1>}],"r":[{"t":<topic number>,"q":[<quiz number>,...]}]}.',
+            'm: add an entry only when the quiz clearly covers the topic\'s subject (same disease, drug class or skill). One quiz per topic at most; s >= 0.6 means a strong match. No match → leave the topic out of m.',
+            'r: for a topic that has NO strong match, list up to 3 quizzes that are the CLOSEST related — same therapeutic area, disease family or drug class (e.g. a topic about topical skin drugs → quizzes on topical corticosteroids or azole antifungals). Leave the topic out of r when nothing is genuinely related.',
             '',
             'TOPICS:',
             ...open.map((t, i) => i + ': ' + t.raw.replace(/\s+/g, ' ').slice(0, 80)),
@@ -101,8 +106,15 @@
             const t = open[Number(m && m.t)], q = titled[Number(m && m.q)];
             if (t && q && Number(m.s) >= 0.6) ids[t.key] = q.id;
         });
-        cacheSet(ck, { ids });
-        return { ids, done: true };
+        const rel = {};
+        ((parsed && Array.isArray(parsed.r)) ? parsed.r : []).forEach(x => {
+            const t = open[Number(x && x.t)]; if (!t || ids[t.key]) return;
+            const seen = new Set();
+            const list = (Array.isArray(x.q) ? x.q : [x.q]).map(n => titled[Number(n)]).filter(q => q && !seen.has(q.id) && seen.add(q.id)).slice(0, 3).map(q => q.id);
+            if (list.length) rel[t.key] = list;
+        });
+        cacheSet(ck, { ids, rel });
+        return { ids, rel, done: true };
     }
     window.upNextMatchAi = matchAi;
 
@@ -124,7 +136,8 @@
                 const act = topic ? `<button type="button" class="un-go un-new" data-i="${i}" title="Create a quiz · สร้างใหม่" aria-label="Create">＋</button>`
                     : live ? `<button type="button" class="un-go un-open" data-i="${i}" title="Live already — open · เปิดอยู่แล้ว ดู" aria-label="Open">↗</button>`
                         : `<button type="button" class="un-go" data-i="${i}" title="Go live · เปิดใช้งาน" aria-label="Go live">▶</button>`;
-                const cap = x.cap === 'none' ? '<small class="un-cap un-none">No quiz yet · create</small>' : x.cap ? `<small class="un-cap">“${esc(x.cap)}”</small>` : '';
+                const rels = x.rel && x.rel.length ? '<div class="un-rels"><small class="un-cap un-relh" title="No quiz covers this exactly — these are the closest · ยังไม่มีตรงตัว ใกล้เคียงที่สุด">≈ Related · ใกล้เคียง</small>' + x.rel.map(r => `<button type="button" class="un-rel${r.live ? ' on' : ''}" data-rel="${esc(r.id)}" title="${esc(r.title)} · ${r.live ? 'live' : 'paused'}">${r.live ? '🟢' : '⏸'} ${esc(r.title)}</button>`).join('') + '</div>' : '';
+                const cap = rels ? rels : x.cap === 'none' ? '<small class="un-cap un-none">No quiz yet · create</small>' : x.cap ? `<small class="un-cap">“${esc(x.cap)}”</small>` : '';
                 return `<div class="un-tile ${topic ? 'un-do un-do-new' : live ? 'un-live' : 'un-do un-do-go'}" title="${esc(x.title)}"><div class="un-top"><span class="un-src">${x.src}</span>${x.n ? `<span class="un-n${x.n >= 2 ? ' hot' : ''}" title="Interns who asked">👥 ${x.n}</span>` : ''}</div><b>${esc(x.title)}</b>${cap}<div class="un-bot">${act}</div></div>`;
             }).join('') + '</div>';
         host._list = list;
@@ -158,6 +171,8 @@
         const host = document.getElementById('upnext-card');
         const chipEl = e.target.closest && e.target.closest('#upnext-card .un-chip');
         if (chipEl) { filter = chipEl.dataset.un; render(); return; }
+        const relEl = e.target.closest && e.target.closest('#upnext-card .un-rel');
+        if (relEl) { if (typeof openQuizModal === 'function') openQuizModal(relEl.dataset.rel); return; }   // a related quiz opens in the editor (live or paused)
         const go = e.target.closest && e.target.closest('#upnext-card .un-go');
         if (!go || !host || !host._list) return;
         const x = host._list[Number(go.dataset.i)];

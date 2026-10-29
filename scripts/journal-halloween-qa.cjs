@@ -57,7 +57,7 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
                 const flags = [chip.textContent]; for (let i = 0; i < 4; i++) { chip.click(); flags.push(chip.textContent + '|' + chip.getAttribute('aria-label')); }
                 return { hw: document.documentElement.classList.contains('hw'), below: wp.getBoundingClientRect().top >= area.getBoundingClientRect().bottom - 1, flex: cs(pane, 'display'),
                     bar: cs(bar, 'backgroundImage').includes('repeating-linear-gradient'), barBorder: cs(bar, 'borderBottomStyle'), canvasBorder: cs(canvas, 'borderTopColor'), ghost: cs(hero, 'content', '::after'),
-                    wpBg: cs(wp, 'backgroundColor'), wpBorder: cs(wp, 'borderTopStyle'), wpTape: cs(wp, 'content', '::before'), heat: cs(document.querySelector('#my-writing-profile .hm-c.l2'), 'backgroundColor'), heatN: cs(document.querySelector('#my-writing-profile .hm-n'), 'color'), flags };
+                    wpBg: cs(wp, 'backgroundImage'), wpBorder: cs(wp, 'borderTopStyle'), wpTape: cs(wp, 'content', '::before'), heat: cs(document.querySelector('#my-writing-profile .hm-c.l2'), 'backgroundColor'), heatN: cs(document.querySelector('#my-writing-profile .hm-n'), 'color'), flags };
             });
             assert.deepEqual(errors, [], 'no page errors');
             await ctx.close();
@@ -69,15 +69,15 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
             assert.equal(r.hw, true, iso + ' is in season');
             assert.ok(r.bar && r.barBorder === 'dashed', 'candlelight tab bar'); assert.equal(r.canvasBorder, 'rgb(253, 186, 116)', 'candlelight card border');
             assert.ok(r.ghost.includes('👻'), 'the ghost floats on the hero');
-            assert.deepEqual([r.wpBg, r.wpBorder], ['rgb(28, 15, 54)', 'dashed'], 'Writing progress is midnight'); assert.ok(r.wpTape.includes('"'), 'hazard tape strip');
-            assert.deepEqual([r.heat, r.heatN], ['rgb(234, 88, 12)', 'rgb(255, 255, 255)'], 'heatmap level 2 is pumpkin orange with white digits');
+            assert.ok(/linear-gradient/.test(r.wpBg) && /243, 232, 255/.test(r.wpBg) && r.wpBorder === 'dashed', 'Writing progress is a pale lavender wash (dusk), not the dark midnight: ' + r.wpBg); assert.ok(r.wpTape.includes('"'), 'hazard tape strip');
+            assert.deepEqual([r.heat, r.heatN], ['rgb(251, 146, 60)', 'rgb(67, 20, 7)'], 'heatmap level 2 is pale pumpkin with dark digits');
             assert.ok(r.below && r.flex === 'flex', 'Writing progress is below the writing part: ' + JSON.stringify([r.below, r.flex]));
             assert.deepEqual(r.flags, FLAGS, 'one chip cycles EN → KR → TH → K·T → EN: ' + r.flags);
         }
         for (const iso of ['2026-10-19T23:30:00+07:00', '2026-11-03T00:30:00+07:00', '2026-12-25T10:00:00+07:00']) {
             const r = await run(iso);
             assert.equal(r.hw, false, iso + ' is out of season');
-            assert.ok(!r.bar && r.barBorder !== 'dashed' && r.ghost !== '"👻"' && r.wpBg !== 'rgb(28, 15, 54)', 'no Halloween outside the season: ' + JSON.stringify(r));
+            assert.ok(!r.bar && r.barBorder !== 'dashed' && r.ghost !== '"👻"' && !/243, 232, 255/.test(r.wpBg), 'no Halloween outside the season: ' + JSON.stringify(r));
             assert.ok(r.below, 'Writing progress is below the writing part all year');
             assert.equal(r.flags[1], FLAGS[1], 'the language chip is there all year');
         }
