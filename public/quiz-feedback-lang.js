@@ -1,6 +1,6 @@
-// V101.95: language capsule (EN | 한 | ไทย) for the quiz feedback sheet (#quizFeedbackModal).
+// V101.95: language capsule for the quiz feedback sheet (#quizFeedbackModal). V101.237: ONE flag chip (🇹🇭 → 🇬🇧 → 🇰🇷 → 🇹🇭) and the sheet opens in Thai.
 // The sheet is shielded from lang-toggle.js (.lang-no-toggle on its .modal-content), so every string picks itself here.
-// It opens in the app language (lang-th-on wins over lang-kr-on, like flood-watch.js); the capsule only changes THIS sheet, not the app.
+// It opens in Thai (V101.237: Thai first) — Korean only when the app is set to Korean alone; the chip only changes THIS sheet, not the app.
 // Korean + Thai wording is a DRAFT — see docs/KO-GLOSSARY.md.
 (function () {
     'use strict';
@@ -39,13 +39,14 @@
             aiHint: 'แนะนำสำหรับคุณ', errPrefix: 'ข้อผิดพลาด: ', already: 'คุณส่งความเห็นสำหรับแบบทดสอบนี้แล้ว ขอบคุณ 🙏', thanks: '🙏 ขอบคุณสำหรับความเห็น!'
         }
     };
-    var chosen = null;   // null = follow the app language
+    var defaultLang = 'th';   // what a fresh open shows (the QA scripts set 'en' to keep their English assertions)
+    var chosen = null;   // null = follow the default (Thai, or Korean when the app is Korean-only)
+    var ORDER = ['th', 'en', 'ko'], FLAG = { th: '🇹🇭', en: '🇬🇧', ko: '🇰🇷' }, NAME = { th: 'ไทย', en: 'English', ko: '한국어' };
 
     function appLang() {
         var b = document.body;
-        if (b && b.classList.contains('lang-th-on')) return 'th';
-        if (b && b.classList.contains('lang-kr-on')) return 'ko';
-        return 'en';
+        if (b && b.classList.contains('lang-kr-on') && !b.classList.contains('lang-th-on')) return 'ko';
+        return defaultLang;
     }
     function current() { return chosen || appLang(); }
     function t(key) {
@@ -65,7 +66,8 @@
         setText('#fb-title', t('title'));
         setAttr('.close-modal', 'title', t('close'));
         setAttr('.fb-lang', 'aria-label', t('lang'));
-        root.querySelectorAll('.fb-lang button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.l === lang)); });
+        var chip = root.querySelector('.fb-lang button');
+        if (chip) { chip.dataset.l = lang; chip.textContent = FLAG[lang]; chip.title = NAME[lang] + ' · ' + t('lang'); chip.setAttribute('aria-label', t('lang') + ': ' + NAME[lang]); }
         setAttr('#fb-rating-stars', 'aria-label', t('rateGroup'));
         root.querySelectorAll('#fb-rating-stars button').forEach(function (b) { b.title = t('rate', b.dataset.val); });
         setText('.fb-rating-scale .fb-lo', t('lo')); setText('.fb-rating-scale .fb-hi', t('hi'));
@@ -81,18 +83,18 @@
         root.setAttribute('lang', lang === 'ko' ? 'ko' : lang === 'th' ? 'th' : 'en');
     }
 
-    // The capsule: EN | 한 | ไทย
+    // The chip: tap = the next language (Thai → English → Korean → Thai)
     document.addEventListener('click', function (e) {
         var b = e.target.closest && e.target.closest('#quizFeedbackModal .fb-lang button');
         if (!b) return;
         var before = current();
-        chosen = b.dataset.l;
+        chosen = ORDER[(ORDER.indexOf(before) + 1) % ORDER.length];
         apply();
         if (current() !== before && window.fbAi) window.fbAi.start();   // V101.96: the AI topics follow the sheet's language
     });
     // Each open follows the app language again (the capsule is a one-off for that sheet).
     function reset() { chosen = null; apply(); }
 
-    window.fbLang = { t: t, apply: apply, reset: reset, current: current };
+    window.fbLang = { t: t, apply: apply, reset: reset, current: current, setDefault: function (l) { if (D[l]) defaultLang = l; } };
     window.fbT = t;
 })();
