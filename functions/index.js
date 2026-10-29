@@ -2305,6 +2305,8 @@ exports.notifyOnAdminEdit = onCall(
 //     is pushed there IN ADDITION to the 1:1 admin push. Discover the
 //     id via the intern LIFF's ?lgid=1 screen.)
 // ============================================================
+// V102.496: one "New Case Submitted" push per case is retired — the same case already arrives by e-mail. true brings the LINE bubbles back (admin 1:1 + group).
+const CASE_LINE_PUSH = false;
 exports.notifyAdminOnNewCase = onCall(
     { secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID', 'GMAIL_APP_PASSWORD'] },   // 2026-10-22: + the mail
     async (request) => {
@@ -2415,8 +2417,9 @@ exports.notifyAdminOnNewCase = onCall(
 
     // Push each target independently — a group failure (e.g. OA kicked from
     // the group) must not block the 1:1 admin push, and vice versa.
+    // V102.496 (owner): a single case is e-mailed (below), so it no longer spends the LINE push quota — see CASE_LINE_PUSH.
     const results = [];
-    for (const target of targets) {
+    for (const target of (CASE_LINE_PUSH ? targets : [])) {
         try {
             await axios.post('https://api.line.me/v2/bot/message/push', {
                 to: target.to,
@@ -5048,6 +5051,10 @@ exports.floodPointCheck = onCall({ timeoutSeconds: 30 }, async (request) => {
     }
 });
 
+// V102.496: flood alerts no longer go out on LINE (the training-site early warning is e-mailed; the 300 / month push quota is better spent elsewhere).
+// Set true to bring the LINE pushes back (site group, tier 3+ group, opted-in homes). E-mail, flood_status and the in-app popup are unaffected.
+const FLOOD_LINE_PUSH = false;
+
 // Hourly: training site + every opted-in home (users/{id}.floodWatch
 // = { optIn: true, home: { lat, lon } }, written by the intern page).
 exports.checkFloodAlerts = onSchedule({
@@ -5086,7 +5093,7 @@ exports.checkFloodAlerts = onSchedule({
         const update = { risk: s.risk, summary: s, checkedAt: admin.firestore.FieldValue.serverTimestamp(), error: null, gauge, tier: w.tier };
         let rosePushed = false;   // the High message already went out this run: skip the tier LINE below, it would say the same thing
         const rose = s.risk === 'high' && prev.risk !== 'high' && prev.lastAlertDay !== today;
-        if (rose && target && target.to) {
+        if (FLOOD_LINE_PUSH && rose && target && target.to) {
             const [r] = await pushLineFlex('floodAlert', [target],
                 () => ({ type: 'text', text: floodAlertText(where, s, lat, lon) }), `doc=${docId}`);
             if (r && r.ok) { update.lastAlertDay = today; rosePushed = true; }
@@ -5101,7 +5108,7 @@ exports.checkFloodAlerts = onSchedule({
                     const m = floodEarlyMail(w, s, lat, lon, await readRiverDischarge(db), await fetchFloodWeather(lat, lon));
                     await sendFloodMail(m.subject, m.text);
                     sent = true;
-                    if (w.tier >= 3 && !rosePushed && target && target.to) {
+                    if (FLOOD_LINE_PUSH && w.tier >= 3 && !rosePushed && target && target.to) {
                         await pushLineFlex('floodTier', [target], () => ({ type: 'text', text: m.subject + '\n' + floodAlertText(where, s, lat, lon) }), `tier=${w.tier}`);
                     }
                 } catch (e) {
