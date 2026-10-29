@@ -4680,6 +4680,18 @@
         #piExportModal .pix-t td { padding:8px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
         #piExportModal .pix-t tr:last-child td { border-bottom:none; }
         #piExportModal .pix-none { color:#cbd5e1; }
+        /* V102.492: users split by group — chip rail jumps to a group, the group header row folds it */
+        #piExportModal .pix-groups { display:flex; gap:6px; flex-wrap:wrap; margin:0 0 10px; }
+        #piExportModal .pix-groups:empty { display:none; }
+        #piExportModal .pix-g { width:auto; min-height:0; margin:0; padding:4px 10px; border:1px solid #e2e8f0; border-radius:999px; background:#fff; color:#334155; font-size:12px; font-weight:700; cursor:pointer; }
+        #piExportModal .pix-g b { color:#94a3b8; font-weight:700; margin-left:3px; }
+        #piExportModal .pix-g:hover { border-color:#7c3aed; color:#7c3aed; }
+        #piExportModal .pix-t tr.pix-gh td { background:#f8fafc; padding:7px 10px; font-weight:800; font-size:12px; cursor:pointer; border-top:1px solid #e2e8f0; user-select:none; }
+        #piExportModal .pix-t tr.pix-gh:hover td { background:#f3e8ff; }
+        #piExportModal .pix-gc { color:#64748b; font-weight:600; margin-left:6px; }
+        #piExportModal .pix-gb { display:inline-block; width:70px; height:6px; border-radius:99px; background:#e2e8f0; vertical-align:middle; margin-left:10px; overflow:hidden; }
+        #piExportModal .pix-gb i { display:block; height:100%; background:#16a34a; }
+        #piExportModal .pix-gt { float:right; color:#64748b; font-weight:600; }
         #piExportModal .pix-foot { margin-top:10px; font-size:11.5px; color:#64748b; }
         #piExportModal .gs-hstat { display:inline-flex; align-items:center; padding:2px 9px; border-radius:999px; font-size:11px; font-weight:800; white-space:nowrap; }
         #piExportModal .gs-hstat.miss { background:#fffbeb; color:#b45309; border:1px solid #fde68a; }
@@ -15608,6 +15620,7 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
                     <button type="button" class="pix-ic" onclick="pixCsv()" title="Download CSV" aria-label="Download CSV">⬇️</button>
                     <button type="button" class="pix-ic pix-close" onclick="forceHideModal('piExportModal')" aria-label="Close">×</button></div>
                 <div class="pix-bar"><input type="search" id="pix-search" class="pix-search" placeholder="🔍 ชื่อ / เบอร์ / กลุ่ม" aria-label="Search" oninput="pixRender()"><span class="pix-chips" id="pix-chips"></span><span class="pix-scope" id="pix-scope"></span></div>
+                <div class="pix-groups" id="pix-groups"></div>
                 <div class="pix-wrap"><table class="pix-t"><thead><tr><th>ชื่อ</th><th title="Phone">📞</th><th>🆘 บุคคลอ้างอิง</th><th>🍼 ที่เกิด</th><th>🥜 แพ้</th><th>🫀 โรคประจำตัว</th><th>🏥 พักรักษาตัว</th><th>สถานะ</th></tr></thead><tbody id="pix-body"></tbody></table></div>
                 <div class="pix-foot">🔒 ข้อมูลสุขภาพ — เห็นและส่งออกได้เฉพาะแอดมิน · สถานะนับ 5 ช่อง: ที่เกิด, บุคคลอ้างอิง 1 (ชื่อ+เบอร์), แพ้, โรคประจำตัว, พักรักษาตัว</div>
             </div>
@@ -62262,7 +62275,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         // V102.280: 📇 Personal data — who has filled birthplace / reference person / health, for the group in view (admin only). Copy as a table, CSV.
         // Status counts 5 items: birthplace, reference 1 (name AND phone), allergies, chronic conditions, hospital stays ("-" = answered "none" and counts).
-        const PIX_STATE = { filter: 'all' };
+        const PIX_STATE = { filter: 'all', fold: {}, groups: [] };
         function pixRows() {
             const v = x => String(x == null ? '' : x).trim();
             const scope = (typeof userInScope === 'function' && typeof activeUserGroup !== 'undefined') ? (u => userInScope(u, activeUserGroup, activeUserGroupDiv)) : (() => true);
@@ -62274,7 +62287,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 return { id: u.id, name: v(u.fullName) || v(u.displayName) || u.id, nick: v(u.nickname || u.nickName), phone: v(u.phone || u.tel), group: v(u.group) || 'Public',
                     ref: [ref(1), ref(2)].filter(Boolean).join('\n'), born: v(u.birthPlace), allergies: v(hl.allergies), conditions: v(hl.conditions), hosp: v(hl.hospitalizations),
                     status: done === 0 ? 'miss' : done === 5 ? 'ok' : 'part', missing: 5 - done };
-            }).sort((a, b) => a.name.localeCompare(b.name, 'th'));
+            }).sort((a, b) => a.group.localeCompare(b.group, 'th') || a.name.localeCompare(b.name, 'th'));
         }
         function pixStatusChip(r) {
             return r.status === 'ok' ? '<span class="gs-hstat ok">✓ ครบ</span>' : r.status === 'part' ? `<span class="gs-hstat part">ขาด ${r.missing}</span>` : '<span class="gs-hstat miss">ยังไม่กรอก</span>';
@@ -62291,14 +62304,32 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             document.getElementById('pix-chips').innerHTML = chip('all', `ทั้งหมด ${all.length}`) + chip('ok', `✓ ครบ ${n('ok')}`) + chip('part', `ขาดบางส่วน ${n('part')}`) + chip('miss', `ยังไม่กรอก ${n('miss')}`, 'warn');
             document.getElementById('pix-scope').textContent = (typeof activeUserGroup !== 'undefined' && activeUserGroup !== 'All') ? 'กลุ่ม: ' + activeUserGroup : 'ทุกกลุ่ม';
             const cell = x => x ? escapeHtml(x).replace(/\n/g, '<br>') : '<span class="pix-none">—</span>';
-            document.getElementById('pix-body').innerHTML = rows.map(r => `<tr><td><b>${escapeHtml(r.name)}</b>${r.nick ? ' (' + escapeHtml(r.nick) + ')' : ''}</td><td>${cell(r.phone)}</td><td>${cell(r.ref)}</td><td>${cell(r.born)}</td><td>${cell(r.allergies)}</td><td>${cell(r.conditions)}</td><td>${cell(r.hosp)}</td><td>${pixStatusChip(r)}</td></tr>`).join('')
-                || '<tr><td colspan="8" class="pix-none" style="text-align:center; padding:18px;">ไม่มีรายการ</td></tr>';
+            const tr = r => `<tr><td><b>${escapeHtml(r.name)}</b>${r.nick ? ' (' + escapeHtml(r.nick) + ')' : ''}</td><td>${cell(r.phone)}</td><td>${cell(r.ref)}</td><td>${cell(r.born)}</td><td>${cell(r.allergies)}</td><td>${cell(r.conditions)}</td><td>${cell(r.hosp)}</td><td>${pixStatusChip(r)}</td></tr>`;
+            // V102.492: split by group (only when more than one group is in view): chip rail + foldable header rows
+            const groups = [...new Set(rows.map(r => r.group))];
+            PIX_STATE.groups = groups;
+            const many = groups.length > 1;
+            document.getElementById('pix-groups').innerHTML = many ? groups.map((g, i) => `<button type="button" class="pix-g" onclick="pixJump(${i})">${escapeHtml(g)}<b>${rows.filter(r => r.group === g).length}</b></button>`).join('') : '';
+            document.getElementById('pix-body').innerHTML = !rows.length ? '<tr><td colspan="8" class="pix-none" style="text-align:center; padding:18px;">ไม่มีรายการ</td></tr>'
+                : !many ? rows.map(tr).join('')
+                : groups.map((g, i) => {
+                    const mine = rows.filter(r => r.group === g), ok = mine.filter(r => r.status === 'ok').length, folded = !!PIX_STATE.fold[g];
+                    return `<tr class="pix-gh" tabindex="0" aria-expanded="${!folded}" onclick="pixFold(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pixFold(${i});}"><td colspan="8">${folded ? '▸' : '▾'} ${escapeHtml(g)}<span class="pix-gc">${mine.length} คน</span><span class="pix-gb"><i style="width:${Math.round(ok / mine.length * 100)}%"></i></span><span class="pix-gt">ครบ ${ok}/${mine.length}</span></td></tr>` + (folded ? '' : mine.map(tr).join(''));
+                }).join('');
+        }
+        function pixFold(i) { const g = PIX_STATE.groups[i]; if (g == null) return; PIX_STATE.fold[g] = !PIX_STATE.fold[g]; pixRender(); }
+        function pixJump(i) {
+            const g = PIX_STATE.groups[i]; if (g == null) return;
+            if (PIX_STATE.fold[g]) { PIX_STATE.fold[g] = false; pixRender(); }
+            const h = document.querySelectorAll('#pix-body tr.pix-gh')[i], w = h && h.closest('.pix-wrap'); if (!h) return;
+            const head = w.querySelector('thead');
+            w.scrollTo({ top: h.getBoundingClientRect().top - w.getBoundingClientRect().top + w.scrollTop - (head ? head.offsetHeight : 0), behavior: 'smooth' });
         }
         function pixFilter(k) { PIX_STATE.filter = k; pixRender(); }
         function openPiExport() {
             const m = document.getElementById('piExportModal');
             if (m.parentElement !== document.body) document.body.appendChild(m);
-            PIX_STATE.filter = 'all';
+            PIX_STATE.filter = 'all'; PIX_STATE.fold = {};
             const s = document.getElementById('pix-search'); if (s) s.value = '';
             pixRender();
             forceShowModal('piExportModal', 'flex');
