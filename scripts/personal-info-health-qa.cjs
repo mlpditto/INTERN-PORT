@@ -38,7 +38,7 @@ const exportStart = adm.indexOf('<div id="piExportModal"');
 const exportHtml = adm.slice(exportStart, adm.indexOf('        <div id="groupSelectModal"', exportStart));
 const admCss = adm.split('\n').filter(l => /^\s*#(groupSelectModal|piExportModal) /.test(l)).join('\n');
 const admFns = ['function gsFoldCards(', 'function gsBodyClick(', 'function gsEditProfileCard(', 'function gsAgeText(', 'function gsRefreshProfileCards(', 'function gsNewFieldWrites(', 'function pixRows(', 'function pixStatusChip(', 'function pixVisible(', 'function pixRender(',
-    'function pixFilter(', 'function openPiExport(', 'async function pixCopy(', 'function pixCsvCell(', 'function pixCsv('].map(m => grab(adm, m)).join('\n')
+    'function pixFilter(', 'function pixFold(', 'function pixJump(', 'function openPiExport(', 'async function pixCopy(', 'function pixCsvCell(', 'function pixCsv('].map(m => grab(adm, m)).join('\n')
     + '\nconst PIX_STATE = { filter: "all" };'
     + '\n' + ['const PIX_HEAD', 'const pixStatusText', 'const pixLine'].map(m => adm.slice(adm.indexOf(m), adm.indexOf('\n', adm.indexOf(m)))).join('\n');
 
@@ -256,7 +256,7 @@ const admFns = ['function gsFoldCards(', 'function gsBodyClick(', 'function gsEd
             await page.evaluate(([a, b, c, d]) => { usersData = [a, b, c, d]; }, [full, part, none, ign]);
             await page.evaluate(() => openPiExport());
             assert.equal(await page.$eval('#piExportModal', e => e.style.display), 'flex');
-            const rows = () => page.$$eval('#pix-body tr', trs => trs.map(t => [...t.children].map(c => c.textContent.trim()).filter((_, i) => i === 0 || i === 7)));
+            const rows = () => page.$$eval('#pix-body tr:not(.pix-gh)', trs => trs.map(t => [...t.children].map(c => c.textContent.trim()).filter((_, i) => i === 0 || i === 7)));
             assert.deepEqual(await rows(), [['A Full (a)', '✓ ครบ'], ['B Part', 'ขาด 3'], ['C None', 'ยังไม่กรอก']], 'camp (isIgnored) users are left out; status = filled of 5 items; a reference without a phone does not count');
             assert.deepEqual(await page.$$eval('#pix-chips .pix-c', e => e.map(x => x.textContent)), ['ทั้งหมด 3', '✓ ครบ 1', 'ขาดบางส่วน 1', 'ยังไม่กรอก 1']);
             await page.click('#pix-chips .pix-c.warn');
@@ -269,6 +269,18 @@ const admFns = ['function gsFoldCards(', 'function gsBodyClick(', 'function gsEd
             await set('pix-search', ''); await page.evaluate(() => { activeUserGroup = 'G1'; pixRender(); });
             assert.deepEqual((await rows()).map(r => r[0]), ['A Full (a)', 'B Part'], 'follows the group in view');
             assert.equal(await page.$eval('#pix-scope', e => e.textContent), 'กลุ่ม: G1');
+            await page.evaluate(() => { activeUserGroup = 'All'; pixRender(); });
+            // V102.490: split by group (G1 / G2 in view -> chip rail + header rows; one group -> neither)
+            assert.deepEqual(await page.$$eval('#pix-groups .pix-g', e => e.map(x => x.textContent)), ['G12', 'G21']);
+            assert.deepEqual(await page.$$eval('#pix-body tr.pix-gh', e => e.map(x => x.textContent.replace(/\s+/g, ' ').trim())), ['▾ G12 คนครบ 1/2', '▾ G21 คนครบ 0/1']);
+            await page.click('#pix-body tr.pix-gh');
+            assert.deepEqual((await rows()).map(r => r[0]), ['C None'], 'folding G1 hides its rows');
+            assert.equal(await page.$eval('#pix-body tr.pix-gh', e => e.getAttribute('aria-expanded')), 'false');
+            await page.click('#pix-groups .pix-g:first-child');
+            assert.deepEqual((await rows()).map(r => r[0]), ['A Full (a)', 'B Part', 'C None'], 'the chip unfolds and jumps to that group');
+            await page.evaluate(() => { activeUserGroup = 'G1'; pixRender(); });
+            assert.equal(await page.$$eval('#pix-body tr.pix-gh', e => e.length), 0, 'a single group in view: no header rows');
+            assert.equal(await page.$eval('#pix-groups', e => e.children.length), 0, 'a single group in view: no chip rail');
             await page.evaluate(() => { activeUserGroup = 'All'; pixRender(); });
             // copy
             await page.evaluate(() => pixCopy());
