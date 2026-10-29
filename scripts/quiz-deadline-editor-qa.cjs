@@ -13,7 +13,7 @@ const html = fs.readFileSync('public/admin.html', 'utf8');
 // static pins — the save path and the quota labels
 assert.ok(html.includes("notifyDeadline: formData.notifyDeadline !== false,"), 'saveQuiz writes notifyDeadline');
 assert.ok(html.includes("quizDeadlineGroup: 'deadline group'") && html.includes("quizDeadlineDM: 'deadline 1:1'"), 'quota card labels the new tags');
-assert.ok(/<title>Nika Admin \(V102\.4[89]\d\)<\/title>/.test(html), 'title carries the version');
+assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(html), 'title carries the version');
 
 (async () => {
     const browser = await chromium.launch({ args: ['--allow-file-access-from-files'] });

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.499)</title>
+    <title>Nika Admin (V102.500)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -3684,6 +3684,28 @@
         #upnext-card .un-tile.un-do-new { border-left: 4px solid #6366f1; background: linear-gradient(180deg, #eef2ff, #fff); }
         #upnext-card .un-tile.un-live { opacity: .72; background: #f8fafc; }
         #upnext-card .un-cap.un-none { color: #4f46e5; }
+        /* V102.500: 🎯 Live quizzes — Eisenhower grid, urgent (closes soon) × important (few submitted) (quiz-matrix.js) */
+        #qmx-card[hidden] { display: none; }
+        #qmx-card { margin: 10px 0 14px; padding: 10px 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; }
+        #qmx-card .qmx-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 8px; }
+        #qmx-card .qmx-title { font-weight: 800; font-size: 0.9em; color: #0f172a; margin-right: auto; }
+        #qmx-card .qmx-rail { display: inline-flex; align-items: center; gap: 4px; font-size: 0.78em; font-weight: 800; color: #64748b; }
+        #qmx-card .qmx-chip { width: auto; min-height: 0; margin: 0; padding: 3px 10px; border: 1px solid #e2e8f0; border-radius: 999px; background: #fff; color: #475569; font-size: 1em; font-weight: 800; cursor: pointer; font-family: inherit; }
+        #qmx-card .qmx-chip[aria-pressed="true"] { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+        #qmx-card .qmx-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        #qmx-card .qmx-q { min-width: 0; padding: 8px; border-radius: 12px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 5px; }
+        #qmx-card .qmx-do { background: #fef2f2; border-color: #fecaca; }
+        #qmx-card .qmx-plan { background: #fffbeb; border-color: #fde68a; }
+        #qmx-card .qmx-watch { background: #eff6ff; border-color: #bfdbfe; }
+        #qmx-card .qmx-fine { background: #f0fdf4; border-color: #bbf7d0; }
+        #qmx-card .qmx-qh { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 5px; font-size: 0.8em; font-weight: 800; color: #0f172a; }
+        #qmx-card .qmx-qh span { white-space: nowrap; }
+        #qmx-card .qmx-qh small { order: 3; flex-basis: 100%; color: #64748b; font-weight: 700; font-size: 0.9em; }
+        #qmx-card .qmx-qh b { margin-left: auto; color: #475569; }
+        #qmx-card .qmx-item { width: auto; min-height: 0; margin: 0; padding: 5px 8px; border: 1px solid rgba(15, 23, 42, 0.08); border-radius: 9px; background: #fff; text-align: left; cursor: pointer; font-family: inherit; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+        #qmx-card .qmx-name { font-size: 0.8em; font-weight: 800; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #qmx-card .qmx-meta { font-size: 0.7em; font-weight: 700; color: #64748b; }
+        #qmx-card .qmx-empty { color: #94a3b8; }
         /* V102.499: related quizzes under a topic nobody has a quiz for */
         #upnext-card .un-rels { display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-width: 0; }
         #upnext-card .un-relh { color: #4f46e5; margin-top: -2px; }
@@ -8191,6 +8213,7 @@
 <script src="dxa-ai-trail.js?v=V102.389"></script>
 <script src="case-review-ai.js?v=V102.423"></script>
 <script src="up-next.js?v=V102.499"></script>
+<script src="quiz-matrix.js?v=V102.500"></script>
 <script src="rank-quiz.js?v=V102.484"></script>
     <script src="peds-dosing.js?v=V102.80"></script>
     <script src="bronchodilator-seed.js?v=V102.220"></script>
@@ -8481,6 +8504,8 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
 
             <!-- V102.388: 🚀 Up next (up-next.js) — five quizzes that could go live next: what interns asked for (💬) + inactive ones nobody has run (🌱) -->
             <div id="upnext-card" class="lang-no-toggle" hidden></div>
+            <!-- V102.500: 🎯 Live quizzes (quiz-matrix.js) — every live quiz on an Eisenhower grid: closes soon × few of its interns submitted -->
+            <div id="qmx-card" class="lang-no-toggle" hidden></div>
 
             <!-- General Works Section (Hidden, Integrated into Kanban) -->
             <div id="general-work-review-section" class="review-card" style="display:none;">
@@ -35680,6 +35705,7 @@ ${JSON.stringify(sourceObj)}`;
             const inactiveCount = sortedInactive.length;
             { const _lh = document.getElementById('section-active-quizzes'); if (_lh) _lh.textContent = '🟢 Live · ' + activeCount; const _ic = document.getElementById('inactive-count'); if (_ic) _ic.textContent = inactiveCount; }   // V102.231: counts instead of the big section box
             if (window.renderQuizSystemFilterBar) window.renderQuizSystemFilterBar(activeCount + inactiveCount);
+            if (window.quizMatrix) window.quizMatrix.refresh();   // V102.500: Dashboard 🎯 Live quizzes follows quizzes + attempts
             
             {   // V102.208: counts over every real quiz (config docs and history revisions excluded); they no longer move with the search or the other filters
                 const real = quizzesData.filter(q => q && !q.isHistoryRevision && !String(q.id).startsWith('--'));
