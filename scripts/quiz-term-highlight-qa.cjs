@@ -85,6 +85,20 @@ const QUIZ = {
         // cheap: 60 renders well under a second each
         const ms = await page.evaluate(() => { const t = performance.now(); for (let i = 0; i < 60; i++) { currentStep = i % 2; renderQuizStep(false); clearInterval(quizTimerInterval); } return (performance.now() - t) / 60; });
         assert.ok(ms < 60, 'render + highlight per question: ' + ms.toFixed(1) + ' ms');
+        // V101.250: Thai disease names, and negative findings underlined in the stem only
+        const neg = await page.evaluate(() => {
+            currentQuiz.questions[1].q = 'หญิงอายุ 32 ปี มีความดันโลหิตสูง ไม่สูบบุหรี่และไม่มีโรคประจำตัว เสี่ยง VTE ข้อใดเหมาะสม';
+            currentQuiz.questions[1].options = ['ไม่มีโรคประจำตัว', 'ไม่ต้องตรวจ'];
+            renderQuizStep(false);
+            const root = document.getElementById('quiz-run-container') || document.querySelector('#quizModal');
+            const txt = s => [...root.querySelectorAll(s)].map(e => e.textContent);
+            const stem = root.querySelector('.md-render');
+            return { dx: txt('.qzh-dx'), ng: txt('.qzh-ng'), inStem: [...root.querySelectorAll('.qzh-ng')].every(e => stem.contains(e)), line: getComputedStyle(root.querySelector('.qzh-ng')).textDecorationLine };
+        });
+        assert.deepEqual(neg.dx.slice(0, 2), ['ความดันโลหิตสูง', 'VTE'], 'Thai names + VTE: ' + JSON.stringify(neg));
+        assert.deepEqual(neg.ng, ['ไม่สูบบุหรี่', 'ไม่มีโรคประจำตัว'], 'each negative finding on its own: ' + JSON.stringify(neg));
+        assert.equal(neg.inStem, true, 'never on an option');
+        assert.equal(neg.line, 'underline');
         console.log('PASS: quiz term highlighting — drugs / classes / conditions / doses / labs, question block, exam-reference card (smaller, shadow), same on every option, progress + capsule untouched, answers still record, markup otherwise unchanged, Codex names join, ' + ms.toFixed(1) + ' ms per render');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
