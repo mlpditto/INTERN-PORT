@@ -67,7 +67,7 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
         assert.equal(await ov.locator('.pra-card .pra-ed').evaluateAll(es => es.every(e => getComputedStyle(e).display === 'none')), true, 'no box is open');
         assert.equal(await ov.locator('.pra-terms').evaluate(t => t.classList.contains('lang-no-toggle')), true, 'the 🔁 chips carry user terms — never hidden by the EN/TH toggle');
         // V102.517: some questions still empty → a strip above the cards with ✨ All
-        assert.equal((await ov.locator('.pra-strip').innerText()).replace(/\s+/g, ' ').trim(), '⚪ 1 of 4 empty ✨ All', 'the strip counts the empty ones');
+        assert.match((await ov.locator('.pra-strip').innerText()).replace(/\s+/g, ' ').trim(), /^⚪ 1 of 4 empty ✨ All/, 'the strip counts the empty ones');
         assert.equal(await ov.locator('.pra-none').count(), 0, 'no empty state while some have a Read first');
         assert.equal(await ov.locator('.pra-chip[data-f="dup"]').isDisabled(), false, 'Repeated only is live when something repeats');
         assert.ok(!cards[0].marks.some(m => /ศัพท์สำคัญ|ความรู้พื้นฐาน/.test(m)), 'bold headings are not terms');
@@ -121,6 +121,15 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
         // V102.517: no Read first anywhere → one message + ✨ All (which runs the first row's ✨ All) instead of empty cards
         await page.evaluate(() => { document.querySelectorAll('.quiz-q-item .q-primer').forEach(t => { t.value = ''; }); window.__all = null; window._qPrimerDraftAll = b => { window.__all = b.className; }; _qPrimerReviewAll(); });
         assert.equal(await page.locator('#praOverlay .pra-card').count(), 0, 'no cards');
+        // V102.539: ✨ All's model can be picked in the popup, and that is the pick on every question's row
+        {
+            const rail = page.locator('#praOverlay .pra-none .pra-model');
+            assert.equal(await rail.count(), 1, 'the model rail is in the empty state');
+            assert.ok(await page.locator('#praOverlay .pra-model .text-ai-chips button').count() > 0, 'with model chips');
+            const next = await page.evaluate(() => { const cur = document.querySelector('.q-primer-model').value; const b = [...document.querySelectorAll('#praOverlay .pra-model .text-ai-chips button')].find(x => x.dataset.value !== cur); window._praPickModel(b.dataset.value); return b.dataset.value; });
+            const after = await page.evaluate(() => ({ rows: [...new Set([...document.querySelectorAll('#quizManageModal .q-primer-model')].map(i => i.value))], stored: localStorage.getItem('ai_primer_model'), rail: document.getElementById('pra-model-pick').value }));
+            assert.deepEqual(after, { rows: [next], stored: next, rail: next }, 'one pick everywhere: ' + JSON.stringify(after));
+        }
         assert.match((await page.locator('#praOverlay .pra-sum').innerText()).replace(/\s+/g, ' '), /4 Q · ⚪ none yet$/, 'the header says so instead of zeros');
         assert.equal(await page.locator('#praOverlay .pra-chip[data-f="dup"]').isDisabled(), true, 'Repeated only is disabled');
         assert.equal((await page.locator('#praOverlay .pra-none-t').innerText()).trim(), '📖 No Read first yet');

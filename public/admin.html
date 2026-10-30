@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.538)</title>
+    <title>Nika Admin (V102.539)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -5675,6 +5675,12 @@
         .pra-none { margin:4px 0; padding:18px 16px; text-align:center; border:1.5px dashed #fde68a; border-radius:14px; background:#fffbeb; }
         .pra-none-t { font-weight:800; color:#92400e; font-size:1em; } .pra-none-s { color:#64748b; font-size:0.82em; margin:4px 0 10px; }
         .pra-none-a { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+        .pra-model { display:flex; justify-content:center; margin-bottom:10px; min-width:0; }   /* V102.539: the model ✨ All uses, in the popup */
+        .pra-strip .pra-model { flex:1 1 100%; justify-content:flex-start; margin:6px 0 0; }
+        .pra-model .audit-model-row { margin-top:0; padding-top:0; border-top:0; gap:5px; }
+        .pra-model .audit-provider { width:30px; height:28px; min-height:0; padding:0; border-radius:7px; background:transparent; border:1px solid transparent; cursor:pointer; }
+        .pra-model .audit-provider[aria-pressed="true"] { background:#fef3c7; border-color:#fcd34d; }
+        .pra-model .audit-provider .text-ai-logo { width:16px; height:16px; margin:0; vertical-align:middle; }
         .pra-strip { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:5px 10px; border:1px dashed #fde68a; border-radius:10px; background:#fffbeb; color:#92400e; font-size:0.82em; font-weight:700; }
         .pra-strip .pra-all { margin-left:auto; padding:4px 10px; font-size:0.8em; } .pra-strip[hidden], .pra-terms[hidden] { display:none; }
         /* V101.49: light rail — black OpenAI Blossom; OpenRouter chips keep the Grape border. */
@@ -26041,10 +26047,11 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const H = window._praHead(qs, A, parts), title = String((document.getElementById('quiz-title') || {}).value || '').trim();
             // V102.517: no Read first anywhere → one message + ✨ All instead of n empty cards; some missing → a strip above the cards
             const emptyN = qs.filter(x => !x.primer.trim()).length, allEmpty = emptyN === qs.length;
+            const modelRail = '<div class="pra-model q-primer-row">' + window._praModelRail() + '</div>';   // V102.539: ✨ All's model was only on each question's row
             const allBtn = '<button type="button" class="pra-all" onclick="_praDraftAll(this)" title="✨ All — AI drafts a Read first for every question that has none yet, one by one, right here (press again to stop). The correct answers are NOT sent.&#10;AI ร่างให้ทุกข้อที่ยังว่าง ทีละข้อ ตรงนี้เลย (กดซ้ำเพื่อหยุด) ไม่ส่งเฉลยให้ AI" data-th-title="AI ร่างให้ทุกข้อที่ยังว่าง ทีละข้อ ตรงนี้เลย (กดซ้ำเพื่อหยุด) ไม่ส่งเฉลยให้ AI&#10;✨ All — AI drafts a Read first for every question that has none yet, one by one, right here (press again to stop). The correct answers are NOT sent." data-kr-title="비어 있는 모든 문항에 Read first 초안 작성 — 여기서 바로 실행">✨ All</button>';
             const body = allEmpty
-                ? '<div class="pra-none"><div class="pra-none-t">📖 No Read first yet</div><div class="pra-none-s">✨ All drafts every question · or write them yourself</div><div class="pra-none-a">' + allBtn.replace('>✨ All<', '>✨ All · ' + qs.length + '<') + '<button type="button" class="pra-chip" onclick="_praClose()">✎ Write by hand</button></div></div>'
-                : (emptyN ? '<div class="pra-strip">⚪ ' + emptyN + ' of ' + qs.length + ' empty' + allBtn + '</div>' : '') + cards;
+                ? '<div class="pra-none"><div class="pra-none-t">📖 No Read first yet</div><div class="pra-none-s">✨ All drafts every question · or write them yourself</div>' + modelRail + '<div class="pra-none-a">' + allBtn.replace('>✨ All<', '>✨ All · ' + qs.length + '<') + '<button type="button" class="pra-chip" onclick="_praClose()">✎ Write by hand</button></div></div>'
+                : (emptyN ? '<div class="pra-strip">⚪ ' + emptyN + ' of ' + qs.length + ' empty' + allBtn + modelRail + '</div>' : '') + cards;
             const old = document.getElementById('praOverlay'); if (old) old.remove();
             const ov = document.createElement('div'); ov.id = 'praOverlay';
             ov.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:100000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);';
@@ -26149,6 +26156,17 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const items = document.querySelectorAll('#quiz-questions-container .quiz-q-item'); if (!items[i]) return;
             quizQPageIndex = i; if (typeof updateQuizPagination === 'function') updateQuizPagination();
             const ta = items[i].querySelector('.q-primer'); if (ta) { ta.scrollIntoView({ block: 'center' }); ta.focus(); }
+        };
+        window._praModelRail = function() {
+            const cur = (document.querySelector('#quizManageModal .q-primer-model') || {}).value || window._qImproveModel(document.querySelector('#quizManageModal .quiz-q-item'));
+            return window.providerModelRailHtml('pra-model-pick', cur, 'window._praPickModel(this.dataset.value)');
+        };
+        // V102.539: a pick in the popup is the same pick as the rail on each question's row
+        window._praPickModel = function(id) {
+            document.querySelectorAll('#quizManageModal .q-primer-model').forEach(i => { i.value = id; i.dispatchEvent(new Event('change', { bubbles: true })); });
+            try { localStorage.setItem('ai_primer_model', id); } catch (_) { /* storage blocked */ }
+            const box = document.querySelector('#praOverlay .pra-model');
+            if (box) box.innerHTML = window._praModelRail();
         };
         window._qPrimerModelSeq = window._qPrimerModelSeq || 0;
         window._qPrimerModelSelect = function() {
