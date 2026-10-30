@@ -162,9 +162,9 @@ const openMap = (page) => page.evaluate(() => [...document.querySelectorAll('#re
       const labels = await hdr.locator('button').evaluateAll(bs => bs.map(b => (b.getAttribute('aria-label') || b.innerText).trim()));
       assert.equal(labels.filter(l => /Full marks 100%/.test(l)).length, 1, 'Full marks stays its own button');
       assert.equal(labels.filter(l => /Actual \d\.\d\d pts/.test(l)).length, 1, 'Actual stays its own button');
-      assert.match(await hdr.locator('button', { hasText: 'Full marks' }).getAttribute('onclick'), /approveQuizAttempt\('q1_u1'\)/);
-      assert.match(await hdr.locator('button', { hasText: 'Actual' }).getAttribute('onclick'), /approveQuizAttemptActual\('q1_u1'\)/);
-      const actual = (await hdr.locator('button', { hasText: 'Actual' }).innerText()).match(/(\d\.\d\d) pts/)[1];
+      assert.match(await hdr.locator('button[aria-label^="🍎"]').getAttribute('onclick'), /approveQuizAttempt\('q1_u1'\)/);
+      assert.match(await hdr.locator('button[aria-label^="🍇"]').getAttribute('onclick'), /approveQuizAttemptActual\('q1_u1'\)/);
+      const actual = (await hdr.locator('button[aria-label^="🍇"]').getAttribute('aria-label')).match(/(\d\.\d\d) pts/)[1];   // V102.527: the visible text is '🍇 X.XX', the words live in aria-label
       const strip = page.locator('#reviewQuizOverlay .rv-sig').first().locator('xpath=..');
       const stripTxt = (await strip.innerText()).replace(/\s+/g, ' ');
       assert(stripTxt.includes(actual + ' / 1.00 pts'), 'the points chip equals the Actual button (' + actual + '): ' + stripTxt);
