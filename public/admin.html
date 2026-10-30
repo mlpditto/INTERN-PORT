@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.537)</title>
+    <title>Nika Admin (V102.538)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -7701,6 +7701,9 @@
             visibility: visible;
             animation: fadein 0.5s;
         }
+        /* V102.538: showTimedToast — a thin line that runs out, then the toast closes itself */
+        #toast .toast-bar { position: absolute; left: 18px; right: 18px; bottom: 3px; height: 2px; border-radius: 2px; background: #fbbf24; transform-origin: left; animation: toast-countdown linear forwards; }
+        @keyframes toast-countdown { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
         .toast-close {
             flex: 0 0 auto;
@@ -35333,7 +35336,7 @@ ${qs}`;
                 if (!snap.empty && typeof showQuizFeedbackPanel === 'function') {
                     showQuizFeedbackPanel(quizId, userId);
                 } else {
-                    showToast('⭐ No feedback from this user for this quiz yet');
+                    showTimedToast('⭐ No feedback from this user for this quiz yet', 10);
                 }
             } catch (e) {
                 console.warn('openFeedbackAfterApprove failed:', e);
@@ -63354,6 +63357,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             x.appendChild(msg);
             x.appendChild(close);
             x.classList.add("show");
+        }
+        // V102.538: a toast that closes itself after `sec` seconds, with a line counting down. A newer toast replaces the line, so this timer then leaves it open.
+        function showTimedToast(m, sec) {
+            showToast(m);
+            const x = document.getElementById("toast");
+            if (!x) return;
+            const bar = document.createElement("i");
+            bar.className = "toast-bar";
+            bar.style.animationDuration = sec + "s";
+            x.appendChild(bar);
+            setTimeout(() => { if (bar.isConnected) x.classList.remove("show"); }, sec * 1000);
         }
         const CAFE_BERI_PER_APPROVED = 1;   // V102.201: Beri for one CAFE post that earned an Ⓐ
         async function svSc(id, uid) {
