@@ -151,10 +151,19 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
       const pickedModel = shown2[0][1];
       assert.equal(await page.evaluate(() => localStorage.getItem('ai_review_writeup_model')), pickedModel, 'the pick is remembered');
       assert.equal(await rail.locator(':scope > button.active').getAttribute('data-value'), pickedModel, 'the picked chip is active');
-      // the language chip → the prompt
-      assert.equal(await page.locator('#rv-writeup-lang .rv-lang[aria-pressed="true"]').getAttribute('data-lang'), 'th', 'Thai by default');
-      await page.locator('#rv-writeup-lang .rv-lang[data-lang="en"]').click();
+      // V102.525: ONE flag chip that cycles 🇹🇭 → 🇺🇸 → 🇰🇷 → 🇹🇭 (the three-flag group is gone), on the header row with ✨ and Send at the right corner
+      const lang = page.locator('#rv-writeup-lang');
+      assert.equal(await lang.count(), 1, 'one language chip'); assert.equal(await page.locator('#rv-writeup .rv-lang').count(), 1, 'no other flags');
+      assert.equal(await lang.getAttribute('data-lang'), 'th', 'Thai by default'); assert.match(await lang.getAttribute('title'), /^Language: Thai/); assert.match(await lang.getAttribute('data-th-title'), /ภาษา: ไทย/); assert.match(await lang.getAttribute('data-kr-title'), /언어: 태국어/);
+      { const row = await page.evaluate(() => { const r = id => document.getElementById(id).getBoundingClientRect(), t = document.querySelector('#rv-writeup span').getBoundingClientRect(), p = document.getElementById('rv-writeup').getBoundingClientRect();
+          return { title: Math.round(t.top), lang: Math.round(r('rv-writeup-lang').top), draft: Math.round(r('rv-writeup-draft').top), send: Math.round(r('rv-writeup-send').top), sendRight: Math.round(p.right - r('rv-writeup-send').right), box: Math.round(r('rv-writeup-text').top), sendBottom: Math.round(r('rv-writeup-send').bottom), rows: document.querySelectorAll('#rv-writeup > div').length }; });
+        assert(Math.abs(row.lang - row.title) <= 12 && Math.abs(row.draft - row.title) <= 12 && Math.abs(row.send - row.title) <= 12, 'flag, ✨ and Send share the title row: ' + JSON.stringify(row));
+        assert(row.sendRight >= 8 && row.sendRight <= 24, 'Send sits in the right corner (panel padding only): ' + row.sendRight);
+        assert(row.box >= row.sendBottom, 'the box is below that row and nothing is below the box: ' + JSON.stringify(row)); assert.equal(row.rows, 1, 'the bottom button row is gone'); }
+      await lang.click(); assert.equal(await lang.getAttribute('data-lang'), 'en', 'one tap → English'); assert.equal(await lang.innerText(), '🇺🇸'); assert.equal(await page.evaluate(() => document.activeElement && document.activeElement.id), 'rv-writeup-lang', 'focus stays on the chip');
       assert.equal(await page.evaluate(() => localStorage.getItem('ai_review_writeup_lang')), 'en', 'the pick is remembered');
+      await lang.click(); assert.equal(await lang.getAttribute('data-lang'), 'ko', 'next tap → Korean'); await lang.click(); assert.equal(await lang.getAttribute('data-lang'), 'th', 'and back to Thai');
+      await lang.click(); assert.equal(await lang.getAttribute('data-lang'), 'en');
       // ✨ with text in the box asks first; the dismissed confirm = no call
       await page.locator('#rv-writeup-draft').click(); await page.waitForTimeout(150);
       assert.equal(await page.evaluate(() => window.__prompts.length), 1, 'dismissed confirm → no second AI call');
@@ -223,6 +232,6 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
       assert.deepEqual(errs.filter(e => !noise(e)), [], 'no page errors: ' + errs);
       await ctx.close();
     }
-    console.log('PASS: review 📰 personal write-up — next to PDF, EN + TH + KO tooltips, panel under the header (no AI until ✨), one academic bullet-style prompt from the wrong answers (no name), draft in the box, Send = quiz_attempts.adminComment only, ✨ asks first, language chip, prefill without auto-draft, all-correct dimmed, 390 px fits; intern side escapes + pre-wrap; Articles.fromMistakes gone');
+    console.log('PASS: review 📰 personal write-up — V102.525 one flag chip that cycles + ✨ / Send on the title row (right corner); next to PDF, EN + TH + KO tooltips, panel under the header (no AI until ✨), one academic bullet-style prompt from the wrong answers (no name), draft in the box, Send = quiz_attempts.adminComment only, ✨ asks first, language chip, prefill without auto-draft, all-correct dimmed, 390 px fits; intern side escapes + pre-wrap; Articles.fromMistakes gone');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
