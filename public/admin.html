@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.526)</title>
+    <title>Nika Admin (V102.527)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -5572,6 +5572,18 @@
         #rv-writeup .rv-lang { width:34px; height:34px; min-height:0; padding:0; margin:0; border-radius:8px; border:1px solid #e2e8f0; background:#fff; font-size:15px; line-height:1; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
         #rv-writeup .rv-lang { border-color:#f59e0b; background:#fef3c7; }   /* V102.525: one chip, always the chosen language */
         #rv-writeup .rv-lang img.emoji { width:18px; height:18px; }
+        /* V102.527: Review header — status pills on the name line (D: the fruit is the status), the approve pair, phone width may wrap */
+        #reviewQuizOverlay .rv-st { display:inline-flex; align-items:center; gap:4px; padding:0 7px; border-radius:999px; font-size:10.5px; font-weight:800; white-space:nowrap; line-height:18px; }
+        #reviewQuizOverlay .rv-st-ok { background:#16a34a; color:#fff; }
+        #reviewQuizOverlay .rv-st-full { background:#dc2626; color:#fff; }
+        #reviewQuizOverlay .rv-st-ex { background:#ede9fe; color:#5b21b6; border:1px solid #c4b5fd; }
+        #reviewQuizOverlay .rv-st-pr { background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
+        #reviewQuizOverlay .rv-pair { display:inline-flex; border:1.5px solid #cbd5e1; border-radius:10px; overflow:hidden; }
+        #reviewQuizOverlay .rv-pair button { width:auto; min-height:0; margin:0; padding:0 10px; height:32px; border:0; border-radius:0; background:#fff; font-weight:800; font-size:0.8em; white-space:nowrap; cursor:pointer; font-family:inherit; }
+        #reviewQuizOverlay .rv-pair button:hover { background:#f8fafc; }
+        #reviewQuizOverlay .rv-pair .rv-full { color:#166534; border-right:1.5px solid #cbd5e1; }
+        #reviewQuizOverlay .rv-pair .rv-act { color:#1d4ed8; }
+        @media (max-width:700px) { #reviewQuizOverlay .rv-hd { flex-wrap:wrap !important; } }
         /* V102.509: the Read first model picker is the page's vendor-first rail (was a <select>, #1784) — light, amber like its row */
         .q-primer-row .text-ai-chips { flex:1 1 auto; padding:0 !important; gap:3px !important; background:transparent; border:0; text-transform:none; letter-spacing:0; }
         .q-primer-row .text-ai-chips > button.glass-toggle-item { min-height:24px; padding:2px 7px; font-size:10.5px; font-weight:800; border-radius:8px; background:#fff; border-color:#fde68a; color:#78350f; }
@@ -32323,20 +32335,22 @@ ${qs}`;
                 // disable the approve buttons so admins can't accidentally double-credit. Read-only
                 // actions (timing config, PDF export, close) remain enabled.
                 const isAlreadyApproved = att.status === 'approved';
-                const approveBtnStyle = isAlreadyApproved
-                    ? 'background:#cbd5e1;color:#64748b;border:none;padding:8px 20px;border-radius:8px;cursor:not-allowed;font-weight:bold;font-size:0.9em;'
-                    : null;
+                // V102.527 (owner, mockups/review-approved-marks.html → D "score chip is the status"): the status is a small pill on the NAME line —
+                // an approved attempt shows the fruit it was approved with (🍎 100% when the stored score is full, else 🍇 X pts), Exam / Practice are
+                // pills of their own colour. The big "Already Approved" badge and the two grey disabled approve slabs are gone (the pair below only
+                // renders while the attempt can still be approved).
+                const rvPill = (cls, text, title) => `<span class="rv-st ${cls}" title="${escapeHtml(title)}">${text}</span>`;
                 const approvedBadgeHtml = isAlreadyApproved
-                    ? `<span style="display:inline-flex;align-items:center;gap:6px;background:#dcfce7;color:#166534;border:1px solid #86efac;padding:6px 12px;border-radius:999px;font-size:0.78em;font-weight:800;"><i class="fa-solid fa-circle-check"></i> Already Approved</span>`
+                    ? (Number(att.score) >= 0.9999
+                        ? rvPill('rv-st-full', '🍎 100%', 'Approved · Full marks 100% — Manten Manten no Mi')
+                        : rvPill('rv-st-ok', '🍇 ' + (Number(att.score) * Number(quiz.totalPoints || 1)).toFixed(2) + ' pts', 'Approved · Actual score — Shōjiki Shōjiki no Mi'))   // what was awarded: the stored ratio × the quiz points (not the live recount)
                     : '';
                 // A ONE-TIME practice run can be approved straight from here (it skips Request → Allow → real exam): say so.
                 const practiceBadgeHtml = att.status === 'practice_done'
-                    ? `<span title="This is a ONE-TIME practice run — approving it counts it as the real exam" style="display:inline-flex;align-items:center;gap:6px;background:#fffbeb;color:#b45309;border:1px solid #fcd34d;padding:4px 10px;border-radius:999px;font-size:0.75em;font-weight:800;">PRACTICE attempt — approving counts it as the real exam</span>`
+                    ? rvPill('rv-st-pr', '🎓 Practice', 'ONE-TIME practice run — approving it counts it as the real exam')
                     : '';
                 // V92.62 Phase 4.c: badge for exam-session attempts.
-                const examBadgeHtml = att.isExamSession
-                    ? `<span style="display:inline-flex;align-items:center;gap:6px;background:#e0e7ff;color:#3730a3;border:1px solid #a5b4fc;padding:6px 12px;border-radius:999px;font-size:0.78em;font-weight:800;">🎓 Group Exam Session</span>`
-                    : '';
+                const examBadgeHtml = att.isExamSession ? rvPill('rv-st-ex', '🎓 Exam', 'Group Exam Session') : '';
                 // V95.33: surface the quiz's downloadable materials right in the review
                 // header so the admin can pull up the source material while grading.
                 // V96.24: count ALL download links — the dedicated materials field PLUS
@@ -32373,22 +32387,22 @@ ${qs}`;
                 overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
                 overlay.innerHTML = `
                     <div style="background:white;width:95vw;height:95vh;border-radius:15px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
-                        <div style="padding:10px 16px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:#f8f9fa;">
-                            <div style="display:flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap;">
-                                <span style="color:#4361ee;font-weight:800;font-size:0.95em;white-space:nowrap;" title="Review Quiz Attempt"><i class="fa-solid fa-magnifying-glass"></i> Review</span>
+                        <div class="rv-hd" style="padding:10px 16px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:nowrap;background:#f8f9fa;">
+                            <!-- V102.527: ONE line — the left block shrinks (min-width:0, the quiz title ellipsises), the right group never wraps, ✕ stays in the corner; the title is the 🔍 alone -->
+                            <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1 1 auto;flex-wrap:nowrap;">
+                                <span style="color:#4361ee;font-weight:800;font-size:0.95em;white-space:nowrap;" title="Review Quiz Attempt" aria-label="Review"><i class="fa-solid fa-magnifying-glass"></i></span>
                                 <!-- V94.08: surface whose attempt + which quiz so the admin knows what they're grading -->
                                 <!-- V95.36: lang-no-toggle — Thai quiz title / displayName are content,
                                      not UI labels; without it lang-toggle.js blanks them in EN mode -->
-                                <div class="lang-no-toggle" style="display:flex;align-items:center;gap:8px;min-width:0;">
+                                <div class="lang-no-toggle" style="display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 auto;">
                                     ${att.pictureUrl ? `<img src="${escapeHtml(att.pictureUrl)}" style="width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none'">` : ''}
                                     <div style="min-width:0;line-height:1.25;">
-                                        <div style="font-weight:800;color:#1e293b;">${escapeHtml(att.displayName || 'Unknown')}</div>
-                                        <div style="font-size:0.8em;color:#64748b;">${escapeHtml(quiz.title || quiz.shortTitle || '-')}</div>
+                                        <div class="rv-name" style="font-weight:800;color:#1e293b;display:flex;align-items:center;gap:6px;white-space:nowrap;">${escapeHtml(att.displayName || 'Unknown')}${approvedBadgeHtml}${examBadgeHtml}${practiceBadgeHtml}</div>
+                                        <div class="rv-quiz" style="font-size:0.8em;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(quiz.title || quiz.shortTitle || '-')}">${escapeHtml(quiz.title || quiz.shortTitle || '-')}</div>
                                     </div>
                                 </div>
-                                ${approvedBadgeHtml} ${examBadgeHtml} ${practiceBadgeHtml}
                             </div>
-                            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                            <div style="display:flex; gap:6px; align-items:center; flex:0 0 auto; flex-wrap:nowrap;">
                                 ${materialsBtnHtml}
                                 <!-- V95.42 option C: peek at this learner's feedback mid-review. The panel's
                                      static z-index (2501) sits under this overlay (99999), so bump it on open. -->
@@ -32398,8 +32412,7 @@ ${qs}`;
                                 ${rvWrongItems.length
                                     ? `<button type="button" id="rv-writeup-btn" onclick="rvWriteupToggle()" class="rv-ib" style="${rvIconBtn}" aria-expanded="false" aria-controls="rv-writeup" title="Personal review for ${escapeHtml(rvFirstName || 'this intern')} — AI drafts from the ${rvWrongItems.length} wrong answer${rvWrongItems.length > 1 ? 's' : ''}, you edit, Send puts it on their quiz result and History" data-th-title="รีวิวส่วนตัวสำหรับ ${escapeHtml(rvFirstName || 'intern คนนี้')} — AI ร่างจากข้อที่ผิด ${rvWrongItems.length} ข้อ แก้ได้ก่อนส่ง ขึ้นในผลควิซและ History ของเขา" data-kr-title="${escapeHtml(rvFirstName || '이 인턴')}을 위한 개인 리뷰 — 틀린 ${rvWrongItems.length}문항으로 AI가 초안을 쓰고, 수정 후 보내면 퀴즈 결과와 History에 표시됩니다" aria-label="Personal review from wrong answers"><i class="fa-solid fa-newspaper"></i></button>`
                                     : `<button type="button" id="rv-writeup-btn" aria-disabled="true" class="rv-ib" style="${rvIconBtn}opacity:.4;cursor:not-allowed;" title="No wrong answers in this attempt — nothing to review" data-th-title="ไม่มีข้อที่ตอบผิดในรอบนี้ — ไม่มีอะไรต้องรีวิว" data-kr-title="이번 시도에는 틀린 문항이 없습니다 — 리뷰할 내용이 없습니다" aria-label="Personal review from wrong answers (none wrong)"><i class="fa-solid fa-newspaper"></i></button>`}
-                                <button ${isAlreadyApproved ? 'disabled' : `onclick="approveQuizAttempt('${attemptId}')"`} style="${approveBtnStyle || 'width:auto;min-height:0;margin:0;background:#fff;color:#166534;border:1.5px solid #16a34a;padding:7px 12px;border-radius:10px;cursor:pointer;font-weight:800;font-size:0.82em;white-space:nowrap;'}" title="${isAlreadyApproved ? 'Already approved — cannot re-approve' : '🍎 Manten Manten no Mi — approve at 100%'}">🍎 Full marks 100%</button>
-                                <button ${isAlreadyApproved ? 'disabled' : `onclick="approveQuizAttemptActual('${attemptId}')"`} style="${approveBtnStyle || 'width:auto;min-height:0;margin:0;background:#fff;color:#1d4ed8;border:1.5px solid #2563eb;padding:7px 12px;border-radius:10px;cursor:pointer;font-weight:800;font-size:0.82em;white-space:nowrap;'}" title="${isAlreadyApproved ? 'Already approved — cannot re-approve' : '🍇 Shōjiki Shōjiki no Mi — approve at the actual score'}">🍇 Actual ${actualApproveLabel}</button>
+                                ${isAlreadyApproved ? '' : `<span class="rv-pair" role="group" aria-label="Approve"><button type="button" class="rv-full" onclick="approveQuizAttempt('${attemptId}')" aria-label="🍎 Full marks 100%" title="🍎 Full marks 100% — Manten Manten no Mi — approve at 100%" data-th-title="🍎 เต็ม 100% — อนุมัติให้คะแนนเต็ม" data-kr-title="🍎 만점 100% — 만점으로 승인">🍎 100%</button><button type="button" class="rv-act" onclick="approveQuizAttemptActual('${attemptId}')" aria-label="🍇 Actual ${actualApproveLabel}" title="🍇 Actual ${actualApproveLabel} — Shōjiki Shōjiki no Mi — approve at the actual score" data-th-title="🍇 ตามจริง ${actualApproveLabel} — อนุมัติตามคะแนนที่ทำได้" data-kr-title="🍇 실제 ${actualApproveLabel} — 실제 점수로 승인">🍇 ${actualApprovePoints.toFixed(2)}</button></span>`}
                                 <button onclick="closeReviewOverlay()" class="rv-ib" style="${rvIconBtn}" title="Close" aria-label="Close">✕</button>
                             </div>
                         </div>

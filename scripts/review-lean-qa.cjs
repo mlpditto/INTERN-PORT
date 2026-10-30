@@ -53,13 +53,15 @@ async function open(browser, { quiz, attempt, cheat }) {
       // Manten / Shōjiki live in the tooltip only
       const headText = await hdr.innerText();
       assert(!/Manten|Shōjiki/.test(headText), 'fruit names are not on the buttons');
-      assert.match(await hdr.locator('button', { hasText: 'Full marks' }).getAttribute('title'), /Manten Manten no Mi/);
-      assert.match(await hdr.locator('button', { hasText: 'Actual' }).getAttribute('title'), /Shōjiki Shōjiki no Mi/);
-      assert.match(await hdr.locator('button', { hasText: 'Full marks' }).getAttribute('onclick'), /approveQuizAttempt\('q1_u1'\)/);
-      assert.match(await hdr.locator('button', { hasText: 'Actual' }).getAttribute('onclick'), /approveQuizAttemptActual\('q1_u1'\)/);
+      assert.match(await hdr.locator('button[aria-label^="🍎"]').getAttribute('title'), /Manten Manten no Mi/);
+      assert.match(await hdr.locator('button[aria-label^="🍇"]').getAttribute('title'), /Shōjiki Shōjiki no Mi/);
+      assert.match(await hdr.locator('button[aria-label^="🍎"]').getAttribute('onclick'), /approveQuizAttempt\('q1_u1'\)/);
+      assert.match(await hdr.locator('button[aria-label^="🍇"]').getAttribute('onclick'), /approveQuizAttemptActual\('q1_u1'\)/);
       assert.match(await hdr.locator('button[aria-label="Export PDF"]').getAttribute('onclick'), /exportIncorrectToPDF\(\)/);
       assert.match(await hdr.locator('button[aria-label="Close"]').getAttribute('onclick'), /closeReviewOverlay\(\)/);
-      assert.equal(await hdr.locator('text=PRACTICE attempt').count(), 0, 'no practice badge on a normal attempt');
+      assert.equal(await hdr.locator('.rv-st').count(), 0, 'V102.527: no status pill on a normal pending attempt');
+      assert.deepEqual(await hdr.locator('.rv-pair button').evaluateAll(bs => bs.map(b => b.innerText.trim())), ['🍎 100%', '🍇 1.00'], 'V102.527: the approve pair reads short (the words live in aria-label / tooltip)');
+      assert.equal((await hdr.locator('span[aria-label="Review"]').innerText()).trim(), '', 'V102.527: the title is the 🔍 alone');
       // the strip: Cheat None + Timing, details folded
       const chips = page.locator('#reviewQuizOverlay .rv-sig');
       assert.equal(await chips.count(), 2, 'Cheat + Timing chips (the timing card exists whenever the quiz has questions)');
@@ -83,7 +85,7 @@ async function open(browser, { quiz, attempt, cheat }) {
       assert.equal(await page.locator('#reviewQuizOverlay >> text=/^Student:$/').count(), 0, 'no separate Student: rows');
       assert.equal(await page.locator('#reviewQuizOverlay >> text=/^Correct:$/').count(), 0, 'no separate Correct: rows');
       // approve buttons are live
-      assert.equal(await hdr.locator('button', { hasText: 'Full marks' }).isDisabled(), false);
+      assert.equal(await hdr.locator('button[aria-label^="🍎"]').isDisabled(), false);
       await ctx.close();
     }
     // ---- 1b. a wrong answer keeps both rows; the right ones merge
@@ -164,17 +166,39 @@ async function open(browser, { quiz, attempt, cheat }) {
     // ---- 4. a practice attempt is flagged; approved attempts cannot be approved again
     {
       const { page, ctx } = await open(browser, { quiz: baseQuiz(), attempt: baseAttempt({ status: 'practice_done', answers: [null, null, null, null, null, null], practiceAnswers: [1, 1, 1, 1, 0, 0], practiceScore: 4, practiceTotalQ: 6 }) });
-      assert.equal(await page.locator('#reviewQuizOverlay >> text=PRACTICE attempt').count(), 1, 'practice badge');
-      assert.match(await page.locator('#reviewQuizOverlay button', { hasText: 'Actual' }).innerText(), /Actual 0\.67 pts/, 'the actual score reads the practice answers (4/6 of 1.0)');
+      assert.equal((await page.locator('#reviewQuizOverlay .rv-name .rv-st-pr').innerText()).trim(), '🎓 Practice', 'V102.527: practice = a pill on the name line');
+      assert.match(await page.locator('#reviewQuizOverlay .rv-st-pr').getAttribute('title'), /counts it as the real exam/);
+      assert.match(await page.locator('#reviewQuizOverlay button[aria-label^="🍇"]').getAttribute('aria-label'), /Actual 0\.67 pts/, 'the actual score reads the practice answers (4/6 of 1.0)');
+      assert.equal(await page.locator('#reviewQuizOverlay button[aria-label^="🍇"]').innerText(), '🍇 0.67');
       await ctx.close();
     }
     {
-      const { page, ctx } = await open(browser, { quiz: baseQuiz(), attempt: baseAttempt({ status: 'approved' }) });
-      assert.equal(await page.locator('#reviewQuizOverlay button', { hasText: 'Full marks' }).isDisabled(), true);
-      assert.equal(await page.locator('#reviewQuizOverlay button', { hasText: 'Actual' }).isDisabled(), true);
-      assert.match(await page.locator('#reviewQuizOverlay button', { hasText: 'Full marks' }).getAttribute('title'), /Already approved/);
+      // V102.527: approved = no approve buttons at all; the fruit it was approved with is a pill on the name line
+      const { page, ctx } = await open(browser, { quiz: baseQuiz(), attempt: baseAttempt({ status: 'approved', score: 1 }) });
+      assert.equal(await page.locator('#reviewQuizOverlay .rv-pair, #reviewQuizOverlay button[aria-label^="🍎"], #reviewQuizOverlay button[aria-label^="🍇"]').count(), 0, 'no approve buttons once approved');
+      assert.equal((await page.locator('#reviewQuizOverlay .rv-name .rv-st-full').innerText()).trim(), '🍎 100%', 'full score → the 🍎 pill');
+      assert.match(await page.locator('#reviewQuizOverlay .rv-st-full').getAttribute('title'), /Approved · Full marks 100% — Manten Manten no Mi/);
+      assert.equal(await page.locator('#reviewQuizOverlay >> text=Already Approved').count(), 0, 'the old badge is gone');
       await ctx.close();
     }
-    console.log('PASS: review modal — one-row header, Full marks / Actual (names on hover), signal chips with auto-open, conditional AI rail, practice badge');
+    {
+      const { page, ctx } = await open(browser, { quiz: baseQuiz(), attempt: baseAttempt({ status: 'approved', score: 0.5, correctCount: 3 }) });
+      assert.equal((await page.locator('#reviewQuizOverlay .rv-name .rv-st-ok').innerText()).trim(), '🍇 0.50 pts', 'partial score → the 🍇 pill with the points');
+      assert.match(await page.locator('#reviewQuizOverlay .rv-st-ok').getAttribute('title'), /Approved · Actual score — Shōjiki/);
+      await ctx.close();
+    }
+    // ---- 5. V102.527: a long Thai quiz title + Exam keeps the header on ONE line (the title ellipsises, ✕ stays in the corner)
+    {
+      const q = baseQuiz(); q.title = 'วิตามินบี 1-6-12 กับระบบประสาทและการดูแลกลุ่มเสี่ยงต่อภาวะขาดวิตามิน และหลักการให้คำแนะนำในร้านยาสำหรับผู้สูงอายุที่รับประทานยาหลายขนาน';
+      const { page, ctx } = await open(browser, { quiz: q, attempt: baseAttempt({ isExamSession: true }) });
+      const hdr = page.locator('#reviewQuizOverlay > div > div').first();
+      const g = await hdr.evaluate(n => { const r = n.getBoundingClientRect(), t = n.querySelector('.rv-quiz'), x = n.querySelector('button[aria-label="Close"]').getBoundingClientRect(); return { h: Math.round(r.height), clipped: t.scrollWidth > t.clientWidth, ellipsis: getComputedStyle(t).textOverflow, title: t.getAttribute('title').length, xRight: Math.round(r.right - x.right), tops: [...n.querySelectorAll('button')].map(b => Math.round(b.getBoundingClientRect().top)) }; });
+      assert(g.h <= 70, 'one row with a long title: ' + JSON.stringify(g)); assert(g.clipped && g.ellipsis === 'ellipsis' && g.title > 100, 'the quiz title ellipsises, the full title is the tooltip: ' + JSON.stringify(g));
+      assert(g.xRight >= 8 && g.xRight <= 24, '✕ in the corner: ' + g.xRight); assert(Math.max(...g.tops) - Math.min(...g.tops) <= 6, 'buttons share the row: ' + g.tops);
+      assert.equal((await hdr.locator('.rv-name .rv-st-ex').innerText()).trim(), '🎓 Exam', 'exam = a pill on the name line'); assert(!/Group Exam Session/.test(await hdr.innerText()), 'the old exam badge text is gone from the header (tooltip only)');
+      assert.equal(await hdr.locator('.rv-pair button').count(), 2, 'not yet approved → the pair is there');
+      await ctx.close();
+    }
+    console.log('PASS: review modal — one-row header even with a long title (V102.527: 🔍 alone, status pills on the name line, 🍎 100% | 🍇 X pair only until approved, approved = the fruit pill), Full marks / Actual (names on hover), signal chips with auto-open, conditional AI rail, practice badge');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
