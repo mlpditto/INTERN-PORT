@@ -601,7 +601,7 @@
     var VENDOR_LOGO = { Gemini: 'gemini', GPT: 'openai', Claude: 'claude', Qwen: 'qwen', DeepSeek: 'deepseek', Grok: 'grok', Ollama: 'ollama', Muse: 'meta', Kimi: 'kimi' };
     function mdlHtml() {
         var mi = window.textAIModelInfo ? window.textAIModelInfo(modelId()) : null, owner = VENDOR_LOGO[((mi && mi.label) || '').split(' ')[0]] || '';
-        return '<button type="button" class="mdl" onclick="Articles.modelPick()" aria-expanded="' + (S.modelOpen ? 'true' : 'false') + '" title="AI model for ✨ Draft — tap to change&#10;โมเดลที่ใช้ร่าง กดเพื่อเปลี่ยน">' + (owner ? '<span class="text-ai-logo" data-owner="' + owner + '" aria-hidden="true"></span>' : '') + esc(modelName(modelId())) + ' <i>' + (S.modelOpen ? '▴' : '▾') + '</i></button>';
+        return '<button type="button" class="mdl"' + (/^(gemini-|as\/)/.test(modelId()) ? ' data-bill="google"' : '') + ' onclick="Articles.modelPick()" aria-expanded="' + (S.modelOpen ? 'true' : 'false') + '" title="AI model for ✨ Draft — tap to change&#10;โมเดลที่ใช้ร่าง กดเพื่อเปลี่ยน">' + (owner ? '<span class="text-ai-logo" data-owner="' + owner + '" aria-hidden="true"></span>' : '') + esc(modelName(modelId())) + ' <i>' + (S.modelOpen ? '▴' : '▾') + '</i></button>';
     }
     // V102.399 (owner's pick 4): 🩺 💊 🔗 chips under the title — always in view (they used to hide in the folded Links row). 🩺 / 💊 = ONE click sends the topic
     // (no AI) into the Disease / Drug Codex ▸ Pending Drafts, to be filled in later in Poneglyph; the ring says where it stands (amber = waiting, green = in the Codex);
