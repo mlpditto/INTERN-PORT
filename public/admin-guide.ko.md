@@ -33,7 +33,7 @@
 | 📱 **UI** | LINE 없이 인턴 화면 미리보기 (LIFF Preview) |
 | 🔮 | AI Engine 설정 (키 / 모델) — "not loaded yet" 이라고 나오면 페이지를 새로고침하세요 |
 | ⚓ | Grand Line Deck + Laugh Tale 의 One Piece 테마 켜기/끄기 |
-| **EN** | 라벨 언어 — 누를 때마다 EN → KR → TH → K·T 순으로 바뀝니다 |
+| 🇺🇸 **국기** | 라벨 언어 — 국기가 현재 언어를 나타내며, 누를 때마다 🇺🇸 EN → 🇰🇷 KR → 🇹🇭 TH → 🇰🇷🇹🇭 두 언어 순으로 바뀝니다 |
 | 🌓 | 라이트 / 다크 모드 전환 |
 | 👋 **Logout** | 로그아웃 |
 
@@ -53,6 +53,9 @@
 
 ### 📊 Dashboard
 - **맨 위 칩 바** (눌러서 목록 열기): 👤 Access (접근 요청) · 📖 Review (Reflective Review) · 💰 Claimed (요청된 포인트) · ⏱️ Quiz (대기 / 지연) · 💼 Work · 💊 Drug Drafts · 🩺 Disease Drafts · 📥 New Cases
+- 🚀 **Up next** + 🎯 **Live quizzes**: 진행 중인 모든 Quiz를 긴급도 × 완료 인원 표로 보여 줍니다 — 🔥 Do first · 📅 Plan · ⏳ Watch · ✅ On track. 기준은 ⏱ 24시간 / 72시간 / 7일, 👥 30 / 50 / 70 %로 정합니다
+- 💬 **Journal feedback**: 인턴이 Journal에서 보낸 메시지입니다. **↩ Reply**를 누르면 그 인턴의 History에서 메시지 아래에 답변이 표시됩니다 · **✓ Mark read**
+- **모델 칩의 파란 점** = Google Cloud 크레딧에서 먼저 차감
 - **칸반**: Backlog → 🚧 Doing → 👀 Review → ✅ Done (Tasks 검색; 오래된 항목은 Show archived)
 - **🚀 Escalated**: 인턴이 특별 주의를 요청한 학습 노트 · **🗑️ Note deletion requests**: 노트 삭제 요청
 - **AI usage · Overview**: AI 사용량 요약 + 히트맵 (눌러서 열기)
@@ -93,6 +96,21 @@
 - 📊 **Monitor: Intern Learning Paths** 에서 인턴의 LP 노트를 확인 · 🗑️ Trash
 - 인턴의 노트를 수정 / 삭제하려면 감사 로그를 남기기 위해 **사유**가 필요합니다 (삭제는 소프트 삭제 — Trash 에서 복구 가능)
 
+### 📝 Quiz 편집기
+- **Read first**: **✨** 는 이 문항만 초안을 만듭니다 (정답은 AI에 보내지 않습니다). 초안 뒤에 **☰ Terms only** 를 고를 수 있습니다. **📖 All** 은 퀴즈 전체를 열어 반복 용어를 표시하고, 팝업에서 바로 수정하며, **✨ All** 은 그곳에서 고른 모델로 빈 문항을 채웁니다
+- **✨ Scene** (🖼 이미지 패널): 문제 상황 그림 — 정답이 드러나지 않는지 확인하는 AI 그림, 또는 숫자로 만든 차트. **Insert** 로 문제에 넣습니다
+- **🎓 Practice** (Logic): 인턴에게 문항마다 **✓ Check** 가 표시됩니다. 정답이 보이므로 시험 세트에서는 꺼 두세요
+- **Rank** 문항: 인턴이 답을 한 번 입력한 뒤 선택지를 순서대로 고르거나 Best / OK / Avoid 로 나눕니다. **✨ Draft with AI** 로 초안을 만든 뒤 수준과 ⚠ 표시를 확인하세요
+- **AI Curate**: 활성 퀴즈에서 Remove 또는 Split 을 누르면 먼저 확인한 뒤 같은 단계에서 퀴즈를 비활성화합니다
+
+### 🔍 응시 검토
+- 헤더는 한 줄이며 상태는 이름 옆에 표시됩니다. 승인 전에는 **🍎 100%** (만점) 또는 **🍇 점수** (실제 점수)를 고르고, 승인 후에는 고른 과일이 상태로 남습니다
+- 📰 **Personal review** (신문 아이콘, 틀린 문항이 있을 때 표시): 국기를 눌러 언어를 고르고 모델을 선택한 뒤 **✨** 를 누릅니다. 그 전에는 AI가 실행되지 않으며 인턴 이름은 보내지 않습니다. 수정 후 **📨 Send** 를 누르면 퀴즈 결과와 History에 표시됩니다. `**굵게**` 는 강조로 보입니다
+
+### 📰 Articles
+- ➕ **Create ▸ Article**. **✨ Draft** 는 붙여 넣은 메모를 2,000자 이내의 짧은 이야기로 만들고, **✨ Episode 2** 는 이어서 씁니다
+- 인턴은 💬 **Any Q?** 로 질문합니다. Dashboard 칩이 열린 질문 수를 세며 ⚠️ "틀림/오래됨"이 먼저 나옵니다. **↩ Reply** 는 인턴의 History에 표시되고 질문자 이름은 숨겨집니다
+
 ---
 
 ## 3. 📅 하루 루틴 (순서 예시)
@@ -101,6 +119,7 @@
 2. 📦 **Assignments** 의 빨간 배지를 확인 → 대기 중인 Quiz 를 검토합니다
 3. **Alabasta** → Pending 필터 → Case / Product 를 검토합니다
 4. **Laugh Tale** → Quiz 피드백의 "Needs a fix" 를 확인합니다
+5. 🎯 **Live quizzes** → 🔥 Do first 부터 시작합니다
 
 ---
 
@@ -193,7 +212,7 @@ PDF 텍스트(또는 인턴의 reflection)가 다른 AI 로 가기 전에, Jev �
 2. **Brief**: 네 칸 📄 Context · 🎯 Goal · 📚 Source · ⭐ Expectations (태국어 가능); 한 프롬프트로 합쳐집니다. **⇄ Free text**로 한 칸 입력으로 전환.
 3. **Style**: 칩 하나 (약국 스타일 먼저, 고령 환자용 **Easy to see**, One Piece 여섯 스타일은 **🏴‍☠️ One Piece** 칩 뒤에). 스타일 문구가 모든 프롬프트 끝에 붙고 🛡️ Always added 줄(원작 캐릭터, 로고 없음)도 함께; 선택은 기억됩니다.
 4. **Plan** (free): 왼쪽 아래 줄이 텍스트 모델(로고 탭 = 회사, 칩 = 버전). **Plan 10 episodes** (또는 **Plan 1 clip**) → **Episodes** 카드: 영/태 제목, 목표, 핵심 사실, 대사 1줄, 그림 1장, 태국어 자막. ✏️로 행을 바로 수정합니다.
-5. **Render** (paid): engine 칩 선택(이름 아래 8초 가격): **Clip 9:16** Gemini Omni Flash ≈ $0.80 · **Veo Lite** ≈ $0.40 · **Kling** ≈ $1.01 · **HeyGen** ≈ $0.40 (아바타 진행자) · **Seedance** ≈ $0.73. 그다음:
+5. **Render** (paid): engine 칩 선택(이름 아래 8초 가격): **Clip 9:16** Gemini Omni Flash ≈ $0.80 · **Veo Lite** ≈ $0.40 · **Kling** ≈ $1.01 · **HeyGen** ≈ $0.40 (아바타 진행자) · **Seedance** ≈ $1.84. 그다음:
    - 에피소드 하나의 **▶** → 그 행에서 **≈ $ · 8 s → Render** 확인 후 9:16 720p 오디오 포함 클립을 렌더링.
    - 여러 에피소드 **☑** → 바에 개수와 합계, **▶ Render n · one at a time**; 확인 한 번, 클립을 차례로 렌더링, **⏹ Stop after this one**으로 중단.
    - 끝난 클립은 자동 저장: Storage `teach-clips/{series}/EPnn.mp4` + `clip_series` 문서, **Codex Gallery → 🎬 Clips**에 표시. 업로드 실패 → 바의 **💾 Save all (n)**.
