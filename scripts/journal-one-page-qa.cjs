@@ -42,7 +42,7 @@ assert.ok(!/role="tab"|dc-tabs|createElement\('details'\)/.test(js), 'no tabs, n
                 where: () => ({ get: () => Promise.resolve({ docs: [] }), onSnapshot: () => () => {} }),
             });
             // V101.247: the Message goes out as one batch (admin's doc + the intern's own copy) — recorded like the adds, with the doc id; a failing collection fails the whole batch
-            db.batch = () => { const ops = []; return { set: (ref, data) => { ops.push([ref.__col, data, ref.id]); }, commit: () => { if (ops.some(o => window.__fail[o[0]])) return Promise.reject(new Error('offline')); ops.forEach(o => window.__writes.push(o)); return Promise.resolve(); } }; };
+            db.batch = () => { const ops = []; return { set: (ref, data) => { ops.push([ref.__col, data, ref.id]); }, commit: () => { const bad = ops.find(o => window.__fail[o[0]]); if (bad) return Promise.reject(Object.assign(new Error(window.__fail[bad[0]] === 'denied' ? 'Missing or insufficient permissions.' : 'offline'), window.__fail[bad[0]] === 'denied' ? { code: 'permission-denied' } : {})); ops.forEach(o => window.__writes.push(o)); return Promise.resolve(); } }; };
             ensureFirebaseAuthReady = async () => ({ uid: 'auth-u1' });
             requireRegistered = () => true;
             tryDailyCheckin = () => {}; renderDailyCheckinCard = () => {}; awardEngagementBonusIfDue = () => {};
@@ -156,6 +156,15 @@ assert.ok(!/role="tab"|dc-tabs|createElement\('details'\)/.test(js), 'no tabs, n
         assert.ok(!(await page.evaluate(() => window.__writes.some(w => w[0] === 'intern_messages' && w[1].message === 'ลองอีกครั้ง'))), 'V101.247: a failed send writes no copy either — one batch');
         assert.match(failed.status, /retained/);
         assert.equal(await page.evaluate(() => document.querySelector('#dc-feedback .dc-cnt').textContent), '1', 'a failed send is not counted');
+        // V101.247: the copy refused by the rules (not deployed yet) → the admin's doc still goes out the old way; the intern sees a normal send
+        await page.evaluate(() => { window.__fail = { intern_messages: 'denied' }; });
+        await page.fill('#dc-feedback-message', 'ส่งแบบไม่มีสำเนา');
+        await page.click('#dc-send');
+        await page.waitForFunction(() => document.querySelector('.dc-sendbar').hidden || !document.getElementById('dc-send').disabled);
+        await page.waitForTimeout(200);
+        const fb = await page.evaluate(() => ({ adm: window.__writes.filter(w => w[0] === 'admin_notifications' && w[1].message === 'ส่งแบบไม่มีสำเนา').length, copy: window.__writes.filter(w => w[0] === 'intern_messages' && w[1].message === 'ส่งแบบไม่มีสำเนา').length, err: document.getElementById('dc-feedback').classList.contains('dc-err'), kept: document.getElementById('dc-feedback-message').value, cnt: document.querySelector('#dc-feedback .dc-cnt').textContent }));
+        assert.deepEqual(fb, { adm: 1, copy: 0, err: false, kept: '', cnt: '2' }, 'rules not live: admin doc sent via add, no copy, no red row, counted as sent: ' + JSON.stringify(fb));
+        await page.evaluate(() => { window.__fail = {}; });
 
         // ---- 5. 💬 timeline: mentor reply as a bubble, 🎁 to collect (one / all), quiet ✓ once collected
         await page.evaluate(() => {

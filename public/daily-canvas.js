@@ -197,7 +197,11 @@ document.addEventListener('DOMContentLoaded', function () {
             const id = db.collection('intern_messages').doc().id, batch = db.batch(), now = firebase.firestore.FieldValue.serverTimestamp();
             batch.set(db.collection('admin_notifications').doc(id), { type: 'journal_feedback', authUid: authUser.uid, userId, userName: userProfile.displayName || '', message, attachment, read: false, timestamp: now });
             batch.set(db.collection('intern_messages').doc(id), { authUid: authUser.uid, userId, message, attached, status: 'sent', createdAt: now });
-            await batch.commit();
+            try { await batch.commit(); }
+            catch (e) {   // the intern_messages rule not deployed yet → the copy is refused and the batch with it; the admin's doc still goes out the old way, so sending never breaks
+                if (!/permission|PERMISSION_DENIED/i.test(String((e && (e.code + ' ' + e.message)) || ''))) throw e;
+                await db.collection('admin_notifications').add({ type: 'journal_feedback', authUid: authUser.uid, userId, userName: userProfile.displayName || '', message, attachment, read: false, timestamp: now });
+            }
             status.textContent = '';
             sentFx();   // V101.241: the ✉️ flies up and back, the counter on it goes +1, a one-word toast in the language you chose
             if (msgTa.value.trim() === message) msgTa.value = '';
