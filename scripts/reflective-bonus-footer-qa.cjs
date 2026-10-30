@@ -86,7 +86,7 @@ const ADMIN = pathToFileURL(path.resolve('public/admin.html')).href;
                 x: [x.getAttribute('aria-label'), x.title], pop: [before, focused], seg: [cs(chips).gap, cs(chips).borderTopWidth], hdrH: Math.round(hdr.getBoundingClientRect().height) };
         });
         assert.ok(d.inHeader && !d.footerBelow, 'bonus + Save sit in the header row, nothing is left below: ' + JSON.stringify(d));
-        assert.deepEqual(d.save, ['✅', 'Save & Score', 'Save & Score (Ctrl/⌘ + Enter)'], 'Save & Score is an icon, named by aria-label / tooltip');
+        assert.deepEqual(d.save, ['✅', 'Save & Score', 'Save & Score, then next (Ctrl/⌘ + Enter)'], 'Save & Score is an icon, named by aria-label / tooltip');
         assert.equal(d.cancel, 0, 'no Cancel button — the ✕ is Cancel'); assert.deepEqual(d.x, ['Close review modal', 'Cancel (Esc)']);
         assert.deepEqual(d.pop, ['none', 'block'], 'the AI reason is a popover on the 💡 (hidden until hover / focus / tap)');
         assert.deepEqual(d.seg, ['0px', '1px'], 'the chips form one segmented control');
@@ -125,6 +125,28 @@ const ADMIN = pathToFileURL(path.resolve('public/admin.html')).href;
             return seen;
         });
         assert.deepEqual(langs, [[1, 'TH', 'Thai', true], [1, 'EN', 'English', true], [1, 'KO', 'Korean', true], [1, 'TH', 'Thai', true]], 'one chip cycles: ' + JSON.stringify(langs));
+
+        // V102.543: Save & Next — position in the pending list beside the title, saving opens the next row, the last one closes, a reviewed log just closes
+        const nx = await page.evaluate(async () => {
+            const $ = i => document.getElementById(i), ts = window.__logs[0].timestamp, o = {}, toasts = [], orig = window.showToast;
+            window.showToast = m => toasts.push(m);
+            const log = (id, name, extra) => Object.assign({ id, userId: 'U' + id, userName: name, mood: 'happy', content: 'sample ' + id, timestamp: ts }, extra || {});
+            reflectiveLogsCache = window.reflectiveLogsCache = [log('a', 'Ann'), log('b', 'Bee'), log('done', 'Dee', { adminComment: 'ok', adminBonus: 0.1 }), log('c', 'Cat'), log('gone', 'Gus', { isArchived: true })];
+            const open = () => getComputedStyle($('reflectiveReviewModal')).display !== 'none';
+            const save = async () => { $('reflective-review-comment').value = 'Fine work'; window.getReflectiveQuillContent = () => ({ html: '<p>Fine work</p>', plain: 'Fine work' }); await saveReflectiveReview(); reflectiveLogsCache.find(l => l.id === o.cur).adminComment = 'x'; };
+            await reviewReflective('a'); o.cur = 'a'; o.first = [$('rr-queue-count').textContent, $('rr-queue-count').hidden];
+            await save(); o.second = [$('reflective-review-id').value, $('rr-queue-count').textContent, open(), toasts.pop()];
+            reviewReflective('c'); await new Promise(r => setTimeout(r, 50)); o.cur = 'c'; await save(); o.wrap = $('reflective-review-id').value;
+            o.cur = 'b'; await reviewReflective('b'); await save(); o.last = [open(), toasts.pop()];
+            await reviewReflective('done'); o.reviewed = [$('rr-queue-count').hidden]; $('reflective-review-comment').value = 'Edit'; await saveReflectiveReview(); o.reviewed.push(open());
+            window.showToast = orig;
+            return o;
+        });
+        assert.deepEqual(nx.first, ['1 / 3 รอตรวจ', false], 'pending only, archived and reviewed rows do not count: ' + JSON.stringify(nx));
+        assert.equal(nx.second[0], 'b', 'saving opens the next row'); assert.equal(nx.second[2], true, 'the modal stays open'); assert.match(nx.second[3], /Bee .* เหลือ 2/, 'the toast names who is next');
+        assert.equal(nx.wrap, 'b', 'the last row goes back to the first one still pending');
+        assert.deepEqual([nx.last[0], /Reviewed!/.test(nx.last[1])], [false, true], 'queue done: closes');
+        assert.deepEqual(nx.reviewed, [true, false], 'a reviewed log has no count and just closes');
 
         // a narrow window: the footer wraps, nothing scrolls sideways
         await page.setViewportSize({ width: 760, height: 900 }); await page.waitForTimeout(200);
