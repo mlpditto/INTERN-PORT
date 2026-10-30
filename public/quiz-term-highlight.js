@@ -38,7 +38,16 @@
         'diarrhea', 'irritable bowel syndrome', 'IBS', 'hepatitis', 'cirrhosis', 'anemia', 'iron deficiency anemia', 'BPH', 'benign prostatic hyperplasia',
         'erectile dysfunction', 'overactive bladder', 'acne', 'psoriasis', 'eczema', 'atopic dermatitis', 'urticaria', 'allergic rhinitis', 'sinusitis', 'otitis media',
         'pharyngitis', 'influenza', 'COVID-19', 'HIV', 'herpes zoster', 'shingles', 'cellulitis', 'cataract', 'glaucoma', 'lactic acidosis', 'hypoglycemia', 'hyperkalemia',
-        'hypokalemia', 'serotonin syndrome', 'bleeding', 'bronchospasm', 'QT prolongation', 'pregnancy', 'breastfeeding', 'postpartum'];
+        'hypokalemia', 'serotonin syndrome', 'bleeding', 'bronchospasm', 'QT prolongation', 'pregnancy', 'breastfeeding', 'postpartum', 'VTE', 'venous thromboembolism',
+        'PCOS', 'PMS', 'PMDD', 'endometriosis', 'menopause',
+        // V101.250: Thai names, so a Thai stem is coloured too
+        'ความดันโลหิตสูง', 'เบาหวาน', 'ไขมันในเลือดสูง', 'หอบหืด', 'ปอดอุดกั้นเรื้อรัง', 'ไตเรื้อรัง', 'ไตวายเฉียบพลัน', 'หัวใจล้มเหลว', 'หัวใจเต้นผิดจังหวะ', 'กล้ามเนื้อหัวใจตาย',
+        'หลอดเลือดสมอง', 'ลิ่มเลือดอุดตัน', 'ไมเกรน', 'ลมชัก', 'ซึมเศร้า', 'วิตกกังวล', 'นอนไม่หลับ', 'ไทรอยด์', 'เกาต์', 'ข้อเสื่อม', 'กระดูกพรุน', 'โลหิตจาง', 'ตับอักเสบ', 'ตับแข็ง',
+        'กรดไหลย้อน', 'แผลในกระเพาะอาหาร', 'ท้องผูก', 'ท้องเสีย', 'ภูมิแพ้', 'สะเก็ดเงิน', 'ไข้หวัดใหญ่', 'ปอดอักเสบ', 'ทางเดินปัสสาวะอักเสบ', 'ตั้งครรภ์', 'ให้นมบุตร', 'วัยหมดประจำเดือน'];
+    // V101.250: negative findings in the stem (what the patient does NOT have) — underlined, never on an option, so no option is singled out
+    const NEG = new RegExp('(?:ไม่มี|ไม่เคย|ไม่แพ้|ไม่สูบ|ไม่ดื่ม|ไม่พบ|ไม่ได้ใช้|ไม่ได้รับ|ปฏิเสธ)[^\\s,.;:()]*?(?=และ|หรือ|[\\s,.;:()]|$)'
+        + "|(?<![\\w-])(?:NKDA|no (?:known )?(?:drug |food )?allerg(?:y|ies)|no (?:significant |relevant |prior |past )?(?:medical |family |surgical )?history(?: of [a-z-]+(?: [a-z-]+)?)?"
+        + "|no (?:underlying|chronic) (?:diseases?|conditions?|illness(?:es)?)|no comorbidit(?:y|ies)|denie[sd] [a-z-]+(?: [a-z-]+)?|non-?smoker|(?:does not|doesn't) (?:smoke|drink)|negative for [a-z0-9-]+)(?![\\w-])", 'gi');
     const LABS = ['INR', 'eGFR', 'CrCl', 'HbA1c', 'A1c', 'SCr', 'creatinine', 'BUN', 'K\\+', 'Na\\+', 'ALT', 'AST', 'TSH', 'LDL-C', 'LDL', 'HDL', 'TG', 'platelets', 'Hb', 'WBC',
         'BP', 'HR', 'BMI', 'EPDS', 'CHA2DS2-VASc', 'QTc', 'FBG', 'FPG', 'SpO2', 'PEF', 'FEV1'];
     const UNIT = '(?:mg\\/kg\\/day|mg\\/kg|mg\\/dL|mmol\\/L|µmol\\/L|umol\\/L|mL\\/min(?:\\/1\\.73\\s?m2)?|mmHg|bpm|mcg|µg|mg|mL|ml|IU|units?|g|L|kg|%)';
@@ -74,7 +83,7 @@
     // A term the admin marked "not a term" (kind 'no') still takes its range, so the built-in lists leave it alone, but it is never drawn.
     function ranges(text, R) {
         const out = [];
-        for (const kind of ['xdr', 'xdx', 'xlb', 'xno', 'dr', 'dc', 'dx', 'ds', 'lb']) {
+        for (const kind of ['ng', 'xdr', 'xdx', 'xlb', 'xno', 'dr', 'dc', 'dx', 'ds', 'lb']) {
             const re = R[kind]; if (!re) continue; re.lastIndex = 0; let m;
             while ((m = re.exec(text))) { const s = m.index, e = s + m[0].length; if (e > s && !out.some(r => s < r[1] && e > r[0])) out.push([s, e, kind.replace(/^x/, '')]); }
         }
@@ -139,7 +148,8 @@
             const R = withTerms(rules((codex && codex.drugs) || [], (codex && codex.diseases) || []), codex && codex.terms);
             const stem = root.querySelector('.md-render');
             if (stem) { liftRef(stem); markAsk(stem); }
-            textNodes(root).forEach(n => wrapNode(n, R));
+            const RS = Object.assign({}, R, { ng: NEG });
+            textNodes(root).forEach(n => wrapNode(n, stem && stem.contains(n) && !n.parentElement.closest('.qzh-ask') ? RS : R));
         } catch (e) { console.warn('[quiz-term-highlight] skipped:', e); }   // never block a question over colouring
     };
 })();
