@@ -37,9 +37,19 @@
         '#adminGuideOverlay .ag-body{overflow-y:auto;padding:6px 18px 18px;font-size:.9em;line-height:1.55}' +
         '#adminGuideOverlay .ag-body h2{display:none}' +
         '#adminGuideOverlay .ag-body h3{margin:16px 0 6px;font-size:1em}' +
+        // V102.529 (owner): a long section (tab map, Jev) must not need scrolling — every ### block folds under its heading, one open at a time
+        '#adminGuideOverlay .ag-folds{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}' +
+        '#adminGuideOverlay .ag-fold{border:1px solid var(--border-color,#e2e8f0);border-radius:10px;margin:0;padding:0 10px;min-width:0}' +
+        '#adminGuideOverlay .ag-fold[open]{grid-column:1 / -1}' +
+        '@media (max-width:600px){#adminGuideOverlay .ag-folds{grid-template-columns:1fr}}' +
+        '#adminGuideOverlay .ag-fold[open]{padding-bottom:6px}' +
+        '#adminGuideOverlay .ag-fold>summary{cursor:pointer;font-weight:800;padding:6px 0;list-style:none;display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+        '#adminGuideOverlay .ag-fold>summary::-webkit-details-marker{display:none}' +
+        '#adminGuideOverlay .ag-fold>summary::before{content:"\\203A";display:inline-block;width:10px;color:var(--text-sub,#64748b);transition:transform .15s}' +
+        '#adminGuideOverlay .ag-fold[open]>summary::before{transform:rotate(90deg)}' +
         '#adminGuideOverlay .ag-body table{border-collapse:collapse;width:100%;margin:8px 0;font-size:.92em}' +
         '#adminGuideOverlay .ag-body img{display:block;max-width:100%;height:auto;margin:10px 0;border:1px solid var(--border-color,#e2e8f0);border-radius:10px}' +
-        '#adminGuideOverlay .ag-body th,#adminGuideOverlay .ag-body td{border:1px solid var(--border-color,#e2e8f0);padding:6px 8px;text-align:left;vertical-align:top}' +
+        '#adminGuideOverlay .ag-body th,#adminGuideOverlay .ag-body td{border:1px solid var(--border-color,#e2e8f0);padding:4px 8px;text-align:left;vertical-align:top}' +   /* V102.529: 4px rows — the tab map must fit beside its folds */
         '#adminGuideOverlay .ag-body th{background:var(--col-bg,#f1f5f9)}' +
         '#adminGuideOverlay .ag-body code{background:var(--col-bg,#f1f5f9);padding:1px 5px;border-radius:5px}' +
         '#adminGuideOverlay .ag-body blockquote{margin:8px 0;padding:6px 12px;border-left:3px solid var(--primary,#4361ee);color:var(--text-sub,#64748b)}' +
@@ -100,6 +110,9 @@
         var bodyEl = overlay.querySelector('.ag-body');
         bodyEl.addEventListener('click', function (e) {
             var g = e.target.closest('.ag-go'); if (g) show(+g.dataset.go);
+            // V102.529: opening one fold closes the others (the click itself toggles the one tapped)
+            var sm = e.target.closest('.ag-fold > summary');
+            if (sm && !sm.parentElement.open) bodyEl.querySelectorAll('.ag-fold[open]').forEach(function (d) { if (d !== sm.parentElement) d.open = false; });
         });
         // the rail's divider only shows once the content has scrolled under it
         bodyEl.addEventListener('scroll', function () {
@@ -136,8 +149,25 @@
             (i > 0 ? '<button type="button" class="ag-go" data-go="' + (i - 1) + '">&lsaquo; ' + esc(sections[i - 1].chip) + '</button>' : '') +
             (i < sections.length - 1 ? '<button type="button" class="ag-go next" data-go="' + (i + 1) + '">' + esc(sections[i + 1].chip) + ' &rsaquo;</button>' : '') + '</div>';
         body.innerHTML = html(sections[i].md) + nav;
+        fold(body);
         body.scrollTop = 0;
         overlay.querySelector('.ag-rail').classList.remove('ag-scrolled');
+    }
+
+    // V102.529: wrap each <h3> and what follows it (up to the next <h3> / the ‹ › nav) in a closed <details class="ag-fold"> — the table and intro above the first heading stay in view
+    function fold(body) {
+        var d = null, grid = null;
+        Array.prototype.slice.call(body.childNodes).forEach(function (n) {
+            var el = n.nodeType === 1 ? n : null;
+            if (el && el.tagName === 'H3') {
+                d = document.createElement('details'); d.className = 'ag-fold';
+                var sm = document.createElement('summary'); sm.innerHTML = el.innerHTML; sm.title = el.textContent; d.appendChild(sm);
+                if (!grid) { grid = document.createElement('div'); grid.className = 'ag-folds'; body.insertBefore(grid, el); }   // consecutive folds share one two-column grid (an open one spans both)
+                grid.appendChild(d); el.parentNode.removeChild(el); return;
+            }
+            if (el && el.classList.contains('ag-nav')) { d = null; grid = null; return; }
+            if (d) d.appendChild(n);
+        });
     }
 
     function open(which) {

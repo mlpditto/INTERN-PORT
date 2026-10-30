@@ -230,9 +230,15 @@
         var cycleBtn = document.getElementById('lang-toggle-cycle');
         if (cycleBtn) {
             var label = krOn && thOn ? 'K·T' : krOn ? 'KR' : thOn ? 'TH' : 'EN';
-            cycleBtn.textContent = label;
+            // V102.529 / V101.248 (owner): the button shows the country flag — 🇺🇸 EN · 🇰🇷 KR · 🇹🇭 TH · 🇰🇷🇹🇭 both; the letters stay in aria-label / title.
+            // Windows has no flag glyphs, so where twemoji is loaded (admin) the flag becomes an SVG; LINE on a phone draws it natively.
+            var flag = krOn && thOn ? '🇰🇷🇹🇭' : krOn ? '🇰🇷' : thOn ? '🇹🇭' : '🇺🇸';
+            cycleBtn.textContent = flag;
             cycleBtn.classList.toggle('active', krOn || thOn);
+            cycleBtn.classList.toggle('both', krOn && thOn);
             cycleBtn.setAttribute('aria-label', 'Language: ' + label + ' (tap to switch)');
+            cycleBtn.title = 'Language: ' + label + ' — tap to switch';
+            if (window.twemoji) { try { twemoji.parse(cycleBtn, { folder: 'svg', ext: '.svg' }); } catch (_) { /* flags stay as text */ } }
         }
         applyAttrLangSwap(body);
     }

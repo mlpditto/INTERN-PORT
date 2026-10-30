@@ -76,6 +76,19 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</
             assert.ok(chips.find(c => c.on === 'true' && /Tab map/.test(c.t)), 'opens in English on the tab map: ' + JSON.stringify(chips));
             const body = () => page.$eval('#adminGuideOverlay .ag-body', e => e.innerText);
             assert.ok((await body()).includes('Alabasta'), 'tab map names Alabasta');
+            // V102.529: the tab map's ### blocks fold (closed) so the section needs no scrolling on a laptop; one open at a time; the table stays above the folds
+            { const f = await page.$$eval('#adminGuideOverlay .ag-fold', ds => ds.map(d => ({ open: d.open, t: d.querySelector('summary').textContent.trim(), kids: d.children.length })));
+              assert.ok(f.length >= 5 && f.every(x => !x.open && x.t && x.kids > 1), 'every ### block is a closed fold with its heading and body: ' + JSON.stringify(f));
+              assert.equal(await page.locator('#adminGuideOverlay .ag-body > h3').count(), 0, 'no bare h3 left');
+              const geo = await page.$eval('#adminGuideOverlay .ag-body', b => ({ sh: b.scrollHeight, ch: b.clientHeight, tableAbove: b.querySelector('.ag-fold').compareDocumentPosition(b.querySelector('p, table')) & Node.DOCUMENT_POSITION_PRECEDING ? true : false }));
+              { const closed = geo.sh; await page.$$eval('#adminGuideOverlay .ag-fold', ds => ds.forEach(d => { d.open = true; })); const open = await page.$eval('#adminGuideOverlay .ag-body', b => b.scrollHeight); await page.$$eval('#adminGuideOverlay .ag-fold', ds => ds.forEach(d => { d.open = false; }));
+                assert.ok(open > closed + 200, 'closed folds hide their body (open ' + open + ' vs closed ' + closed + ')'); }   // the real fit (1366×768 / 1100×700) was measured with real marked in the render check; the fake marked here makes every line a <p>
+              assert.equal(await page.locator('#adminGuideOverlay .ag-folds').count(), 1, 'the folds sit in one grid'); assert.ok(await page.$eval('#adminGuideOverlay .ag-folds', g => getComputedStyle(g).gridTemplateColumns.split(' ').length === (innerWidth > 600 ? 2 : 1)), 'two columns wide, one on a phone');
+              assert.ok(geo.tableAbove, 'the table / intro stays above the first fold');
+              await page.click('#adminGuideOverlay .ag-fold:nth-of-type(1) > summary'); await page.click('#adminGuideOverlay .ag-fold:nth-of-type(2) > summary');
+              assert.deepEqual(await page.$$eval('#adminGuideOverlay .ag-fold', ds => ds.map(d => d.open)), f.map((_, i) => i === 1), 'opening the second fold closes the first (accordion)');
+              await page.click('#adminGuideOverlay .ag-fold:nth-of-type(2) > summary');
+              assert.equal(await page.locator('#adminGuideOverlay .ag-fold[open]').count(), 0, 'tapping the open one closes it'); }
 
             // Chip rail switches section; only that section shows.
             await page.click('#adminGuideOverlay .ag-chip[data-i="0"]');
@@ -155,6 +168,6 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</
         await page.evaluate(() => openAdminGuide());
         await page.waitForSelector('#adminGuideOverlay.open');
         assert.deepEqual(errs, [], 'no page errors with storage blocked');
-        console.log('PASS: admin guide — 📖 opens it (English first, EN | TH switch remembered), it opens once by itself after first login, chip rail shows one section, Esc/× close, fits 412/1100 px, works with storage blocked; guide names all ' + tabs.length + ' real tabs');
+        console.log('PASS: admin guide — V102.529 ### blocks fold (closed, accordion, fits @1100×700); — 📖 opens it (English first, EN | TH switch remembered), it opens once by itself after first login, chip rail shows one section, Esc/× close, fits 412/1100 px, works with storage blocked; guide names all ' + tabs.length + ' real tabs');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
