@@ -9,6 +9,7 @@ Admin: EN/TH switch in the header, 🌐 Translate Missing. Intern: language caps
 ## Scripts that drive it
 
 - `backfill-list-thai-qa` — Thai titles show in the Translate Missing list under lang-toggle
+- `lang-toggle-flags-qa` — V102.529 / V101.248 (owner): the header language toggle shows the country flag 🇺🇸 → 🇰🇷 → 🇹🇭 → 🇰🇷🇹🇭 (letters stay in aria-label / title, two flags = a short pill, twemoji draws the flag where it is loaded — admin; LINE draws it natively)
 - `quiz-translation-stale-qa` — a stored translation is used only while it still fits the quiz
 - `kr-gap-ratchet-check` — Korean gap counts may only go down (new label without Korean fails CI)
 

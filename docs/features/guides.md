@@ -9,7 +9,7 @@ Intern: Settings ▸ 📖 Guide. Admin: 📖 header button; 🏴‍☠️ deck b
 ## Scripts that drive it
 
 - `intern-guide-qa` — intern guide with a feedback box per section → admin_notifications
-- `admin-guide-qa` — admin guide opens once after first login; chip rail
+- `admin-guide-qa` — admin guide opens once after first login; chip rail. V102.529 (owner: no scrolling): every `###` block of a section folds under its heading (`<details class="ag-fold">`, closed, one open at a time), consecutive folds sit in a two-column grid (one column ≤ 600 px) and table rows are 4 px — the tab map and the Jev section fit 1366×768 / 1100×700 without a scrollbar (measured with real marked); the deck guide shares the renderer
 - `guide-feedback-admin-qa` — admin ▸ 📖 Guide feedback list, newest first
 - `guide-pdf-qa` — built PDFs match the markdown sha256 in intern-guide.pdf.json
 

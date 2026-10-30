@@ -62,7 +62,7 @@ None of these has been run on a real LINE account yet (all were verified with ha
 None of this has been clicked in a real admin session yet (all verified with harnesses on the real code). Open admin fresh (V102.48 in the tab title).
 
 **V102.46 · one language button**
-1. The header has **one** language button, not KR + TH. Tapping it cycles **EN → KR → TH → K·T → EN**, and the labels switch with it.
+1. The header has **one** language button, not KR + TH. Tapping it cycles **EN → KR → TH → K·T → EN**, and the labels switch with it. (V102.529: the button shows the flag — 🇺🇸 🇰🇷 🇹🇭 🇰🇷🇹🇭 — instead of the letters.)
 
 **V102.47 · feedback labels** (the hourly `triageQuizFeedback` labels every quiz comment)
 2. **Laugh Tale → 🧠 Quiz:** every feedback card has a small category chip (🐞 bug · ❌ question · 🧗 hard · 💡 request · 👍 praise · · noise); hover shows its name.
