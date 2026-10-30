@@ -34,6 +34,32 @@ assert.ok(!/min-width:\s*250px/.test(css) && css.includes('width: max-content;')
             assert.ok(long.w <= cap + 1 && long.w > cap * 0.85, `long message uses the cap (${long.w} of ${Math.round(cap)}) @${vw}`);
             await page.close();
         }
+        // V102.538: showTimedToast — a line counts down, the toast closes itself; a newer toast cancels the timer; a plain toast stays until ✕
+        {
+            const page = await browser.newPage({ viewport: { width: 1100, height: 700 } });
+            await page.setContent(`<style>body{margin:0}${css}</style><div id="toast" class="lang-no-toggle"></div>`);
+            await page.addScriptTag({ content: fn });
+            const shown = () => page.$eval('#toast', t => t.classList.contains('show'));
+            await page.evaluate(() => showTimedToast('⭐ No feedback', 1));
+            const bar = await page.$eval('#toast .toast-bar', b => { const c = getComputedStyle(b); return [c.animationName, c.animationDuration, c.animationFillMode, c.position]; });
+            assert.deepEqual(bar, ['toast-countdown', '1s', 'forwards', 'absolute'], 'the line runs for the given time: ' + bar);
+            const w0 = await page.$eval('#toast .toast-bar', b => b.getBoundingClientRect().width);
+            await page.waitForTimeout(500);
+            const w1 = await page.$eval('#toast .toast-bar', b => b.getBoundingClientRect().width);
+            assert.ok(w1 < w0, 'the line shrinks: ' + w0 + ' → ' + w1);
+            assert.equal(await shown(), true, 'still open mid-way');
+            await page.waitForTimeout(700);
+            assert.equal(await shown(), false, 'closes itself');
+            await page.evaluate(() => showTimedToast('first', 1));
+            await page.evaluate(() => showToast('a newer one'));
+            await page.waitForTimeout(1300);
+            assert.equal(await shown(), true, 'a newer toast is not closed by the old timer');
+            assert.equal(await page.locator('#toast .toast-bar').count(), 0, 'a plain toast has no line');
+            await page.evaluate(() => showTimedToast('close me', 5));
+            await page.click('#toast .toast-close');
+            assert.equal(await shown(), false, '✕ still closes it');
+            await page.close();
+        }
         console.log('PASS: admin toast fits its message — "Reward saved!" is a small centred pill with even padding, long messages wrap only at min(90vw, 560 px) (412 / 1100 px)');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
