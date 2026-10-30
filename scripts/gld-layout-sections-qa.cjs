@@ -102,6 +102,17 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
       const d = await box.evaluate(n => ({ sw: n.scrollWidth, cw: n.clientWidth, past: [...n.querySelectorAll('button,input')].filter(e => e.getBoundingClientRect().right > n.getBoundingClientRect().right + 1).length }));
       assert.ok(d.sw <= d.cw + 1 && d.past === 0, 'fits at ' + w + ' px: ' + JSON.stringify(d));
     }
+    // V102.534: the enhancer may fill in visual choices only, never facts — read from the prompt it is really sent
+    const enh = await page.evaluate(async () => {
+      let sent = '';
+      window.callUniversalAI = async (m, prompt, j, v, s, o) => { if (o && o.feature === 'design_enhance') sent = prompt; return { text: '[TASK]: x' }; };
+      generateAIDesign();
+      for (let i = 0; i < 50 && !sent; i++) await new Promise(r => setTimeout(r, 20));
+      return sent;
+    });
+    assert.ok(enh.includes('fill them in with visual design choices only'), 'gaps get visual choices only: ' + enh);
+    assert.ok(enh.includes('Never add medical facts, numbers, doses, indications, claims or sources'), 'no new facts anywhere in the Infographic');
+    assert.ok(!/creative expertise/.test(enh), 'the old "fill it in creatively" rule is gone');
     assert.deepEqual(errs, [], 'no page errors: ' + errs.join(' | '));
     console.log('PASS: Grand Line Deck Layout + Sections — Infographic + Image only, cards become Layout / Section lines, add / remove to 6, style change and Free text round trip, fits 1300 / 960 / 390 px');
   } finally { await browser.close(); }
