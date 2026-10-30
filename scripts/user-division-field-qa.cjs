@@ -12,6 +12,17 @@ assert.ok(!/relevantGroups/.test(idx), 'no leaderboard filter is built from "the
 assert.ok(idx.includes('myDivisionRaw = typeof da.division') && idx.includes('myDivisionRaw = typeof userData.division'), 'both user-doc paths keep myDivisionRaw');
 assert.ok(cafe.includes('function primaryDivision(') && cafe.includes('isCreatorDivision(primaryDivision(primary))'), 'the Content gate uses the user\'s own division');
 
+// V101.253: getLeaderboard sends a boolean `active`, the same rule as the admin's hwIsActiveUser
+assert.ok(/active: isActiveMember\(u, today\)/.test(fnSrc) && /timeZone: 'Asia\/Bangkok'/.test(fnSrc), 'getLeaderboard sends active, Bangkok date');
+{ const body = fnSrc.slice(fnSrc.indexOf('function isActiveMember('), fnSrc.indexOf('exports.getLeaderboard = onCall'));
+  const f = new Function(body + '; return isActiveMember;')(), T = '2026-10-30';
+  assert.equal(f({ startDate: '2026-10-01', endDate: '2026-10-30' }, T), true, 'inside the dates');
+  assert.equal(f({ startDate: '2026-01-01', endDate: '2026-10-29' }, T), false, 'finished');
+  assert.equal(f({ startDate: '2026-11-01', endDate: '2026-12-01' }, T), false, 'not started');
+  assert.equal(f({}, T), false, 'no dates');
+  assert.equal(f({ notAnInternship: true }, T), true, 'outside the scheme');
+  assert.equal(f({ isIgnored: true, notAnInternship: true }, T), false, 'camp user'); }
+
 function grab(src, marker) {
     const i = src.indexOf(marker); assert.ok(i >= 0, marker);
     let d = 0, k = src.indexOf('{', src.indexOf(')', i));
