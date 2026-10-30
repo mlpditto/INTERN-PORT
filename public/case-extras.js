@@ -1,3 +1,4 @@
+// V101.256: + 📋 Daily log — the fields of the faculty reflective daily log table; saved as one `dailyLog` field with only what is filled in. Plan and Assessment are the intern's own writing.
 // V101.204: + ⚠️ ADR / Naranjo — suspected drug + reaction, the 10 Naranjo questions as Yes / No / ? chips (? = 0), live score + category; saved as `adr` only when something was answered or typed.
 // V101.132: Submit New → Case — optional details (all skippable): 💊 medications · 🧪 lab results · 🛡 treatment rights · 📅 appointment.
 // The tiles fold a block open; only what is filled in is sent. submitUnifiedCase calls caseExtrasCollect() → window.caseExtras → spread into the
@@ -9,6 +10,19 @@
     // Naranjo points per question [yes, no]; an unanswered question (?) is 0. Category by total: ≥ 9 definite · 5–8 probable · 1–4 possible · ≤ 0 doubtful.
     var NARANJO = [[1, 0], [2, -1], [1, 0], [2, -1], [-1, 2], [-1, 1], [1, 0], [1, 0], [1, 0], [1, 0]];
     var ADR_LEVELS = { definite: 'Definite · ใช่แน่ · 확실', probable: 'Probable · น่าจะใช่ · 가능성 높음', possible: 'Possible · อาจใช่ · 가능', doubtful: 'Doubtful · ไม่น่าใช่ · 의심' };   // EN · ไทย · 한국어 runs (the lang-toggle walker shows the ones switched on)
+    // [key, label, placeholder EN, TH, KO, max length, rows]
+    var DAILY_LOG = [
+        ['pt', 'Pt', 'Sex, age', 'เพศ อายุ', '성별, 나이', 60, 1],
+        ['cc', 'CC', 'Chief complaint', 'อาการสำคัญ', '주호소', 200, 1],
+        ['hpi', 'HPI', 'Present illness', 'ประวัติปัจจุบัน', '현병력', 1000, 2],
+        ['pmh', 'PMH', 'Past history', 'ประวัติในอดีต', '과거력', 400, 1],
+        ['ud', 'U/D', 'Underlying disease', 'โรคประจำตัว', '기저질환', 200, 1],
+        ['mh', 'MH', 'Current drugs', 'ยาที่ใช้อยู่', '복용 약물', 300, 1],
+        ['all', 'ALL', 'Drug allergy', 'การแพ้ยา', '약물 알레르기', 200, 1],
+        ['drps', 'DRPs', 'Problems / DRPs', 'ปัญหาหรือ DRPs', '문제 / DRPs', 400, 1],
+        ['plan', 'Plan', 'Your plan', 'แผนของคุณ', '나의 계획', 2000, 3],
+        ['assessment', 'Assessment', 'Your assessment', 'การประเมินของคุณ', '나의 평가', 2000, 4]
+    ];
     var adr = NARANJO.map(function () { return 'u'; });
     var KINDS = {
         meds: { box: 'u-opt-meds', a: ['Drug name', 'ชื่อยา'], b: ['Dose · frequency', 'ขนาด · ความถี่'], add: 'Add drug' },
@@ -40,11 +54,21 @@
     function apptFilled() { return !!(($('u-opt-appt-date') || {}).value || trimTo(($('u-opt-appt-place') || {}).value, LIM.place)); }
     function adrScore() { return adr.reduce(function (s, a, i) { return s + (a === 'y' ? NARANJO[i][0] : a === 'n' ? NARANJO[i][1] : 0); }, 0); }
     function adrLevel(s) { return s >= 9 ? 'definite' : s >= 5 ? 'probable' : s >= 1 ? 'possible' : 'doubtful'; }
+    function dlValue(row) { return trimTo(($('u-dl-' + row[0]) || {}).value, row[5]); }
+    function dlFilled() { return DAILY_LOG.some(dlValue); }
+    function buildDailyLog() {
+        var box = $('u-opt-log'); if (!box) return;
+        box.innerHTML = DAILY_LOG.map(function (r) {
+            var sep = r[0] === 'plan' ? '<div class="u-dl-sep" data-th="✍️ เขียนเอง">✍️ Write these yourself 직접 작성</div>' : '';
+            return sep + '<label class="u-dl-row' + (r[6] > 2 ? ' wide' : '') + '"><span>' + r[1] + '</span><textarea id="u-dl-' + r[0] + '" rows="' + r[6] + '" maxlength="' + r[5] + '" placeholder="' + r[2] + '" data-th-placeholder="' + r[3] + '" data-kr-placeholder="' + r[4] + '"></textarea></label>';
+        }).join('');
+        box.addEventListener('input', paint);
+    }
     function adrFilled() { return !!(trimTo(($('u-opt-adr-drug') || {}).value, LIM.drug) || trimTo(($('u-opt-adr-rx') || {}).value, LIM.rx) || adr.some(function (a) { return a !== 'u'; })); }
 
     // badges + "has data" look on each tile
     function paint() {
-        var counts = { meds: filledRows('meds').length, labs: filledRows('labs').length, rights: rights ? 1 : 0, appt: apptFilled() ? 1 : 0, adr: adrFilled() ? 1 : 0 };
+        var counts = { meds: filledRows('meds').length, labs: filledRows('labs').length, rights: rights ? 1 : 0, appt: apptFilled() ? 1 : 0, adr: adrFilled() ? 1 : 0, log: dlFilled() ? 1 : 0 };
         var score = adrScore(), level = adrLevel(score);
         document.querySelectorAll('#u-case-opt .u-opt-tile').forEach(function (t) {
             var k = t.dataset.opt, n = counts[k] || 0, b = t.querySelector('.u-opt-n');
@@ -66,6 +90,7 @@
         var wrap = $('u-case-opt');
         if (!wrap || wrap.dataset.ready) return;
         wrap.dataset.ready = '1';
+        buildDailyLog();
         wrap.querySelectorAll('.u-opt-tile').forEach(function (t) {
             t.addEventListener('click', function () {
                 var blk = $('u-opt-' + t.dataset.opt); if (!blk) return;
@@ -109,6 +134,10 @@
             out.adr.score = score;
             out.adr.category = adrLevel(score);
         }
+        if (dlFilled()) {
+            out.dailyLog = {};
+            DAILY_LOG.forEach(function (r) { var v = dlValue(r); if (v) out.dailyLog[r[0]] = v; });
+        }
         return Object.keys(out).length ? out : null;
     };
     window.caseExtrasReset = function () {
@@ -116,6 +145,7 @@
         adr = NARANJO.map(function () { return 'u'; });
         Object.keys(KINDS).forEach(function (k) { var list = $(KINDS[k].box) && $(KINDS[k].box).querySelector('.u-opt-rows'); if (list) list.innerHTML = ''; });
         ['u-opt-appt-date', 'u-opt-appt-place', 'u-opt-rights-other', 'u-opt-adr-drug', 'u-opt-adr-rx'].forEach(function (id) { var e = $(id); if (e) e.value = ''; });
+        DAILY_LOG.forEach(function (r) { var e = $('u-dl-' + r[0]); if (e) e.value = ''; });
         document.querySelectorAll('#u-case-opt .u-opt-blk').forEach(function (b) { b.hidden = true; });
         document.querySelectorAll('#u-case-opt .u-opt-tile').forEach(function (t) { t.setAttribute('aria-pressed', 'false'); });
         paint();

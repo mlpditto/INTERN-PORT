@@ -225,7 +225,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
             caseExtrasReset(); o.afterReset = [caseExtrasCollect(), $('u-opt-adr').hidden, $('u-opt-adr-score').querySelector('em').textContent, $('u-opt-adr-drug').value, document.querySelector('.u-opt-tile[data-opt="adr"] .u-opt-n').hidden];
             return o;
         });
-        assert.deepEqual(adr.tiles, ['meds', 'labs', 'rights', 'appt', 'adr'], 'five tiles, ⚠️ ADR last');
+        assert.deepEqual(adr.tiles, ['meds', 'labs', 'rights', 'appt', 'adr', 'log'], 'five tiles, ⚠️ ADR last, then the 📋 Daily log row');
         assert.ok(adr.hidden0 && !adr.hidden1 && adr.rows === 10, 'the ADR block folds open with the 10 Naranjo questions');
         assert.ok(adr.oneLine.every(x => x[1] <= x[2] + 1 && x[3] < 24), 'every question fits one line on the phone: ' + JSON.stringify(adr.oneLine));
         assert.deepEqual(adr.default, ['0', 'doubtful', 'uuuuuuuuuu'], 'every answer starts at ? (0) → 0 Doubtful');
@@ -237,6 +237,24 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.deepEqual(adr.collected, { adr: { drug: 'Amoxicillin', reaction: 'ผื่นลมพิษ', answers: ['y', 'y', 'y', 'u', 'n', 'u', 'u', 'u', 'u', 'u'], score: 6, category: 'probable' } }, 'saved as one `adr` field, trimmed, nothing else');
         assert.equal(adr.scoreBack, '5', 'a chip tap re-scores at once');
         assert.deepEqual(adr.afterReset, [null, true, '0', '', true], 'reset folds the block and clears answers, score, drug and badge');
+        // ---- V101.256: 📋 Daily log — folds open, only what is filled goes into one `dailyLog` field, reset clears it
+        const dl = await page.evaluate(() => {
+            const $ = i => document.getElementById(i), o = {}, tile = document.querySelector('.u-opt-tile[data-opt="log"]');
+            o.closed = $('u-opt-log').hidden; tile.click(); o.open = !$('u-opt-log').hidden;
+            o.ids = [...document.querySelectorAll('#u-opt-log textarea')].map(t => t.id.replace('u-dl-', ''));
+            o.empty = caseExtrasCollect();
+            $('u-dl-cc').value = ' sneezing '; $('u-dl-all').value = 'NKDA'; $('u-dl-assessment').value = 'fits allergic rhinitis'; $('u-dl-all').dispatchEvent(new Event('input', { bubbles: true }));
+            o.badge = [tile.querySelector('.u-opt-n').textContent, tile.classList.contains('has')];
+            o.collected = JSON.parse(JSON.stringify(caseExtrasCollect()));
+            caseExtrasReset(); o.after = [caseExtrasCollect(), $('u-opt-log').hidden, $('u-dl-cc').value];
+            return o;
+        });
+        assert.deepEqual([dl.closed, dl.open], [true, true], 'the Daily log row folds its block');
+        assert.deepEqual(dl.ids, ['pt', 'cc', 'hpi', 'pmh', 'ud', 'mh', 'all', 'drps', 'plan', 'assessment'], 'every column of the faculty table has a field');
+        assert.equal(dl.empty, null, 'open but empty sends nothing');
+        assert.deepEqual(dl.badge, ['✓', true], 'the row shows it holds data');
+        assert.deepEqual(dl.collected, { dailyLog: { cc: 'sneezing', all: 'NKDA', assessment: 'fits allergic rhinitis' } }, 'only what is filled, trimmed');
+        assert.deepEqual(dl.after, [null, true, ''], 'reset clears and folds it');
         if (process.env.SHOT) {   // the ADR block open with the mockup sample (for before/after bundles), then reset again
             await page.evaluate(() => { const q = (n, a) => document.querySelector('#u-opt-adr .u-nq button[data-q="' + n + '"][data-a="' + a + '"]').click(); document.querySelector('.u-opt-tile[data-opt="adr"]').click(); q(0, 'y'); q(1, 'y'); q(2, 'y'); q(4, 'n'); document.getElementById('u-opt-adr-drug').value = 'Amoxicillin'; document.getElementById('u-opt-adr-rx').value = 'ผื่นลมพิษ'; document.getElementById('u-opt-adr-drug').dispatchEvent(new Event('input', { bubbles: true })); });
             await page.locator('#u-case-opt').screenshot({ path: path.join(process.env.SHOT, 'case_adr_open.png') });
