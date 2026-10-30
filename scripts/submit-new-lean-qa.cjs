@@ -241,7 +241,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         const dl = await page.evaluate(() => {
             const $ = i => document.getElementById(i), o = {}, tile = document.querySelector('.u-opt-tile[data-opt="log"]');
             o.closed = $('u-opt-log').hidden; tile.click(); o.open = !$('u-opt-log').hidden;
-            o.ids = [...document.querySelectorAll('#u-opt-log textarea')].map(t => t.id.replace('u-dl-', ''));
+            o.ids = [...document.querySelectorAll('#u-opt-log .u-dl-row textarea')].map(t => t.id.replace('u-dl-', ''));
             o.empty = caseExtrasCollect();
             $('u-dl-cc').value = ' sneezing '; $('u-dl-all').value = 'NKDA'; $('u-dl-assessment').value = 'fits allergic rhinitis'; $('u-dl-all').dispatchEvent(new Event('input', { bubbles: true }));
             o.badge = [tile.querySelector('.u-opt-n').textContent, tile.classList.contains('has')];
@@ -255,6 +255,43 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.deepEqual(dl.badge, ['✓', true], 'the row shows it holds data');
         assert.deepEqual(dl.collected, { dailyLog: { cc: 'sneezing', all: 'NKDA', assessment: 'fits allergic rhinitis' } }, 'only what is filled, trimmed');
         assert.deepEqual(dl.after, [null, true, ''], 'reset clears and folds it');
+        // ---- V101.257: Daily log AI — fills only empty case fields, never Plan / Assessment; name + HN masked; 🔍 lists gaps and writes nothing; a failure leaves the form usable
+        const dlai = await page.evaluate(async () => {
+            const $ = i => document.getElementById(i), o = {}, calls = [], realFetch = window.fetch, realAuth = window.ensureFirebaseAuthReady;
+            let reply = '', fail = false;
+            window.ensureFirebaseAuthReady = async () => ({ getIdToken: async () => 't' });
+            window.fetch = async (u, init) => { const b = JSON.parse(init.body); calls.push([u, b]); if (fail) return { ok: false, status: 500 }; return { ok: true, json: async () => ({ text: reply }) }; };
+            document.querySelector('.u-opt-tile[data-opt="log"]').click();
+            $('u-case-id').value = 'HN12345'; $('u-case-customer').value = 'สมศรี ใจดี';
+            await $('u-dl-split').click(); o.noStory = [calls.length, $('u-dl-msg').dataset.kind];
+            $('u-dl-story').value = 'คุณสมศรี HN12345 หญิง 34 ปี น้ำมูกใส'; $('u-dl-cc').value = 'typed by me';
+            reply = '**PT:** หญิง 34 ปี\nCC: น้ำมูกใส\nHPI: 2 สัปดาห์\nPMH:\nU/D: -\nALL: NKDA\nPLAN: should never land\nASSESSMENT: nor this';
+            $('u-dl-split').click(); await new Promise(r => setTimeout(r, 50));
+            o.req = [calls[0][0].includes('callAIProxy'), calls[0][1].provider, calls[0][1].prompt.includes('HN12345'), calls[0][1].prompt.includes('สมศรี')];
+            o.vals = ['pt', 'cc', 'hpi', 'pmh', 'ud', 'all', 'plan', 'assessment'].map(k => $('u-dl-' + k).value);
+            o.lit = [$('u-dl-pt').classList.contains('ai'), $('u-dl-cc').classList.contains('ai')];
+            $('u-dl-pt').dispatchEvent(new Event('input', { bubbles: true })); o.editedClears = $('u-dl-pt').classList.contains('ai');
+            o.story = JSON.stringify(caseExtrasCollect()).includes('น้ำมูกใส HN') || 'story' in (caseExtrasCollect().dailyLog || {});
+            calls.length = 0; $('u-dl-check').click(); await new Promise(r => setTimeout(r, 20)); o.checkEmpty = [calls.length, $('u-dl-hints').dataset.kind];
+            $('u-dl-plan').value = 'Loratadine 10 mg'; reply = '- กำหนดติดตามอาการ\n- <b>red flags</b>\n- c\n- d\n- e';
+            $('u-dl-check').click(); await new Promise(r => setTimeout(r, 50));
+            o.hints = [...$('u-dl-hints').children].map(d => d.textContent); o.noHtml = $('u-dl-hints').querySelector('b') === null; o.planKept = [$('u-dl-plan').value, $('u-dl-assessment').value];
+            fail = true; $('u-dl-pmh').value = ''; $('u-dl-split').click(); await new Promise(r => setTimeout(r, 50));
+            o.failed = [$('u-dl-msg').dataset.kind, $('u-dl-split').disabled, $('u-dl-plan').value];
+            caseExtrasReset(); o.reset = [$('u-dl-story').value, $('u-dl-msg').hidden, $('u-dl-hints').hidden, $('u-dl-cc').classList.contains('ai')];
+            $('u-case-id').value = ''; $('u-case-customer').value = ''; window.fetch = realFetch; window.ensureFirebaseAuthReady = realAuth;
+            return o;
+        });
+        assert.deepEqual(dlai.noStory, [0, 'err'], 'no story, no call');
+        assert.deepEqual(dlai.req, [true, 'typhoon', false, false], 'Typhoon only, HN and patient name masked: ' + JSON.stringify(dlai.req));
+        assert.deepEqual(dlai.vals, ['หญิง 34 ปี', 'typed by me', '2 สัปดาห์', '', '', 'NKDA', '', ''], 'fills empty case fields only, empties stay empty, never Plan / Assessment: ' + JSON.stringify(dlai.vals));
+        assert.deepEqual(dlai.lit, [true, false], 'AI-filled fields are marked'); assert.equal(dlai.editedClears, false, 'an edit clears the mark');
+        assert.equal(dlai.story, false, 'the story is not saved');
+        assert.deepEqual(dlai.checkEmpty, [0, 'err'], 'nothing written, no check call');
+        assert.equal(dlai.hints.length, 4, 'at most four gaps'); assert.ok(dlai.noHtml, 'hints are text, never HTML');
+        assert.deepEqual(dlai.planKept, ['Loratadine 10 mg', ''], '🔍 changes nothing the intern wrote');
+        assert.deepEqual(dlai.failed, ['err', false, 'Loratadine 10 mg'], 'a failure says so, re-enables, keeps the form');
+        assert.deepEqual(dlai.reset, ['', true, true, false], 'reset clears story, message, hints, marks');
         if (process.env.SHOT) {   // the ADR block open with the mockup sample (for before/after bundles), then reset again
             await page.evaluate(() => { const q = (n, a) => document.querySelector('#u-opt-adr .u-nq button[data-q="' + n + '"][data-a="' + a + '"]').click(); document.querySelector('.u-opt-tile[data-opt="adr"]').click(); q(0, 'y'); q(1, 'y'); q(2, 'y'); q(4, 'n'); document.getElementById('u-opt-adr-drug').value = 'Amoxicillin'; document.getElementById('u-opt-adr-rx').value = 'ผื่นลมพิษ'; document.getElementById('u-opt-adr-drug').dispatchEvent(new Event('input', { bubbles: true })); });
             await page.locator('#u-case-opt').screenshot({ path: path.join(process.env.SHOT, 'case_adr_open.png') });

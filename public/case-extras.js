@@ -1,3 +1,4 @@
+// V101.257: Daily log AI (Typhoon, the only provider open to interns): ✨ splits the told case into the EMPTY case fields, 🔍 lists what Plan / Assessment miss. AI never writes Plan or Assessment; patient name + HN are masked before sending; the story itself is not saved.
 // V101.256: + 📋 Daily log — the fields of the faculty reflective daily log table; saved as one `dailyLog` field with only what is filled in. Plan and Assessment are the intern's own writing.
 // V101.204: + ⚠️ ADR / Naranjo — suspected drug + reaction, the 10 Naranjo questions as Yes / No / ? chips (? = 0), live score + category; saved as `adr` only when something was answered or typed.
 // V101.132: Submit New → Case — optional details (all skippable): 💊 medications · 🧪 lab results · 🛡 treatment rights · 📅 appointment.
@@ -23,6 +24,8 @@
         ['plan', 'Plan', 'Your plan', 'แผนของคุณ', '나의 계획', 2000, 3],
         ['assessment', 'Assessment', 'Your assessment', 'การประเมินของคุณ', '나의 평가', 2000, 4]
     ];
+    var AI_PROXY = 'https://us-central1-intern-port-edfa7.cloudfunctions.net/callAIProxy', AI_MODEL = 'typhoon-v2.5-30b-a3b-instruct';
+    var AI_KEYS = ['pt', 'cc', 'hpi', 'pmh', 'ud', 'mh', 'all', 'drps'];
     var adr = NARANJO.map(function () { return 'u'; });
     var KINDS = {
         meds: { box: 'u-opt-meds', a: ['Drug name', 'ชื่อยา'], b: ['Dose · frequency', 'ขนาด · ความถี่'], add: 'Add drug' },
@@ -58,11 +61,92 @@
     function dlFilled() { return DAILY_LOG.some(dlValue); }
     function buildDailyLog() {
         var box = $('u-opt-log'); if (!box) return;
-        box.innerHTML = DAILY_LOG.map(function (r) {
+        var story = '<textarea id="u-dl-story" rows="3" maxlength="2000" aria-label="Tell the case" placeholder="Tell the case · no name or HN" data-th-placeholder="เล่าเคสสั้น ๆ · ไม่ต้องใส่ชื่อหรือ HN" data-kr-placeholder="케이스 설명 · 이름, HN 제외"></textarea>'
+            + '<button type="button" id="u-dl-split" class="u-dl-ai" data-th="✨ แยกลงตาราง">✨ Split into the table 표로 나누기</button><div id="u-dl-msg" class="u-dl-msg" role="status" hidden></div>';
+        var check = '<button type="button" id="u-dl-check" class="u-dl-chk" data-th="🔍 ตรวจว่าขาดอะไร">🔍 What am I missing? 빠진 내용 확인</button><div id="u-dl-hints" class="u-dl-hints" role="status" hidden></div>';
+        box.innerHTML = story + DAILY_LOG.map(function (r) {
             var sep = r[0] === 'plan' ? '<div class="u-dl-sep" data-th="✍️ เขียนเอง">✍️ Write these yourself 직접 작성</div>' : '';
             return sep + '<label class="u-dl-row' + (r[6] > 2 ? ' wide' : '') + '"><span>' + r[1] + '</span><textarea id="u-dl-' + r[0] + '" rows="' + r[6] + '" maxlength="' + r[5] + '" placeholder="' + r[2] + '" data-th-placeholder="' + r[3] + '" data-kr-placeholder="' + r[4] + '"></textarea></label>';
-        }).join('');
-        box.addEventListener('input', paint);
+        }).join('') + check;
+        box.addEventListener('input', function (e) { if (e.target) e.target.classList.remove('ai'); paint(); });
+        $('u-dl-split').addEventListener('click', dlSplit);
+        $('u-dl-check').addEventListener('click', dlCheck);
+    }
+    // the story goes to an outside AI service: whatever the intern typed as HN / patient name never leaves in it
+    function dlMask(text) {
+        var out = String(text || ''), id = trimTo(($('u-case-id') || {}).value, 80), name = trimTo(($('u-case-customer') || {}).value, 120);
+        [id].concat(name.split(/\s+/)).forEach(function (w) { if (w && w.length >= 2) out = out.split(w).join('[ผู้ป่วย]'); });
+        return out;
+    }
+    function dlAsk(prompt, feature) {
+        return ensureFirebaseAuthReady(10000).then(function (u) {
+            if (!u) throw new Error('Firebase auth is required');
+            return u.getIdToken();
+        }).then(function (idToken) {
+            return fetch(AI_PROXY, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
+                body: JSON.stringify({ provider: 'typhoon', model: AI_MODEL, prompt: prompt, isJson: false, feature: feature }) });
+        }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function (d) {
+            if (d.error) throw new Error(d.error);
+            return String(d.text || '');
+        });
+    }
+    function dlSplitPrompt(story) {
+        return ['Read this community pharmacy case note and sort it into labelled lines.',
+            'Use only what the note says. Add no diagnosis, advice or plan of your own. If the note does not say, leave that label empty.',
+            'Keep the language of the note; keep drug names and medical terms in English. One line per label, no other text.',
+            'PT: sex and age', 'CC: chief complaint', 'HPI: present illness', 'PMH: past history', 'UD: underlying disease', 'MH: current drugs', 'ALL: drug allergy', 'DRPS: the problem or drug-related problem the note states',
+            '', 'Note:', story].join('\n');
+    }
+    // line-based reply, not JSON: Typhoon leaves unescaped quotes and newlines inside JSON strings
+    function dlParseSplit(text) {
+        var out = {};
+        String(text || '').split(/\r?\n/).forEach(function (line) {
+            var m = line.match(/^[\s*#-]*(PT|CC|HPI|PMH|U\/?D|MH|ALL|DRPS?)[\s*]*[:：]\s*(.*)$/i);
+            if (!m) return;
+            var key = m[1].toLowerCase().replace('/', ''), v = m[2].replace(/\*+/g, '').trim();
+            if (key === 'drp') key = 'drps';
+            if (v && !/^(-+|n\/?a|ไม่ระบุ)$/i.test(v)) out[key] = v;
+        });
+        return out;
+    }
+    function dlMsg(text, kind) { var m = $('u-dl-msg'); if (!m) return; m.hidden = !text; m.textContent = text || ''; m.dataset.kind = kind || ''; }
+    function dlSplit() {
+        var btn = $('u-dl-split'), story = trimTo(($('u-dl-story') || {}).value, 2000);
+        if (!story) { dlMsg('Tell the case first · เล่าเคสก่อน', 'err'); $('u-dl-story').focus(); return Promise.resolve(); }
+        btn.disabled = true; dlMsg('⏳ Splitting · กำลังแยก 처리 중', '');
+        return dlAsk(dlSplitPrompt(dlMask(story)), 'intern_case_daily_log').then(function (text) {
+            var got = dlParseSplit(text), n = 0;
+            DAILY_LOG.forEach(function (r) {
+                var e = $('u-dl-' + r[0]);
+                if (AI_KEYS.indexOf(r[0]) < 0 || !e || e.value.trim() || !got[r[0]]) return;
+                e.value = got[r[0]].slice(0, r[5]); e.classList.add('ai'); n++;
+            });
+            if (!n && !Object.keys(got).length) throw new Error('No labelled lines');
+            dlMsg(n + ' filled · check every line · เติม ' + n + ' ช่อง ตรวจทุกช่องก่อนส่ง 모두 확인해주세요', 'ok');
+            paint();
+        }).catch(function (e) {
+            console.warn('dailyLog split failed:', e);
+            dlMsg('Could not split right now · please fill in yourself · แยกไม่ได้ตอนนี้ กรอกเองได้เลย 직접 입력해주세요', 'err');
+        }).then(function () { btn.disabled = false; });
+    }
+    function dlCheck() {
+        var btn = $('u-dl-check'), box = $('u-dl-hints'), plan = trimTo(($('u-dl-plan') || {}).value, 2000), asm = trimTo(($('u-dl-assessment') || {}).value, 2000);
+        function show(lines, kind) { box.hidden = !lines.length; box.dataset.kind = kind; box.textContent = ''; lines.forEach(function (t) { var d = document.createElement('div'); d.textContent = t; box.appendChild(d); }); }
+        if (!plan && !asm) { show(['Write your Plan or Assessment first · เขียน Plan หรือ Assessment ก่อน'], 'err'); return Promise.resolve(); }
+        var facts = AI_KEYS.map(function (k) { var v = trimTo(($('u-dl-' + k) || {}).value, 1000); return v ? k.toUpperCase() + ': ' + v : ''; }).filter(Boolean).join('\n');
+        var prompt = ['A pharmacy student wrote this Plan and Assessment for a community pharmacy case.',
+            'List at most 4 short points they have NOT covered, such as follow-up, red flags, counselling or drug choice reasons.',
+            'Name the missing point only. Never write the plan or assessment for them, and never give the answer.',
+            'Keep the language of the student. One point per line, each starting with "- ". If nothing important is missing, reply OK.',
+            '', 'Case:', facts, '', 'Plan:', plan, '', 'Assessment:', asm].join('\n');
+        btn.disabled = true; show(['⏳'], '');
+        return dlAsk(dlMask(prompt), 'intern_case_daily_log_check').then(function (text) {
+            var lines = String(text).split(/\r?\n/).map(function (l) { return l.replace(/^[\s*•-]+/, '').trim().slice(0, 140); }).filter(function (l) { return l && !/^ok\.?$/i.test(l); }).slice(0, 4);
+            show(lines.length ? lines.map(function (l) { return '• ' + l; }) : ['✓ Nothing obvious missing · ไม่พบจุดที่ขาดชัดเจน'], lines.length ? 'warn' : 'ok');
+        }).catch(function (e) {
+            console.warn('dailyLog check failed:', e);
+            show(['Could not check right now · ตรวจไม่ได้ตอนนี้ 지금은 확인할 수 없습니다'], 'err');
+        }).then(function () { btn.disabled = false; });
     }
     function adrFilled() { return !!(trimTo(($('u-opt-adr-drug') || {}).value, LIM.drug) || trimTo(($('u-opt-adr-rx') || {}).value, LIM.rx) || adr.some(function (a) { return a !== 'u'; })); }
 
@@ -145,7 +229,8 @@
         adr = NARANJO.map(function () { return 'u'; });
         Object.keys(KINDS).forEach(function (k) { var list = $(KINDS[k].box) && $(KINDS[k].box).querySelector('.u-opt-rows'); if (list) list.innerHTML = ''; });
         ['u-opt-appt-date', 'u-opt-appt-place', 'u-opt-rights-other', 'u-opt-adr-drug', 'u-opt-adr-rx'].forEach(function (id) { var e = $(id); if (e) e.value = ''; });
-        DAILY_LOG.forEach(function (r) { var e = $('u-dl-' + r[0]); if (e) e.value = ''; });
+        DAILY_LOG.forEach(function (r) { var e = $('u-dl-' + r[0]); if (e) { e.value = ''; e.classList.remove('ai'); } });
+        if ($('u-dl-story')) { $('u-dl-story').value = ''; dlMsg('', ''); $('u-dl-hints').hidden = true; }
         document.querySelectorAll('#u-case-opt .u-opt-blk').forEach(function (b) { b.hidden = true; });
         document.querySelectorAll('#u-case-opt .u-opt-tile').forEach(function (t) { t.setAttribute('aria-pressed', 'false'); });
         paint();
