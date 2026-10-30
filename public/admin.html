@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.536)</title>
+    <title>Nika Admin (V102.537)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -14905,126 +14905,116 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
                         </summary>
                         <div style="padding:10px 12px; border-top:1px solid #334155;">
                             
-                            <!-- V101.08: System override. One select writes both fields the resolvers
-                                 already honour: diseaseSystemKey (intern card icon, getQuizIconStyle in
-                                 index.html) and coverageSystem (dashboard Quiz Coverage bucket + list row
-                                 chips). Auto = both guessed from title/tags, as before. Options are
-                                 filled from CASE_SYSTEMS by populateQuizSystemSelect(). -->
-                            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #334155;">
-                                <label for="quiz-system-select" style="font-size:0.75em; color:#4ade80; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; white-space:nowrap;"><i class="fa-solid fa-lungs"></i> System</label>
-                                <select id="quiz-system-select" class="lang-no-toggle" title="Sets the card icon and the Quiz Coverage bucket. Auto guesses from title and tags." style="flex:1; padding:8px 12px; border:1px solid #334155; border-radius:12px; font-size:0.85em; background:#0f172a; color:#f1f5f9; outline:none;">
-                                    <option value="">Auto · guess from title & tags</option>
-                                </select>
-                            </div>
-                            <!-- V101.10: Campaign (e.g. PharmCamp) is a field, not a tag. Chips list every
-                                 campaign already on a quiz; populateQuizCampaignChips() fills them. -->
-                            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #334155;">
-                                <label style="font-size:0.75em; color:#4ade80; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; white-space:nowrap;"><i class="fa-solid fa-flag"></i> Campaign</label>
-                                <div id="quiz-campaign-chips" class="glass-toggle-container lang-no-toggle" style="background:rgba(0,0,0,0.3); border:1px solid rgba(74,222,128,0.25); padding:2px; border-radius:8px; display:flex; flex-wrap:wrap; gap:1px;"></div>
-                                <input type="hidden" id="quiz-campaign" value="">
-                            </div>
-                            <!-- V101.76: exam style label (SQM_EXAM_STYLES keys). Set automatically the first
-                                 time an Expand Quiz suggestion is added; populateQuizExamStyleChips() fills it. -->
-                            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #334155;">
-                                <label style="font-size:0.75em; color:#4ade80; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; white-space:nowrap;"><i class="fa-solid fa-graduation-cap"></i> Style</label>
-                                <div id="quiz-exam-style-chips" class="glass-toggle-container lang-no-toggle" style="background:rgba(0,0,0,0.3); border:1px solid rgba(74,222,128,0.25); padding:2px; border-radius:8px; display:flex; flex-wrap:wrap; gap:1px;"></div>
-                                <input type="hidden" id="quiz-exam-style" value="">
-                            </div>
-                            <div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #334155;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                    <label style="font-size:0.75em; color:#4ade80; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><i class="fa-solid fa-tags"></i> Tags</label>
-                                    <div style="display:flex; align-items:center; gap:6px; position:relative; z-index:100; pointer-events:auto;">
+                            <!-- V102.537: lean rows — one label column, no dividers; every field keeps its id and what it saves.
+                                 System: sets diseaseSystemKey + coverageSystem (V101.08) · Campaign is a field, not a tag (V101.10) ·
+                                 Style: SQM_EXAM_STYLES key (V101.76) · Unlock: hidden until users.score >= it, 0 = none (V95.17). -->
+                            <style>
+                                #qe-aud { display:grid; gap:7px; margin-bottom:8px; }
+                                #qe-aud .aud-r { display:grid; grid-template-columns:62px minmax(0,1fr); align-items:center; gap:8px; min-width:0; }
+                                #qe-aud [hidden] { display:none !important; }
+                                #qe-aud .aud-2 { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:10px; }
+                                #qe-aud .aud-l { margin:0; font-size:.68em; font-weight:800; color:#4ade80; text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; }
+                                #qe-aud .aud-camp { grid-template-columns:auto minmax(0,1fr); }
+                                #qe-aud .aud-s { box-sizing:border-box; width:100%; height:30px; min-height:0; margin:0; padding:0 8px; border:1px solid #334155; border-radius:8px; background:#0f172a; color:#f1f5f9; font-size:.85em; outline:none; }
+                                #qe-aud .aud-rail { display:flex; flex-wrap:wrap; align-items:center; gap:4px; min-width:0; padding:0; background:none; border:0; }
+                                #qe-aud .aud-rail .glass-toggle-item { display:inline-flex; align-items:center; height:26px; padding:0 9px !important; border-radius:8px !important; font-size:.72em !important; font-weight:700 !important; color:#cbd5e1 !important; background:rgba(148,163,184,.1); border:1px solid rgba(148,163,184,.22); cursor:pointer; white-space:nowrap; }
+                                #qe-aud .aud-rail .glass-toggle-item.active { color:#fff !important; background:#4361ee; border-color:#4361ee; }
+                                #qe-aud .aud-tags { display:flex; flex-wrap:wrap; align-items:center; gap:5px; min-width:0; min-height:34px; padding:3px 4px 3px 6px; border:1px solid #334155; border-radius:9px; background:rgba(15,23,42,.8); }
+                                #qe-aud .aud-tagchips { display:contents; }
+                                #qe-aud .aud-tagchips > span { padding:2px 8px !important; border-radius:7px !important; font-size:.74em !important; gap:6px !important; box-shadow:none !important; }
+                                #qe-aud #quiz-tag-input { flex:1 1 110px; width:auto; min-width:0; min-height:0; height:26px; margin:0; padding:0 4px; border:0; outline:none; background:transparent; color:#f1f5f9; font-size:.82em; box-shadow:none; }
+                                #qe-aud .aud-ai { display:inline-flex; align-items:center; gap:5px; width:auto; height:26px; min-height:0; margin:0; padding:0 9px; border-radius:7px; background:rgba(22,163,74,.15); border:1px solid rgba(22,163,74,.35); color:#4ade80; font-size:.72em; font-weight:800; cursor:pointer; white-space:nowrap; }
+                                #qe-aud .aud-ai.pick { color:#86efac; font-weight:700; }
+                                #qe-aud .aud-who { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px; min-width:0; }
+                                #qe-aud .aud-nums { display:flex; gap:4px; }
+                                #qe-aud .aud-n { display:inline-flex; align-items:center; gap:5px; height:26px; margin:0; padding:0 7px; border:1px solid #334155; border-radius:8px; background:#0f172a; color:#94a3b8; font-size:.74em; font-weight:700; cursor:text; }
+                                #qe-aud .aud-n input { width:44px; min-height:0; height:22px; margin:0; padding:0; border:0; outline:none; background:transparent; color:#f1f5f9; font:inherit; text-align:right; }
+                                #qe-aud .logic-chip { position:relative; display:inline-flex; align-items:center; height:26px; padding:0 9px; border-radius:8px; font-size:.72em; font-weight:700; color:#94a3b8; background:rgba(148,163,184,.1); border:1px solid rgba(148,163,184,.22); cursor:pointer; user-select:none; white-space:nowrap; }
+                                #qe-aud .logic-chip input { position:absolute; opacity:0; width:100%; height:100%; left:0; top:0; margin:0; min-height:0; cursor:pointer; }
+                                #qe-aud .logic-chip:has(input:focus-visible) { outline:2px solid #818cf8; outline-offset:1px; }
+                                #qe-aud .logic-chip:has(input:checked) { font-weight:800; color:var(--mc); background:var(--mb); border-color:var(--mc); }
+                                #qe-aud .m-blue { --mc:#93c5fd; --mb:rgba(59,130,246,.18); } #qe-aud .m-red { --mc:#fca5a5; --mb:rgba(239,68,68,.18); }
+                                #qe-aud .m-green { --mc:#6ee7b7; --mb:rgba(16,185,129,.18); } #qe-aud .m-vio { --mc:#c4b5fd; --mb:rgba(167,139,250,.2); }
+                                #qe-aud .m-amb { --mc:#fcd34d; --mb:rgba(245,158,11,.18); } #qe-aud .m-cy { --mc:#67e8f9; --mb:rgba(6,182,212,.18); }
+                                @media (max-width:720px) { #qe-aud .aud-2 { grid-template-columns:minmax(0,1fr); } #qe-aud .aud-camp { grid-template-columns:62px minmax(0,1fr); } }
+                            </style>
+                            <div id="qe-aud">
+                                <div class="aud-2">
+                                    <div class="aud-r">
+                                        <label for="quiz-system-select" class="aud-l">System</label>
+                                        <select id="quiz-system-select" class="lang-no-toggle aud-s" title="Sets the card icon and the Quiz Coverage bucket. Auto guesses from title and tags.">
+                                            <option value="">Auto · guess from title & tags</option>
+                                        </select>
+                                    </div>
+                                    <div class="aud-r aud-camp">
+                                        <span class="aud-l">Campaign</span>
+                                        <div id="quiz-campaign-chips" class="glass-toggle-container lang-no-toggle aud-rail"></div>
+                                        <input type="hidden" id="quiz-campaign" value="">
+                                    </div>
+                                </div>
+                                <div class="aud-r">
+                                    <span class="aud-l">Style</span>
+                                    <div id="quiz-exam-style-chips" class="glass-toggle-container lang-no-toggle aud-rail"></div>
+                                    <input type="hidden" id="quiz-exam-style" value="">
+                                </div>
+                                <div class="aud-r">
+                                    <span class="aud-l">Tags</span>
+                                    <div class="aud-tags">
+                                        <!-- lang-no-toggle: lang-toggle.js would strip Thai tag names (V96.58) -->
+                                        <div id="quiz-tag-chips-container" class="lang-no-toggle aud-tagchips"></div>
+                                        <input type="text" id="quiz-tag-input" list="quiz-tag-suggestions" placeholder="Add a tag, Enter" title="Type a tag or pick a suggestion, then Enter · พิมพ์แท็กแล้วกด Enter" aria-label="Add a tag" onkeydown="if(event.key==='Enter'){ event.preventDefault(); manualAddTag(this.value); this.value=''; }">
+                                        <button type="button" class="aud-ai" onclick="window.autoTagQuizAI(this)" title="Suggest tags from the vocabulary with AI · ให้ AI แนะนำแท็ก"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggest</button>
+                                        <button type="button" class="aud-ai pick" id="qa-ai-pick" aria-expanded="false" aria-controls="qa-ai-row" onclick="qaToggleAiRail()" title="Choose the AI model · เลือกโมเดล AI"><span id="qa-ai-name" class="lang-no-toggle"></span> ▾</button>
+                                    </div>
+                                    <input type="hidden" id="quiz-tags" value="">
+                                    <!-- V101.07: autocomplete behind #quiz-tag-input; filled by refreshQuizTagSuggestions() -->
+                                    <datalist id="quiz-tag-suggestions"></datalist>
+                                </div>
+                                <div class="aud-r" id="qa-ai-row" hidden onclick="setTimeout(qaPaintAiName, 0)">
+                                    <span></span>
+                                    <div style="display:flex; align-items:center; gap:6px; min-width:0; position:relative; z-index:100;">
                                         <div class="glass-toggle-container" style="background:rgba(0,0,0,0.3); border:1px solid rgba(74,222,128,0.25); padding:2px; height:24px; border-radius:8px; display:flex; gap:1px; pointer-events:auto;">
                                             <div class="glass-toggle-item" data-value="gemini-3.8-flash" onclick="window.selectAiToolbarToggle(this,'ai-tagging-model-val')" style="font-size:0.6em; font-weight:800; padding:2px 8px; border-radius:6px; cursor:pointer;">3.8</div>
                                 <div class="glass-toggle-item active" data-value="gemini-3.6-flash" onclick="window.selectAiToolbarToggle(this,'ai-tagging-model-val')" style="font-size:0.6em; font-weight:800; padding:2px 8px; border-radius:6px; cursor:pointer;">3.6</div>
                                             <div class="glass-toggle-item" data-value="gpt-4o-mini" onclick="window.selectAiToolbarToggle(this,'ai-tagging-model-val')" style="font-size:0.6em; font-weight:800; padding:2px 8px; border-radius:6px; cursor:pointer;">GPT Mini</div>
                                         </div>
                                         <input type="hidden" id="ai-tagging-model-val" value="gemini-3.6-flash">
-                                        <button class="btn-sm" onclick="window.autoTagQuizAI(this)" style="background:rgba(22,163,74,0.15); border:1px solid rgba(22,163,74,0.3); color:#4ade80; padding:3px 12px; border-radius:8px; font-size:0.65em; font-weight:800; display:flex; align-items:center; gap:3px; cursor:pointer; pointer-events:auto;" onmouseover="this.style.background='rgba(22,163,74,0.25)'" onmouseout="this.style.background='rgba(22,163,74,0.15)'">
-                                            <i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggest
-                                        </button>
                                     </div>
                                 </div>
-                                
-                                <!-- V96.58: lang-no-toggle so lang-toggle.js does not strip Thai tag
-                                     names from the dynamically injected chips (refreshTagChips);
-                                     see [[feedback_lang_toggle_thai_blank]]. -->
-                                <div id="quiz-tag-chips-container" class="lang-no-toggle" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; min-height:32px; padding:8px; background:rgba(15,23,42,0.8); border:1.5px solid #334155; border-radius:15px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); align-items:center;">
-                                    <span style="color:#64748b; font-size:0.75em; font-style:italic;">Add clinical topics, ICD-11, or difficulty tags below...</span>
+                                <div class="aud-r">
+                                    <span class="aud-l">Who</span>
+                                    <div class="aud-who">
+                                        <div id="quiz-target-chips" class="glass-toggle-container lang-no-toggle aud-rail" role="radiogroup" aria-label="Target Group"></div>
+                                        <!-- the kept source of truth: load and save read it; the chips are built from its options -->
+                                        <select id="quiz-target-group" hidden aria-hidden="true" tabindex="-1">
+                                            <option value="Public">Public</option>
+                                            <option value="intern_current">Current Interns</option>
+                                            <option value="intern_alumni">Alumni</option>
+                                            <option value="intern_all">All Interns</option>
+                                            <option value="preceptor">Preceptors</option>
+                                            <option value="staff">Staff</option>
+                                        </select>
+                                    </div>
                                 </div>
-                                
-                                <div style="display:flex; gap:8px;">
-                                    <input type="text" id="quiz-tag-input" list="quiz-tag-suggestions" placeholder="Type a tag or pick a suggestion, then Enter (e.g. Cardiology)" style="flex:1; padding:10px 14px; border:1px solid #334155; border-radius:12px; font-size:0.85em; background:#0f172a; color:#f1f5f9; outline:none; transition:0.2s; box-shadow:0 4px 6px rgba(0,0,0,0.1);" onfocus="this.style.borderColor='#4ade80'; this.style.boxShadow='0 0 0 3px rgba(74,222,128,0.1)';" onblur="this.style.borderColor='#334155'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.1)';" onkeydown="if(event.key==='Enter'){ event.preventDefault(); manualAddTag(this.value); this.value=''; }">
-                                    <button onclick="const inp=document.getElementById('quiz-tag-input'); manualAddTag(inp.value); inp.value='';" style="background:#334155; color:white; border:none; border-radius:10px; padding:0 15px; cursor:pointer;"><i class="fa-solid fa-plus"></i></button>
+                                <div class="aud-r">
+                                    <span class="aud-l">Modes</span>
+                                    <div class="aud-who">
+                                    <div class="aud-rail">
+                                    <label class="logic-chip m-blue" title="Collection Form (Poll) · ฟอร์มเก็บข้อมูล"><input type="checkbox" id="quiz-is-poll"> <span>Poll</span></label>
+                                    <label class="logic-chip m-red" title="Single Attempt Only · ทำได้ครั้งเดียว"><input type="checkbox" id="quiz-one-time"> <span>One attempt</span></label>
+                                    <label class="logic-chip m-green" title="Homework Assignment · มอบหมายการบ้าน"><input type="checkbox" id="quiz-is-homework" onchange="toggleHomeworkUI()"> <span>Homework</span></label>
+                                    <label class="logic-chip m-vio" title="Shuffle Choices · สลับตัวเลือก"><input type="checkbox" id="quiz-shuffle-choices" checked> <span>Shuffle</span></label>
+                                    <label class="logic-chip m-amb" title="Partial Credit (multi-answer): (correct − wrong) / total correct, min 0. Single-answer unaffected. · ให้คะแนนบางส่วนในข้อหลายคำตอบ"><input type="checkbox" id="quiz-partial-credit"> <span>Partial</span></label>
+                                    <label class="logic-chip m-green" title="Practice: after each choice question the intern presses Check and sees right / wrong, the answer and the explanation straight away (the choice then locks). Leave OFF for exam sets — it shows the key. · ฝึก: เฉลยทีละข้อระหว่างทำ"><input type="checkbox" id="quiz-instant-answer"> <span>Practice</span></label>
+                                    <label class="logic-chip m-cy" title="Notify LINE every submit. OFF (normal): an active quiz already announces two milestones to the LINE group by itself — the first intern to submit, and when everyone eligible has finished. ON: announce EVERY submission instead — one message per intern, so only use it on quizzes worth watching live (the OA's monthly message quota is shared with the case and digest pushes). · แจ้ง LINE ทุกครั้งที่ส่ง"><input type="checkbox" id="quiz-notify-group"> <span>Notify</span></label>
+                                    <label class="logic-chip m-red" title="Deadline alert (LINE). ON (default): once the quiz has a Deadline, LINE alerts the intern group when it closes within 24 h, then messages each intern who has not submitted yet 3 h before. Nothing is sent 22:00–07:00. Personal messages stop when the month's LINE quota is critical or the daily cap is reached. Turn OFF for a quiz that should close quietly. · เตือนก่อนหมดเวลาทาง LINE"><input type="checkbox" id="quiz-notify-deadline" checked> <span>Deadline</span></label>
+                                    </div>
+                                    <div class="aud-nums">
+                                            <label class="aud-n" title="Hide this quiz until the user's cumulative score ≥ this value (0 = no gate) · ซ่อน Quiz จนกว่าคะแนนสะสมถึงค่านี้">🔒 Unlock<input type="number" id="quiz-unlock-score" value="0" min="0" step="0.5" aria-label="Unlock at score"></label>
+                                            <label class="aud-n" title="Max characters for the per-quiz feedback note · จำกัดจำนวนตัวอักษรของ Feedback">💬 Limit<input type="number" id="quiz-feedback-limit" value="280" min="0" max="1000" aria-label="Feedback limit"></label>
+                                        </div>
+                                    </div>
                                 </div>
-                                <input type="hidden" id="quiz-tags" value="">
-                                <!-- V101.07: autocomplete behind #quiz-tag-input. Existing quiz tags
-                                     (most used first, canonical spelling), CASE_SYSTEMS labels +
-                                     symptoms, LP taxonomy tags. Filled by refreshQuizTagSuggestions(). -->
-                                <datalist id="quiz-tag-suggestions"></datalist>
-                            </div>
-
-                            <!-- V95.17: lean Audience row — Unlock-at-score + Target Group
-                                 + Feedback packed into one 3-col grid. unlockScore gates the
-                                 quiz: hidden from interns until users.score >= it (0 = none).
-                                 The Thai hint moved to the input title to keep labels short. -->
-                             <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; margin-bottom:8px;">
-                                <div>
-                                    <label style="font-size:0.7em; color:#94a3b8; font-weight:600; display:block; margin-bottom:2px;"><i class="fa-solid fa-lock"></i> Unlock at score</label>
-                                    <input type="number" id="quiz-unlock-score" value="0" min="0" step="0.5" title="Hide this quiz until the user's cumulative score ≥ this value (0 = no gate)" style="width:100%; padding:5px 8px; border:1px solid #334155; border-radius:6px; font-size:0.85em; background:#0f172a; color:#f1f5f9;">
-                                </div>
-                                <div>
-                                    <label style="font-size:0.7em; color:#94a3b8; font-weight:600; display:block; margin-bottom:2px;"><i class="fa-solid fa-users"></i> Target Group</label>
-                                    <select id="quiz-target-group" style="width:100%; padding:5px 8px; border:1px solid #334155; border-radius:6px; font-size:0.85em; background:#0f172a; color:#f1f5f9;">
-                                        <option value="Public">Public</option>
-                                        <option value="intern_current">Current Interns</option>
-                                        <option value="intern_alumni">Alumni</option>
-                                        <option value="intern_all">All Interns</option>
-                                        <option value="preceptor">Preceptors</option>
-                                        <option value="staff">Staff</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label style="font-size:0.7em; color:#94a3b8; font-weight:600; display:block; margin-bottom:2px;"><i class="fa-solid fa-comment"></i> Feedback Limit</label>
-                                    <input type="number" id="quiz-feedback-limit" value="280" min="0" max="1000" title="Max characters for the per-quiz feedback note" style="width:100%; padding:5px 8px; border:1px solid #334155; border-radius:6px; font-size:0.85em; background:#0f172a; color:#f1f5f9;">
-                                </div>
-                            </div>
-
-                            <!-- EXECUTION MODES & LOGIC ([Version: V90.26] Integrated) -->
-                            <div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(148,163,184,0.2); margin-bottom:12px;">
-                                <label style="font-size:0.7em; color:#10b981; font-weight:700; display:block; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.8px;"><i class="fa-solid fa-microchip"></i> EXECUTION MODES & LOGIC</label>
-                                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                                    <label class="logic-chip" style="background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.3); color:#60a5fa;">
-                                        <input type="checkbox" id="quiz-is-poll"> <span>Collection Form (Poll)</span>
-                                    </label>
-                                    <label class="logic-chip" style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); color:#f87171;">
-                                        <input type="checkbox" id="quiz-one-time"> <span>Single Attempt Only</span>
-                                    </label>
-                                    <label class="logic-chip" style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); color:#34d399;">
-                                        <input type="checkbox" id="quiz-is-homework" onchange="toggleHomeworkUI()"> <span>Homework Assignment</span>
-                                    </label>
-                                    <label class="logic-chip" style="background:rgba(167,139,250,0.1); border:1px solid rgba(167,139,250,0.3); color:#a78bfa;">
-                                        <input type="checkbox" id="quiz-shuffle-choices" checked> <span>Shuffle Choices</span>
-                                    </label>
-                                    <label class="logic-chip" style="background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); color:#fbbf24;" title="Multi-answer questions award partial points: (correct − wrong) / total correct, min 0. Single-answer unaffected.">
-                                        <input type="checkbox" id="quiz-partial-credit"> <span>Partial Credit (multi-answer)</span>
-                                    </label>
-                                    <!-- V102.502: practice quizzes — the intern presses ✓ Check after each choice question and sees right/wrong + the explanation right away -->
-                                    <label class="logic-chip" style="background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.3); color:#4ade80;" title="Practice: after each choice question the intern presses ✓ Check and sees right / wrong, the answer and the explanation straight away (the choice then locks). Leave OFF for exam sets — it shows the key. · ฝึก: เฉลยทีละข้อระหว่างทำ">
-                                        <input type="checkbox" id="quiz-instant-answer"> <span>🎓 Practice — answer after each question</span>
-                                    </label>
-                                    <label class="logic-chip" style="background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.3); color:#22d3ee;" title="OFF (normal): an active quiz already announces two milestones to the LINE group by itself — the first intern to submit, and when everyone eligible has finished. ON: announce EVERY submission instead — one message per intern, so only use it on quizzes worth watching live (the OA's monthly message quota is shared with the case and digest pushes).">
-                                        <input type="checkbox" id="quiz-notify-group"> <span>Notify LINE every submit</span>
-                                    </label>
-                                    <label class="logic-chip" style="background:rgba(220,38,38,0.1); border:1px solid rgba(220,38,38,0.3); color:#f87171;" title="ON (default): once the quiz has a Deadline, LINE alerts the intern group when it closes within 24 h, then messages each intern who has not submitted yet 3 h before. Nothing is sent 22:00–07:00. Personal messages stop when the month's LINE quota is critical or the daily cap is reached. Turn OFF for a quiz that should close quietly.">
-                                        <input type="checkbox" id="quiz-notify-deadline" checked> <span>Deadline alert (LINE)</span>
-                                    </label>
-                                </div>
-                                <style>
-                                    .logic-chip { display:flex; align-items:center; gap:6px; cursor:pointer; padding:6px 12px; border-radius:10px; font-size:0.75em; font-weight:700; transition:all 0.2s; user-select:none; }
-                                    .logic-chip:hover { transform: translateY(-1px); filter: brightness(1.2); }
-                                    .logic-chip input { cursor:pointer; width:14px; height:14px; accent-color:currentColor; }
-                                </style>
                             </div>
                             <!-- Case Content Area (Markdown split, Phase 2 V91.36) -->
                             <div id="case-content-area" style="display:none; margin-bottom:8px;">
@@ -26839,9 +26829,35 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         // V95.39 lean Phase 3: mirror the collapsed Audience & Categorization values
         // into its <summary> so the admin can read the config without expanding.
         // window-assigned because refreshTagChips (its other caller) is too.
+        // V102.537: Target Group chips over the kept <select> — built from its options, so a group added later still shows
+        window.paintQuizTargetChips = function() {
+            const rail = document.getElementById('quiz-target-chips'), sel = document.getElementById('quiz-target-group');
+            if (!rail || !sel) return;
+            const short = { intern_current: 'Current', intern_alumni: 'Alumni', intern_all: 'All' };
+            rail.innerHTML = [...sel.options].map(o => `<div class="glass-toggle-item${o.value === sel.value ? ' active' : ''}" role="radio" aria-checked="${o.value === sel.value}" data-value="${escapeHtml(o.value)}" title="${escapeHtml(o.text)}" onclick="selectQuizTarget(this.dataset.value)">${escapeHtml(short[o.value] || o.text)}</div>`).join('');
+        };
+        window.selectQuizTarget = function(v) {
+            const sel = document.getElementById('quiz-target-group'); if (!sel) return;
+            sel.value = v; sel.dispatchEvent(new Event('change', { bubbles: true })); window.updateAudienceSummaryPreview();
+            window.paintQuizTargetChips();
+        };
+        // the tag model rail folds behind the model name on the Tags row
+        window.qaPaintAiName = function() {
+            const el = document.getElementById('qa-ai-name'), v = (document.getElementById('ai-tagging-model-val') || {}).value || '';
+            if (!el) return;
+            const info = window.textAIModelInfo ? window.textAIModelInfo(v) : null;
+            el.textContent = (info && (info.short || info.label)) || v;
+        };
+        window.qaToggleAiRail = function() {
+            const row = document.getElementById('qa-ai-row'), btn = document.getElementById('qa-ai-pick');
+            if (!row) return;
+            row.hidden = !row.hidden;
+            if (btn) btn.setAttribute('aria-expanded', String(!row.hidden));
+        };
         window.updateAudienceSummaryPreview = function() {
             const el = document.getElementById('audience-summary-preview');
             if (!el) return;
+            window.paintQuizTargetChips(); window.qaPaintAiName();   // V102.537
             const tgSel = document.getElementById('quiz-target-group');
             const target = (tgSel && tgSel.selectedIndex >= 0) ? tgSel.options[tgSel.selectedIndex].text : 'Public';
             const unlock = Number(document.getElementById('quiz-unlock-score')?.value || 0);
@@ -27185,6 +27201,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-short-title').value = "";
             refreshQuizTargetGroupOptions();
             document.getElementById('quiz-target-group').value = "Public";
+            window.paintQuizTargetChips();   // V102.537
             if (document.getElementById('quiz-unlock-score')) document.getElementById('quiz-unlock-score').value = 0;
             if (document.getElementById('quiz-feedback-limit')) document.getElementById('quiz-feedback-limit').value = 280;
             document.getElementById('quiz-total-points').value = 1.0;
@@ -27416,6 +27433,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 sel.add(opt);
             }
             sel.value = wanted;
+            window.paintQuizTargetChips();   // V102.537
         }
 
         function selectAllHomeworkUsers() {
@@ -72708,7 +72726,7 @@ RULES:
             if (current) known.add(current);
             hidden.value = current;
             const chip = (v, label, extra = '') => `<div class="glass-toggle-item${current === v ? ' active' : ''}" data-value="${escapeHtml(v)}" onclick="selectQuizCampaign(this${extra})" style="font-size:0.7em; font-weight:800; padding:3px 10px; border-radius:6px; cursor:pointer;">${escapeHtml(label)}</div>`;
-            rail.innerHTML = chip('', 'None') + [...known].sort().map(c => chip(c, c)).join('') + chip('', '+ New', ', true').replace(' active', '');
+            rail.innerHTML = chip('', 'None') + [...known].sort().map(c => chip(c, c)).join('') + chip('', '＋', ', true').replace(' active', '').replace('<div ', '<div title="New campaign · เพิ่มแคมเปญ" ');
         };
         window.selectQuizCampaign = function (el, isNew) {
             if (isNew) {
@@ -72734,7 +72752,8 @@ RULES:
             const keys = Object.keys(window.SQM_EXAM_STYLES || {});
             if (current && !keys.includes(current)) keys.push(current);
             const chip = (v, label) => `<div class="glass-toggle-item${current === v ? ' active' : ''}" data-value="${escapeHtml(v)}" onclick="populateQuizExamStyleChips(this.dataset.value)" style="font-size:0.7em; font-weight:800; padding:3px 10px; border-radius:6px; cursor:pointer;">${escapeHtml(label)}</div>`;
-            rail.innerHTML = chip('', 'None') + keys.map(k => chip(k, window.quizExamStyleLabel(k))).join('');
+            const short = { thai: 'PC', pebc2: 'PEBC II', china: 'Zhíyè', spc: 'SPC', spcf: 'Forensic' };   // V102.537: the full name in the tooltip
+            rail.innerHTML = chip('', 'None') + keys.map(k => { const s = (window.SQM_EXAM_STYLES || {})[k]; return chip(k, s && short[k] ? `${s.flag} ${short[k]}` : window.quizExamStyleLabel(k)).replace('<div ', `<div title="${escapeHtml(window.quizExamStyleLabel(k))}" `); }).join('');
         };
         // Called when an Expand Quiz suggestion is added: label an unlabelled quiz with
         // the style the batch was generated in. Never overrides a chosen style.
