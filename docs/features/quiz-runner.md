@@ -26,6 +26,6 @@ Intern: home ▸ Mission ▸ a quiz card ▸ Start.
 
 - Rank reveal timing: a counted quiz (not practice, not a poll) reveals Rank answers only after Submit — so `rankAwardBeri` returns early unless called quiet (`rankAwardBeri(i, true)` from `submitQuiz`); a QA that calls it without `true` sees nothing paid. The Rank step hides the shared footer with `#quizModal.rk-on`, cleared at the top of every `renderQuizStep` — a Rank test that renders another step must expect the footer back.
 
-- Never show other interns' faces: `quiz-done-count-qa` applies the live `users` rule to the fake db — a stub that returns every user hides a real privacy regression.
+- Other interns' faces stay off the quiz CARD: `quiz-done-count-qa` applies the live `users` rule to the fake db — a stub that returns every user hides a real privacy regression. Owner changed the rule 2026-10-30: the Start popup may show photos (no names) of ACTIVE members only — V101.253, `active` from `getLeaderboard` (not a camp user, and `notAnInternship` or inside start–end dates, Bangkok); no list = plain 👥 n; pinned by `quiz-card-preview-qa` and `user-division-field-qa`.
 - Reduce Motion: the pulse / breathe animations must not run under `prefers-reduced-motion`; emulate it in the page context or the animation assertion flips.
 - The runner renders into a modal that is hidden until `renderQuizStep` finishes; measure after a rAF.

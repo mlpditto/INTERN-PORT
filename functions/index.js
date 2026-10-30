@@ -311,6 +311,14 @@ exports.getDrugNews = onCall({ timeoutSeconds: 30, memory: '256MiB' }, async (re
     return { items };
 });
 
+// V101.253: same rule as the admin's hwIsActiveUser — not a camp user, and either outside the internship scheme or inside today's start–end dates (Bangkok).
+function isActiveMember(u, today) {
+    if (!u || u.isIgnored) return false;
+    if (u.notAnInternship === true) return true;
+    const start = String(u.startDate || '').slice(0, 10), end = String(u.endDate || '').slice(0, 10);
+    return !!(start && end && start <= today && today <= end);
+}
+
 exports.getLeaderboard = onCall(async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'Login required');
@@ -320,6 +328,7 @@ exports.getLeaderboard = onCall(async (request) => {
         .orderBy('score', 'desc')
         .limit(500)   // bounds cost; the board only ever shows a division's top rows
         .get();
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
     const rows = snap.docs.map((d) => {
         const u = d.data() || {};
         return {
@@ -333,7 +342,9 @@ exports.getLeaderboard = onCall(async (request) => {
             reflectiveBestStreak: Number(u.reflectiveBestStreak) || 0,
             // Team Player (intern V101.25) leaves camp users out of the group total.
             // A boolean only — still no identity in the projection.
-            ignored: u.isIgnored === true
+            ignored: u.isIgnored === true,
+            // V101.253: a boolean only — the Start popup shows photos of active members only.
+            active: isActiveMember(u, today)
         };
     });
     return { rows, count: rows.length };

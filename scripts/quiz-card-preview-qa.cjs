@@ -52,11 +52,18 @@ const INDEX = require('url').pathToFileURL(path.join(process.cwd(), 'public/inde
             // 7 · V101.252: the faces of who finished, from data-faces; a bad picture leaves the chip; none = the plain 👥 n
             const cnt = host.querySelector('[data-qa="1"] .quiz-done-count'), wrap = document.createElement('span');
             wrap.className = 'quiz-avatar-stack'; cnt.replaceWith(wrap); wrap.appendChild(cnt);
-            wrap.dataset.faces = JSON.stringify(['https://example.com/a.png', 'https://example.com/"b.png']);
+            // V101.253: only members getLeaderboard marks active keep their photo
+            const stored = [['u1', 'https://example.com/a.png'], ['u2', 'https://example.com/"b.png'], ['u3', 'https://example.com/left.png'], ['u4', 'https://example.com/unknown.png']];
+            wrap.dataset.faces = JSON.stringify(stored);
+            allUsersData = [];
+            host.querySelector('[data-qa="1"] .body-text').click();
+            out.notLoaded = [!!sheet().querySelector('.qzp-faces'), /👥 7/.test(txt())];
+            qzPreviewClose();
+            allUsersData = [{ id: 'u1', active: true }, { id: 'u2', active: true }, { id: 'u3', active: false }];
             host.querySelector('[data-qa="1"] .body-text').click();
             const f = sheet().querySelector('.qzp-faces');
             out.faces = f ? { n: f.querySelectorAll('img').length, text: f.textContent.trim(), srcs: [...f.querySelectorAll('img')].map(i => i.getAttribute('src')), w: f.querySelector('img').getBoundingClientRect().width } : null;
-            qzPreviewClose(); wrap.dataset.faces = '[]';
+            qzPreviewClose(); wrap.dataset.faces = '[]'; allUsersData = [];
             host.querySelector('[data-qa="1"] .body-text').click();
             out.noFaces = [!!sheet().querySelector('.qzp-faces'), /👥 7/.test(txt())];
             qzPreviewClose();
@@ -66,6 +73,7 @@ const INDEX = require('url').pathToFileURL(path.join(process.cwd(), 'public/inde
         assert.ok(r.faces && r.faces.n === 2 && r.faces.text === '7' && r.faces.w === 24, 'faces + the count in one chip: ' + JSON.stringify(r.faces));
         assert.deepEqual(r.faces.srcs, ['https://example.com/a.png', 'https://example.com/"b.png'], 'a stored URL stays one attribute');
         assert.deepEqual(r.noFaces, [false, true], 'no pictures → the plain 👥 n chip');
+        assert.deepEqual(r.notLoaded, [false, true], 'V101.253: no active list yet → no photos, the plain 👥 n chip');
         assert.ok(/Patient Interview-1/.test(r.t1) && /“การจ่ายยาให้ผู้ป่วย”/.test(r.t1), 'title + the description quote');
         assert.ok(/3 questions/.test(r.t1) && /⏱ 3 min/.test(r.t1) && /🎯 5 pts/.test(r.t1) && /📎 1 file/.test(r.t1) && /#dispensing/.test(r.t1) && /👥 7/.test(r.t1) && /⏰ 5 Nov/.test(r.t1), 'questions · time · points · files · tag · people · deadline: ' + r.t1);
         assert.ok(!/ai_variant/.test(r.t1), 'internal marker tags are not shown');
