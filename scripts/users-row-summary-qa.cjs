@@ -39,16 +39,27 @@ const helpers = ['function toggleUserSeenSort(', 'function copyUserRow(', 'funct
             "var userBirthdayChipHtml = () => '';",   // V102.330: 🎂 chip (tested in birthday-this-month-qa)
             "var alabastaAgo = ts => { const min = Math.floor((Date.now() - ts.toMillis()) / 60000); return min < 60 ? min + ' min' : Math.floor(min / 1440) + ' d'; };",
             "var userSeenAgo = ts => { const min = Math.floor((Date.now() - ts.toMillis()) / 60000); return min < 60 ? min + 'm' : Math.floor(min / 1440) + 'd'; };",   // V102.188: the row uses userSeenAgo
-            "var reflectiveLogsCache = [{ userId: 'u1' }, { userId: 'u1', isArchived: true }], quizAttemptsAllCache = [{ userId: 'u1', status: 'approved' }, { userId: 'u1', status: 'approved' }, { userId: 'u1', status: 'pending' }], casesData = [{ userId: 'u1' }];",
+            "var reflectiveLogsCache = [{ userId: 'u1' }, { userId: 'u1', isArchived: true }], learningNotesCache = [{ userId: 'u1' }, { userId: 'u2x' }], quizAttemptsAllCache = [{ userId: 'u1', status: 'approved' }, { userId: 'u1', status: 'approved' }, { userId: 'u1', status: 'pending' }], casesData = [{ userId: 'u1' }];",
             "function rowBits(d) { " + slice + "\n return { _logsHtml, _copyText, _qN, _cN, logsN }; }",
             helpers
         ].join('\n') });
         const now = Date.now();
         const bits = await page.evaluate(now => rowBits({ id: 'u1', displayName: 'Bua', fullName: 'ณัชชา โคตรบุปผา', score: 13.75, beri: 257.4, lastSeen: { toMillis: () => now - 3 * 86400000 } }), now);
-        assert.deepEqual([bits._qN, bits.logsN, bits._cN], [2, 1, 1], 'approved quizzes · non-archived journals · cases');
-        assert.match(bits._logsHtml, /<span class="u-qjc"[^>]*><button type="button" class="ok" onclick="userRowQuick\('u1', 'history'\)"[^>]*>Q2<\/button><button type="button" class="ok" onclick="setReflectiveSearch\('Bua', 'u1'\)"[^>]*>J1<\/button><span class="ok"[^>]*>C1<\/span><\/span>/, 'Q·J·C chips, green: ' + bits._logsHtml);
+        assert.deepEqual([bits._qN, bits.logsN, bits._cN], [2, 3, 1], 'approved quizzes · every journal (archived + Learning Notes, V102.536) · cases');
+        assert.match(bits._logsHtml, /<span class="u-qjc"[^>]*><button type="button" class="ok" onclick="userRowQuick\('u1', 'history'\)"[^>]*>Q2<\/button><button type="button" class="ok" onclick="userRowQuick\('u1', 'journal'\)"[^>]*>J3<\/button><span class="ok"[^>]*>C1<\/span><\/span>/, 'Q·J·C chips, green: ' + bits._logsHtml);
         assert.match(bits._logsHtml, /<span class="u-seen" title="Last seen [^"]+"><i class="fa-regular fa-clock" aria-hidden="true"><\/i> 3d<\/span>$/, '3 days = plain 🕓');
-        assert.equal(bits._copyText, 'ณัชชา โคตรบุปผา — Quiz 2 · Journal 1 · Case 1 · 13.75 pts · 🪙257', 'the panel\'s one-line Copy text');
+        assert.equal(bits._copyText, 'ณัชชา โคตรบุปผา — Quiz 2 · Journal 3 · Case 1 · 13.75 pts · 🪙257', 'the panel\'s one-line Copy text');
+        // V102.536: J opens the Hub History on Logs, the rows that hold everything it counts
+        const quick = html.slice(html.indexOf('function userRowQuick(uid, act) {'), html.indexOf('// V102.53: score / Beri are adjusted'));
+        const jump = await page.evaluate(async src => {
+            const calls = []; window.usersData = [{ id: 'u1', displayName: 'Bua' }];
+            window.openUserHub = async (uid, tab) => { calls.push(['hub', uid, tab]); };
+            window.setHubHistoryFilter = f => calls.push(['filter', f]);
+            (0, eval)(src + '; window.__urq = userRowQuick;');
+            window.__urq('u1', 'journal'); await new Promise(r => setTimeout(r, 0));
+            return calls;
+        }, quick);
+        assert.deepEqual(jump, [['hub', 'u1', 'history'], ['filter', 'logs']], 'J → Hub History → Logs, in that order: ' + JSON.stringify(jump));
         const fresh = await page.evaluate(now => rowBits({ id: 'u2', displayName: 'Joey', score: 0, lastSeen: { toMillis: () => now - 17 * 60000 } }), now);
         assert.match(fresh._logsHtml, /class="u-qjc"[^>]*><button type="button" class="" [^>]*>Q0<\/button><button type="button" class="" [^>]*>J0<\/button><span class=""[^>]*>C0<\/span>/, 'zeros grey');
         assert.match(fresh._logsHtml, /class="u-seen u-seen-fresh"[^>]*>.*? 17m<\/span>/, '< 1 day = fresh');
