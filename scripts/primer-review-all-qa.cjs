@@ -44,7 +44,7 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
 
         // the button
         const b = page.locator('.quiz-q-item .q-primer-review').first();
-        assert.equal(await b.evaluate(x => x.previousElementSibling.classList.contains('q-primer-all')), true, 'sits right after ✨ All');
+        assert.deepEqual(await b.evaluate(x => [x.previousElementSibling.textContent.trim(), x.closest('label').querySelectorAll('.q-primer-ai').length]), ['✨', 2], 'V102.524 (owner, option 1): the row is ✨ then 📖 All — two buttons');
         await page.evaluate(() => { const it = document.querySelectorAll('.quiz-q-item')[0]; it.style.display = 'block'; });
         await page.evaluate(() => document.querySelector('.quiz-q-item .q-primer-review').click());
         const ov = page.locator('#praOverlay');
@@ -126,7 +126,7 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
         assert.equal((await page.locator('#praOverlay .pra-none-t').innerText()).trim(), '📖 No Read first yet');
         assert.equal((await page.locator('#praOverlay .pra-none .pra-all').innerText()).trim(), '✨ All · 4');
         await page.locator('#praOverlay .pra-none .pra-all').evaluate(b => b.click());
-        assert.equal(await page.locator('#praOverlay').count(), 0, 'the popup closes'); assert.match(await page.evaluate(() => window.__all), /q-primer-all/, 'and the first row\'s ✨ All runs');
+        assert.equal(await page.locator('#praOverlay').count(), 1, 'V102.524: the popup stays open'); assert.equal(await page.evaluate(() => window.__all), 'pra-all', 'and ✨ All runs on the popup\'s own button');
         await page.evaluate(() => { _qPrimerReviewAll(); }); await page.locator('#praOverlay .pra-none .pra-chip').evaluate(b => b.click()); assert.equal(await page.locator('#praOverlay').count(), 0, '✎ Write by hand closes');
         // V102.517 compact: ✎ is icon-only with the question in its label; two columns at ≥ 900 px, one below
         await page.evaluate(() => { document.querySelectorAll('.quiz-q-item .q-primer')[0].value = '**A** x'; _qPrimerReviewAll(); });
@@ -139,6 +139,6 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
 
         const noise = e => /ServiceWorker|mermaid is not defined|reading 'auth'|db\.collection|firebase/.test(e);
         assert.deepEqual(errors.filter(e => !noise(e)), [], 'no page errors: ' + errors);
-        console.log('PASS: 📖 All Read first popup — V102.520 one-line term strips, ✎ opens the card in place with a live box that edits the question, re-check while typing, Open all / Close all, 10 questions without scrolling, lang-no-toggle; plus: after ✨ All with EN/TH/KO tooltips, reads the editor as it is, header counts, alias-aware repeated terms (headings excluded) with Qn marks, identical lines ≡ Qn, short pills with the breakdown on hover, strip for missing ones, all-empty state with ✨ All, header never overflows, Repeated-only filter, term chip outline, Esc closes');
+        console.log('PASS: 📖 All Read first popup — V102.520 one-line term strips, ✎ opens the card in place with a live box that edits the question, re-check while typing, Open all / Close all, 10 questions without scrolling, lang-no-toggle; plus: after ✨ All with EN/TH/KO tooltips, reads the editor as it is, header counts, alias-aware repeated terms (headings excluded) with Qn marks, identical lines ≡ Qn, short pills with the breakdown on hover, strip for missing ones, all-empty state with ✨ All run in place, header never overflows, Repeated-only filter, term chip outline, Esc closes');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
