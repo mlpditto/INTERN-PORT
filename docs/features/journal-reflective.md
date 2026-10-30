@@ -15,6 +15,7 @@ Intern: home ▸ Journal. Admin: Kanban ▸ a reflective card ▸ Reflective Rev
 - `reflective-writing-tip-qa` — ➕ Add tip to reply in the reply language with a reference
 - `reflective-bonus-footer-qa` — Bonus in the footer beside Save; AI pick ringed 💡
 - `reflective-mood-emoji-qa` — admin shows the saved mood emoji, not 📝
+- `journal-feedback-reply-qa` — admin ▸ Dashboard ▸ 💬 Journal feedback (`public/journal-feedback-admin.js`, V102.525): ↩ Reply writes the intern's copy `intern_messages/{same id}` (set + merge, backfilled fields, who / when) and marks the notification read; the reply shows under the message, can be updated, draft survives a repaint
 - `note-review-qa` — note review: paired deletion, award history, concurrent edit guard
 - `writing-progress-qa` — the intern's Journal progress card (`public/writing-progress.js`): weekday-aware streak (Sat / Sun never break it, Fri → Mon is consecutive, a weekend entry counts, today not written keeps it alive), 8-week heatmap (number + latest mood + grade bar in each cell, tint = words, detail line, month labels, weekend strips), month chip = `monthlyProgress.summary()` (target → n/target + green ✓, none → just n, tap = goal editor), mentor-grade strip (`latestGrammarGrade`: hidden under 2, caption from 3, calm colours), new-intern short view, EN/TH/KO
 
