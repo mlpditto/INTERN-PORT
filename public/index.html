@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.251)</title>
+    <title>Internship Portfolio (V101.252)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.234">
     <link rel="stylesheet" href="halloween.css?v=V101.249">
     <script>/* V101.235: 20 Oct – 2 Nov (Bangkok) the Journal wears Halloween (halloween.css), then it goes back on its own */(function () { try { var d = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).slice(5); if (d >= '10-20' && d <= '11-02') document.documentElement.classList.add('hw'); } catch (e) { /* none */ } })();</script>
@@ -1034,6 +1034,10 @@
         #quizPreviewSheet .qzp-chip { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border-radius:999px; background:#f1f5f9; color:#334155; font-weight:700; font-size:.82em; white-space:nowrap; }
         #quizPreviewSheet .qzp-chip.tag { background:#eef2ff; color:#4338ca; }
         #quizPreviewSheet .qzp-chip.mine { background:#ecfdf5; color:#047857; border:1px solid #6ee7b7; }
+        /* V101.252: the faces of who finished this quiz */
+        #quizPreviewSheet .qzp-faces { padding:3px 11px 3px 5px; }
+        #quizPreviewSheet .qzp-faces img { width:24px; height:24px; border-radius:50%; object-fit:cover; border:2px solid #fff; margin-left:-9px; background:#e2e8f0; }
+        #quizPreviewSheet .qzp-faces img:first-child { margin-left:0; }
         #quizPreviewSheet .qzp-cd { font-variant-numeric: tabular-nums; }
         #quizPreviewSheet .qzp-cd[hidden] { display:none; }
         #quizPreviewSheet .qzp-cd[data-tier="red"] { background:#dc2626; color:#fff; box-shadow:0 1px 4px rgba(220,38,38,.35); }
@@ -11975,8 +11979,9 @@
 
         // 🔥 V91.47: Populate Quiz Avatar Stacks
         // V101.179: a "👥 n" count of the people who did this quiz (+ your own avatar when you are one of them).
-        // Other people's faces are gone on purpose: the users rule lets an intern read only their own doc
+        // Other people's faces are gone from the card on purpose: the users rule lets an intern read only their own doc
         // (since 2026-04-23), so the old users/{id} read per completer was permission-denied for everyone else.
+        // V101.252: the Start popup shows them from the attempts themselves (pictureUrl on quiz_attempts, no users read) — kept in data-faces.
         async function populateQuizAvatarStacks() {
             const stacks = document.querySelectorAll('.quiz-avatar-stack');
             if (!stacks.length) return;
@@ -11995,13 +12000,15 @@
                         .limit(100)
                         .get();
 
-                    const userIds = new Set();
+                    const userIds = new Set(), faces = new Map();
                     attemptsSnap.forEach(doc => {
                         const attempt = doc.data();
                         if (attempt.userId) userIds.add(attempt.userId);
+                        if (attempt.userId && /^https:\/\//i.test(String(attempt.pictureUrl || ''))) faces.set(attempt.userId, attempt.pictureUrl);
                     });
 
                     const n = userIds.size;
+                    stackEl.dataset.faces = JSON.stringify([...faces.values()].slice(0, 6));
                     if (n > 0) {
                         const mine = userIds.has(userId) ? ((window.myUserDoc && window.myUserDoc.pictureUrl) || (userProfile && userProfile.pictureUrl) || '') : '';
                         const label = attemptsSnap.size >= 100 ? n + '+' : String(n);   // the query stops at 100 attempts
@@ -12834,7 +12841,13 @@
             const mats = (Array.isArray(q.materials) ? q.materials : []).filter(function (m) { return m && /^https?:\/\//i.test(String(m.url || '').trim()); });
             if (mats.length) chips.push('<span class="qzp-chip" title="Files · เอกสารประกอบ · 자료">📎 ' + mats.length + (mats.length === 1 ? ' file' : ' files') + '</span>');
             const taken = card && card.querySelector('.quiz-done-count');
-            if (taken) chips.push('<span class="qzp-chip" title="People who did it · จำนวนคนที่ทำแล้ว · 응시자 수">👥 ' + e(taken.textContent.replace(/\D/g, '') || '') + '</span>');
+            if (taken) {
+                const takenN = e(taken.textContent.replace(/\D/g, '') || ''), stack = taken.closest('.quiz-avatar-stack');
+                let faces = []; try { faces = JSON.parse((stack && stack.dataset.faces) || '[]'); } catch (err) { faces = []; }
+                chips.push(faces.length
+                    ? '<span class="qzp-chip qzp-faces" title="People who did it · คนที่ทำแล้ว · 응시자">' + faces.map(function (u) { return '<img alt="" src="' + e(u) + '" onerror="this.remove()">'; }).join('') + ' ' + takenN + '</span>'
+                    : '<span class="qzp-chip" title="People who did it · จำนวนคนที่ทำแล้ว · 응시자 수">👥 ' + takenN + '</span>');
+            }
             const att = quizAttemptsCache && quizAttemptsCache[q.id];
             if (att && att.totalQuestions > 0 && typeof att.correctCount === 'number' && att.status && att.status !== 'none' && att.status !== 'started')
                 chips.push('<span class="qzp-chip mine" title="Your result · ผลของคุณ · 내 결과">✓ ' + Math.round(att.correctCount / att.totalQuestions * 100) + '%</span>');

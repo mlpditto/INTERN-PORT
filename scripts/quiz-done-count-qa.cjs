@@ -66,7 +66,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         });
         assert.deepEqual(r.userReads, [], 'no users/{id} reads at all (other people\'s docs are permission-denied): ' + r.userReads);
         assert.equal(r.out.q1.count, '👥 3', 'q1: three distinct people (one did it twice)');
-        assert.equal(r.out.q1.imgs, 0, 'q1: no faces of other people');
+        assert.equal(r.out.q1.imgs, 0, 'q1: no faces of other people on the card (V101.252: the Start popup shows them, from data-faces)');
         assert.equal(r.out.q1.title, '3 people have done this quiz');
         assert.equal(r.out.q2.count, '👥 3', 'q2: me + two others = 3');
         assert.ok(r.out.q2.me && r.out.q2.imgs === 1, 'q2: my own avatar, and only mine');
