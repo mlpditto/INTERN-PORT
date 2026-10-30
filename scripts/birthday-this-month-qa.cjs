@@ -104,7 +104,7 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
         assert.ok(cal.cells >= 1, 'month view marks the birthday days'); assert.equal(cal.count.replace(/\s+/g, ' ').trim(), '🎂 ' + n);
         await page.evaluate(d => Holidays.pickDay(d), T.today);
         assert.match(await page.$eval('#hol-cal .hol-det', e => e.textContent), /TodayKid/, 'the day list names the person');
-        assert.equal(await page.$$eval('#hol-cal .hol-det .hol-ok', b => b.filter(x => x.textContent === '↗').length), 1, '↗ opens the User Hub (never a show-to-interns ✓)');
+        assert.equal(await page.$$eval('#hol-cal .hol-det .hol-ok', b => b.filter(x => x.textContent === '↗').length), 1 + (expect.first === 'today' ? 1 : 0) + (expect.last === 'today' ? 1 : 0), '↗ opens the User Hub for each person that day, first / last of the month may share today (never a show-to-interns ✓)');
         assert.deepEqual(errs, [], 'no page errors: ' + errs.join(' | '));
         console.log('birthday-this-month-qa: all checks passed');
     } finally { await browser.close(); }
