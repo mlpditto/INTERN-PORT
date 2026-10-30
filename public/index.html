@@ -12004,11 +12004,11 @@
                     attemptsSnap.forEach(doc => {
                         const attempt = doc.data();
                         if (attempt.userId) userIds.add(attempt.userId);
-                        if (attempt.userId && /^https:\/\//i.test(String(attempt.pictureUrl || ''))) faces.set(attempt.userId, attempt.pictureUrl);
+                        if (attempt.userId && /^https:\/\//i.test(String(attempt.pictureUrl || ''))) faces.set(attempt.userId, attempt.pictureUrl);   // V101.253: kept with the id — the Start popup keeps active members only
                     });
 
                     const n = userIds.size;
-                    stackEl.dataset.faces = JSON.stringify([...faces.values()].slice(0, 6));
+                    stackEl.dataset.faces = JSON.stringify([...faces.entries()]);
                     if (n > 0) {
                         const mine = userIds.has(userId) ? ((window.myUserDoc && window.myUserDoc.pictureUrl) || (userProfile && userProfile.pictureUrl) || '') : '';
                         const label = attemptsSnap.size >= 100 ? n + '+' : String(n);   // the query stops at 100 attempts
@@ -12846,6 +12846,9 @@
             if (taken) {
                 const takenN = e(taken.textContent.replace(/\D/g, '') || ''), stack = taken.closest('.quiz-avatar-stack');
                 let faces = []; try { faces = JSON.parse((stack && stack.dataset.faces) || '[]'); } catch (err) { faces = []; }
+                // V101.253 (owner): active members only — `active` comes from getLeaderboard; before it loads, or from an older function, no photos show (the plain 👥 n)
+                const activeIds = new Set(((typeof allUsersData !== 'undefined' && allUsersData) || []).filter(r => r && r.active === true).map(r => r.id));
+                faces = faces.filter(f => Array.isArray(f) && activeIds.has(f[0])).map(f => f[1]).slice(0, 6);
                 chips.push(faces.length
                     ? '<span class="qzp-chip qzp-faces" title="People who did it · คนที่ทำแล้ว · 응시자">' + faces.map(function (u) { return '<img alt="" src="' + e(u) + '" onerror="this.remove()">'; }).join('') + ' ' + takenN + '</span>'
                     : '<span class="qzp-chip" title="People who did it · จำนวนคนที่ทำแล้ว · 응시자 수">👥 ' + takenN + '</span>');
