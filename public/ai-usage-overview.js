@@ -123,8 +123,110 @@
         if(peak?.value)body.append(node('p','Peak recorded hour · '+peak.day+' · '+peak.h+':00–'+peak.h+':59 · '+number(peak.value)+' '+(metric==='count'?'calls':'tokens'),'au-note'));
         body.append(node('p','Bangkok time · Hourly data is available only for requests recorded after hourly tracking was enabled.','au-note'));
     }
+    // V102.526 (owner, 2026-10-30: "show which UI is paid by Google Cloud credits", admin first): a 💳 strip above the Google Cloud bill card.
+    // Credit pools = what Cloud Billing ▸ Credits showed on `asOf` (credits cannot be read by API — update the numbers here from that page).
+    // The provider mix is the real ai_usage of the period (only the Google routes are paid by credits). The busiest features get a one-tap
+    // "default → Flash 3.8" where the feature follows an admin default model; the table says where credits apply in admin.
+    const GOOGLE_CREDITS = {
+        asOf: '2026-10-30',
+        pools: [
+            { name: 'Developer Program', thb: 1680, sub: '5 × ฿336 · +฿336 every month (auto)', scope: 'Gemini API · Cloud TTS · Firebase · all of Google Cloud', until: '2027-01-28', untilLabel: 'first one expires' },
+            { name: 'GenAI App Builder', thb: 31090, sub: 'not used yet', scope: 'Vertex AI Search only → 📚 Nika', until: '2027-03-24', untilLabel: 'expires' }
+        ],
+        prepay: { thb: 93, autoReload: false }
+    };
+    const CREDIT_MODEL = 'gemini-3.8-flash';
+    const PROVIDER_MIX = { 'gemini-aistudio': 'Google (credits)', gemini: 'Google (credits)', cloud_tts: 'Google (credits)', openai: 'OpenAI', typhoon: 'Typhoon', openrouter: 'OpenRouter', anthropic: 'Anthropic' };
+    const MIX_COLOR = { 'Google (credits)': '#4285F4', OpenAI: '#10a37f', Typhoon: '#f59e0b', OpenRouter: '#8b5cf6', Anthropic: '#d97757', other: '#cbd5e1' };
+    // feature → [model input id, saved default key, window default name] — the features that follow an admin default model
+    const FEATURE_DEFAULTS = { quiz_translation: ['toolbar-ai-translate-model', 'ai_default_translate_model', 'DEFAULT_TRANSLATE_MODEL'], quiz_analyzer: ['ai-analyzer-model-val', 'ai_default_analyzer_model', 'DEFAULT_ANALYZER_MODEL'] };
+    const FEATURE_NAMES = { quiz_translation: 'Quiz translation', quiz_analyzer: 'AI Analyzer', intern_quiz_translate: 'Intern quiz translate', i18n_translate: 'UI translations', quiz_audit: 'Quality audit', answer_find: 'Answer finder', question_primer: 'Read first', quiz_curate: 'AI Curate', quiz_cover: 'Quiz cover', feedback_triage: 'Feedback triage', casecard_translate: 'Case Card translate', article_draft: 'Article draft', casecard_image: 'Case Card picture', reflective_feedback: 'Reflective feedback' };
+    const billedByGoogle = id => (typeof window.isGoogleBilledModel === 'function' ? window.isGoogleBilledModel(id) : /^(gemini-|as\/)/.test(String(id || '')));
+    const shortName = id => { const i = typeof window.textAIModelInfo === 'function' ? window.textAIModelInfo(id) : null; return (i && (i.short || i.label)) || id || '—'; };
+    function readDefault(def) {
+        const input = document.getElementById(def[0]); let v = input && input.value;
+        if (!v) { try { v = localStorage.getItem(def[1]) || ''; } catch (_) { v = ''; } }
+        return v || window[def[2]] || '';
+    }
+    function setDefault(def, model) {
+        const input = document.getElementById(def[0]);
+        if (input && typeof window.syncRegistryModelSelect === 'function') { input.value = model; window.syncRegistryModelSelect(def[0]); }
+        try { localStorage.setItem(def[1], model); } catch (_) { /* storage blocked */ }
+        window[def[2]] = model;
+    }
+    const daysLeft = iso => Math.max(0, Math.ceil((new Date(iso + 'T23:59:59+07:00').getTime() - Date.now()) / 86400000));
+    function googleCredits(a, days) {
+        const box = node('section', undefined, 'gc-credits lang-no-toggle');   // ฿ (U+0E3F) is in the Thai block — the EN/TH toggle would hide it box.setAttribute('aria-label', 'Google Cloud credits');
+        const head = node('div', undefined, 'gcc-head'), link = node('a', 'Credits page ↗', 'gc-link');
+        link.href = 'https://console.cloud.google.com/billing/credits'; link.target = '_blank'; link.rel = 'noopener';
+        head.append(node('strong', '💳 Google Cloud credits'), node('span', '🔵 on a chip or a ✨ button = paid by these credits first · จุดสีฟ้า = จ่ายด้วยเครดิตก่อนตัดบัตร · amounts from Billing ' + GOOGLE_CREDITS.asOf, 'gc-sub'), link);
+        box.append(head);
+        const pools = node('div', undefined, 'gcc-pools');
+        for (const p of GOOGLE_CREDITS.pools) {
+            const c = node('div', undefined, 'gcc-pool');
+            c.append(node('small', p.name), node('strong', '฿' + number(p.thb)), node('span', p.sub), node('span', p.scope), node('span', p.untilLabel + ' ' + p.until + ' · ' + daysLeft(p.until) + ' days left'));
+            pools.append(c);
+        }
+        const pp = GOOGLE_CREDITS.prepay, pc = node('div', undefined, 'gcc-pool' + (pp.autoReload ? '' : ' warn'));
+        pc.append(node('small', 'AI Studio Prepay'), node('strong', '฿' + number(pp.thb)), node('span', pp.autoReload ? 'auto-reload on' : '⚠️ auto-reload off — Gemini API calls stop at ฿0 if the credits are not applied first'));
+        pools.append(pc); box.append(pools);
+        // the real provider mix of the period
+        const mix = {}; let total = 0;
+        for (const m of a.models) { const k = PROVIDER_MIX[m.provider] || 'other'; mix[k] = (mix[k] || 0) + Number(m.count || 0); total += Number(m.count || 0); }
+        const order = ['Google (credits)', 'OpenAI', 'Typhoon', 'OpenRouter', 'Anthropic', 'other'].filter(k => mix[k] > 0);
+        const onCredits = mix['Google (credits)'] || 0, pct = total ? Math.round(100 * onCredits / total) : 0;
+        box.append(node('div', 'AI calls · last ' + days + ' days · ' + number(total) + ' calls · ' + pct + '% on credits (the blue part)', 'gcc-l'));
+        const bar = node('div', undefined, 'gcc-bar'); bar.setAttribute('role', 'img'); bar.setAttribute('aria-label', pct + '% of recorded AI calls were paid by Google Cloud credits');
+        const leg = node('div', undefined, 'gcc-leg');
+        for (const k of order) {
+            const s = node('span'); s.style.width = (100 * mix[k] / total).toFixed(2) + '%'; s.style.background = MIX_COLOR[k]; s.dataset.k = k; s.title = k + ' · ' + number(mix[k]); bar.append(s);
+            const l = node('span'), dot = node('i'); dot.style.background = MIX_COLOR[k]; l.append(dot, k + ' ' + Math.round(100 * mix[k] / total) + '% · ' + number(mix[k])); leg.append(l);
+        }
+        if (total) box.append(bar, leg);
+        // the busiest features — any provider (ai_usage does not record which provider a feature used)
+        const feats = {};
+        for (const d of a.selected) for (const [k, f] of Object.entries(d.features || {})) if (k !== 'untagged') feats[k] = (feats[k] || 0) + Number((f && f.count) || 0);
+        const top = Object.entries(feats).sort((x, y) => y[1] - x[1]).slice(0, 4);
+        if (top.length) {
+            const list = node('div', undefined, 'gcc-top'); list.append(node('div', 'Busiest AI features', 'gcc-l'));
+            for (const [k, n] of top) {
+                const row = node('div', undefined, 'gcc-row'); row.dataset.feature = k;
+                row.append(node('b', number(n)), node('span', FEATURE_NAMES[k] || k));
+                const def = FEATURE_DEFAULTS[k], side = node('span', undefined, 'gcc-side');
+                const paint = () => {
+                    side.replaceChildren();
+                    if (def) {
+                        const cur = readDefault(def);
+                        if (billedByGoogle(cur)) side.append(node('em', '🔵 on credits · ' + shortName(cur), 'gcc-ok'));
+                        else {
+                            const b = node('button', 'Default → 🔵 ' + shortName(CREDIT_MODEL)); b.type = 'button';
+                            b.title = 'Now: ' + shortName(cur) + ' (not on credits). Make ' + shortName(CREDIT_MODEL) + ' the default for this feature — paid by credits; any other model can still be picked in its rail · ตั้งค่าเริ่มต้นเป็น ' + shortName(CREDIT_MODEL) + ' (จ่ายด้วยเครดิต)';
+                            b.onclick = () => { setDefault(def, CREDIT_MODEL); paint(); };
+                            side.append(node('small', shortName(cur)), b);
+                        }
+                    } else side.append(node('small', /^intern_/.test(k) ? 'intern side · later' : 'the model picked in its own rail'));
+                };
+                paint(); row.append(side); list.append(row);
+            }
+            box.append(list);
+        }
+        // where credits apply in admin
+        const map = node('details', undefined, 'gcc-map'), sum = node('summary', 'Where credits apply in admin · ใช้เครดิตได้ที่ไหน');
+        const t = node('table'), hr = node('tr'); ['Screen', 'AI used', 'On credits?'].forEach(x => hr.append(node('th', x))); t.append(hr);
+        for (const [screen, ai, on, cls] of [
+            ['Read first ✨ · Articles ✨ Draft · Translate · AI Analyzer · Curate', 'the model picked in that rail', '🔵 when a Gemini chip is picked', 'm'],
+            ['✨ Scene · Quiz cover · Case Card picture', 'image rail', '🔵 Nano Banana · Flash Lite Image · 3 Pro Image', 'm'],
+            ['✨ Scene leak check', 'Gemini 3.8 Flash', '🔵 always', 'y'],
+            ['Voices / TTS', 'Gemini TTS · Cloud Text-to-Speech', '🔵 those two engines', 'm'],
+            ['📚 Nika · 🔎 search before writing (coming)', 'Vertex AI Search', '🔵 GenAI App Builder credit', 'y'],
+            ['Behind the screen: Functions, Firestore, Storage, LINE digests', 'Firebase', '🔵 always', 'y'],
+            ['GPT · Claude · Typhoon · Qwen · DeepSeek · Grok chips', 'OpenAI · Anthropic · Typhoon · OpenRouter', 'no — their own bills', 'n']
+        ]) { const tr = node('tr'); tr.append(node('td', screen), node('td', ai), node('td', on, 'gcc-' + cls)); t.append(tr); }
+        map.open = true; map.append(sum, t); box.append(map);
+        return box;
+    }
     function googleBill(a, days) {
-        const box=node('section',undefined,'gc-bill');box.setAttribute('aria-label','Google Cloud bill');
+        const box=node('section',undefined,'gc-bill lang-no-toggle');   // V102.526: the EN/TH toggle hid every ฿ here ("reaches0", "FKB-300300")box.setAttribute('aria-label','Google Cloud bill');
         const head=node('div',undefined,'gc-head'), ring=node('i',undefined,'gc-ring'), link=node('a','Billing reports ↗','gc-link');
         ring.setAttribute('aria-hidden','true');link.href='https://console.cloud.google.com/billing/reports';link.target='_blank';link.rel='noopener';
         const credit=node('a','Credit balance ↗','gc-link');credit.href='https://aistudio.google.com/billing';credit.target='_blank';credit.rel='noopener';
@@ -160,7 +262,7 @@
                 for(const [label,value] of [['Calls',number(a.calls)],['Tokens',number(a.tokens)],['Est. cost','—']]){
                     const card=node('div');card.append(node('small',label),node('strong',value));stats.append(card);
                 }
-                body.append(googleBill(a,Number(range.value)),stats);
+                body.append(googleCredits(a,Number(range.value)),googleBill(a,Number(range.value)),stats);
                 body.append(node('p','Recorded server usage · Bangkok time · '+number(a.unattributed)+' tokens not attributed to a model.','au-note'));
                 if(!a.selected.length){body.append(node('p','No recorded usage for this period.'));return;}
                 body.append(node('h4','Activity'));

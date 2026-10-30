@@ -17,7 +17,7 @@ const assert = require('node:assert/strict'), { chromium } = require('playwright
     // V101.59: the spark names the owner (no "Gemini" in the chip text), the Thai tooltip explains the bar,
     // and the rail has no legend line.
     assert.equal(await page.locator('#rail button[data-value="gemini-3.8-flash"]').innerText(), 'Flash 3.8');
-    assert.match(await page.locator('#rail button[data-value="gemini-3.8-flash"]').getAttribute('title'), /จุดสีฟ้า = ค่าใช้จ่ายเรียกเก็บผ่านบัญชี Google Cloud/);
+    assert.match(await page.locator('#rail button[data-value="gemini-3.8-flash"]').getAttribute('title'), /paid by Google Cloud credits first · จ่ายด้วยเครดิต Google Cloud ก่อนตัดบัตร/);
     assert.equal(await page.locator('#rail button[data-value="gpt-6-luna"]').getAttribute('title').then(t => t.includes('Google Cloud')), false);
     assert.equal(await page.locator('#rail .text-ai-chips').evaluate(n => getComputedStyle(n, '::after').content), 'none');
 

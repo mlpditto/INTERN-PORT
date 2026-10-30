@@ -52,6 +52,9 @@
     window.THAI_IMAGE_OK = ['gemini-3.8-flash', 'as/gemini-3.5-flash-lite', 'or/google/gemma-4-26b-a4b-it', 'claude-opus-5-5'];
     window.readsThaiImage = id => window.THAI_IMAGE_OK.indexOf(String(id || '')) >= 0;
     window.isGoogleBilledModel = id => /^(gemini-|as\/)/.test(String(id || ''));
+    // V102.526 (owner): the blue dot now says the call is paid by the Google Cloud credits first (Developer Program credits cover the Gemini API,
+    // Cloud TTS and Firebase) — the same words on every rail that carries the dot.
+    window.CREDIT_TIP = ' · 🔵 paid by Google Cloud credits first · จ่ายด้วยเครดิต Google Cloud ก่อนตัดบัตร';
     // V101.70: DeepSeek V4 Pro takes text only (OpenRouter input_modalities ["text"]), so image features hide it.
     // V4.1 Flash lists ["text","image"] and read Thai 2/3 in the 2026-09-25 smoke — it stays.
     window.isTextOnlyAIModel = id => /^(or\/deepseek\/deepseek-v4-pro|ol\/)/.test(String(id || ''));   // V102.76: + local Ollama (text only here)
@@ -93,7 +96,7 @@
         const owner = LOGO_OWNERS[m.label.split(' ')[0]];
         const logo = owner ? `<span class="text-ai-logo" data-owner="${owner}" aria-hidden="true"></span>` : '';
         const google = window.isGoogleBilledModel(m.id), thai = window.readsThaiImage(m.id);
-        return `<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}"${owner ? ` data-vendor="${owner}"` : ''}${google ? ' data-bill="google"' : ''}${thai ? ' data-thai="1"' : ''} aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} · ${m.id}${thai ? ' · พื้นสีธงไทย = อ่านภาษาไทยในรูปได้ (ทดสอบแล้ว)' : ''}${google ? ' · จุดสีฟ้า = ค่าใช้จ่ายเรียกเก็บผ่านบัญชี Google Cloud' : ''} — ${m.hint}"${action ? ` onclick="${action}"` : ''}>${logo}${m.short}</button>`;
+        return `<button type="button" class="glass-toggle-item${m.id === value ? ' active' : ''}" data-value="${m.id}"${owner ? ` data-vendor="${owner}"` : ''}${google ? ' data-bill="google"' : ''}${thai ? ' data-thai="1"' : ''} aria-label="${m.label}" aria-pressed="${m.id === value}" title="${m.label} · ${m.id}${thai ? ' · พื้นสีธงไทย = อ่านภาษาไทยในรูปได้ (ทดสอบแล้ว)' : ''}${google ? window.CREDIT_TIP : ''} — ${m.hint}"${action ? ` onclick="${action}"` : ''}>${logo}${m.short}</button>`;
     }).join('');
     window.textAIChipsHtml = (id, value, action, extra = []) => `<div class="text-ai-chips lang-no-toggle" role="group" aria-label="AI model"${id ? ` id="${id}"` : ''}>${window.textAIChipContents(value, action, null, extra)}</div>`;
     // V102.487 vendor-first rail: vendor icons first, only that vendor's models (the other chips stay in the DOM, hidden).
