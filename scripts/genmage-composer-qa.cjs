@@ -83,7 +83,7 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
         await page.evaluate(() => localStorage.setItem('ai_default_design_enhancer_model', 'no-such-model'));
         await open();
         assert.equal(await page.locator('#ai-model-design-enhancer').inputValue(), 'gpt-6-luna', 'unknown id → default');
-        // V102.364: desktop — the bar is ONE line in clip mode (Plan beside the engine rail), even at 1000 px where the rail scrolls sideways
+        // V102.364 / V102.531: desktop — ONE line in clip mode while it fits (1300 px); at 1000 px it wraps, and no chip or button is cut off or past the bar
         for (const w of [1300, 1000]) {
             await page.setViewportSize({ width: w, height: 900 });
             await page.evaluate(() => {
@@ -100,7 +100,9 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
                 const btn = document.getElementById('btn-generate-design');
                 return { h: Math.round(r.height), spread: Math.max(...tops) - Math.min(...tops), btn: btn.textContent.trim(), title: btn.title, inside: Math.round(btn.getBoundingClientRect().right) <= Math.round(r.right), wrap: getComputedStyle(b).flexWrap };
             });
-            assert.ok(d.h <= 66 && d.spread <= 12 && d.inside && d.wrap === 'nowrap', 'one line at ' + w + ' px: ' + JSON.stringify(d));
+            const fit = await page.evaluate(() => { const b = document.querySelector('#hub-view-design .gm-bar'), r = b.getBoundingClientRect(), rail = b.querySelector('.alabasta-genmage-quick-rail'); return { railClip: rail.scrollWidth - rail.clientWidth, past: [...b.querySelectorAll('button')].filter(e => e.offsetParent).filter(e => e.getBoundingClientRect().right > r.right + 1).length }; });
+            assert.ok(d.inside && fit.railClip <= 1 && fit.past === 0, 'nothing cut off at ' + w + ' px: ' + JSON.stringify([d, fit]));
+            if (w === 1300) assert.ok(d.h <= 66 && d.spread <= 12, 'one line at 1300 px: ' + JSON.stringify(d));
             assert.ok(/^Plan 10 episodes$/.test(d.btn) && /^Free · text only/.test(d.title), 'the free tier sits in the tooltip, not on the button: ' + d.btn + ' / ' + d.title);
         }
         // V102.294: phone width — the bar wraps instead of overflowing; Create is a full-width line inside the viewport
