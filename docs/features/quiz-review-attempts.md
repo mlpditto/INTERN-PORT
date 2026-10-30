@@ -8,7 +8,7 @@ Admin: Kanban ▸ a quiz attempt ▸ Review; Quiz Engine row ▸ 👥 Participan
 
 ## Scripts that drive it
 
-- `review-lean-qa` — Review Quiz Attempt: one-row header, Full / Actual marks
+- `review-lean-qa` — Review Quiz Attempt: one-row header, Full / Actual marks. V102.527 (owner, `mockups/review-header-lean.html` 1+2+3 + `mockups/review-approved-marks.html` D): the header stays one line even with a long quiz title (ellipsis, full title on hover), the title is the 🔍 alone, Approved / Exam / Practice are small pills on the name line — an approved attempt shows the fruit it was approved with (🍎 100% when the stored score is full, else 🍇 X pts) and the approve buttons disappear; until then they are one compact pair 🍎 100% | 🍇 X.XX (Full marks / Actual + the fruit names in aria-label / tooltip)
 - `review-lean2-qa` — Review round 2: ONE status helper (skipped / typed-not-ranked / correct / partial / wrong / review), chip rail + filter, compact bars + Expand all (a skipped or typed-not-ranked Rank card starts folded), ⚠ Low active + points chips on the Cheat / Timing strip (the two approve buttons stay separate), Rank 📋 Copy key, orange unsaved dot on 💾, leaner controls row
 - `pending-multi-recount-qa` — two-answer questions recounted correctly in the pending table
 - `choice-rescore-check` — seven admin paths score a joined multi-answer correctly
