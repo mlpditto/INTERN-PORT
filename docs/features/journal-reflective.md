@@ -8,13 +8,14 @@ Intern: home ▸ Journal. Admin: Kanban ▸ a reflective card ▸ Reflective Rev
 
 ## Scripts that drive it
 
-- `journal-one-page-qa` — Journal design A: no tabs, entry · Note fold · recent
+- `journal-one-page-qa` — Journal design A: no tabs, entry · Note fold · recent; V101.247: Message → `admin_notifications` + the intern's own copy `intern_messages/{same id}` in ONE batch (a failed send writes neither) — the copy shows in History (`history.md`)
 - `reflective-model-row-qa` — vendor-first MODEL rows, trial chips survive a reload
 - `reflective-grammar-lean-qa` — Writing Analysis column: Issues → Suggestions → Why; Apply per change / all
 - `reflective-diff-runs-qa` — Edited preview word diff: Thai phrase whole, no side padding, space is a space
 - `reflective-writing-tip-qa` — ➕ Add tip to reply in the reply language with a reference
 - `reflective-bonus-footer-qa` — Bonus in the footer beside Save; AI pick ringed 💡
 - `reflective-mood-emoji-qa` — admin shows the saved mood emoji, not 📝
+- `journal-feedback-reply-qa` — admin ▸ Dashboard ▸ 💬 Journal feedback (`public/journal-feedback-admin.js`, V102.526): ↩ Reply writes the intern's copy `intern_messages/{same id}` (set + merge, backfilled fields, who / when) and marks the notification read; the reply shows under the message, can be updated, draft survives a repaint
 - `note-review-qa` — note review: paired deletion, award history, concurrent edit guard
 - `writing-progress-qa` — the intern's Journal progress card (`public/writing-progress.js`): weekday-aware streak (Sat / Sun never break it, Fri → Mon is consecutive, a weekend entry counts, today not written keeps it alive), 8-week heatmap (number + latest mood + grade bar in each cell, tint = words, detail line, month labels, weekend strips), month chip = `monthlyProgress.summary()` (target → n/target + green ✓, none → just n, tap = goal editor), mentor-grade strip (`latestGrammarGrade`: hidden under 2, caption from 3, calm colours), new-intern short view, EN/TH/KO
 

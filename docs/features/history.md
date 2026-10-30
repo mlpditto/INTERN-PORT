@@ -16,6 +16,7 @@ Intern: home ▸ History accordion (desktop: right rail with flood + news cards)
 - `history-delete-menu-qa` — 🗑 ▸ Request delete form is not clipped near the bottom
 - `history-news-qa` — news rail card: parseDrugNews on a live-shaped fixture
 - `history-flood-rail-qa` — flood rail card: at-risk places, wide screens only
+- `intern-messages-history-qa` — ✉️ To admin rows (`public/intern-messages.js`, V101.247): the intern's own copy of a Journal message + the admin's 💬 reply (↩ Replied pill, new dot for a day, row moves to the reply time); score 0, never pending, not in the streak / Schedule heatmap, no 🗑; only `intern_messages where authUid == me`
 
 ## What usually lies
 
