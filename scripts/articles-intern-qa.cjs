@@ -159,6 +159,7 @@ const D = 864e5, BKK = 7 * 3600e3;
         const chips = () => [...row.querySelectorAll('.art-hist .lng')].map(b => b.textContent + ':' + b.dataset.lang);
         const wBefore = writes.length;
         out.histLng = chips();
+        { const css = getComputedStyle(row.querySelector('.art-top')); out.histInline = [css.position, css.top, css.right]; }   // V101.251: the pill sits on the title line
         row.querySelector('.art-hist .lng').click(); await wait(20);
         out.histLngTh = [chips().join(' '), row.querySelector('.art-md').innerHTML === window.renderMd(docs.a1.body.th), row.getAttribute('aria-expanded'), writes.length - wBefore];
         row.querySelector('.art-hist .lng').click(); await wait(20);
@@ -194,6 +195,7 @@ const D = 864e5, BKK = 7 * 3600e3;
     assert.deepEqual(r.histRead, ['true', 'art-read', 'hist', true, 4], 'opening the row reads it in place (disc → green ring, act hist, body + 🩺/💊/quiz/Codex links)');
     assert.deepEqual(r.listen, { on: [true, 'true', 'true'], mid: [true, true, true], off: [false, 'false'], said: true, lang: 'en-US', tm: true }, 'V101.206: tapping the disc speaks (ring fills, bars, countdown) without toggling the row; a second tap stops and restores the time badge: ' + JSON.stringify(r.listen));
     assert.deepEqual(r.histLng, ['EN:en'], 'V101.202: the row carries one language pill (a1 has no ko), EN on');
+    assert.deepEqual(r.histInline, ['absolute', '14px', '0px'], 'V101.251: the pill sits on the title line: ' + r.histInline);
     assert.deepEqual(r.histLngTh, ['TH:th', true, 'true', 0], 'a tap: Thai body in place, pill → TH, row still open, no write');
     assert.deepEqual(r.histLngBack, ['EN:en', true], 'a second tap: back to the English body');
     assert.equal(r.stillOpen, 'true', 'the next users snapshot does not collapse the open row');
