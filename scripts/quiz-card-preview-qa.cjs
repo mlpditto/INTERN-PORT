@@ -49,9 +49,23 @@ const INDEX = require('url').pathToFileURL(path.join(process.cwd(), 'public/inde
             host.querySelector('[data-qa="3"] h4').click(); out.t3 = txt(); out.startBtn3 = !!sheet().querySelector('.qzp-start'); out.mine3 = !!sheet().querySelector('.qzp-chip.mine');
             // 6 · taps on buttons / the footer never open it
             qzPreviewClose(); host.querySelector('[data-qa="3"] .assign-footer span').click(); out.footerTap = sheet().classList.contains('open');
+            // 7 · V101.252: the faces of who finished, from data-faces; a bad picture leaves the chip; none = the plain 👥 n
+            const cnt = host.querySelector('[data-qa="1"] .quiz-done-count'), wrap = document.createElement('span');
+            wrap.className = 'quiz-avatar-stack'; cnt.replaceWith(wrap); wrap.appendChild(cnt);
+            wrap.dataset.faces = JSON.stringify(['https://example.com/a.png', 'https://example.com/"b.png']);
+            host.querySelector('[data-qa="1"] .body-text').click();
+            const f = sheet().querySelector('.qzp-faces');
+            out.faces = f ? { n: f.querySelectorAll('img').length, text: f.textContent.trim(), srcs: [...f.querySelectorAll('img')].map(i => i.getAttribute('src')), w: f.querySelector('img').getBoundingClientRect().width } : null;
+            qzPreviewClose(); wrap.dataset.faces = '[]';
+            host.querySelector('[data-qa="1"] .body-text').click();
+            out.noFaces = [!!sheet().querySelector('.qzp-faces'), /👥 7/.test(txt())];
+            qzPreviewClose();
             return out;
         });
         assert.equal(r.open1, true, 'tap on the card body opens the sheet');
+        assert.ok(r.faces && r.faces.n === 2 && r.faces.text === '7' && r.faces.w === 24, 'faces + the count in one chip: ' + JSON.stringify(r.faces));
+        assert.deepEqual(r.faces.srcs, ['https://example.com/a.png', 'https://example.com/"b.png'], 'a stored URL stays one attribute');
+        assert.deepEqual(r.noFaces, [false, true], 'no pictures → the plain 👥 n chip');
         assert.ok(/Patient Interview-1/.test(r.t1) && /“การจ่ายยาให้ผู้ป่วย”/.test(r.t1), 'title + the description quote');
         assert.ok(/3 questions/.test(r.t1) && /⏱ 3 min/.test(r.t1) && /🎯 5 pts/.test(r.t1) && /📎 1 file/.test(r.t1) && /#dispensing/.test(r.t1) && /👥 7/.test(r.t1) && /⏰ 5 Nov/.test(r.t1), 'questions · time · points · files · tag · people · deadline: ' + r.t1);
         assert.ok(!/ai_variant/.test(r.t1), 'internal marker tags are not shown');
