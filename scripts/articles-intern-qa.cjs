@@ -14,7 +14,7 @@ assert.ok(/fwOnUserDoc\(da\.floodWatch\);[^\n]*\n\s*if \(window\.internArticles\
 assert.ok(/mapLinkSuggestionsToUnified\(\), window\.internArticles \? internArticles\.historyItems\(\) : \[\], window\.internMessages \? internMessages\.historyItems\(\) : \[\]\)/.test(html), 'History includes the article rows (V101.247: and the messages to admin after them)');
 assert.ok(/content_review: 0, article: 0, message: 0 \}/.test(html), 'History counts the 📰 type (V101.247: and ✉️)');
 const lean = fs.readFileSync('public/history-lean.js', 'utf8'), remind = fs.readFileSync('public/quiz-feedback-remind.js', 'utf8');
-assert.ok(/article: \{ e: '📰', n: 'Article' \}/.test(lean) && /'content_review', 'article'\]/.test(lean), 'history-lean knows the 📰 type and gives it a chip');
+assert.ok(/article: \{ e: '📰', n: 'Article' \}/.test(lean) && /'content_review', 'article', 'message'\]/.test(lean), 'history-lean knows the 📰 type and gives it a chip');
 assert.ok(/getElementById\('art-back'\)/.test(remind), 'the feedback reminder waits while an article is open');
 
 const D = 864e5, BKK = 7 * 3600e3;
