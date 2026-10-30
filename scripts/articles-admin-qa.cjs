@@ -312,9 +312,11 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
       // the one-line model rail
       Articles.modelPick();
       const chips = qa('.art-mrail .text-ai-chips > button'), shown = chips.filter(b => getComputedStyle(b).display !== 'none');
-      const tops = shown.concat(qa('.art-mrail .audit-provider')).map(b => Math.round(b.getBoundingClientRect().top + b.getBoundingClientRect().height / 2));
+      const tops = shown.concat(qa('.art-mrail .audit-provider')).concat([q('.art-ai .mdl')]).map(b => Math.round(b.getBoundingClientRect().top + b.getBoundingClientRect().height / 2));   // V102.521: the trigger shares the row
+      // V102.521 (design D): the trigger is the chosen chip (dark + vendor logo); open = the rail inline in the toolbar row, ✨ Draft steps aside, the chosen chip is not repeated in the rail
+      out.railD = [!q('.art-ai .go'), q('.art-ai .mdl').getAttribute('aria-expanded'), !!q('.art-ai .mdl .text-ai-logo'), getComputedStyle(q('.art-ai .mdl')).backgroundColor, chips.filter(b => b.getAttribute('aria-pressed') === 'true').every(b => getComputedStyle(b).display === 'none'), !!q('.art-tb .art-ai.open .art-mrail'), !q('.art-md > .art-mrail')];
       out.rail = [chips.length, shown.length, Math.max(...tops) - Math.min(...tops), shown.every(b => /^GPT /.test(b.getAttribute('aria-label')))];
-      Articles.model(shown[1].dataset.value); out.picked = [q('.art-ai .mdl').textContent.trim(), localStorage.getItem('articleDraftModel'), !q('.art-mrail')];
+      Articles.model(shown[1].dataset.value); out.picked = [q('.art-ai .mdl').textContent.trim(), localStorage.getItem('articleDraftModel'), !q('.art-mrail'), !!q('.art-ai .go'), q('.art-ai .mdl').getAttribute('aria-expanded'), q('.art-ai .mdl').title];
       Articles.close();
       return out;
     }, { D });
@@ -356,6 +358,8 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
     assert.ok(r3.rail[0] >= 10 && r3.rail[1] >= 1 && r3.rail[1] < r3.rail[0] && r3.rail[3], 'the model rail shows only the picked vendor’s models: ' + r3.rail);
     assert.ok(r3.rail[2] <= 3, 'logos and chips sit on one line (centres within 3 px), got ' + r3.rail[2]);
     assert.ok(r3.picked[0] && r3.picked[1] && r3.picked[2], 'picking a model folds the rail and remembers it: ' + r3.picked);
+    assert.deepEqual(r3.railD, [true, 'true', true, 'rgb(30, 41, 59)', true, true, true], 'V102.521 design D: dark logo chip is the trigger, rail inline in the toolbar row, ✨ Draft aside, chosen chip not repeated: ' + JSON.stringify(r3.railD));
+    assert.deepEqual(r3.picked.slice(3), [true, 'false', 'AI model for ✨ Draft — tap to change\nโมเดลที่ใช้ร่าง กดเพื่อเปลี่ยน'], '✨ Draft is back once a model is picked; EN + TH hover: ' + JSON.stringify(r3.picked.slice(3)));
     const bad = errors.filter(e => /Articles|articles-admin|art-/.test(e));
     assert.deepEqual(bad, [], 'no page errors from the module: ' + bad.join(' | '));
     console.log('PASS: admin 📰 Articles — Create ▸ Article row, status chips + list, editor (EN/TH/KO, markdown, window, 🔁, audience, quiz/Codex links), 📱 preview, draft / schedule / back to draft / two-tap delete → articles/{id}, rule');
