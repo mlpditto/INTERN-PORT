@@ -10,7 +10,7 @@ The top card is **you**: photo, name, points (**pts**), 🪙 Beri, level, and a 
 |---|---|
 | 📅 **Schedule** | Your training calendar and goals. The number on the corner = items due **today** |
 | ✏️ **Personal Info** | Your profile, internship dates, social handles · ⚙️ **Settings** top-right = privacy preferences, reload, and **📖 Guide** (this page) |
-| **EN** | Language — each tap cycles EN → KR → TH → K·T |
+| 🇺🇸 **Flag** | Language — the flag shows the current one; each tap cycles 🇺🇸 EN → 🇰🇷 KR → 🇹🇭 TH → 🇰🇷🇹🇭 both |
 | 🌊 **Flood watch** | River / flood risk near your training site |
 
 **Do this first**
@@ -19,6 +19,8 @@ The top card is **you**: photo, name, points (**pts**), 🪙 Beri, level, and a 
 3. Tap **⋯** under the check-in card for monthly progress, certificate progress 🏅, your next level ✨ and the 🏆 **Leaderboard**
 
 The page scrolls top to bottom: **Mission** (Quiz · Journal · Explore) → **DD Codex** → **History**. Tap a section's title bar to open or close it. The round **＋** button (bottom right) is **Submit New**.
+
+On weekdays from 16:00, a **to-do sheet** may open with today's Journal or Case and any unread articles.
 
 ---
 
@@ -29,6 +31,11 @@ Open **Mission ▸ Quiz**. Each card is one quiz with its **deadline** — the s
 - 🔍 In the **Mission** title bar: find a quiz that is not on your list, or **request** one
 - **ONE-TIME quizzes** — the first run is **Practice** (no points). When you finish, tap **Request Real Exam**; the admin allows it, then you retake it for real and it counts
 - Quizzes that are due soon and not done yet are the ones you want to finish first
+- **Tap a card** for a summary first (questions, time, points, deadline, files) — no questions are shown. Press **▶ Start**, or the countdown chip on the cover
+- The popup shows **👥** how many finished, with photos of active members
+- 🎓 **Practice quizzes** have **✓ Check** under each question: it locks your choice and shows the answer
+- **Rank questions** — type your answer once, then rank the options or sort them into Best / OK / Avoid
+- 📰 **Personal review** — the admin may send a review of your wrong answers. It appears on the quiz result and in **History**; highlights mark what to get right
 
 **Daily Quiz Digest (LINE group)**
 The bot posts a **Daily Quiz Digest** in the intern LINE group at **16:00**:
@@ -51,11 +58,13 @@ After a scored quiz, tell us how it went — under a minute, and it makes the qu
 
 ## 4. 📓 Journal
 
-Open **Mission ▸ Journal** and write your **daily reflection**: pick a **mood** (😊 😓 💪 🤔 …) then write what you did and learned. Thai or English — both are fine.
+Open **Mission ▸ Journal**. Pick a **mood**, then fill **Learned · Hard · Next** — any part is fine, Thai or English. **🎓 Note** and **✉️ Message** sit on the same page. One **Send** appears once something is filled, and it sends only those parts.
 
 - **My Writing Profile** shows total words, active days, your streak, and your TH / EN balance
 - The small number on the Journal tab = logs that already received an **admin bonus**
 - Writing every day builds your 🔥 **streak** (shown on the History tab)
+- ✉️ **Message to admin** — you keep a copy in **History**, and the admin's reply shows under it. It earns no points
+- 🎁 **Mentor bonus** — a Journal bonus waits for you: tap **🎁** to collect it
 
 ---
 
@@ -72,6 +81,8 @@ The round **＋** button (bottom right) is the one door for everything you hand 
 | ⋯ **Drug · Disease · Product** | Add a Codex entry or a product listing |
 
 Everything you submit shows up in **History** with its status. Cases are also in **History ▸ 🩺 ▸ 📊 My Cases**.
+
+**Case** also has an optional ⚠️ **ADR** tile: 10 Naranjo questions with a live score.
 
 ---
 
@@ -105,6 +116,7 @@ Everything you submit shows up in **History** with its status. Cases are also in
 | 🥇🥈🥉 First 3 to submit a quiz | 10 · 6 · 4 |
 | ⏱️ Submit a quiz ≥48 / ≥24 / ≥6 h before the deadline | 5 · 3 · 1 |
 | ⭐ Special gift from the admin | admin's call |
+| ★ Rank question at ★4 / ★5 | +1 / +2 (up to 50 a day) |
 
 - Quiz numbers are defaults; the admin can change or switch them off per quiz, and you get them when the admin approves the quiz
 - Once you hold **more than 500 Beri**, the **Murthehelp** shop opens (and stays open even if your Beri drops)
@@ -121,3 +133,5 @@ Everything you submit shows up in **History** with its status. Cases are also in
 **Explore** (Mission ▸ Explore) — links picked by the admin (shops, videos…).
 - Opening a link for the first time earns **🪙 Beri** — the earlier you open it, the more you get
 - Spend Beri in the Beri shop; write a short review on links you used
+
+**📰 Articles** — a short read pops up, one a day, until you have read it. **👍 Got it** marks it read; then **💬 Any Q?** lets you ask, report something out of date or suggest an addition. Your name is not shown, and replies appear in **History**.
