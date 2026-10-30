@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.535)</title>
+    <title>Nika Admin (V102.536)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -55693,7 +55693,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     // V102.33 (lean B): 9 columns → 6. Group = dot on the avatar; 📝 logs and 🏅
                     // badges sit under the name; Status went (ignore ⇄ show lives in ⋯, and the
                     // Hidden section already says who is ignored); Set / 👁 LIFF moved into ⋯.
-                    const logsN = reflectiveLogsCache.filter(lg => lg.userId === d.id && !lg.isArchived).length; // V102.35: same set Reflective Review lists
+                    const logsN = reflectiveLogsCache.filter(lg => lg.userId === d.id).length + learningNotesCache.filter(n => n.userId === d.id).length; // V102.536: every journal — reviewed, in Laugh Tale, and Learning Notes; J opens the same set
                     // V102.181: hide what is empty — no "—" for no badges, no "📝0"; the line itself goes when both are empty
                     const _badgesHtml = userBadgesCellHtml(d).replace(/^<span style="color:#cbd5e1;"[^>]*>—<\/span>$/, '');
                     // V102.182: the Users summary panel folded into the row — approved quizzes · journals · cases as Q·J·C chips (green when > 0),
@@ -55703,7 +55703,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const _seenMs = d.lastSeen && d.lastSeen.toMillis ? d.lastSeen.toMillis() : 0;
                     const _seenAge = _seenMs ? Date.now() - _seenMs : 0;
                     const _seenHtml = _seenMs ? `<span class="u-seen${_seenAge < 86400000 ? ' u-seen-fresh' : _seenAge > 7 * 86400000 ? ' u-seen-stale' : ''}" title="Last seen ${new Date(_seenMs).toLocaleString('th-TH')}"><i class="fa-regular fa-clock" aria-hidden="true"></i> ${escapeHtml(userSeenAgo(d.lastSeen))}</span>` : '';
-                    const _qjcHtml = `<span class="u-qjc" title="Quiz ${_qN} · Journal ${logsN} · Case ${_cN}"><button type="button" class="${_qN ? 'ok' : ''}" onclick="userRowQuick('${d.id}', 'history')" title="Approved quizzes — open the score history" aria-label="Quizzes ${_qN}">Q${_qN}</button><button type="button" class="${logsN ? 'ok' : ''}" onclick="setReflectiveSearch('${(d.displayName || d.id).replace(/'/g, "\\'")}', '${d.id}')" title="All submitted journals, pending and reviewed" data-th-title="Journal ที่ส่งทั้งหมด รวมรายการที่รอตรวจและตรวจแล้ว" aria-label="Journals ${logsN}">J${logsN}</button><span class="${_cN ? 'ok' : ''}" title="Cases" aria-label="Cases ${_cN}">C${_cN}</span></span>`;
+                    const _qjcHtml = `<span class="u-qjc" title="Quiz ${_qN} · Journal ${logsN} · Case ${_cN}"><button type="button" class="${_qN ? 'ok' : ''}" onclick="userRowQuick('${d.id}', 'history')" title="Approved quizzes — open the score history" aria-label="Quizzes ${_qN}">Q${_qN}</button><button type="button" class="${logsN ? 'ok' : ''}" onclick="userRowQuick('${d.id}', 'journal')" title="All journals: pending, reviewed, in Laugh Tale, and Learning Notes" data-th-title="Journal ทั้งหมด รวมที่รอตรวจ ตรวจแล้ว อยู่ใน Laugh Tale และ Learning Note" aria-label="Journals ${logsN}">J${logsN}</button><span class="${_cN ? 'ok' : ''}" title="Cases" aria-label="Cases ${_cN}">C${_cN}</span></span>`;
                     const _logsHtml = _qjcHtml + (window.Articles ? Articles.userChip(d) : '') + _seenHtml + userBirthdayChipHtml(d);   // V102.330: 🎂 this month · V102.341: 📰 articles read r/n
                     const _copyText = `${d.fullName || d.displayName || d.id} — Quiz ${_qN} · Journal ${logsN} · Case ${_cN} · ${parseFloat((d.score || 0).toFixed(2))} pts · 🪙${Math.round(d.beri || 0)}`;
                     tbody.innerHTML += `<tr class="${ignored ? 'u-ignored' : ''}" data-copy="${escapeHtml(_copyText)}">
@@ -55919,6 +55919,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (act === 'period') openPeriodModal(uid, u.displayName, u.startDate || '', u.endDate || '');
             else if (act === 'docs') { const o = applicantOwnerFor(u); if (o) openApplicantDocs(o); }   // V102.310
             else if (act === 'history') showHistory(uid, u.displayName, u.score || 0);
+            else if (act === 'journal') openUserHub(uid, 'history').then(() => window.setHubHistoryFilter('logs'));   // V102.536: the Logs rows hold everything J counts
             else if (act === 'log') openAdminLogWorkModal(uid);
             else if (act === 'cert') openCertModal(uid);
         }
@@ -67125,6 +67126,7 @@ Save it anyway?`;
                     learningNotesCache = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
                     learningNotesCache.sort((a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0));
                     drawKanban();
+                    if (activeTab === 'tab-users') renderTable('users');   // V102.536: the J count includes these
                     refreshNoteDeleteRequests();
                     if (window._lnrCurrent) lnrRenderDeleteRequest(learningNotesCache.find(note => note.id === window._lnrCurrent.id));
                     refreshEscalatedNotesCount(); // γ.4d: keep the Escalated queue button + count fresh
