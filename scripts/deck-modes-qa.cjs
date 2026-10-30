@@ -1,4 +1,4 @@
-// V102.337: the Grand Line Deck mode bar (a 113 px card above the panes) moved into the top tab row — 🏴 🧭 🐳 + 📖 as icon chips right after
+// V102.337: the Grand Line Deck mode bar (a 113 px card above the panes) moved into the top tab row — 🏴 🧭 🐳 as icon chips right after
 // "🏴‍☠️ Grand Line Deck", shown only while that tab is open (owner pick B). The REAL admin.html at 1440 / 1280 px, network stubbed.
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
@@ -36,28 +36,26 @@ assert.ok(/toggleAttribute\('hidden', id !== 'tab-ai-hub'\)/.test(html), 'switch
         out.mid = Math.abs((rr.top + rr.bottom) / 2 - (tabs[0].top + tabs[0].bottom) / 2) < 4;
         out.prev = rail.previousElementSibling && rail.previousElementSibling.textContent.trim();
         out.btns = [...rail.querySelectorAll('button')].map(b => b.textContent.trim() + '|' + (b.getAttribute('aria-label') || '') + '|' + !!b.title);
-        out.noBar = !document.querySelector('#tab-ai-hub .hub-mode-btn, #tab-ai-hub .deck-guide-btn');
+        out.noBar = !document.querySelector('#tab-ai-hub .hub-mode-btn');
         document.getElementById('btn-hub-research').click();
         out.research = [document.getElementById('btn-hub-research').classList.contains('active'), document.getElementById('btn-hub-design').classList.contains('active'), document.getElementById('hub-view-research').style.display];
         document.getElementById('btn-hub-design').click();
         out.activeBg = getComputedStyle(document.getElementById('btn-hub-design')).backgroundImage.includes('gradient');
-        let opened = 0; window.openDeckGuide = () => { opened++; }; rail.querySelector('.deck-guide-btn').click(); out.guide = opened;
         return out;
       });
       const tag = ' @' + width;
       assert.equal(r.otherTab, true, 'hidden on other tabs' + tag); assert.equal(r.deckTab, false, 'shown on the deck tab' + tag);
       assert.ok(r.h <= 44, 'one slim rail (≤ 44 px), got ' + r.h + tag); assert.ok(r.oneRow, 'the tab row does not wrap' + tag); assert.ok(r.mid, 'centred on the tab row' + tag);
       assert.equal(r.prev, '🏴‍☠️ Grand Line Deck', 'right after the deck tab' + tag);
-      assert.deepEqual(r.btns.map(b => b.split('|')[0]), ['🏴', '🧭', '🐳', '📖'], 'icon chips: modes + guide' + tag);
+      assert.deepEqual(r.btns.map(b => b.split('|')[0]), ['🏴', '🧭', '🐳'], 'icon chips: the three modes (the how-to lives in the 📖 Admin guide, V102.530)' + tag);
       assert.ok(r.btns.every(b => b.split('|')[1] && b.split('|')[2] === 'true'), 'every chip has an aria-label and a tooltip' + tag);
       assert.equal(r.noBar, true, 'no mode bar left inside the deck' + tag);
       assert.deepEqual(r.research, [true, false, 'flex'], '🧭 switches the deck to Log Pose' + tag);
       assert.equal(r.activeBg, true, 'One Piece theme: the active mode is the orange gradient' + tag);
-      assert.equal(r.guide, 1, '📖 opens the deck guide' + tag);
       const bad = errors.filter(e => /deck-modes|switchTab|switchHubMode/.test(e));
       assert.deepEqual(bad, [], 'no page errors' + tag + ': ' + bad.join(' | '));
       await page.close();
     }
-    console.log('PASS: Grand Line Deck modes live in the top tab row (🏴 🧭 🐳 📖, deck tab only, one row at 1440 / 1280 px, One Piece theme), the old 113 px bar is gone');
+    console.log('PASS: Grand Line Deck modes live in the top tab row (🏴 🧭 🐳, deck tab only, one row at 1440 / 1280 px, One Piece theme), the old 113 px bar is gone');
   } finally { await browser.close(); }
 })().catch(e => { console.error('FAIL:', e.message); process.exit(1); });

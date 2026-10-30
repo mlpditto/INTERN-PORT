@@ -1,32 +1,34 @@
-// V102.301: the 🏴‍☠️ Grand Line Deck badge opens the deck's own guide (images · video · audio · research) in the same overlay as the
-// 📖 Admin guide — admin-guide.js now serves two SETS. The REAL admin-guide.js + the three grand-line-guide markdown files + the real
-// admin-guide files; the guide only names buttons and chips that admin.html really has.
+// V102.530: the Grand Line Deck how-to lives in the 📖 Admin guide as section 7 (the deck's own 📖 button and grand-line-guide files are gone).
+// The REAL admin-guide.js + the three admin-guide markdown files; the chapter only names buttons and chips that admin.html really has.
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const admin = fs.readFileSync('public/admin.html', 'utf8').replace(/\r\n/g, '\n');
 const js = fs.readFileSync('public/admin-guide.js', 'utf8');
-const deck = { en: fs.readFileSync('public/grand-line-guide.en.md', 'utf8'), th: fs.readFileSync('public/grand-line-guide.md', 'utf8'), ko: fs.readFileSync('public/grand-line-guide.ko.md', 'utf8') };
 const adm = { en: fs.readFileSync('public/admin-guide.en.md', 'utf8'), th: fs.readFileSync('public/admin-guide.md', 'utf8'), ko: fs.readFileSync('public/admin-guide.ko.md', 'utf8') };
+const chapter = doc => doc.split(/\r?\n## 7\. /)[1] || '';
 
-// static: wiring + the three deck files agree + every named control exists in admin.html
-assert.ok(/<button type="button" class="deck-guide-btn deck-guide-mini" onclick="openDeckGuide\(\)"[^>]*>\s*<span class="deck-guide-hint" aria-hidden="true">📖<\/span>\s*<\/button>/.test(admin), 'V102.331: a 📖 icon button opens the deck guide (the name moved to the tab)');
+// static: one guide, one button + every named control exists in admin.html
+assert.ok(!/openDeckGuide|deck-guide/.test(admin) && !/openDeckGuide|SETS/.test(js), 'no second guide, no deck 📖 button');
+for (const f of ['grand-line-guide.md', 'grand-line-guide.en.md', 'grand-line-guide.ko.md']) assert.ok(!fs.existsSync('public/' + f), f + ' merged away');
 assert.ok(admin.includes(`onclick="switchTab('tab-ai-hub')"`) && /switchTab\('tab-ai-hub'\)"[^>]*>🏴‍☠️ Grand Line Deck<\/button>/.test(admin) && !admin.includes('AI Digital Lab'), 'the top tab is "🏴‍☠️ Grand Line Deck" — "AI Digital Lab" is gone everywhere');
-assert.ok(/class="deck-guide-btn deck-guide-mini"[^>]*title="[^"]*วิธี[^"]*·[^"]*만들기/.test(admin), '📖 tooltip EN · TH · KO');
 assert.ok(/<script src="admin-guide\.js\?v=V102\.\d+" defer><\/script>/.test(admin) && !admin.includes('admin-guide.js?v=V102.226'), 'script cache-busted');
-const secs = m => m.split(/\r?\n/).filter(l => /^## /.test(l));
-assert.equal(secs(deck.en).length, 5, 'five sections: images · video · Thai clip (V102.369) · audio · research');
-assert.equal(secs(deck.th).length, 5); assert.equal(secs(deck.ko).length, 5);
-for (const label of ['Plan 10 episodes', 'Clip 9:16', 'Nano Banana 2.1', 'Image 2', 'Visual Style Collection', 'Polish', 'Query Brain', 'Suggest Prompts', 'Focus on KB Only', 'Manage Documents', 'Codex Gallery', 'Clear Chat', 'Send to Podcast', 'Target Length', 'Performance Direction', 'CC ไทย', '🔊 เสียงไทย', 'Series ×10', 'One clip', '⇄ Free text', 'Easy to see', 'Stop after this one', 'Save all']) {   // V102.370: the Video section names the stepper's controls
-    assert.ok(admin.includes(label), 'admin.html has "' + label + '"');
-    for (const l of ['en', 'th', 'ko']) assert.ok(deck[l].split('**').join('').includes(label), l.toUpperCase() + ' deck guide names "' + label + '"');
+const subs = { en: ['🖼 Images', '🎬 Video', '🗣️ Thai clip', '🐳 Audio', '🧭 Log Pose'], th: ['🖼 ภาพ', '🎬 วิดีโอ', '🗣️ คลิปไทย', '🐳 เสียง', '🧭 Log Pose'], ko: ['🖼 이미지', '🎬 영상', '🗣️ 태국어 클립', '🐳 오디오', '🧭 Log Pose'] };
+for (const l of ['en', 'th', 'ko']) {
+    const c = chapter(adm[l]);
+    assert.deepEqual(c.split(/\r?\n/).filter(x => /^### /.test(x)).map(x => x.slice(4)), subs[l], l + ': five sub-headings in order');
+    assert.ok(!/\n## /.test(c) && !/📖/.test(c), l + ': section 7 is the last one and no longer points at a deck 📖');
+    assert.ok(!/section 3|หัวข้อ 3|3절/.test(c), l + ': no stale "section 3" reference');
+    assert.ok(/\$0\.80/.test(c) && /teach-clips/.test(c) && /clip_series/.test(c), l + ': cost + save targets');
 }
-for (const l of ['en', 'th', 'ko']) assert.ok(/\$0\.80/.test(deck[l]) && /teach-clips/.test(deck[l]) && /clip_series/.test(deck[l]), l + ': cost + save targets');
-assert.ok(js.includes("window.openDeckGuide = function () { open('deck'); }") && js.includes("window.openAdminGuide = function () { open('admin'); }"), 'two openers');
+for (const label of ['Plan 10 episodes', 'Clip 9:16', 'Nano Banana 2.1', 'Image 2', 'Visual Style Collection', 'Polish', 'Query Brain', 'Suggest Prompts', 'Focus on KB Only', 'Manage Documents', 'Codex Gallery', 'Clear Chat', 'Send to Podcast', 'Target Length', 'Performance Direction', 'CC ไทย', '🔊 เสียงไทย', 'Series ×10', 'One clip', '⇄ Free text', 'Easy to see', 'Stop after this one', 'Save all']) {
+    assert.ok(admin.includes(label), 'admin.html has "' + label + '"');
+    for (const l of ['en', 'th', 'ko']) assert.ok(chapter(adm[l]).split('**').join('').includes(label), l.toUpperCase() + ' Deck chapter names "' + label + '"');
+}
 
 const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</title>
 <style>:root{--bg-card:#fff;--text-main:#1e293b;--text-sub:#64748b;--border-color:#e2e8f0;--col-bg:#f1f5f9;--primary:#4361ee}body{margin:0;font-family:sans-serif}</style>
-<div id="dashboard-container" style="display:block"><button id="btn-admin-guide" onclick="openAdminGuide()">📖</button><button type="button" class="deck-guide-btn deck-guide-mini" onclick="openDeckGuide()" aria-label="Grand Line Deck guide">📖</button></div>
+<div id="dashboard-container" style="display:block"><button id="btn-admin-guide" onclick="openAdminGuide()">📖</button></div>
 <script>try{localStorage.setItem('adminGuideSeen','1')}catch(e){}window.marked={parse:function(t){return t.split('\\n').map(function(l){var m=/^### (.+)/.exec(l);return m?'<h3>'+m[1]+'</h3>':'<p>'+l+'</p>';}).join('')}};window.DOMPurify={sanitize:function(h){return h}};</script>
 <script src="/admin-guide.js" defer></script>`;
 (async () => {
@@ -36,51 +38,37 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</
         const errs = []; page.on('pageerror', e => errs.push(e.message));
         await page.route('https://qa.test/**', r => {
             const p = new URL(r.request().url()).pathname;
-            const files = { '/h.html': ['text/html', harness], '/admin-guide.js': ['text/javascript', js], '/admin-guide.md': ['text/markdown', adm.th], '/admin-guide.en.md': ['text/markdown', adm.en], '/admin-guide.ko.md': ['text/markdown', adm.ko],
-                '/grand-line-guide.md': ['text/markdown', deck.th], '/grand-line-guide.en.md': ['text/markdown', deck.en], '/grand-line-guide.ko.md': ['text/markdown', deck.ko] };
+            const files = { '/h.html': ['text/html', harness], '/admin-guide.js': ['text/javascript', js], '/admin-guide.md': ['text/markdown', adm.th], '/admin-guide.en.md': ['text/markdown', adm.en], '/admin-guide.ko.md': ['text/markdown', adm.ko] };
             if (files[p]) return r.fulfill({ contentType: files[p][0], body: files[p][1] });
             return r.fulfill({ status: 404, body: '' });
         });
         await page.goto('https://qa.test/h.html');
         await page.waitForTimeout(300);
         assert.equal(await page.locator('#adminGuideOverlay.open').count(), 0, 'seen flag set → no auto-open');
-        // the badge → deck guide, English, first section (images), four chips
-        await page.click('.deck-guide-btn');
-        await page.waitForFunction(() => document.querySelector('#adminGuideOverlay.open') && document.querySelectorAll('#adminGuideOverlay .ag-chip').length === 5);
-        assert.equal(await page.$eval('#adminGuideOverlay', e => e.dataset.set), 'deck');
-        assert.match(await page.$eval('#adminGuideOverlay .ag-title', e => e.textContent), /Grand Line Deck — how to/);
-        const chips = await page.$$eval('#adminGuideOverlay .ag-chip', els => els.map(e => ({ t: e.textContent, on: e.getAttribute('aria-pressed') })));
-        assert.deepEqual(chips.map(c => c.t), ['🖼 Images', '🎬 Video', '🗣️ Thai clip', '🐳 Audio', '🧭 Log Pose']);
-        assert.equal(chips[0].on, 'true', 'opens on Images (not the admin guide\'s tab map)');
-        const body = () => page.$eval('#adminGuideOverlay .ag-body', e => e.innerText);
-        assert.ok(/Visual Style Collection/.test(await body()) && /Nano Banana 2\.1/.test(await body()));
-        await page.click('#adminGuideOverlay .ag-chip[data-i="1"]');
-        assert.ok(/Plan 10 episodes/.test(await body()) && /\$0\.80/.test(await body()) && /teach-clips/.test(await body()) && /Intent.*Brief.*Style.*Plan.*Render.*Review/s.test(await body()) && /Series ×10/.test(await body()) && /Stop after this one/.test(await body()), 'video section = the stepper (V102.370)');
-        await page.click('#adminGuideOverlay .ag-chip[data-i="2"]');
-        assert.ok(/CC ไทย/.test(await body()) && /🔊 เสียงไทย/.test(await body()) && /Kore \/ Charon \/ Achird/.test(await body()) && /EPnn-th-voice\.mp4/.test(await body()), 'Thai clip section (V102.369)');
-        await page.click('#adminGuideOverlay .ag-chip[data-i="1"]');
-        // Thai switch stays on the deck set
+        await page.click('#btn-admin-guide');
+        await page.waitForFunction(() => document.querySelector('#adminGuideOverlay.open') && document.querySelectorAll('#adminGuideOverlay .ag-chip').length === 8);
+        const chips = () => page.$$eval('#adminGuideOverlay .ag-chip', els => els.map(e => e.textContent));
+        assert.equal((await chips())[7], '🏴‍☠️ Deck', 'the eighth chip is the Deck chapter');
+        const body = () => page.$eval('#adminGuideOverlay .ag-body', e => { e.querySelectorAll('.ag-fold').forEach(d => { d.open = true; }); return e.innerText; });   // V102.529: every ### block folds
+        await page.click('#adminGuideOverlay .ag-chip[data-i="7"]');
+        assert.deepEqual(await page.$$eval('#adminGuideOverlay .ag-fold > summary', els => els.map(e => e.textContent)), subs.en, 'the five parts are the chapter\'s folds');
+        const en = await body();
+        assert.ok(/Visual Style Collection/.test(en) && /Nano Banana 2\.1/.test(en), 'images');
+        assert.ok(/Plan 10 episodes/.test(en) && /\$0\.80/.test(en) && /Intent.*Brief.*Style.*Plan.*Render.*Review/s.test(en) && /Stop after this one/.test(en), 'video');
+        assert.ok(/CC ไทย/.test(en) && /Kore \/ Charon \/ Achird/.test(en) && /EPnn-th-voice\.mp4/.test(en), 'Thai clip');
+        assert.ok(/Query Brain/.test(en) && /Send to Podcast/.test(en), 'audio + Log Pose');
+        assert.equal(await page.locator('#adminGuideOverlay .ag-go.next').count(), 0, 'last chapter');
+        // the language switch keeps the chapter; reopening lands where it was
         await page.click('#adminGuideOverlay .ag-l[data-l="th"]');
-        // the title repaints at once, the body after the TH file loads — wait for the body (CI is slow)
-        await page.waitForFunction(() => /วิธีใช้ Grand Line Deck/.test(document.querySelector('#adminGuideOverlay .ag-title').textContent) && /ยืนยัน/.test(document.querySelector('#adminGuideOverlay .ag-body').innerText));
-        assert.ok(/Plan 10 episodes/.test(await body()) && /ยืนยัน/.test(await body()), 'TH video section, same index');
-        assert.deepEqual(await page.$$eval('#adminGuideOverlay .ag-chip', els => els.map(e => e.textContent)), ['🖼 ภาพ', '🎬 วิดีโอ', '🗣️ คลิปไทย', '🐳 เสียง', '🧭 Log Pose']);
-        // close, open the ADMIN guide → its own title, its own chips (not the deck's), lands on the tab map; the deck remembers its page
+        await page.waitForFunction(() => /ยืนยัน/.test(document.querySelector('#adminGuideOverlay .ag-body').textContent) && /คู่มือ Admin/.test(document.querySelector('#adminGuideOverlay .ag-title').textContent));
+        assert.ok(/Plan 10 episodes/.test(await body()), 'TH Deck chapter');
         await page.keyboard.press('Escape');
         await page.click('#btn-admin-guide');
-        await page.waitForFunction(() => document.querySelector('#adminGuideOverlay.open') && document.querySelectorAll('#adminGuideOverlay .ag-chip').length >= 5);
-        assert.equal(await page.$eval('#adminGuideOverlay', e => e.dataset.set), 'admin');
-        assert.match(await page.$eval('#adminGuideOverlay .ag-title', e => e.textContent), /คู่มือ Admin/);
-        assert.ok(!(await page.$$eval('#adminGuideOverlay .ag-chip', els => els.map(e => e.textContent))).includes('🎬 วิดีโอ'), 'admin chips, not deck chips');
-        await page.keyboard.press('Escape');
-        await page.click('.deck-guide-btn');
-        await page.waitForFunction(() => document.querySelector('#adminGuideOverlay').dataset.set === 'deck' && document.querySelectorAll('#adminGuideOverlay .ag-chip').length === 5);
-        assert.equal(await page.$eval('#adminGuideOverlay .ag-chip[aria-pressed="true"]', e => e.dataset.i), '1', 'deck guide reopens where it was (video)');
-        // KO
+        await page.waitForFunction(() => document.querySelectorAll('#adminGuideOverlay .ag-chip').length === 8);
+        assert.equal(await page.$eval('#adminGuideOverlay .ag-chip[aria-pressed="true"]', e => e.dataset.i), '7', 'reopens on the Deck chapter');
         await page.click('#adminGuideOverlay .ag-l[data-l="ko"]');
-        await page.waitForFunction(() => /사용법/.test(document.querySelector('#adminGuideOverlay .ag-title').textContent) && /에피소드/.test(document.querySelector('#adminGuideOverlay .ag-body').innerText));
-        assert.ok(/Plan 10 episodes/.test(await body()), 'KO video section');
-        await page.click('#adminGuideOverlay .ag-l[data-l="en"]');
+        await page.waitForFunction(() => /관리자 가이드/.test(document.querySelector('#adminGuideOverlay .ag-title').textContent) && /에피소드/.test(document.querySelector('#adminGuideOverlay .ag-body').textContent));
+        assert.ok(/Plan 10 episodes/.test(await body()), 'KO Deck chapter');
         assert.deepEqual(errs, []);
         console.log('deck-guide-qa: all passed');
     } finally { await browser.close(); }
