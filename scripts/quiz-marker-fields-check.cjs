@@ -59,7 +59,7 @@ check('pharmCampDateRange uses B (legacy) + C (field), not D (substring)', j(w.p
 // campaign chips
 w.populateQuizCampaignChips('PharmCamp');
 const rail = mk('quiz-campaign-chips').innerHTML;
-check('chips: None + known campaigns + New', [...rail.matchAll(/>([^<]+)<\/div>/g)].map(m => m[1]).join('|'), 'None|Camp2|PharmCamp|+ New');
+check('chips: None + known campaigns + New', [...rail.matchAll(/>([^<]+)<\/div>/g)].map(m => m[1]).join('|'), 'None|Camp2|PharmCamp|＋');
 check('chips: active = current', /class="glass-toggle-item active" data-value="PharmCamp"/.test(rail), true);
 check('chips: hidden value set', mk('quiz-campaign').value, 'PharmCamp');
 w.selectQuizCampaign({ dataset: { value: '' } });
