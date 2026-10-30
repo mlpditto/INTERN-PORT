@@ -33,7 +33,7 @@ The **Admin Portal** page has 3 ways in — use any one:
 | 📱 **UI** | Preview the intern's screen (LIFF Preview) without LINE |
 | 🔮 | AI Engine settings (keys / models) — if it says "not loaded yet", refresh the page |
 | ⚓ | Toggle the One Piece theme for Grand Line Deck + Laugh Tale |
-| **EN** | Label language — each tap cycles EN → KR → TH → K·T |
+| 🇺🇸 **Flag** | Label language — the flag shows the current one; each tap cycles 🇺🇸 EN → 🇰🇷 KR → 🇹🇭 TH → 🇰🇷🇹🇭 both |
 | 🌓 | Switch light / dark mode |
 | 👋 **Logout** | Sign out |
 
@@ -53,6 +53,9 @@ The **Admin Portal** page has 3 ways in — use any one:
 
 ### 📊 Dashboard
 - **Chip bar at the top** (tap to open the list): 👤 Access (access requests) · 📖 Review (Reflective Review) · 💰 Claimed (points requested) · ⏱️ Quiz (waiting / late) · 💼 Work · 💊 Drug Drafts · 🩺 Disease Drafts · 📥 New Cases
+- 🚀 **Up next** + 🎯 **Live quizzes**: every live quiz on a grid of how urgent × how many have done it — 🔥 Do first · 📅 Plan · ⏳ Watch · ✅ On track. Set the limits with ⏱ 24 h / 72 h / 7 d and 👥 30 / 50 / 70 %
+- 💬 **Journal feedback**: messages interns send from their Journal. **↩ Reply** lands in that intern's History under their message · **✓ Mark read**
+- **Blue dot on a model chip** = paid by Google Cloud credits first
 - **Kanban**: Backlog → 🚧 Doing → 👀 Review → ✅ Done (search Tasks; Show archived for older ones)
 - **🚀 Escalated**: learning notes an intern escalated for special attention · **🗑️ Note deletion requests**: requests to delete notes
 - **AI usage · Overview**: AI usage summary + heatmap (tap to open)
@@ -93,6 +96,21 @@ The **Admin Portal** page has 3 ways in — use any one:
 - 📊 **Monitor: Intern Learning Paths** to view interns' LP notes · 🗑️ Trash
 - Editing / deleting an intern's note requires a **reason** so an audit log is kept (deletes are soft — recoverable from Trash)
 
+### 📝 Quiz editor
+- **Read first**: **✨** drafts this question (the correct answer is not sent to the AI); **☰ Terms only** is offered right after a draft. **📖 All** opens the whole quiz: repeated terms are flagged, you edit in the popup, and **✨ All** fills the empty ones with the model picked there
+- **✨ Scene** (🖼 image panel): a picture of the stem's situation — an AI picture with a check that it does not give the answer away, or a chart from the numbers. **Insert** puts it in the stem
+- **🎓 Practice** (Logic): the intern gets **✓ Check** after each question. It shows the key, so leave it off for exam sets
+- **Rank** question: the intern types an answer once, then ranks the options or sorts them into Best / OK / Avoid. **✨ Draft with AI** fills it; check the levels and ⚠ flags
+- **AI Curate**: Remove or Split on an active quiz asks first, then deactivates the quiz in the same step
+
+### 🔍 Reviewing an attempt
+- The header is one line: the status sits beside the name. Until approved, choose **🍎 100%** (full marks) or **🍇 points** (actual score); after that the fruit you chose stays as the status
+- 📰 **Personal review** (the newspaper icon, shown when there are wrong answers): tap the flag for the language, pick a model, press **✨** — nothing runs before that, and the intern's name is not sent. Edit, then **📨 Send**: it appears on their quiz result and in History. `**bold**` shows as a highlight
+
+### 📰 Articles
+- ➕ **Create ▸ Article**. **✨ Draft** turns pasted notes into a short story of up to 2,000 characters; **✨ Episode 2** carries on where it stopped
+- Interns ask through 💬 **Any Q?** — the Dashboard chip counts open ones, ⚠️ "wrong / out of date" first. **↩ Reply** shows in their History; their name stays hidden
+
 ---
 
 ## 3. 📅 Daily routine (example order)
@@ -101,6 +119,7 @@ The **Admin Portal** page has 3 ways in — use any one:
 2. Check the red badge on 📦 **Assignments** → review the waiting Quizzes
 3. **Alabasta** → filter Pending → review Cases / Products
 4. **Laugh Tale** → look at "Needs a fix" in Quiz feedback
+5. 🎯 **Live quizzes** → start with 🔥 Do first
 
 ---
 
@@ -193,7 +212,7 @@ Tab: **🏴‍☠️ Grand Line Deck** → the three modes at the top: 🏴 Miss
 2. **Brief**: four fields, 📄 Context · 🎯 Goal · 📚 Source · ⭐ Expectations (Thai is fine); they become one prompt. **⇄ Free text** swaps them for a single box.
 3. **Style**: one chip (pharmacy styles first, **Easy to see** for older patients, the six One Piece styles behind the **🏴‍☠️ One Piece** chip). The style text is appended to every prompt, with the 🛡️ Always added line (original characters, no logos); the pick is remembered.
 4. **Plan** (free): the bottom-left rail is the text model (logo tabs pick the vendor, chips the version). Press **Plan 10 episodes** (or **Plan 1 clip**) → the **Episodes** card: EN/TH title, objective, key fact, one spoken line, one picture, Thai caption. ✏️ edits a row in place.
-5. **Render** (paid): pick the engine chip (the 8-s price sits under the name): **Clip 9:16** Gemini Omni Flash ≈ $0.80 · **Veo Lite** ≈ $0.40 · **Kling** ≈ $1.01 · **HeyGen** ≈ $0.40 (avatar presenter) · **Seedance** ≈ $0.73. Then:
+5. **Render** (paid): pick the engine chip (the 8-s price sits under the name): **Clip 9:16** Gemini Omni Flash ≈ $0.80 · **Veo Lite** ≈ $0.40 · **Kling** ≈ $1.01 · **HeyGen** ≈ $0.40 (avatar presenter) · **Seedance** ≈ $1.84. Then:
    - **▶** on one episode → the row asks **≈ $ · 8 s → Render**; confirm and it renders a 9:16 720p clip with audio.
    - **☑** several episodes → the bar shows the count and the total, **▶ Render n · one at a time**; one confirmation, the clips render one after another, **⏹ Stop after this one** stops.
    - Every finished clip saves itself: MP4 to Storage `teach-clips/{series}/EPnn.mp4` + the `clip_series` record, and it shows in **Codex Gallery → 🎬 Clips**. A failed upload → **💾 Save all (n)** in the bar.
