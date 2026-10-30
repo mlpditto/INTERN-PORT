@@ -18,7 +18,7 @@ assert.equal(await page.evaluate(()=>loads),1);
 assert.equal(await page.locator('#acc-usage-today').innerText(),'Today · 4 calls · 1,000 tokens','today total on the Usage & quota row');
 await page.evaluate(()=>aiUsageOverview.mount('settings'));await page.waitForSelector('#settings .au-stats');assert.equal(await page.evaluate(()=>loads),1,'the overview shares the cache');
 assert.match(await page.locator('#settings').innerText(),/200 tokens not attributed/);
-assert.equal(await page.locator('#settings details').getAttribute('open'),null);
+assert.equal(await page.locator('#settings details:not(.gcc-map)').getAttribute('open'),null);   // V102.528: the 💳 strip's where-credits table is a <details> too
 for(const width of [320,390,1024]){await page.setViewportSize({width,height:800});assert(await page.locator('#settings').evaluate(n=>n.scrollWidth<=n.clientWidth));}
 await page.locator('#settings select[aria-label="Heatmap metric"]').selectOption('count');
 await page.locator('#settings .au-scroll button').nth(6*24+14).click();assert.match(await page.locator('#settings [role=status]').innerText(),/3 calls/);

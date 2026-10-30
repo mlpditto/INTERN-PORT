@@ -123,7 +123,7 @@
         if(peak?.value)body.append(node('p','Peak recorded hour · '+peak.day+' · '+peak.h+':00–'+peak.h+':59 · '+number(peak.value)+' '+(metric==='count'?'calls':'tokens'),'au-note'));
         body.append(node('p','Bangkok time · Hourly data is available only for requests recorded after hourly tracking was enabled.','au-note'));
     }
-    // V102.526 (owner, 2026-10-30: "show which UI is paid by Google Cloud credits", admin first): a 💳 strip above the Google Cloud bill card.
+    // V102.528 (owner, 2026-10-30: "show which UI is paid by Google Cloud credits", admin first): a 💳 strip above the Google Cloud bill card.
     // Credit pools = what Cloud Billing ▸ Credits showed on `asOf` (credits cannot be read by API — update the numbers here from that page).
     // The provider mix is the real ai_usage of the period (only the Google routes are paid by credits). The busiest features get a one-tap
     // "default → Flash 3.8" where the feature follows an admin default model; the table says where credits apply in admin.
@@ -226,7 +226,7 @@
         return box;
     }
     function googleBill(a, days) {
-        const box=node('section',undefined,'gc-bill lang-no-toggle');   // V102.526: the EN/TH toggle hid every ฿ here ("reaches0", "FKB-300300")box.setAttribute('aria-label','Google Cloud bill');
+        const box=node('section',undefined,'gc-bill lang-no-toggle');   // V102.528: the EN/TH toggle hid every ฿ here ("reaches0", "FKB-300300")box.setAttribute('aria-label','Google Cloud bill');
         const head=node('div',undefined,'gc-head'), ring=node('i',undefined,'gc-ring'), link=node('a','Billing reports ↗','gc-link');
         ring.setAttribute('aria-hidden','true');link.href='https://console.cloud.google.com/billing/reports';link.target='_blank';link.rel='noopener';
         const credit=node('a','Credit balance ↗','gc-link');credit.href='https://aistudio.google.com/billing';credit.target='_blank';credit.rel='noopener';

@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const owner = pick.logos && ownerOf(value);
         if (owner) { const logo = document.createElement('span'); logo.className = 'cs-logo'; logo.dataset.owner = owner; logo.setAttribute('aria-hidden', 'true'); b.append(logo); }
         b.append(label);
-        if (pick.logos && /^(gemini-|as\/)/.test(value)) { b.dataset.bill = 'google'; b.title += window.CREDIT_TIP || ''; }   // V102.526: the credits dot (text-ai-chips.css)
+        if (pick.logos && /^(gemini-|as\/)/.test(value)) { b.dataset.bill = 'google'; b.title += window.CREDIT_TIP || ''; }   // V102.528: the credits dot (text-ai-chips.css)
         b.onclick = () => { if (busy || pick.sel.value === value) return; pick.sel.value = value; pick.sel.onchange(); };
         rail.append(b);
     });
@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modelRail.querySelectorAll('button').forEach(b => {
             const id = b.dataset.value, sug = SUGGEST[layout.value] === id, v = votes(id);
             b.classList.toggle('cs-sug', sug);
-            b.title = (fullName[id] || id) + (HINTS[id] ? ' — ' + HINTS[id] : '') + (sug ? ' · ★ suggested for this template' : '') + (v.up + v.down ? ' · 👍 ' + v.up + '/' + (v.up + v.down) + ' here' : '') + (b.dataset.bill === 'google' ? (window.CREDIT_TIP || '') : '');   // V102.526
+            b.title = (fullName[id] || id) + (HINTS[id] ? ' — ' + HINTS[id] : '') + (sug ? ' · ★ suggested for this template' : '') + (v.up + v.down ? ' · 👍 ' + v.up + '/' + (v.up + v.down) + ' here' : '') + (b.dataset.bill === 'google' ? (window.CREDIT_TIP || '') : '');   // V102.528
         });
         const cur = votes(model.value);
         hintEl.textContent = (HINTS[model.value] || '') + (SUGGEST[layout.value] === model.value ? ' · ★ suggested for this template' : '') + (cur.up + cur.down ? ' · 👍 ' + cur.up + '/' + (cur.up + cur.down) + ' here' : '');

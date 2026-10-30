@@ -1,4 +1,4 @@
-// V102.526 — credits cue (owner: "show which UI is paid by Google Cloud credits", admin first). The REAL admin.html offline (file://, network
+// V102.528 — credits cue (owner: "show which UI is paid by Google Cloud credits", admin first). The REAL admin.html offline (file://, network
 // blocked, Firebase = Proxy, the module script's @google/generative-ai import stubbed).
 // ① the blue dot's tooltip = "paid by Google Cloud credits first" (EN + TH); the dot also on the Case Card / ✨ Scene image rails (Google models only)
 //    and the Gemini / Cloud TTS engines; ② the ✨ button carries the dot while a credit-covered model is picked (Read first, ✨ Scene, Articles Draft,

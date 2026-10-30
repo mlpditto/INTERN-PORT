@@ -52,9 +52,9 @@
     window.THAI_IMAGE_OK = ['gemini-3.8-flash', 'as/gemini-3.5-flash-lite', 'or/google/gemma-4-26b-a4b-it', 'claude-opus-5-5'];
     window.readsThaiImage = id => window.THAI_IMAGE_OK.indexOf(String(id || '')) >= 0;
     window.isGoogleBilledModel = id => /^(gemini-|as\/)/.test(String(id || ''));
-    // V102.526 (owner): the blue dot now says the call is paid by the Google Cloud credits first (Developer Program credits cover the Gemini API,
+    // V102.528 (owner): the blue dot now says the call is paid by the Google Cloud credits first (Developer Program credits cover the Gemini API,
     // Cloud TTS and Firebase) — the same words on every rail that carries the dot.
-    window.CREDIT_TIP = ' · 🔵 paid by Google Cloud credits first · จ่ายด้วยเครดิต Google Cloud ก่อนตัดบัตร';
+    window.CREDIT_TIP = ' · 🔵 paid by Google Cloud credits first · จ่ายด้วยเครดิต Google Cloud ก่อนตัดบัตร · Google Cloud 크레딧으로 먼저 결제';
     // V101.70: DeepSeek V4 Pro takes text only (OpenRouter input_modalities ["text"]), so image features hide it.
     // V4.1 Flash lists ["text","image"] and read Thai 2/3 in the 2026-09-25 smoke — it stays.
     window.isTextOnlyAIModel = id => /^(or\/deepseek\/deepseek-v4-pro|ol\/)/.test(String(id || ''));   // V102.76: + local Ollama (text only here)
