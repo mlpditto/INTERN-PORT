@@ -1,4 +1,4 @@
-// V102.525: admin ▸ Dashboard ▸ "💬 Journal feedback" — ↩ Reply. The REAL public/journal-feedback-admin.js against a stubbed Firestore.
+// V102.526: admin ▸ Dashboard ▸ "💬 Journal feedback" — ↩ Reply. The REAL public/journal-feedback-admin.js against a stubbed Firestore.
 // A reply is written to the intern's own copy intern_messages/{same id} with set(merge) — status answered, reply, repliedAt, repliedBy —
 // backfilling the copy's six fields from the notification (a message sent before V101.247 has no copy yet) and marking the notification
 // read; the existing reply shows under the message (↩ Replied in the summary) and can be updated; an empty reply is refused; a failed
@@ -85,6 +85,6 @@ const db = { app: { auth: () => ({ currentUser: { email: 'admin@test' }, onAuthS
         await page.evaluate(() => window.__ok({ docs: [docs[1]], size: 1 }));
         assert.equal(await page.locator('details.lr-admin.queue-empty').count(), 1, 'hides itself when nothing is unread');
         assert.deepEqual(errs, [], 'no page errors: ' + errs.join(' | '));
-        console.log('PASS: admin Journal feedback ↩ Reply (V102.525) — reads the copies alongside, existing reply shown + ↩ Replied, Update reply, empty refused, draft survives a repaint, failure keeps text, reply = set(merge) on intern_messages/{same id} with backfilled fields + who/when and the notification read, ✓ Mark read kept, hides when nothing is unread');
+        console.log('PASS: admin Journal feedback ↩ Reply (V102.526) — reads the copies alongside, existing reply shown + ↩ Replied, Update reply, empty refused, draft survives a repaint, failure keeps text, reply = set(merge) on intern_messages/{same id} with backfilled fields + who/when and the notification read, ✓ Mark read kept, hides when nothing is unread');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

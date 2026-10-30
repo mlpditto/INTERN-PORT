@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     host.prepend(section);
     const list = section.querySelector('div'), status = section.querySelector('p');
     let unsubscribe, unsubCopies, snapDocs = [], copies = {};
-    const drafts = {};   // V102.525: a reply being typed survives the re-render a snapshot causes
+    const drafts = {};   // V102.526: a reply being typed survives the re-render a snapshot causes
     const when = ts => ts?.toDate?.().toLocaleString() || '';
     function paint() {
         section.classList.toggle('queue-empty', !snapDocs.some(doc => !doc.data().read));
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 attachment.append(label, content); row.append(attachment);
             }
             const date = document.createElement('small'); date.textContent = when(data.timestamp); row.append(date);
-            // V102.525: ↩ Reply — written to the intern's own copy (intern_messages/{same id}); the intern reads it in History under the message.
+            // V102.526: ↩ Reply — written to the intern's own copy (intern_messages/{same id}); the intern reads it in History under the message.
             // A copy that does not exist yet (a message sent before V101.247) is backfilled from this doc in the same set (merge).
             const box = document.createElement('div'); box.className = 'jf-reply'; box.style.cssText = 'margin-top:8px; display:grid; gap:6px;';
             if (replied) {
@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
         unsubscribe = db.collection('admin_notifications').where('type', '==', 'journal_feedback').onSnapshot(snap => {
             snapDocs = snap.docs; paint();
         }, () => { section.classList.remove('queue-empty'); unsubscribe = null; status.textContent = 'Could not load. Close and reopen to retry.'; });
-        // V102.525: the interns' copies carry the replies — read alongside (admins read all); missing or denied = no reply shown, nothing else changes
+        // V102.526: the interns' copies carry the replies — read alongside (admins read all); missing or denied = no reply shown, nothing else changes
         if (!unsubCopies) unsubCopies = db.collection('intern_messages').onSnapshot(snap => {
             copies = {}; snap.docs.forEach(d => { copies[d.id] = d.data(); }); paint();
         }, e => { console.warn('intern_messages:', e && e.message); unsubCopies = null; });
