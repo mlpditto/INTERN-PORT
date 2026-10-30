@@ -108,6 +108,24 @@ const ADMIN = pathToFileURL(path.resolve('public/admin.html')).href;
         });
         assert.deepEqual(tr, [['🌐', 'Hide translation', 'true', false], ['🌐', 'Show translation', 'false', true]], 'translate toggles by state, icon stays: ' + JSON.stringify(tr));
 
+        // V102.542: every header control has one height, Save is a quiet tile, the number has no spinner
+        const bal = await page.evaluate(() => {
+            const m = document.getElementById('reflectiveReviewModal'), h = s => Math.round(m.querySelector(s).getBoundingClientRect().height), cs = getComputedStyle(m.querySelector('.reflective-review-save-btn'));
+            return { h: ['#reflective-bonus-chips', '#reflective-review-bonus', '.reflective-review-save-btn', '.reflective-review-overflow-btn', '.reflective-close-btn'].map(h), bg: cs.backgroundImage, shadow: cs.boxShadow };
+        });
+        assert.deepEqual(bal.h, [34, 34, 34, 34, 34], 'one height across the header row: ' + JSON.stringify(bal));
+        assert.deepEqual([bal.bg, bal.shadow], ['none', 'none'], 'Save is a flat tile');
+        assert.ok(await page.evaluate(() => { const m = document.getElementById('reflectiveReviewModal'), t = s => m.querySelector(s).getBoundingClientRect().top; return new Set(['#reflective-bonus-chips', '#reflective-review-bonus', '.reflective-review-save-btn', '.reflective-close-btn'].map(s => Math.round(t(s)))).size === 1; }), 'the header controls share one top edge');
+
+        // V102.542: one language chip — a tap goes TH → EN → KO → TH, labels and the hidden input follow, focus stays on the chip
+        const langs = await page.evaluate(() => {
+            const seen = [], box = document.querySelector('#reflectiveReviewModal .reflective-review-lang-pills');
+            const shown = () => [...box.children].filter(c => getComputedStyle(c).display !== 'none');
+            for (let i = 0; i < 4; i++) { const v = shown(); seen.push([v.length, v[0].textContent, document.getElementById('ai-lang-review').value, document.activeElement === v[0] || i === 0]); v[0].click(); }
+            return seen;
+        });
+        assert.deepEqual(langs, [[1, 'TH', 'Thai', true], [1, 'EN', 'English', true], [1, 'KO', 'Korean', true], [1, 'TH', 'Thai', true]], 'one chip cycles: ' + JSON.stringify(langs));
+
         // a narrow window: the footer wraps, nothing scrolls sideways
         await page.setViewportSize({ width: 760, height: 900 }); await page.waitForTimeout(200);
         assert.ok(await page.evaluate(() => { const c = document.querySelector('#reflectiveReviewModal .modal-content'); return c.scrollWidth - c.clientWidth <= 1; }), 'no sideways scroll at 760 px');
