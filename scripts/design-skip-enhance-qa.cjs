@@ -14,6 +14,8 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 const STRUCT = '👉 [TASK]: Create a comparative infographic about restaurant rules.\n\n👉 [CONTEXT]: A social media post for Thai consumers.\n\n👉 [CORE INSTRUCTION]: two columns.\n\n👉 [CONSTRAINT]: flat vector.\n\n👉 [OUTPUT]: 1:1.';
 
+const window_safe = h => /window\.GM_STYLE_SAFE = '([^']+)'/.exec(h)[1];
+
 (async () => {
     const browser = await chromium.launch({ args: ['--allow-file-access-from-files'] });
     try {
@@ -52,10 +54,14 @@ const STRUCT = '👉 [TASK]: Create a comparative infographic about restaurant r
 
         const auto = await run(STRUCT);
         assert.deepEqual([auto.err, auto.enhanced, auto.modalSeen, auto.imgPrompt.startsWith(STRUCT), auto.shown, auto.btn, auto.toasts[0]], [null, false, false, true, true, 'Create', '⚡ Structured Brief — sent as is, no AI Refined Prompt'], 'a structured Brief: no enhancer, no modal, sent as is: ' + JSON.stringify(auto));
-        assert.ok(auto.imgPrompt.length > STRUCT.length, 'the style line is still appended');
+        const STYLE = await page.evaluate(() => document.getElementById('selected-design-style').value);
+        assert.ok(STYLE.length > 10 && auto.imgPrompt.includes(STYLE), 'V102.532: the chosen Style reaches the image model on a structured Brief: ' + auto.imgPrompt);
+        assert.ok(auto.imgPrompt.includes(window_safe(html)), 'the Always added line is still appended');
         const plain = await run('make an infographic about dengue');
         assert.deepEqual([plain.err, plain.enhanced, plain.modalSeen, plain.imgPrompt.startsWith('[TASK]: enhanced'), plain.shown], [null, true, true, true, true], 'a plain Brief still goes through the enhancer + modal: ' + JSON.stringify(plain));
         const manual = await run('make an infographic about dengue', { skipEnhance: true });
+        assert.ok(manual.imgPrompt.includes(STYLE), 'V102.532: ⚡ Create now sends the chosen Style: ' + manual.imgPrompt);
+        assert.equal(plain.imgPrompt.includes(STYLE), false, 'the refined path adds nothing — the enhancer already wrote the Style in');
         assert.deepEqual([manual.err, manual.enhanced, manual.modalSeen, manual.imgPrompt.startsWith('make an infographic about dengue'), manual.toasts[0]], [null, false, false, true, '⚡ Sent as is — no AI Refined Prompt'], '⚡ Create now skips on any text: ' + JSON.stringify(manual));
 
         const btn = await page.evaluate(() => { const b = document.getElementById('btn-generate-now'), c = document.getElementById('btn-generate-design'); return [c.nextElementSibling === b, b.textContent.trim(), b.title, b.getAttribute('aria-label'), b.classList.contains('gm-create')]; });
