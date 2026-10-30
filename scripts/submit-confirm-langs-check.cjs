@@ -17,4 +17,11 @@ for (const msg of lits) {
 }
 // the quiz translation chip really offers ja / zh (this is why the confirm must name them)
 assert.ok(/code: 'ja'/.test(src) && /code: 'zh'/.test(src), 'ja / zh are quiz languages');
+// V101.254 (owner): the ONE-TIME Practice confirm carries one short JA and one short ZH line (first run = no points, the real exam needs admin approval)
+{ const a = src.indexOf('const practiceMsg = '), b = src.slice(a, src.indexOf('if (confirm(practiceMsg))', a));
+  const ja = (b.match(/🇯🇵 ([^`]*?)\\n/) || [])[1] || '', zh = (b.match(/🇨🇳 ([^`]*?)\\n/) || [])[1] || '';
+  assert.ok(/[぀-ヿ]/.test(ja) && /得点なし/.test(ja) && /承認/.test(ja), 'ONE-TIME JA line: ' + ja);
+  assert.ok(/不计分/.test(zh) && /批准/.test(zh), 'ONE-TIME ZH line: ' + zh);
+  assert.ok(ja.length <= 40 && zh.length <= 40, 'both stay one short line');
+  assert.ok(b.indexOf('🇰🇷') < b.indexOf('🇯🇵') && b.indexOf('🇯🇵') < b.indexOf('🇨🇳') && b.indexOf('🇨🇳') < b.indexOf('⚠️'), 'after KR, before the warning'); }
 console.log('submit-confirm-langs-check: PASS');
