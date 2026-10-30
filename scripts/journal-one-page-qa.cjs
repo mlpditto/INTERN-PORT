@@ -38,9 +38,11 @@ assert.ok(!/role="tab"|dc-tabs|createElement\('details'\)/.test(js), 'no tabs, n
                     if (name === 'reflective_logs') { const log = { id: 'today', ...data, timestamp: now() }; reflectiveLogsCache = reflectiveLogsCache.concat([log]); window.myReflectiveLogsCache = (window.myReflectiveLogsCache || []).concat([log]); renderReflectiveLogs(); }
                     return Promise.resolve({ id: name + window.__writes.length });
                 },
-                doc: () => ({ update: () => Promise.resolve(), get: () => Promise.resolve({ exists: false, data: () => ({}) }), set: () => Promise.resolve() }),
+                doc: id => ({ id: id || name + '-' + (window.__writes.length + 1), __col: name, update: () => Promise.resolve(), get: () => Promise.resolve({ exists: false, data: () => ({}) }), set: () => Promise.resolve() }),
                 where: () => ({ get: () => Promise.resolve({ docs: [] }), onSnapshot: () => () => {} }),
             });
+            // V101.247: the Message goes out as one batch (admin's doc + the intern's own copy) — recorded like the adds, with the doc id; a failing collection fails the whole batch
+            db.batch = () => { const ops = []; return { set: (ref, data) => { ops.push([ref.__col, data, ref.id]); }, commit: () => { if (ops.some(o => window.__fail[o[0]])) return Promise.reject(new Error('offline')); ops.forEach(o => window.__writes.push(o)); return Promise.resolve(); } }; };
             ensureFirebaseAuthReady = async () => ({ uid: 'auth-u1' });
             requireRegistered = () => true;
             tryDailyCheckin = () => {}; renderDailyCheckinCard = () => {}; awardEngagementBonusIfDue = () => {};
@@ -140,6 +142,10 @@ assert.ok(!/role="tab"|dc-tabs|createElement\('details'\)/.test(js), 'no tabs, n
         assert.deepEqual(await page.evaluate(() => { const b = document.body, r = []; for (const [kr, th] of [[1, 0], [0, 1], [1, 1], [0, 0]]) { b.classList.toggle('lang-kr-on', !!kr); b.classList.toggle('lang-th-on', !!th); r.push(dcSentWord()); } return r; }), ['전송됨', 'ส่งแล้ว', '전송됨 · ส่งแล้ว', 'Sent'], 'the toast word follows the app language (KR · TH · both · EN)');
         const msg = await page.evaluate(() => window.__writes.filter(w => w[0] === 'admin_notifications').map(w => w[1]));
         assert.equal(msg.length, 1); assert.equal(msg[0].type, 'journal_feedback'); assert.match(msg[0].attachment.content, /^Learned: /, '📎 attaches today’s entry');
+        // V101.247: the intern's own copy — same doc id, one batch, no name and no attachment text in it, status 'sent' (never pending)
+        const pair = await page.evaluate(() => { const a = window.__writes.find(w => w[0] === 'admin_notifications'), c = window.__writes.filter(w => w[0] === 'intern_messages'); return { n: c.length, same: !!a && c[0] && a[2] === c[0][2], copy: c[0] && c[0][1] }; });
+        assert.deepEqual([pair.n, pair.same], [1, true], 'one copy, same id as the admin’s doc');
+        assert.deepEqual(pair.copy, { authUid: 'auth-u1', userId: 'u1', message: 'อยากได้โจทย์คำนวณยาเด็กเพิ่มครับ', attached: true, status: 'sent', createdAt: 0 }, 'the copy carries only the rule’s six fields');
         await page.evaluate(() => { window.__fail.admin_notifications = true; });
         await page.fill('#dc-feedback-message', 'ลองอีกครั้ง');
         assert.equal(await page.evaluate(() => document.getElementById('dc-feedback').classList.contains('dc-sent')), false, 'typing again clears the sent state');
@@ -147,6 +153,7 @@ assert.ok(!/role="tab"|dc-tabs|createElement\('details'\)/.test(js), 'no tabs, n
         await page.waitForFunction(() => !document.getElementById('dc-send').disabled);
         const failed = await page.evaluate(() => ({ err: document.getElementById('dc-feedback').classList.contains('dc-err'), kept: document.getElementById('dc-feedback-message').value, status: document.getElementById('dc-feedback-status').textContent }));
         assert.deepEqual([failed.err, failed.kept], [true, 'ลองอีกครั้ง'], 'not sent → red row, draft kept');
+        assert.ok(!(await page.evaluate(() => window.__writes.some(w => w[0] === 'intern_messages' && w[1].message === 'ลองอีกครั้ง'))), 'V101.247: a failed send writes no copy either — one batch');
         assert.match(failed.status, /retained/);
         assert.equal(await page.evaluate(() => document.querySelector('#dc-feedback .dc-cnt').textContent), '1', 'a failed send is not counted');
 

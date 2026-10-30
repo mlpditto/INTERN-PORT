@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', function () {
     while (pane.firstChild) day.append(pane.firstChild);
     // V101.211 (design C, mockup pick 2026-10-26): no folds. One warm hero (title · streak · mood) and borderless rows below it:
     // Today = Learned · Hard · Next, 🎓 Note, ✉️ Message admin. Fill any of them; ONE Send sends only the filled parts (Today →
-    // reflective_logs, Note → learning_path_entries, Message → admin_notifications) and names them. Once today's entry is in,
+    // reflective_logs, Note → learning_path_entries, Message → admin_notifications + the intern's own copy in intern_messages, same id, one batch — V101.247) and names them. Once today's entry is in,
     // the hero shows it as a quote with the mood discs turned green. Save handlers, ids and rules are unchanged.
     const hero = document.createElement('div');
     hero.id = 'dc-hero'; hero.className = 'dc-hero lang-no-toggle';
@@ -193,7 +193,11 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             const authUser = await ensureFirebaseAuthReady(10000);
             if (!authUser) throw new Error('Sign in required');
-            await db.collection('admin_notifications').add({ type: 'journal_feedback', authUid: authUser.uid, userId, userName: userProfile.displayName || '', message, attachment, read: false, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+            // V101.247: one id, one batch — the admin's doc (unchanged) + the intern's own copy, which History shows with the reply. Both land or neither does.
+            const id = db.collection('intern_messages').doc().id, batch = db.batch(), now = firebase.firestore.FieldValue.serverTimestamp();
+            batch.set(db.collection('admin_notifications').doc(id), { type: 'journal_feedback', authUid: authUser.uid, userId, userName: userProfile.displayName || '', message, attachment, read: false, timestamp: now });
+            batch.set(db.collection('intern_messages').doc(id), { authUid: authUser.uid, userId, message, attached, status: 'sent', createdAt: now });
+            await batch.commit();
             status.textContent = '';
             sentFx();   // V101.241: the ✉️ flies up and back, the counter on it goes +1, a one-word toast in the language you chose
             if (msgTa.value.trim() === message) msgTa.value = '';
