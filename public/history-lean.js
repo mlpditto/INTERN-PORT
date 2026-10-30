@@ -4,9 +4,10 @@ window.historyLean = (() => {
     const T = {
         case: { e: '🩺', n: 'Case' }, work: { e: '📝', n: 'Work' }, quiz: { e: '🧠', n: 'Quiz' }, quest: { e: '⭐', n: 'Quest' },
         reflective: { e: '😊', n: 'Journal' }, learning_note: { e: '🎓', n: 'Note' }, product: { e: '🛒', n: 'Product' }, explore_link: { e: '🔗', n: 'Link' }, content_review: { e: 'Ⓐ', n: 'Review' },
-        article: { e: '📰', n: 'Article' }   // V101.176: articles.js historyItems()
+        article: { e: '📰', n: 'Article' },   // V101.176: articles.js historyItems()
+        message: { e: '✉️', n: 'To admin' }   // V101.247: intern-messages.js historyItems() — the intern's own copy of a Journal message to admin (+ the reply)
     };
-    const ORDER = ['case', 'quiz', 'explore_link', 'work', 'reflective', 'learning_note', 'product', 'quest', 'content_review', 'article'];
+    const ORDER = ['case', 'quiz', 'explore_link', 'work', 'reflective', 'learning_note', 'product', 'quest', 'content_review', 'article', 'message'];
     const esc = s => escapeUnifiedHtml(s);
     // V101.189: lang-toggle.js announces a change; the list's dates / bucket labels / pills are plain text, so redraw them
     if (typeof document.addEventListener === 'function') document.addEventListener('lang-changed', () => { const tl = document.getElementById('unified-timeline'); if (tl && tl.querySelector('.hl-row') && typeof renderUnifiedHistory === 'function') { try { renderUnifiedHistory(); } catch (e) { /* mid-load */ } } });   // only once rows exist (applyState fires at page load too)
@@ -95,6 +96,7 @@ window.historyLean = (() => {
             (b ? '<span class="hl-br" title="Beri">🪙 <b>' + (b > 0 ? '+' : '−') + Math.abs(b) + '</b></span>' : '') + '</span>';
     }
     function pillHtml(s) {
+        if (s.submissionType === 'message') return window.internMessages ? internMessages.pillHtml(s) : '';   // V101.247: ↩ Replied once the admin answered, nothing while sent
         if (s.submissionType === 'article') return window.internArticles && !internArticles.discHtml ? internArticles.pillHtml(s) : '';   // V101.206: the icon disc carries read / listen — no pill   // V101.176: ✓ Read · 👁 Closed · 📰 New
         if (s.submissionType === 'content_review') { const m = s.metadata || {}; return m.verdict === 'approve' ? '<span class="hl-pill">Ⓐ OK' + (Number(m.suggested) ? ' · +' + Number(m.suggested) : '') + '</span>' : '<span class="hl-pill hl-warn">↩ Changes</span>'; }   // V101.124
         const U = window.uiText || (en => en);   // V101.189
@@ -157,6 +159,8 @@ window.historyLean = (() => {
         if (type === 'case') {
             const rows = [['Patient', m.customer], ['Symptoms', m.symptoms], ['Notes', m.notes]].filter(r => r[1]);
             if (rows.length) body = '<div class="hl-facts">' + rows.map(r => '<span>' + r[0] + '</span><span>' + esc(r[1]) + '</span>').join('') + '</div>';
+        } else if (type === 'message') {
+            body = window.internMessages ? internMessages.detailHtml(s) : '';   // V101.247: the message itself; the admin's reply is the 💬 line below (adminComment)
         } else if (type === 'article') {
             body = window.internArticles ? internArticles.detailHtml(s) : '';   // V101.176: the article itself, read in place
         } else if (type !== 'quiz' && type !== 'work' && type !== 'explore_link' && type !== 'content_review') {

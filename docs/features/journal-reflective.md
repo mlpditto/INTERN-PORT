@@ -8,7 +8,7 @@ Intern: home ▸ Journal. Admin: Kanban ▸ a reflective card ▸ Reflective Rev
 
 ## Scripts that drive it
 
-- `journal-one-page-qa` — Journal design A: no tabs, entry · Note fold · recent
+- `journal-one-page-qa` — Journal design A: no tabs, entry · Note fold · recent; V101.247: Message → `admin_notifications` + the intern's own copy `intern_messages/{same id}` in ONE batch (a failed send writes neither) — the copy shows in History (`history.md`)
 - `reflective-model-row-qa` — vendor-first MODEL rows, trial chips survive a reload
 - `reflective-grammar-lean-qa` — Writing Analysis column: Issues → Suggestions → Why; Apply per change / all
 - `reflective-diff-runs-qa` — Edited preview word diff: Thai phrase whole, no side padding, space is a space

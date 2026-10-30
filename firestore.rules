@@ -510,6 +510,25 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    // V101.247: the intern's own copy of a Journal "Message to admin" — same doc id as the admin_notifications doc, written in the
+    // same batch (both land or neither does). The intern creates it as themselves and reads only their own; the admin's reply is an
+    // update only an admin can make. It is a message, not a submission: status is 'sent' / 'answered', never pending, nothing scored.
+    match /intern_messages/{messageId} {
+      function validInternMessage() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['authUid', 'userId', 'message', 'attached', 'status', 'createdAt'])
+          && d.keys().hasAll(['authUid', 'userId', 'message', 'attached', 'status', 'createdAt'])
+          && d.authUid == request.auth.uid
+          && (d.userId == request.auth.uid || hasAuthLinkToUserId(d.userId))
+          && d.message is string && d.message.size() <= 4000 && d.message.matches('[\\s\\S]*[^\\s][\\s\\S]*')
+          && d.attached is bool
+          && d.status == 'sent' && d.createdAt == request.time;
+      }
+      allow create: if isAdmin() || (isSignedIn() && validInternMessage());   // admin: backfills a copy for a message sent before V101.247 (set + merge from the Journal feedback inbox)
+      allow read: if isAdmin() || (isSignedIn() && resource.data.authUid == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
     // 19. Quiz Discussions (LIFF discussion threads)
     match /quiz_discussions/{discussionId} {
       allow read, create: if isSignedIn();
