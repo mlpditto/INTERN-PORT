@@ -4,7 +4,7 @@ The admin design / video hub: composer, deck workflow stepper, styles, image eng
 
 ## How to get to it (user POV)
 
-Admin: 🏴‍☠️ Grand Line Deck tab; 📖 badge → deck guide.
+Admin: 🏴‍☠️ Grand Line Deck tab; how-to = 📖 Admin guide (header) → 🏴‍☠️ Deck chapter.
 
 ## Scripts that drive it
 
@@ -12,7 +12,7 @@ Admin: 🏴‍☠️ Grand Line Deck tab; 📖 badge → deck guide.
 - `deck-modes-qa` — mode bar as icon chips in the top tab row
 - `deck-style-qa` — Visual Style in the Brief; pharmacy chips first
 - `deck-friction-qa` — style tile survives a reload; clip mode keeps the series
-- `deck-guide-qa` — deck guide sets (images · video · audio · research · Thai clip)
+- `deck-guide-qa` — the Deck chapter of the Admin guide (images · video · Thai clip · audio · Log Pose)
 - `genmage-composer-qa` — composer: 🪄 Vision, ghost formula, enhancer rail
 - `design-image-models-qa` — Seedream / GPT Image via OpenRouter Image API
 - `grand-line-clips-qa` — Clip 9:16: 10 episodes, ▶ renders one through the proxy
@@ -23,5 +23,5 @@ Admin: 🏴‍☠️ Grand Line Deck tab; 📖 badge → deck guide.
 
 ## What usually lies
 
-- Deck guide shots need an `https://qa.test` route serving `public/` with the `marked` / `purify` CDN let through; file:// cannot load the guide sets.
+- Guide shots need an `https://qa.test` route serving `public/` with the `marked` / `purify` CDN let through; file:// cannot load the guide.
 - Render → poll is simulated by the script's own proxy stub; a stub that resolves immediately skips the "busy" UI states.

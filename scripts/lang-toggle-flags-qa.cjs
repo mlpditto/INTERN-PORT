@@ -13,8 +13,8 @@ for (const [name, html] of [['admin', admin], ['intern', index]]) {
 }
 assert.ok(/twemoji\.parse\(cycleBtn/.test(js), 'lang-toggle.js asks twemoji to draw the flag where it is loaded (Windows has no flag glyphs)');
 const V = (html, re) => (html.match(re) || [])[1];
-assert.equal(V(admin, /lang-toggle\.js\?v=(V[\d.]+)/), V(admin, /<title>Nika Admin \((V[\d.]+)\)/), 'admin cache-bust = admin version');
-assert.equal(V(index, /lang-toggle\.js\?v=(V[\d.]+)/), V(index, /<title>Internship Portfolio \((V[\d.]+)\)/), 'intern cache-bust = intern version');
+assert.ok(+V(admin, /lang-toggle\.js\?v=V102\.(\d+)/) >= 529, 'admin cache-bust carries the flag build');   // not == the title: any later admin release would fail this
+assert.ok(+V(index, /lang-toggle\.js\?v=V101\.(\d+)/) >= 248, 'intern cache-bust carries the flag build');
 
 const page_html = `<!doctype html><meta charset="utf-8"><style>body{font-size:16px}${cssOf(admin)}</style>
 <button id="lang-toggle-cycle" class="btn-sm lang-toggle-btn" onclick="cycleLang()" title="Language: tap to switch" aria-label="Language (tap to switch)">EN</button>
