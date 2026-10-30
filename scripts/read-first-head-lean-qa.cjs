@@ -14,7 +14,7 @@ const labelHead = label.slice(0, label.indexOf('<span style="margin-left:auto'))
 
 assert.ok(/fa-book-open[^]*<\/i>\s*Read first\s*$/.test(labelHead), 'the label is icon + "Read first" and nothing else before the controls: ' + labelHead.slice(-120));
 assert.ok(!/own page before the timer/.test(label), 'the aside is gone from the label');
-assert.ok(label.includes('${window._qPrimerModelSelect()}') && label.includes('_qPrimerDraft(this, \'full\')') && label.includes('_qPrimerDraft(this, \'terms\')') && label.includes('_qPrimerDraftAll(this)'), 'model select + ✨ + ☰ + ✨ All untouched');
+assert.ok(label.includes('${window._qPrimerModelSelect()}') && label.includes('_qPrimerDraft(this, \'full\')') && label.includes('_qPrimerReviewAll()') && !label.includes('\'terms\'') && !label.includes('_qPrimerDraftAll(this)'), 'V102.524: model select + ✨ + 📖 All — ☰ moved into the panel after a draft, ✨ All into the popup');
 
 const ph = (box.match(/<textarea class="q-primer" placeholder="([^"]*)"/) || [])[1] || '';
 for (const need of ['Background or vocabulary the learner needs before answering', 'own page before the timer starts', 'kept in the review', 'Markdown', 'Do not give away the answer', '(optional)'])

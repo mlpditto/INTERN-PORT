@@ -44,7 +44,7 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
 
         // the button
         const b = page.locator('.quiz-q-item .q-primer-review').first();
-        assert.deepEqual(await b.evaluate(x => [x.previousElementSibling.textContent.trim(), x.closest('label').querySelectorAll('.q-primer-ai').length]), ['✨', 2], 'V102.522 (owner, option 1): the row is ✨ then 📖 All — two buttons');
+        assert.deepEqual(await b.evaluate(x => [x.previousElementSibling.textContent.trim(), x.closest('label').querySelectorAll('.q-primer-ai').length]), ['✨', 2], 'V102.524 (owner, option 1): the row is ✨ then 📖 All — two buttons');
         await page.evaluate(() => { const it = document.querySelectorAll('.quiz-q-item')[0]; it.style.display = 'block'; });
         await page.evaluate(() => document.querySelector('.quiz-q-item .q-primer-review').click());
         const ov = page.locator('#praOverlay');
@@ -126,7 +126,7 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
         assert.equal((await page.locator('#praOverlay .pra-none-t').innerText()).trim(), '📖 No Read first yet');
         assert.equal((await page.locator('#praOverlay .pra-none .pra-all').innerText()).trim(), '✨ All · 4');
         await page.locator('#praOverlay .pra-none .pra-all').evaluate(b => b.click());
-        assert.equal(await page.locator('#praOverlay').count(), 1, 'V102.522: the popup stays open'); assert.equal(await page.evaluate(() => window.__all), 'pra-all', 'and ✨ All runs on the popup\'s own button');
+        assert.equal(await page.locator('#praOverlay').count(), 1, 'V102.524: the popup stays open'); assert.equal(await page.evaluate(() => window.__all), 'pra-all', 'and ✨ All runs on the popup\'s own button');
         await page.evaluate(() => { _qPrimerReviewAll(); }); await page.locator('#praOverlay .pra-none .pra-chip').evaluate(b => b.click()); assert.equal(await page.locator('#praOverlay').count(), 0, '✎ Write by hand closes');
         // V102.517 compact: ✎ is icon-only with the question in its label; two columns at ≥ 900 px, one below
         await page.evaluate(() => { document.querySelectorAll('.quiz-q-item .q-primer')[0].value = '**A** x'; _qPrimerReviewAll(); });
