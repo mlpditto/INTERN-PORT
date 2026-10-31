@@ -2344,12 +2344,40 @@ exports.readCaseFile = onCall({ secrets: ['GEMINI_API_KEY'], timeoutSeconds: 120
         const out = await reader.readPdf(buf, process.env.GEMINI_API_KEY);
         recordAiUsage('gemini-aistudio', reader.MODEL, out.tokens, callerAdmin, 'case_file_read', { inputTokens: out.inputTokens, outputTokens: out.outputTokens });
         if (!out.read) throw new Error('unusable answer');
-        await ref.update({ caseFileRead: { status: 'done', model: reader.MODEL, at: stamp(), ...out.read } });
-        return { ok: true, pages: out.read.pages };
+        const { parts, ...read } = out.read;
+        if (c.caseGroup) {   // a retry on one card of a split file: only its own pages
+            await ref.update({ caseFileRead: { status: 'done', model: reader.MODEL, at: stamp(), ...reader.partRead(read, c.caseGroup) } });
+            return { ok: true, pages: read.pages };
+        }
+        if (parts.length) {
+            await reader.applySplit(admin.firestore(), ref, c, parts, read, admin.firestore.FieldValue);
+            return { ok: true, pages: read.pages, cases: parts.length };
+        }
+        await ref.update({ caseFileRead: { status: 'done', model: reader.MODEL, at: stamp(), ...read } });
+        return { ok: true, pages: read.pages };
     } catch (err) {
         console.warn(`[readCaseFile] ${caseDocId}:`, err.message);
         await ref.update({ caseFileRead: { status: 'failed', at: stamp() } }).catch(() => {});
         return { ok: false };
+    }
+});
+
+// V102.548: Fix the split. The admin's page ranges for one file; the lines read are reused, nothing goes to Gemini again.
+exports.applyCaseSplit = onCall(async (request) => {
+    requireAdminCallable(request);
+    const { caseDocId, parts } = request.data || {};
+    const reader = require('./case-file-read'), db = admin.firestore();
+    const ref = db.collection('cases').doc(String(caseDocId || 'x')), snap = await ref.get();
+    if (!snap.exists) throw new HttpsError('not-found', 'Case not found');
+    const c = snap.data() || {};
+    const group = c.caseGroup ? (await db.collection('cases').where('caseGroup.id', '==', c.caseGroup.id).get()).docs.map(d => d.data()) : [c];
+    const pages = (c.caseGroup && c.caseGroup.filePages) || (c.caseFileRead && c.caseFileRead.pages) || 0;
+    const clean = (Array.isArray(parts) ? parts : []).map(p => ({ title: String((p && p.title) || '').trim().slice(0, 60), from: Number(p && p.from), to: Number(p && p.to) }));
+    if (!c.caseFile || !reader.validParts(clean, pages)) throw new HttpsError('invalid-argument', 'Every page must be in one case, in order');
+    const read = { pages, rows: group.flatMap(d => (d.caseFileRead && d.caseFileRead.rows) || []), identifiers: group.flatMap(d => (d.caseFileRead && d.caseFileRead.identifiers) || []) };
+    try { return { cases: await reader.applySplit(db, ref, c, clean, read, admin.firestore.FieldValue) }; } catch (e) {
+        if (e.message === 'reviewed card') throw new HttpsError('failed-precondition', 'A reviewed card cannot be removed');
+        throw e;
     }
 });
 

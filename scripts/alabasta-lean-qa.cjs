@@ -38,7 +38,7 @@ function grabDiv(id) {
     await page.addScriptTag({ path: 'public/case-article.js' });   // V102.395: the 🖼️ / 📰 icon buttons come from this module
     await page.addScriptTag({
       content: `
-      window.alabastaSelectedIds = new Set(); window.alabastaSystemFilter = 'all'; window.alabastaStatusFilter = 'all';
+      window.alabastaSelectedIds = new Set(); window.alabastaSystemFilter = 'all'; window.alabastaStatusFilter = 'history';
       window.CASE_SYSTEMS = [{ key: 'resp', emoji: '🫁', label: { en: 'Respiratory', ko: '' } }];
       var activeBoardGroup = 'All', usersData = [], productListingsData = [];
       var casesData = [
@@ -57,16 +57,18 @@ function grabDiv(id) {
     // Phase 2: Inbox is a folded banner; table has 7 columns (☐ + 6), initials not full names
     assert.equal(await page.locator('#alabasta-inbox-section').evaluate(n => n.classList.contains('is-empty')), false);
     assert.match(await page.locator('#alabasta-inbox-section').innerText(), /2\s+waiting for review/);
-    assert.equal(await page.locator('#alabasta-inbox-body').isVisible(), false);
-    await page.locator('#alabasta-inbox-toggle').click();
-    assert.equal(await page.locator('#alabasta-inbox-body').isVisible(), true);
+    assert.equal(await page.locator('#alabasta-inbox-body').isVisible(), true, 'V102.548: waiting work opens by default');
     assert.equal(await page.locator('#alabasta-inbox-container .alabasta-inbox-card').count(), 2);
+    assert.equal(await page.locator('#alabasta-inbox-container .alabasta-inbox-card .alabasta-row-checkbox').count(), 2, 'cards can be picked for a batch');
     assert.equal(await page.locator('#alabasta-inbox-toggle').getAttribute('aria-expanded'), 'true');
     await page.locator('#alabasta-inbox-toggle').click();
     assert.equal(await page.locator('#alabasta-inbox-body').isVisible(), false);
+    await page.locator('#alabasta-inbox-toggle').click();
+    assert.equal(await page.locator('#alabasta-inbox-body').isVisible(), true);
     // V3: lands on Pending when something waits; the archive toggle is gone (All = every case)
-    assert(await page.locator('#alabasta-status-pending').evaluate(n => n.classList.contains('active')), 'default chip = Pending when cases wait');
-    assert.equal(await rows(), 2);
+    assert(await page.locator('#alabasta-status-history').evaluate(n => n.classList.contains('active')), 'V102.548: the table opens as History');
+    assert.equal(await page.locator('#alabasta-status-pending').count(), 0, 'no Pending chip: waiting work is the cards');
+    assert.equal(await rows(), 1);
     assert.equal(await page.locator('#alabasta-archived-toggle, #alabasta-case-show-archived').count(), 0);
     await page.evaluate(() => setAlabastaStatusFilter('all'));
     assert.equal(await page.locator('#alabastaCaseTable thead th').count(), 7);
@@ -97,24 +99,19 @@ function grabDiv(id) {
     await page.locator('#alabasta-tools-menu > summary').click();
 
     // old ids survive and are filled
-    for (const id of ['alabasta-case-total', 'alabasta-case-pending', 'alabasta-case-reviewed']) assert.equal(await page.locator('#' + id).count(), 1);
-    assert.deepEqual([await txt('alabasta-case-total'), await txt('alabasta-case-pending'), await txt('alabasta-case-reviewed')], ['3', '2', '1']);
+    for (const id of ['alabasta-case-total', 'alabasta-case-reviewed']) assert.equal(await page.locator('#' + id).count(), 1);
+    assert.deepEqual([await txt('alabasta-case-total'), await txt('alabasta-case-reviewed')], ['1', '1']);
     assert.equal(await rows(), 3);
 
     // rail filters, counts stay put
-    await page.locator('#alabasta-status-pending').click();
-    assert.equal(await rows(), 2);
-    assert(await page.locator('#alabasta-status-pending').evaluate(n => n.classList.contains('active')));
-    assert.equal(await page.locator('#alabasta-status-all').evaluate(n => n.classList.contains('active')), false);
-    assert.deepEqual([await txt('alabasta-case-total'), await txt('alabasta-case-pending'), await txt('alabasta-case-reviewed')], ['3', '2', '1']);
     await page.locator('#alabasta-status-reviewed').click();
     assert.equal(await rows(), 1);
-    await page.locator('#alabasta-status-all').click();
-    assert.equal(await rows(), 3);
+    assert(await page.locator('#alabasta-status-reviewed').evaluate(n => n.classList.contains('active')));
+    assert.equal(await page.locator('#alabasta-status-history').evaluate(n => n.classList.contains('active')), false);
+    await page.locator('#alabasta-status-history').click();
+    assert.equal(await rows(), 1);
 
-    // pending chip + nothing pending → friendly empty row
-    await page.evaluate(() => { casesData.forEach(c => c.status = 'reviewed'); setAlabastaStatusFilter('pending'); });
-    assert.match(await page.locator('#alabastaCaseTable tbody').innerText(), /No cases waiting for review/);
+    await page.evaluate(() => { casesData.forEach(c => c.status = 'reviewed'); setAlabastaStatusFilter('history'); });
 
     // all reviewed → nothing waiting: the Inbox banner is not shown at all
     assert.equal(await page.locator('#alabasta-inbox-section').evaluate(n => n.classList.contains('is-empty')), true);
@@ -137,14 +134,14 @@ function grabDiv(id) {
       ];
       window.alabastaStatusFilter = 'all'; window.alabastaSystemFilter = 'all'; renderAlabastaCases();
     });
-    const counts = async () => [await txt('alabasta-case-total'), await txt('alabasta-case-pending'), await txt('alabasta-case-reviewed'), await txt('alabasta-case-rejected')];
-    assert.deepEqual(await counts(), ['4', '2', '1', '1']);
+    const counts = async () => [await txt('alabasta-case-total'), await txt('alabasta-case-reviewed'), await txt('alabasta-case-rejected')];
+    assert.deepEqual(await counts(), ['2', '1', '1']);
     assert.equal(await rows(), 4, 'All = every case, archived or not');
     await page.locator('#alabasta-status-reviewed').click();
     assert.equal(await rows(), 1);
     assert.match(await page.locator('#alabastaCaseTable tbody').innerText(), /✓ 1\.50 pts/);
     assert.doesNotMatch(await page.locator('#alabastaCaseTable tbody').innerText(), /Archived/);
-    assert.deepEqual(await counts(), ['4', '2', '1', '1']);
+    assert.deepEqual(await counts(), ['2', '1', '1']);
     await page.locator('#alabasta-status-rejected').click();
     assert.equal(await rows(), 1);
     assert.match(await page.locator('#alabastaCaseTable tbody').innerText(), /Rejected/);
@@ -153,10 +150,10 @@ function grabDiv(id) {
     // system pills count inside the chosen status; system filter narrows chip counts but not the chosen status
     await page.evaluate(() => setAlabastaSystemFilter('resp'));
     assert.equal(await rows(), 1);
-    assert.deepEqual(await counts(), ['3', '1', '1', '1']);
+    assert.deepEqual(await counts(), ['2', '1', '1']);
     await page.evaluate(() => { setAlabastaSystemFilter('all'); setAlabastaStatusFilter('all'); });
     assert.equal(await rows(), 4);
-    assert.equal((await counts())[0], '4', 'chip counts add up: 4 = 2 + 1 + 1');
+    assert.equal((await counts())[0], '2', 'History = reviewed + rejected');
     await page.evaluate(() => { setAlabastaStatusFilter('rejected'); casesData.splice(3, 1); renderAlabastaCases(); });
     assert.match(await page.locator('#alabastaCaseTable tbody').innerText(), /No rejected cases/);
     await page.evaluate(() => setAlabastaStatusFilter('all'));
@@ -258,14 +255,14 @@ function grabDiv(id) {
     const top = (sel) => page.locator(sel).first().evaluate(n => Math.round(n.getBoundingClientRect().top));
     const row1 = [await top('#alabasta-subtab-case'), await top('#alabasta-subtab-product'), await top('#alabasta-date-trigger'), await top('#alabasta-case-toolbar .alabasta-search-wrap > button'), await top('#alabasta-tools-menu > summary')];
     assert(Math.max(...row1) - Math.min(...row1) <= 8, 'phone row 1 holds tabs, date, search, tools: ' + row1);
-    const statusTop = await top('#alabasta-status-all');
+    const statusTop = await top('#alabasta-status-history');
     const statusTops = await page.locator('#alabasta-status-rail > .alabasta-filter-pill').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().top)));
     assert(Math.max(...statusTops) - Math.min(...statusTops) <= 4, 'status chips share one row: ' + statusTops);
     assert(statusTop > Math.max(...row1) + 10, 'status row sits below row 1');
     const sysTops = await page.locator('#alabasta-system-filter-pills > button').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().top)));
     assert(sysTops.length === 2 && Math.max(...sysTops) - Math.min(...sysTops) <= 4 && Math.min(...sysTops) > statusTop + 10, 'systems on their own row below status: ' + sysTops);
-    assert.equal(await page.locator('#alabasta-status-pending .alabasta-pill-label').isVisible(), false, 'pill names are hidden on the phone');
-    assert.equal(await page.locator('#alabasta-status-pending').getAttribute('title'), 'Pending');
+    assert.equal(await page.locator('#alabasta-status-reviewed .alabasta-pill-label').isVisible(), false, 'pill names are hidden on the phone');
+    assert.equal(await page.locator('#alabasta-status-reviewed').getAttribute('title'), 'Reviewed');
     assert.equal(await page.locator('#alabasta-toolbar').evaluate(n => n.scrollWidth <= n.clientWidth + 1), true, 'toolbar does not scroll sideways');
     assert.equal(await page.locator('#alabasta-toolbar h4').isVisible(), false);
     assert.equal(await page.locator('#alabasta-toolbar .case-taxonomy-gear').isVisible(), false, 'gear leaves row 1 on the phone');
@@ -276,13 +273,13 @@ function grabDiv(id) {
     await page.locator('#alabasta-case-toolbar .alabasta-search-wrap > button').click();
     const sb = await page.locator('#alabasta-case-search').evaluate(n => { const b = n.getBoundingClientRect(); return [Math.round(b.top), Math.round(b.width)]; });
     assert(sb[0] > Math.max(...row1) + 10 && sb[1] > 300, 'search input is a full-width row under row 1: ' + sb);
-    assert((await top('#alabasta-status-all')) > sb[0], 'status row moves below the open search');
+    assert((await top('#alabasta-status-history')) > sb[0], 'status row moves below the open search');
     await page.locator('#alabasta-case-search').fill('');
     await page.locator('#alabasta-subtab-case').click({ force: true });
     // desktop is untouched: labels are back, search is not full width
     await page.setViewportSize({ width: 1280, height: 900 });
-    assert.equal(await page.locator('#alabasta-status-pending .alabasta-pill-label').isVisible(), false, 'desktop pills drop the names');
-    assert.equal(await page.locator('#alabasta-status-pending').getAttribute('aria-label'), 'Pending', 'pill name stays in aria-label');
+    assert.equal(await page.locator('#alabasta-status-reviewed .alabasta-pill-label').isVisible(), false, 'desktop pills drop the names');
+    assert.equal(await page.locator('#alabasta-status-reviewed').getAttribute('aria-label'), 'Reviewed', 'pill name stays in aria-label');
     assert.equal(await page.locator('#alabasta-toolbar .case-taxonomy-gear').isVisible(), true, 'desktop keeps the gear');
     assert.equal(await page.locator('.alabasta-tools-taxonomy').isVisible(), false, 'taxonomy menu item is phone-only');
     await page.evaluate(() => CASE_SYSTEMS.pop());

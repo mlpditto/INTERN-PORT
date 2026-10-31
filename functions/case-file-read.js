@@ -4,15 +4,16 @@ const axios = require('axios');
 
 const MODEL = 'gemini-3.8-flash';
 const MAX_BYTES = 5 * 1024 * 1024;
-const LIM = { rows: 60, label: 40, text: 1000, marks: 20 };
+const LIM = { rows: 240, label: 60, text: 1000, marks: 20, parts: 20 };
 const KINDS = ['hn', 'name', 'id', 'address', 'phone'];
 
 const PROMPT = 'This PDF is a pharmacy intern\'s case log, typed, scanned or handwritten, in Thai and English. Copy what is written, line by line, in reading order, in the same language. '
     + 'Do not correct, translate, summarise or judge it. Use the printed heading as the label when there is one (CC, HPI, PMH, U/D, MH, ALL, DRPs, Plan, Assessment), otherwise "Note". '
     + 'Set unsure true on a line when you cannot read it with confidence. '
     + 'NEVER copy a patient name, HN, national ID number, address or phone number: write [hidden] in its place and add one entry to identifiers with its page and kind. '
-    + 'A black bar or a covered area is not an identifier. Do not guess a covered value.';
-const SYSTEM = 'Answer ONLY with JSON of the form {"pages":3,"rows":[{"page":1,"label":"CC","text":"...","unsure":false}],"identifiers":[{"page":1,"kind":"hn"}]}. kind is one of hn, name, id, address, phone.';
+    + 'A black bar or a covered area is not an identifier. Do not guess a covered value. '
+    + 'One file can hold several patient cases. List every case in cases, in page order, with a short clinical title (never an identifier) and pageFrom, pageTo. Set splitSure true only when where each case starts is clear from the pages.';
+const SYSTEM = 'Answer ONLY with JSON of the form {"pages":3,"rows":[{"page":1,"label":"CC","text":"...","unsure":false}],"identifiers":[{"page":1,"kind":"hn"}],"cases":[{"title":"COPD exacerbation","pageFrom":1,"pageTo":3}],"splitSure":true}. kind is one of hn, name, id, address, phone.';
 
 function clean(v, max) { return String(v == null ? '' : v).replace(/[\u0000-\u0008\u000b-\u001f]/g, ' ').trim().slice(0, max); }
 
@@ -31,7 +32,49 @@ function parseRead(raw) {
     const identifiers = (Array.isArray(j.identifiers) ? j.identifiers : []).slice(0, LIM.marks).map(m => ({ page: page(m && m.page), kind: KINDS.includes(m && m.kind) ? m.kind : 'name' }));
     if (!rows.length && !identifiers.length) return null;
     const pages = Math.max(page(j.pages), ...rows.map(r => r.page), ...identifiers.map(m => m.page));
-    return { pages, rows, identifiers };
+    const found = (Array.isArray(j.cases) ? j.cases : []).slice(0, LIM.parts).map(c => ({ title: clean(c && c.title, LIM.label), from: page(c && c.pageFrom), to: page(c && c.pageTo) }));
+    const many = found.length > 1, usable = many && validParts(found, pages) && j.splitSure === true;
+    return { pages, rows, identifiers, parts: usable ? found : [], ...(many && !usable ? { unsplit: true } : {}) };
+}
+
+// every page in exactly one part, in order
+function validParts(parts, pages) {
+    if (!Array.isArray(parts) || !parts.length || parts.length > LIM.parts) return false;
+    let next = 1;
+    for (const p of parts) {
+        if (!p || !Number.isInteger(p.from) || !Number.isInteger(p.to) || p.from !== next || p.to < p.from) return false;
+        next = p.to + 1;
+    }
+    return next === pages + 1;
+}
+
+function partRead(read, part) {
+    const inside = x => x.page >= part.from && x.page <= part.to;
+    return { pages: part.to - part.from + 1, rows: read.rows.filter(inside), identifiers: read.identifiers.filter(inside) };
+}
+
+// One real Case per part: the sent case stays as the first card, so its +0.1 and mirror are untouched. Reviewed cards are never removed.
+async function applySplit(db, ref, c, parts, read, FieldValue) {
+    const groupId = (c.caseGroup && c.caseGroup.id) || ref.id, base = (c.caseGroup && c.caseGroup.base) || c.caseId;
+    const snap = await db.collection('cases').where('caseGroup.id', '==', groupId).get();
+    const docs = snap.empty ? [{ ref, data: c }] : snap.docs.map(d => ({ ref: d.ref, data: d.data() })).sort((a, b) => a.data.caseGroup.index - b.data.caseGroup.index);
+    if (docs.slice(parts.length).some(d => (d.data.status || 'pending') !== 'pending')) throw new Error('reviewed card');
+    const first = docs[0].data, stamp = FieldValue.serverTimestamp(), batch = db.batch();
+    docs.slice(parts.length).forEach(d => batch.delete(d.ref));
+    parts.forEach((part, i) => {
+        const doc = docs[i], total = parts.length;
+        const fields = {
+            caseId: total > 1 ? `${base} · ${i + 1}/${total}` : base,
+            caseGroup: total > 1 ? { id: groupId, base, index: i + 1, total, from: part.from, to: part.to, title: part.title, filePages: read.pages } : FieldValue.delete(),
+            caseFile: first.caseFile,
+            caseFileRead: { status: 'done', model: MODEL, at: stamp, ...partRead(read, part) }
+        };
+        if (doc) { batch.update(doc.ref, fields); return; }
+        const { authUid, userId, displayName, pictureUrl, customer, customerTel, disease, diseaseSystemKey, diseaseSystemLabel, timestamp } = first;
+        batch.set(db.collection('cases').doc(), { authUid, userId, displayName, pictureUrl, customer, customerTel, disease, diseaseSystemKey, diseaseSystemLabel, symptomTags: [], note: '', status: 'pending', timestamp, ...fields });
+    });
+    await batch.commit();
+    return parts.length;
 }
 
 async function readPdf(buf, apiKey) {
@@ -45,4 +88,4 @@ async function readPdf(buf, apiKey) {
     return { read: parseRead((parts || []).map(p => p.text || '').join('')), inputTokens: usage.promptTokenCount || 0, outputTokens: usage.candidatesTokenCount || 0, tokens: usage.totalTokenCount || 0 };
 }
 
-module.exports = { MODEL, MAX_BYTES, allowedPath, parseRead, readPdf };
+module.exports = { MODEL, MAX_BYTES, allowedPath, parseRead, readPdf, validParts, partRead, applySplit };

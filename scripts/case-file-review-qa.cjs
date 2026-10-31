@@ -7,7 +7,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
 const load = Module._load;
 Module._load = (id, ...a) => id === 'axios' ? { post: async () => { throw new Error('no network in QA'); } } : load(id, ...a);
-const { allowedPath, parseRead, MAX_BYTES } = require('../functions/case-file-read.js');
+const { allowedPath, parseRead, MAX_BYTES, validParts, partRead, applySplit } = require('../functions/case-file-read.js');
 Module._load = load;
 
 const admin = fs.readFileSync('public/admin.html', 'utf8').replace(/\r\n/g, '\n');
@@ -30,6 +30,17 @@ assert.deepEqual(ok.rows, [{ page: 2, label: 'CC', text: 'cough', unsure: true }
 assert.deepEqual(ok.identifiers, [{ page: 3, kind: 'hn' }, { page: 1, kind: 'name' }], 'unknown kinds never reach the page');
 assert.equal(ok.pages, 3, 'pages follow what was seen');
 
+// the split: every page once, in order; unsure or broken ranges never make cards
+const split = c => parseRead(JSON.stringify({ pages: 6, rows: [{ page: 1, text: 'a' }, { page: 4, text: 'b' }], identifiers: [{ page: 4, kind: 'hn' }], ...c }));
+const two = [{ title: 'A', pageFrom: 1, pageTo: 3 }, { title: 'B', pageFrom: 4, pageTo: 6 }];
+assert.equal(split({ cases: two, splitSure: true }).parts.length, 2);
+assert.deepEqual([split({ cases: two, splitSure: false }).parts, split({ cases: two, splitSure: false }).unsplit], [[], true], 'not sure: one card, and it says so');
+assert.deepEqual([split({ cases: [two[0]], splitSure: true }).parts, split({ cases: [two[0]], splitSure: true }).unsplit], [[], undefined], 'one case: nothing to split');
+assert.equal(split({ cases: [two[0], { title: 'B', pageFrom: 5, pageTo: 6 }], splitSure: true }).unsplit, true, 'a page left out');
+assert.equal(validParts([{ from: 1, to: 2 }, { from: 2, to: 3 }], 3), false, 'overlap');
+assert.equal(validParts([{ from: 1, to: 3 }], 3), true);
+assert.deepEqual(partRead({ rows: [{ page: 1 }, { page: 4 }], identifiers: [{ page: 4 }] }, { from: 4, to: 6 }), { pages: 3, rows: [{ page: 4 }], identifiers: [{ page: 4 }] }, 'a card holds only its pages');
+
 // rule + wiring
 const rule = /match \/case-files\/\{ownerUid\}\/\{fileName\} \{([\s\S]*?)\n    \}/.exec(rules);
 assert.ok(rule, 'storage rule');
@@ -39,8 +50,30 @@ assert.ok(/exports\.readCaseFile = onCall\(\{ secrets: \['GEMINI_API_KEY'\]/.tes
 assert.ok(/c\.authUid !== request\.auth\.uid/.test(fn) && /reader\.allowedPath\(file\.path, c\.authUid\)/.test(fn), 'own case, own folder');
 assert.ok(/callerAdmin && retry/.test(fn), 'only the admin reads twice');
 assert.ok(/<script src="case-file-review\.js\?v=V102\.\d+"><\/script>/.test(admin));
+assert.ok(admin.includes('<div id="edit-case-file-box" class="lang-no-toggle" hidden></div>') && /caseFileReview\.start\(casesData\.find\(x => x\.id === caseDocId\), 'edit-case-file-box'\)/.test(admin), 'Edit Case Note shows the file too');
+const waiting = admin.slice(admin.indexOf('<div class="ib-sub-row">'), admin.indexOf('caseDup.html(c)', admin.indexOf('<div class="ib-sub-row">')));
+assert.ok(!/updateCaseStatus|openAlabastaRejectModal/.test(waiting) && /editCaseNote/.test(waiting) && /caseArticle\.btns/.test(waiting), 'the waiting card keeps Open case, Case card, Article');
+assert.ok(/id="edit-case-decide"[^\n]*caseOpenDecide\('review'\)[^\n]*caseOpenDecide\('reject'\)/.test(admin) && /Leave without saving the note/.test(admin), 'Review + Reject are in Open case, and unsaved text asks first');
+assert.equal((admin.match(/class="crf-mark"/g) || []).length, 2, 'the row and the queue card mark a case with a file');
 assert.equal((admin.match(/caseFileReview\.purge\(/g) || []).length, 4, 'review, bulk review, delete, bulk delete drop the file');
-assert.ok(!/score|bonus/i.test(js.replace(/^\/\/.*$/gm, '').replace(/its score stay|case-score-modal-shell/g, '')), 'never touches the score');
+assert.ok(!/score|bonus/i.test(js.replace(/^\/\/.*$/gm, '').replace(/its score stay|keep their score|Score it as one|case-score-modal-shell|caseReviewScoreModal|closeCaseReviewScoreModal/g, '')), 'never touches the score');
+
+const applyCheck = async () => {
+    const writes = [], FieldValue = { serverTimestamp: () => 'NOW', delete: () => 'DEL' };
+    const mk = id => ({ id, set: (d, v) => writes.push(['set', id, v]) });
+    let n = 0;
+    const db = { collection: () => ({ where: () => ({ get: async () => db.existing }), doc: () => mk('new' + (++n)) }), batch: () => ({ set: (r, v) => writes.push(['set', r.id, v]), update: (r, v) => writes.push(['update', r.id, v]), delete: r => writes.push(['delete', r.id]), commit: async () => {} }), existing: { empty: true, docs: [] } };
+    const c = { caseId: 'HN1', authUid: 'u', userId: 'U', displayName: 'J', caseFile: { path: 'p', size: 1 }, score: 9, adminBonus: 2, status: 'pending', timestamp: 'T' };
+    const read = { pages: 6, rows: [{ page: 1 }, { page: 5 }], identifiers: [] };
+    await applySplit(db, { id: 'p1' }, c, [{ title: 'A', from: 1, to: 3 }, { title: 'B', from: 4, to: 6 }], read, FieldValue);
+    assert.deepEqual(writes.map(w => w.slice(0, 2)), [['update', 'p1'], ['set', 'new1']], 'the sent case stays as card 1, one new card');
+    assert.equal(writes[0][2].caseId, 'HN1 · 1/2'); assert.equal(writes[1][2].caseId, 'HN1 · 2/2');
+    assert.equal(writes[1][2].status, 'pending'); assert.equal(writes[1][2].timestamp, 'T', 'sits with its group in the queue');
+    assert.ok(!('adminBonus' in writes[1][2]) && !('score' in writes[1][2]), 'a new card carries no points');
+    assert.equal(writes[1][2].caseFileRead.rows.length, 1);
+    db.existing = { empty: false, docs: [{ ref: { id: 'p1' }, data: () => ({ ...c, caseGroup: { id: 'p1', base: 'HN1', index: 1 } }) }, { ref: { id: 'p2' }, data: () => ({ status: 'reviewed', caseGroup: { id: 'p1', index: 2 } }) }] };
+    await assert.rejects(applySplit(db, { id: 'p1' }, c, [{ title: 'A', from: 1, to: 6 }], read, FieldValue), /reviewed card/, 'a reviewed card is never removed');
+};
 
 const shell = /<div class="modal-content case-score-modal-shell"[\s\S]*?<div class="csr-ctl">/.exec(admin)[0] + '</div></div>';
 const css = /\/\* V102\.547: the intern's PDF[\s\S]*?\.crai-dot \{/.exec(admin)[0].replace('.crai-dot {', '');
@@ -55,6 +88,7 @@ window.confirm = () => true; window.showToast = () => {};
 </script><script>${js}</script>`;
 
 (async () => {
+    await applyCheck();
     const browser = await chromium.launch();
     try {
         for (const width of [1100, 390]) {
@@ -98,6 +132,30 @@ window.confirm = () => true; window.showToast = () => {};
             await p.waitForFunction(() => document.getElementById('case-file-box').hidden);
             const calls = await p.evaluate(() => window.calls);
             assert.deepEqual(calls.slice(-2), [['rm', file.path], ['update', 'c1', ['caseFile', 'caseFileRead']]], 'file first, then the fields; the case stays');
+
+            await p.evaluate(() => { const d = document.createElement('div'); d.id = 'edit-case-file-box'; d.hidden = true; document.body.append(d); });
+            await p.evaluate(f => window.caseFileReview.start({ id: 'c3', caseFile: f, caseFileRead: { status: 'done', pages: 6, rows: [{ page: 1, label: 'CC', text: 'x', unsure: true }], identifiers: [] } }, 'edit-case-file-box'), file);
+            assert.match(await p.textContent('#edit-case-file-box'), /6 pages.*1 line to check/s, 'the same row in Edit Case Note');
+            await p.click('#edit-case-file-box [data-a="compare"]');
+            await p.waitForSelector('#edit-case-file-box iframe.crf-page');
+            // a split card: its place in the file, no whole-file Open, unsplit advice on a single card
+            await p.evaluate(f => { window.caseFileReview.stop(); window.casesData = []; window.caseFileReview.start({ id: 'c4', caseFile: f, caseGroup: { id: 'g', index: 2, total: 5, from: 3, to: 4, filePages: 6, title: 'X' }, caseFileRead: { status: 'done', rows: [], identifiers: [] } }); }, file);
+            assert.match(await p.textContent(box), /Case 2 of 5.*Pages 3–4 of 6/s);
+            assert.equal(await p.locator(box + ' [data-a="open"]').count(), 0, 'one card never opens the whole file');
+            await p.evaluate(f => { window.caseFileReview.start({ id: 'c5', caseFile: f, caseFileRead: { status: 'done', pages: 6, unsplit: true, rows: [], identifiers: [] } }); }, file);
+            assert.match(await p.textContent(box), /could not split/);
+            await p.click(box + ' [data-a="fix"]');
+            await p.waitForSelector('#crf-fix[open]');
+            assert.equal(await p.textContent('#crf-fx-used'), '6 of 6 pages used');
+            await p.click('#crf-fix [data-fx="add"]');
+            assert.deepEqual(await p.$$eval('#crf-fix .crf-fx-p', e => e.map(x => x.value)), ['1-5', '6']);
+            await p.fill('#crf-fix .crf-fx-p >> nth=1', '7');
+            assert.equal(await p.locator('#crf-fix [data-fx="apply"]').isDisabled(), true, 'a gap cannot be applied');
+            await p.fill('#crf-fix .crf-fx-p >> nth=1', '6');
+            await p.click('#crf-fix [data-fx="merge"]');
+            assert.deepEqual(await p.$$eval('#crf-fix .crf-fx-p', e => e.map(x => x.value)), ['1-6'], 'merge joins the ranges');
+            await p.evaluate(() => document.getElementById('crf-fix').close());
+            assert.equal(await p.evaluate(() => { const s = new Set(), c = { id: 'a', caseGroup: { id: 'g', total: 5, filePages: 6 } }; return window.caseFileReview.groupHead(c, s).includes('1 PDF · 5 cases') && window.caseFileReview.groupHead(c, s) === ''; }), true, 'the group line shows once');
 
             await p.evaluate(() => window.caseFileReview.stop());
             assert.ok((await p.evaluate(() => window.calls)).includes('unwatch'), 'stops listening when the modal closes');
