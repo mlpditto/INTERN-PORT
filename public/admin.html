@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.549)</title>
+    <title>Nika Admin (V102.550)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -3684,7 +3684,7 @@
         .crf-name b { font-size: .9em; } .crf-name small { color: #64748b; font-size: .76em; }
         .crf-open { width: auto; min-height: 0; margin: 0; padding: 2px 4px; border: 0; background: none; color: #4361ee; font-weight: 800; font-size: .84em; cursor: pointer; }
         .crf-done { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; font-size: .84em; font-weight: 700; color: #475569; }
-        .crf-done.bad { color: #b91c1c; }
+        .crf-done.bad { color: #b91c1c; } .crf-acts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
         .crf-btn { width: auto; min-height: 0; margin: 0; padding: 5px 12px; border: 1px solid #cbd5e1; border-radius: 999px; background: #fff; color: #334155; font-size: .92em; font-weight: 700; cursor: pointer; flex: none; }
         .crf-btn[aria-pressed="true"] { background: #eef2ff; border-color: #4361ee; color: #4361ee; }
         .crf-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 12px; margin-top: 12px; }
@@ -3692,7 +3692,10 @@
         .crf-text { min-width: 0; max-height: 58vh; overflow: auto; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 10px; }
         .crf-tl { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: .84em; font-weight: 800; } .crf-of { font-weight: 500; color: #94a3b8; }
         .crf-text table { width: 100%; margin-top: 6px; border-collapse: collapse; font-size: .82em; }
-        .crf-text th { width: 60px; padding: 4px 6px 4px 0; text-align: left; vertical-align: top; color: #475569; background: none; }
+        .crf-text th { width: 84px; padding: 4px 6px 4px 0; text-align: left; vertical-align: top; color: #475569; background: none; }
+        .crf-head { width: 100%; min-height: 0; margin: 0; padding: 2px 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
+        .crf-line { display: block; box-sizing: border-box; width: 100%; min-height: 0; margin: 0; padding: 2px 4px; border: 1px solid transparent; border-radius: 6px; background: none; color: inherit; font: inherit; line-height: 1.45; resize: none; overflow: hidden; }
+        .crf-line:hover, .crf-line:focus { border-color: #cbd5e1; background: #fff; outline: none; }
         .crf-text td { padding: 4px 0; overflow-wrap: anywhere; } .crf-text tr.low td { background: #fef9c3; padding-left: 5px; }
         .crf-text em { display: block; font-style: normal; font-size: .86em; color: #a16207; }
         .crf-warn { display: flex; gap: 6px; margin-top: 8px; font-size: .76em; color: #64748b; }
@@ -8440,7 +8443,7 @@
 <script src="dca-ai-trail.js?v=V102.390"></script>
 <script src="dxa-ai-trail.js?v=V102.389"></script>
 <script src="case-review-ai.js?v=V102.423"></script>
-<script src="case-file-review.js?v=V102.549"></script>
+<script src="case-file-review.js?v=V102.550"></script>
 <script src="up-next.js?v=V102.501"></script>
 <script src="quiz-matrix.js?v=V102.503"></script>
 <script src="rank-quiz.js?v=V102.484"></script>
@@ -32010,13 +32013,14 @@ ${JSON.stringify(sourceObj)}`;
             const langName = { th: 'Thai', en: 'English', ko: 'Korean' }[rvWriteupLang()] || 'Thai';
             const cut = (v, n) => { v = String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); return v.length > n ? v.slice(0, n) + '…' : v; };
             const qs = src.items.slice(0, 20).map((it, i) => `${i + 1}. Question: ${cut(it.q, 600)}\n   Picked (wrong): ${cut(it.picked, 300)}\n   Correct: ${cut(it.correct, 300)}${it.explanation ? `\n   Explanation: ${cut(it.explanation, 500)}` : ''}`).join('\n');
-            const prompt = `Write a concise academic review in ${langName} (under 1000 characters) of the quiz "${cut(src.quizTitle, 120)}" for one pharmacy intern, based ONLY on the questions below that were answered wrongly.
-Form: one short topic line, then bullet points — each on its own line starting with "• ", one line each, grouped by concept — each stating the misconception and the correct principle with its reason. Do NOT go question by question, do NOT number the questions, do NOT quote the answer key verbatim, do NOT mention scores or points.
-Register: formal, impersonal, textbook style — no greeting, no praise or encouragement, no pronouns or forms of address for the reader or the writer (no "you", "I", "we", no names, no particles such as ครับ / ค่ะ / นะ).
+            const prompt = `Write a short learning story in ${langName} (under 1800 characters) on the quiz "${cut(src.quizTitle, 120)}" for one pharmacy intern, based ONLY on the questions below that were answered wrongly.
+Form: one short topic line, then at most 3 short stories, grouped by concept, separated by a blank line. Each story starts with "• " and flows as prose in this order: a small scene at a pharmacy counter or on a ward with an unnamed patient; the tempting thought and why it feels right; what actually happens in the body or the treatment, step by step, so the reason is clear; then a line starting with "🧠 " holding one memory aid (an analogy, a mental picture or a short mnemonic) that fits the reason. Do NOT go question by question, do NOT number the questions, do NOT quote the answer key verbatim, do NOT mention scores or points.
+Accuracy: the scenes are illustrations, but every clinical fact must come from the questions below or be well established; invent no number, dose, study or guideline, and no memory aid that bends the fact to fit.
+Voice: a senior pharmacist telling a colleague a story, warm and plain, with short sentences. No greeting, no flattery and no blame; no names; no gendered particles such as ครับ / ค่ะ.
 Terminology: keep drug names, drug classes, receptors, enzymes, mechanisms, lab values and other technical terms in English (Latin script) inside the ${langName} text — never transliterate them.
-Emphasis: in each bullet wrap the one phrase that must be understood correctly (the correct principle) in **double asterisks** — nothing else is bold.
+Emphasis: in each story wrap the one phrase that must be understood correctly (the correct principle) in **double asterisks** — nothing else is bold.
 Then a short section headed "Read more" (in ${langName}) listing 2–4 specific sources worth reading on the concepts missed — a guideline, a textbook chapter, a drug-class monograph — names only, no URLs, no invented sources.
-Plain text only: no markdown beyond the "• " bullets and the **…** marks, no headings other than the topic line and the Read-more line.
+Plain text only: no markdown beyond the "• " story marks and the **…** marks, no headings other than the topic line and the Read-more line.
 
 --- QUIZ: ${cut(src.quizTitle, 120)} — questions answered wrongly ---
 ${qs}`;

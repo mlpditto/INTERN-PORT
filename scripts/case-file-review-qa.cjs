@@ -6,8 +6,13 @@ const assert = require('node:assert/strict');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
 const load = Module._load;
-Module._load = (id, ...a) => id === 'axios' ? { post: async () => { throw new Error('no network in QA'); } } : load(id, ...a);
-const { allowedPath, parseRead, MAX_BYTES, validParts, partRead, applySplit } = require('../functions/case-file-read.js');
+const sent = [];
+const reply = u => u.includes('anthropic') ? { content: [{ type: 'text', text: 'Here it is:\n' + ANSWER }], usage: { input_tokens: 3, output_tokens: 4 } }
+    : u.includes('openai') ? { output: [{ content: [{ type: 'output_text', text: ANSWER }] }], usage: { input_tokens: 3, output_tokens: 4, total_tokens: 7 } }
+    : { candidates: [{ content: { parts: [{ text: ANSWER }] } }], usageMetadata: { totalTokenCount: 7 } };
+const ANSWER = '{"pages":1,"rows":[{"page":1,"label":"CC","text":"cough"}]}';
+Module._load = (id, ...a) => id === 'axios' ? { post: async (u, b, o) => { sent.push({ u, b, o }); return { data: reply(u) }; } } : load(id, ...a);
+const { allowedPath, parseRead, MAX_BYTES, validParts, partRead, applySplit, READERS, readPdf } = require('../functions/case-file-read.js');
 Module._load = load;
 
 const admin = fs.readFileSync('public/admin.html', 'utf8').replace(/\r\n/g, '\n');
@@ -54,7 +59,7 @@ const rule = /match \/case-files\/\{ownerUid\}\/\{fileName\} \{([\s\S]*?)\n    \
 assert.ok(rule, 'storage rule');
 assert.ok(/allow read: if isAdmin\(\);/.test(rule[1]) && /auth\.uid == ownerUid/.test(rule[1]) && /5 \* 1024 \* 1024/.test(rule[1]) && /contentType == 'application\/pdf'/.test(rule[1]), 'admin reads; owner creates a PDF under 5 MB');
 assert.ok(!/allow update/.test(rule[1]), 'no overwrite');
-assert.ok(/exports\.readCaseFile = onCall\(\{ secrets: \['GEMINI_API_KEY'\]/.test(fn), 'callable');
+assert.ok(/exports\.readCaseFile = onCall\(\{ secrets: \['GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY'\]/.test(fn), 'callable');
 assert.ok(/c\.authUid !== request\.auth\.uid/.test(fn) && /reader\.allowedPath\(file\.path, c\.authUid\)/.test(fn), 'own case, own folder');
 assert.ok(/callerAdmin && retry/.test(fn), 'only the admin reads twice');
 assert.ok(/<script src="case-file-review\.js\?v=V102\.\d+"><\/script>/.test(admin));
@@ -66,6 +71,16 @@ assert.ok(/id="edit-case-decide"[^\n]*caseOpenDecide\('review'\)[^\n]*caseOpenDe
 assert.equal((admin.match(/class="crf-mark"/g) || []).length, 2, 'the row and the queue card mark a case with a file');
 assert.equal((admin.match(/caseFileReview\.purge\(/g) || []).length, 4, 'review, bulk review, delete, bulk delete drop the file');
 assert.ok(!/score|bonus/i.test(js.replace(/^\/\/.*$/gm, '').replace(/its score stay|keep their score|Score it as one|case-score-modal-shell|caseReviewScoreModal|closeCaseReviewScoreModal/g, '')), 'never touches the score');
+
+// V102.550: each reader gets the PDF itself and comes back through the same parser; only the admin's retry can name one
+const readerCheck = async () => {
+    assert.deepEqual(Object.keys(READERS), ['gemini-3.8-flash', 'claude-opus-5-5', 'gpt-6-sol']);
+    for (const m of Object.keys(READERS)) assert.equal((await readPdf(Buffer.from('x'), { gemini: 'g', anthropic: 'a', openai: 'o' }, m)).read.rows[0].text, 'cough', m);
+    assert.ok(sent[0].u.includes('generativelanguage') && sent[1].u.includes('api.anthropic.com') && sent[2].u.includes('api.openai.com'));
+    assert.equal(sent[1].b.messages[0].content[0].source.media_type, 'application/pdf');
+    assert.ok(sent[2].b.input[0].content[0].file_data.startsWith('data:application/pdf;base64,'));
+    assert.ok(/callerAdmin && retry && reader\.READERS\[request\.data\.model\] \? request\.data\.model : reader\.MODEL/.test(fn), 'an intern always gets Gemini');
+};
 
 const applyCheck = async () => {
     const writes = [], FieldValue = { serverTimestamp: () => 'NOW', delete: () => 'DEL' };
@@ -97,6 +112,7 @@ window.confirm = () => true; window.showToast = () => {};
 </script><script>${js}</script>`;
 
 (async () => {
+    await readerCheck();
     await applyCheck();
     const browser = await chromium.launch();
     try {
@@ -116,11 +132,16 @@ window.confirm = () => true; window.showToast = () => {};
             assert.match(await p.textContent(box), /has not read/, 'the read never started: the admin can start it');
             await p.click(box + ' [data-a="retry"]');
             assert.deepEqual((await p.evaluate(() => window.calls)).pop(), ['readCaseFile', { caseDocId: 'c1', retry: true }]);
-            assert.match(await p.textContent(box), /is reading/);
+            assert.match(await p.textContent(box), /Gemini is reading/);
 
             await p.evaluate(f => window.push({ caseFile: f, caseFileRead: { status: 'failed' } }), file);
             assert.match(await p.textContent(box), /could not read/);
             assert.equal(await p.locator(box + ' [data-a="open"]').count(), 1, 'the file still opens');
+            await p.click(box + ' [data-m="claude-opus-5-5"]');
+            assert.deepEqual((await p.evaluate(() => window.calls)).pop(), ['readCaseFile', { caseDocId: 'c1', retry: true, model: 'claude-opus-5-5' }]);
+            assert.match(await p.textContent(box), /Opus 5\.5 is reading/);
+            await p.evaluate(f => window.push({ caseFile: f, caseFileRead: { status: 'failed', model: 'gpt-6-sol' } }), file);
+            assert.match(await p.textContent(box), /Sol 6 could not read/);
 
             const rows = [{ page: 1, label: 'CC', text: '<b>cough</b>', unsure: false }, { page: 1, label: 'ALL', text: 'Penicillin?', unsure: true }];
             await p.evaluate(a => window.push({ caseFile: a[0], caseFileRead: { status: 'done', pages: 3, rows: a[1], identifiers: [] } }), [file, rows]);
@@ -130,6 +151,16 @@ window.confirm = () => true; window.showToast = () => {};
             await p.waitForSelector(box + ' iframe.crf-page');
             assert.equal(await p.locator(box + ' tr.low').count(), 1, 'the unsure line is marked');
             assert.equal(await p.locator(box + ' td b').count(), 0, 'model text is escaped');
+            // V102.550: each line and its heading can be corrected; Copy all sorts by heading
+            await p.fill(box + ' tr.low .crf-line', 'Penicillin rash');
+            await p.keyboard.press('Tab');
+            await p.waitForFunction(() => window.calls.some(c => c[0] === 'update' && c[2][0] === 'caseFileRead.rows'));
+            assert.equal(await p.locator(box + ' tr.low').count(), 0, 'a corrected line is no longer unsure');
+            assert.match(await p.textContent(box), /nothing marked unsure/);
+            await p.selectOption(box + ' tr[data-i="0"] .crf-head', 'Plan');
+            await p.evaluate(() => { window.clip = ''; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async t => { window.clip = t; } } }); });
+            await p.click(box + ' [data-a="copy"]');
+            assert.equal(await p.evaluate(() => window.clip), 'ALL:\nPenicillin rash\n\nPlan:\n<b>cough</b>', 'headings in order, with the edits');
             assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'no sideways scroll @' + width);
             assert.equal(await p.evaluate(() => document.getElementById('case-file-box').closest('.case-score-modal-shell').className), 'modal-content case-score-modal-shell crf-wide', 'wider only for Compare');
 
@@ -153,7 +184,7 @@ window.confirm = () => true; window.showToast = () => {};
             assert.equal(await p.locator(box + ' [data-a="open"]').count(), 0, 'one card never opens the whole file');
             await p.evaluate(f => { window.caseFileReview.start({ id: 'c5', caseFile: f, caseFileRead: { status: 'done', pages: 6, unsplit: true, rows: [], identifiers: [] } }); }, file);
             assert.match(await p.textContent(box), /not split/);
-            assert.equal(await p.locator(box + ' .crf-flag [data-a="retry"]').count(), 1, 'Gemini can try again');
+            assert.equal(await p.locator(box + ' .crf-flag [data-a="retry"]').count(), 3, 'Gemini, Opus 5.5 or Sol 6 can try again');
             await p.click(box + ' [data-a="fix"]');
             await p.waitForSelector('#crf-fix[open]');
             assert.equal(await p.textContent('#crf-fx-used'), '6 of 6 pages used');
