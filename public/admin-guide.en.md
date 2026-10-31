@@ -252,3 +252,143 @@ Thai speech from the video engines is not reliable yet. The route that works: th
 - 📎 **Attach Image for Vision Analysis** sends a picture with the question (a slide, a label, a chart).
 - **Focus on KB Only** in the sidebar keeps answers inside the uploaded documents; **Manage Documents** adds or removes them.
 - **Clear Chat** starts over. Nothing here writes to the database — it is a scratchpad for preparing the images, clips and scripts above.
+
+---
+
+## 8. 🔣 Icons — what each symbol means
+
+Search by word, or switch to the grid when you only remember the picture. AI model chips and provider logos are not listed because they change often.
+
+### 🧭 Header
+
+| Icon | Name | What it does |
+|---|---|---|
+| ➕ | Create | New Task, Quest, Event or Article |
+| 📥 | Archive | Things already archived |
+| 📱 | UI Preview | See the intern page without LINE |
+| 🔮 | AI Engine | AI keys and models |
+| 📖 | Admin guide | Opens this guide |
+| ⚓ | One Piece theme | Theme for Grand Line Deck and Laugh Tale |
+| 🇺🇸 | Language | Tap to change the label language |
+| 🌓 | Theme | Light or dark mode |
+
+### 📊 Dashboard
+
+| Icon | Name | What it does |
+|---|---|---|
+| ✈️ | LINE pushes | Pushes used this month; tap for the digest |
+| 🚀 | Escalated | Learning notes you flagged for focused review |
+| 🗑️ | Note deletion requests | Requests from users to delete notes |
+| 📦 | Show Done | Show finished Kanban cards |
+
+### 🧠 Quiz Engine
+
+| Icon | Name | What it does |
+|---|---|---|
+| 🟢 | Live | Open to interns now |
+| ⏸️ | Paused | Not live and not a template |
+| 📑 | Templates | Quiz templates |
+| 📝 | Graded | Graded quizzes |
+| 1️⃣ | One-time | Can be taken once |
+| 🔒 | Locked | Needs a score to unlock |
+| 📎 | Materials | Has attached files |
+| 🧪 | Audit | Never audited, or changed since the audit |
+| 🏷️ | Tags | Missing System, Topic or Skill tag |
+| 🩺 | Coverage | Quiz count by disease system |
+| 🌐 | Translate missing | Translate questions that lack a language |
+| 🗺️ | Topic Map | Topic groups and the review queue |
+| 🚀 | Activate | Turn the selected quizzes on |
+| ⏹️ | Deactivate | Turn the selected quizzes off |
+| 📄 | Export PDF | Export the selected quizzes |
+| 🔍 | Compare | Check selected quizzes for duplicates |
+
+### 📦 Assignments
+
+| Icon | Name | What it does |
+|---|---|---|
+| 🎓 | Exam | Exam sessions |
+| 🔗 | Gourmet World | Explore links |
+| 🏪 | A Shop for Killers | Beri reward shop |
+| 🖼️ | Fetch missing logos | Find logos for shops without one |
+| 🎁 | Give Beri | Give Beri to a user |
+
+### 👥 User Hub tools
+
+| Icon | Name | What it does |
+|---|---|---|
+| 🏆 | Elite Board | The ranking table |
+| 📅 | Score range | Pick the dates for scores |
+| 🏅 | Badge Stats | Interns whose badges have synced |
+| 🌸 | CAFE | CAFE, Content Creator and Audit points |
+| 📤 | Share ranking | Share the ranking |
+| ⚙️ | Divisions & Groups | Manage divisions and groups |
+| 👥 | Entry | Pre-registration |
+| 📇 | Personal data | Status, copy and CSV |
+| ⏳ | Decay | Preview the daily no-check-in decay |
+
+### 👤 User rows
+
+| Icon | Name | What it does |
+|---|---|---|
+| Q | Quiz | Approved quizzes; tap for the score history |
+| J | Journal | All journals, Laugh Tale and Learning Notes included |
+| C | Case | Cases sent |
+| 📰 | Articles | Articles read |
+| 🕓 | Last seen | Green under 1 day, orange over 7 days |
+| ⭐ | Score | Total score; tap to adjust |
+| 🪙 | Beri | Beri balance; tap to adjust |
+| 📎 | Documents | Applicant documents |
+| 📜 | History | Score history |
+| ⬆️ | Log work | Log work for this user |
+| 🎓 | Certificate | Certificate |
+| ⧉ | Copy | Copy this row |
+| ⋯ | More | More actions |
+
+### 🏴‍☠️ Grand Line Deck
+
+| Icon | Name | What it does |
+|---|---|---|
+| 🤖 | AI Architecture | AI chat and tools |
+| 🖼 | Image | Make one image |
+| 🎬 | Series ×10 | Plan a 10-episode 9:16 series |
+| 🎞 | One clip | Make one 9:16 clip |
+| ⚡ | Create now | Skip the AI prompt and send the brief as is |
+| 🔁 | Re-plan | Plan the series again |
+
+### 🏝️ Laugh Tale
+
+| Icon | Name | What it does |
+|---|---|---|
+| 📓 | Reflections | Reflection logs |
+| 🧠 | Quiz | Quiz feedback |
+| 📖 | Analysis | Analysis view |
+| 🪄 | Patterns | Patterns view |
+| 🪶 | Comments | Comments view |
+| 👒 | Straw Hat Mode | Hide or show all identities |
+| 📐 | Fullscreen | Fill the screen |
+| ⚙️ | LP Taxonomy | Edit the taxonomy |
+
+### 🏜️ Alabasta
+
+| Icon | Name | What it does |
+|---|---|---|
+| 🩺 | Case | Patient cases |
+| 🛒 | Product | Product listings |
+| 📥 | Pending | Waiting for review |
+| ✅ | Reviewed | Already reviewed |
+| ❌ | Rejected | Sent back |
+| 🔎 | Search | Search this list |
+| ⬇️ | CSV | Export the products shown |
+| 🔧 | Sync intern view | Sync reviewed work to the intern view |
+
+### 🪨 Poneglyph
+
+| Icon | Name | What it does |
+|---|---|---|
+| 🧭 | My Path | Your learning queue |
+| 💊 | Drugs | Drug Codex |
+| 🩺 | Diseases | Disease Codex |
+| 🎟️ | Memories | Finished events and their stamps |
+| 🖼️ | Gallery | Saved images and clips |
+| 🤖 | Generate My Path | Build the path with AI |
+| 📊 | Weekly Summary | This week in summary |

@@ -46,7 +46,7 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</
         await page.waitForTimeout(300);
         assert.equal(await page.locator('#adminGuideOverlay.open').count(), 0, 'seen flag set → no auto-open');
         await page.click('#btn-admin-guide');
-        await page.waitForFunction(() => document.querySelector('#adminGuideOverlay.open') && document.querySelectorAll('#adminGuideOverlay .ag-chip').length === 8);
+        await page.waitForFunction(() => document.querySelector('#adminGuideOverlay.open') && document.querySelectorAll('#adminGuideOverlay .ag-chip').length === 9);
         const chips = () => page.$$eval('#adminGuideOverlay .ag-chip', els => els.map(e => e.textContent));
         assert.equal((await chips())[7], '🏴‍☠️ Deck', 'the eighth chip is the Deck chapter');
         const body = () => page.$eval('#adminGuideOverlay .ag-body', e => { e.querySelectorAll('.ag-fold').forEach(d => { d.open = true; }); return e.innerText; });   // V102.529: every ### block folds
@@ -64,7 +64,7 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</
         assert.ok(/Plan 10 episodes/.test(await body()), 'TH Deck chapter');
         await page.keyboard.press('Escape');
         await page.click('#btn-admin-guide');
-        await page.waitForFunction(() => document.querySelectorAll('#adminGuideOverlay .ag-chip').length === 8);
+        await page.waitForFunction(() => document.querySelectorAll('#adminGuideOverlay .ag-chip').length === 9);
         assert.equal(await page.$eval('#adminGuideOverlay .ag-chip[aria-pressed="true"]', e => e.dataset.i), '7', 'reopens on the Deck chapter');
         await page.click('#adminGuideOverlay .ag-l[data-l="ko"]');
         await page.waitForFunction(() => /관리자 가이드/.test(document.querySelector('#adminGuideOverlay .ag-title').textContent) && /에피소드/.test(document.querySelector('#adminGuideOverlay .ag-body').textContent));
