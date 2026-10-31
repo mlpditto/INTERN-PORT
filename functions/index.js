@@ -2739,6 +2739,20 @@ exports.notifyAdminOnNewProduct = onCall(
 //   - LINE_CHANNEL_ACCESS_TOKEN
 //   - ADMIN_LINE_USER_ID  (single LINE userId starting with 'U')
 // ============================================================
+// 🌞 Nika: published Codex + Articles into the search store, every night (nika-sync.js). Nothing from users, cases or quizzes.
+exports.syncNikaContent = onSchedule({
+    schedule: '30 3 * * *',
+    timeZone: 'Asia/Bangkok',
+    region: 'us-central1',
+    timeoutSeconds: 540,
+    memory: '512MiB'
+}, async () => {
+    const auth = new GoogleAuth({ scopes: 'https://www.googleapis.com/auth/cloud-platform' });
+    const token = await (await auth.getClient()).getAccessToken();
+    const out = await require('./nika-sync').syncAll(admin.firestore(), axios, token.token || token);
+    console.log('[syncNikaContent]', out);
+});
+
 exports.notifyPurgeDigest = onSchedule({
     schedule: 'every monday 09:00',
     timeZone: 'Asia/Bangkok',
