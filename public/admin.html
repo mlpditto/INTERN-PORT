@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.542)</title>
+    <title>Nika Admin (V102.543)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -5784,6 +5784,8 @@
         /* V102.496: the footer bar moved into the header row — one segmented Bonus control, the AI reason in a popover, Save & Score = ✅ icon */
         #reflectiveReviewModal .reflective-liquid-header { --rr-h:34px; flex-wrap:wrap; row-gap:8px; } /* V102.542: one height for every control in this row */
         #reflectiveReviewModal .reflective-liquid-header .reflective-liquid-title { flex:0 0 auto; }
+        #reflectiveReviewModal .rr-queue-count { padding:3px 10px; border-radius:999px; background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; font-size:0.62em; font-weight:800; letter-spacing:0; white-space:nowrap; }
+        #reflectiveReviewModal .rr-queue-count[hidden] { display:none; }
         #reflectiveReviewModal .reflective-liquid-header .reflective-review-footer { flex:1 1 auto; margin:0; padding:0; border:0; gap:8px; justify-content:flex-end; flex-wrap:wrap; min-width:0; }
         #reflectiveReviewModal .reflective-liquid-header .rr-foot-bonus { flex:0 1 auto; flex-wrap:nowrap; gap:8px; }
         #reflectiveReviewModal .reflective-liquid-header .reflective-bonus-chips { gap:0; border:1px solid #cbd5e1; border-radius:10px; background:#fff; }
@@ -15312,7 +15314,7 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
         <div id="reflectiveReviewModal" class="modal" style="z-index: 2501;">
             <div class="modal-content reflective-liquid-modal">
                 <div class="reflective-liquid-header" style="margin-bottom:10px;">
-                    <h3 class="reflective-liquid-title">Reflective Review</h3>
+                    <h3 class="reflective-liquid-title">Reflective Review<span id="rr-queue-count" class="rr-queue-count lang-no-toggle" hidden></span></h3>
                     <!-- V102.496: the footer bar lives in the header row — Bonus is one segmented control (the AI pick is the ringed chip; its reason is a popover on the 💡),
                          Save & Score is a ✅ icon (name in aria-label / tooltip), Cancel is the ✕ beside it. Every id and handler is unchanged. -->
                     <div class="reflective-review-footer">
@@ -15332,7 +15334,7 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
                         </div>
                     </div>
                         <div class="reflective-review-actions">
-                            <button class="magic-btn reflective-review-save-btn" onclick="saveReflectiveReview()" title="Save & Score (Ctrl/⌘ + Enter)" aria-label="Save & Score"><span aria-hidden="true">✅</span></button>
+                            <button class="magic-btn reflective-review-save-btn" onclick="saveReflectiveReview()" title="Save & Score, then next (Ctrl/⌘ + Enter)" aria-label="Save & Score"><span aria-hidden="true">✅</span></button>
                             <button type="button" class="reflective-review-overflow-btn lang-no-toggle" onclick="openQuillImageOrphanScan()" title="Orphan images — scan editor-images/ Storage for files no reflective_logs doc uses" aria-label="Orphan images"><i class="fa-solid fa-broom"></i></button>
                         </div>
                     </div>
@@ -70440,6 +70442,20 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             showToast('🗑 ' + parts.join(' · '), failed ? 'warning' : 'success');
         }
 
+        // V102.543: the rows the review table lists as pending, in its order (same user + search filters)
+        function rrReviewQueue() {
+            const search = (document.getElementById('reflective-search')?.value || '').toLowerCase();
+            return reflectiveLogsCache.filter(log => !log.isArchived && !log.adminComment && (log.adminBonus === undefined || log.adminBonus === null)
+                && (!window._reflUserFilter || log.userId === window._reflUserFilter)
+                && (!search || (log.content || '').toLowerCase().includes(search) || (log.userName || log.displayName || '').toLowerCase().includes(search)));
+        }
+        function rrPaintQueueCount(id) {
+            const el = document.getElementById('rr-queue-count'), queue = rrReviewQueue(), i = queue.findIndex(l => l.id === id);
+            if (!el) return;
+            el.hidden = i < 0;
+            el.textContent = i < 0 ? '' : `${i + 1} / ${queue.length} รอตรวจ`;
+        }
+
         async function reviewReflective(id) {
             let log = reflectiveLogsCache.find(l => l.id === id);
             
@@ -70460,6 +70476,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             const uid = log.userId || '';
 
             document.getElementById('reflective-review-id').value = id;
+            rrPaintQueueCount(id);
             document.getElementById('reflective-review-uid').value = uid;
             document.getElementById('reflective-review-uname').value = name;
             
@@ -70596,6 +70613,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
 
             if (!comment) return alert("Please provide a short comment/feedback for the student.");
 
+            // V102.543: Save & Next — the row after this one in the pending list, else the top of it. A log that is not pending (re-editing) just closes.
+            const queue = rrReviewQueue(), at = queue.findIndex(l => l.id === id);
+            const next = at < 0 ? null : (queue[at + 1] || (queue[0].id !== id ? queue[0] : null));
             try {
                 const logRef = db.collection("reflective_logs").doc(id);
 
@@ -70613,7 +70633,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 // so the intern's unified "pending" banner clears for this reflective log.
                 const rmBatch = db.batch();
                 if (await stageSubmissionMirror(rmBatch, id, submissionReviewedFields(bonus))) await rmBatch.commit();
-                showToast(`Reviewed! User can claim +${bonus} points ✨`);
+                showToast(next ? `✅ บันทึกแล้ว +${bonus} · คนถัดไป: ${next.userName || next.displayName || 'Unknown'} · เหลือ ${queue.length - 1}` : `Reviewed! User can claim +${bonus} points ✨`);
                 // V93.48: GC orphan Storage uploads from this session. Files whose
                 // basename is absent from the committed commentHtml were uploaded but
                 // not retained — safe to delete because dedup-reuse uploads (which
@@ -70624,7 +70644,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 forceHideModal('reflectiveReviewModal');
             } catch (e) {
                 alert("Error: " + e.message);
+                return;
             }
+            if (next) await reviewReflective(next.id);
         }
 
         // 🔥 Points Claimed Notification Listener
