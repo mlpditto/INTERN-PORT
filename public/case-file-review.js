@@ -3,7 +3,9 @@
 // The admin scores: nothing here touches the score. The file goes when the case is reviewed or deleted (window.caseFileReview.purge).
 // V102.548: a file holding several cases is split into cards (caseGroup): Compare draws only that card's pages, Fix the split changes the ranges.
 (function () {
-    const STALE_MS = 2 * 60 * 1000;
+    const STALE_MS = 5 * 60 * 1000;
+    // V102.550: a retry can ask another reader. One press reads, and the file then goes to that vendor; the read after Send stays Gemini.
+    const READERS = { 'gemini-3.8-flash': 'Gemini', 'claude-opus-5-5': 'Opus 5.5', 'gpt-6-sol': 'Sol 6' }, OTHERS = [['claude-opus-5-5', 'Anthropic'], ['gpt-6-sol', 'OpenAI']];
     const KIND = { hn: 'an HN', name: 'a patient name', id: 'an ID number', address: 'an address', phone: 'a phone number' };
     let stop = null, current = null, wide = false, url = '', boxId = 'case-file-box';
 
@@ -16,12 +18,25 @@
     const toast = (m, k) => { if (typeof showToast === 'function') showToast(m, k); };
     const groupDocs = id => db.collection('cases').where('caseGroup.id', '==', id).get();
 
+    const reader = read => (read && READERS[read.model]) || 'Gemini';
+    const others = cls => OTHERS.map(([m, who]) => '<button type="button" class="' + cls + '" data-a="retry" data-m="' + m + '" title="Read with ' + READERS[m] + '. The file goes to ' + who + '.">' + READERS[m] + '</button>').join('');
+    // V102.550: the admin corrects each line and its heading here; Copy all puts the same lines under their headings.
+    const HEADS = ['CC', 'HPI', 'PMH', 'U/D', 'MH', 'ALL', 'DRPs', 'Plan', 'Assessment'];
+    const headOpts = label => [...new Set([...HEADS, 'Note', label])].map(h => '<option' + (h === label ? ' selected' : '') + '>' + esc(h) + '</option>').join('');
+    const fit = t => { t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; };
+    function copyText(read) {
+        const rows = (read.rows || []).filter(r => r.text);
+        return [...new Set([...HEADS, ...rows.map(r => r.label), 'Note'])].map(h => {
+            const lines = rows.filter(r => r.label === h).map(r => r.text);
+            return lines.length ? h + ':\n' + lines.join('\n') : '';
+        }).filter(Boolean).join('\n\n');
+    }
     function statusHtml(read) {
-        if (!read) return '<div class="crf-done"><span>Gemini has not read this file</span><button type="button" class="crf-btn" data-a="retry">Read now</button></div>';
-        if (read.status === 'reading' && Date.now() - ms(read.at) < STALE_MS) return '<div class="crf-done"><span><i class="crai-dot"></i>Gemini is reading…</span></div>';
-        if (read.status !== 'done') return '<div class="crf-done bad"><span>Gemini could not read this file. You can still open it.</span><button type="button" class="crf-btn" data-a="retry">Try again</button></div>';
+        if (!read) return '<div class="crf-done"><span>Gemini has not read this file</span><div class="crf-acts"><button type="button" class="crf-btn" data-a="retry">Read now</button>' + others('crf-btn') + '</div></div>';
+        if (read.status === 'reading' && Date.now() - ms(read.at) < STALE_MS) return '<div class="crf-done"><span><i class="crai-dot"></i>' + reader(read) + ' is reading…</span></div>';
+        if (read.status !== 'done') return '<div class="crf-done bad"><span>' + reader(read) + ' could not read this file. You can still open it.</span><div class="crf-acts"><button type="button" class="crf-btn" data-a="retry">Try again</button>' + others('crf-btn') + '</div></div>';
         const n = (read.rows || []).filter(r => r.unsure).length;
-        return '<div class="crf-done"><span>✨ Read by Gemini · ' + (n ? n + (n === 1 ? ' line' : ' lines') + ' to check' : 'nothing marked unsure') + '</span><button type="button" class="crf-btn" data-a="compare" aria-pressed="' + wide + '">Compare</button></div>';
+        return '<div class="crf-done"><span>✨ Read by ' + reader(read) + ' · ' + (n ? n + (n === 1 ? ' line' : ' lines') + ' to check' : 'nothing marked unsure') + '</span><button type="button" class="crf-btn" data-a="compare" aria-pressed="' + wide + '">Compare</button></div>';
     }
     function flagHtml(read) {
         const marks = (read && read.identifiers) || [];
@@ -32,14 +47,14 @@
     }
     function unsplitHtml(read) {
         if (!read || !read.unsplit) return '';
-        return '<div class="crf-flag"><b>❔ This file was not split</b><span>Ask Gemini to try, or split it yourself.</span><div><button type="button" class="crf-keep" data-a="retry">✨ Try to split</button><button type="button" class="crf-keep" data-a="fix">Split it myself</button></div></div>';
+        return '<div class="crf-flag"><b>❔ This file was not split</b><span>Ask a model to try, or split it yourself.</span><div><button type="button" class="crf-keep" data-a="retry">✨ Try to split</button>' + others('crf-keep') + '<button type="button" class="crf-keep" data-a="fix">Split it myself</button></div></div>';
     }
     function compareHtml(c) {
         const read = c.caseFileRead, g = c.caseGroup;
-        const rows = (read.rows || []).map(r => '<tr class="' + (r.unsure ? 'low' : '') + '"><th>' + esc(r.label) + '</th><td>' + esc(r.text) + (r.unsure ? '<em>Unsure · check the page</em>' : '') + '</td></tr>').join('');
+        const rows = (read.rows || []).map((r, i) => '<tr class="' + (r.unsure ? 'low' : '') + '" data-i="' + i + '"><th><select class="crf-head" aria-label="Heading">' + headOpts(r.label) + '</select></th><td><textarea class="crf-line" rows="1" aria-label="' + esc(r.label) + ' text">' + esc(r.text) + '</textarea>' + (r.unsure ? '<em>Unsure · check the page</em>' : '') + '</td></tr>').join('');
         const left = g ? '<div class="crf-page crf-pages" id="crf-pages"><div class="crf-of">Drawing the pages…</div></div>' : '<iframe class="crf-page" title="The intern\'s PDF" src="' + esc(url) + '"></iframe>';
         const where = g ? 'case ' + g.index + ' of ' + g.total + ' · ' + range(g).toLowerCase() : Number(read.pages || 1) + (read.pages > 1 ? ' pages' : ' page');
-        return '<div class="crf-two">' + left + '<div class="crf-text"><div class="crf-tl"><span>Text read</span><span class="crf-of">Gemini · ' + where + '</span></div><table>' + rows + '</table><div class="crf-warn">⚠️ <span>Check each line against the page.</span></div></div></div>';
+        return '<div class="crf-two">' + left + '<div class="crf-text"><div class="crf-tl"><span>Text read <button type="button" class="crf-btn" data-a="copy" title="Copy this case, sorted by heading">⧉ Copy all</button></span><span class="crf-of">' + reader(read) + ' · ' + where + '</span></div><table>' + rows + '</table><div class="crf-warn">⚠️ <span>Check each line against the page.</span></div></div></div>';
     }
     // only this card's pages; the browser's PDF viewer cannot be held to a range
     async function drawPages(c) {
@@ -76,6 +91,7 @@
         if (!f) { box.innerHTML = ''; return; }
         const showCompare = wide && c.caseFileRead && c.caseFileRead.status === 'done';
         box.innerHTML = fileRow(c) + flagHtml(c.caseFileRead) + unsplitHtml(c.caseFileRead) + statusHtml(c.caseFileRead) + (showCompare ? compareHtml(c) : '');
+        if (showCompare) box.querySelectorAll('.crf-line').forEach(fit);
         if (showCompare && c.caseGroup) drawPages(c);
     }
 
@@ -103,16 +119,26 @@
         if ((next.status || 'pending') === 'pending') updateCaseStatus(next.id, 'reviewed'); else editCaseNote(next.id);
     }
 
-    async function act(a) {
+    async function saveRow(el) {
+        const c = current, tr = el.closest('tr'), r = c && c.caseFileRead && (c.caseFileRead.rows || [])[+tr.dataset.i];
+        if (!r) return;
+        if (el.matches('select')) r.label = el.value;
+        else { r.text = el.value.trim(); r.unsure = false; tr.classList.remove('low'); const em = tr.querySelector('em'); if (em) em.remove(); }
+        $(boxId).querySelector('.crf-done').outerHTML = statusHtml(c.caseFileRead);
+        await db.collection('cases').doc(c.id).update({ 'caseFileRead.rows': c.caseFileRead.rows });
+    }
+
+    async function act(a, model) {
         const c = current; if (!c) return;
         if (a === 'open') window.open(await getUrl(), '_blank', 'noopener');
         else if (a === 'compare') { if (!wide) await getUrl(); wide = !wide; render(); }
+        else if (a === 'copy') { await navigator.clipboard.writeText(copyText(c.caseFileRead)); toast('Copied', 'success'); }
         else if (a === 'prev') go(-1);
         else if (a === 'next') go(1);
         else if (a === 'fix') openFix(c);
         else if (a === 'retry') {
-            c.caseFileRead = { status: 'reading', at: { toMillis: () => Date.now() } }; render();
-            adminApp.functions().httpsCallable('readCaseFile')({ caseDocId: c.id, retry: true }).catch(e => console.warn('readCaseFile', e));
+            c.caseFileRead = { status: 'reading', model, at: { toMillis: () => Date.now() } }; render();
+            adminApp.functions().httpsCallable('readCaseFile')({ caseDocId: c.id, retry: true, ...(model ? { model } : {}) }).catch(e => console.warn('readCaseFile', e));
         } else if (a === 'clear') await db.collection('cases').doc(c.id).update({ 'caseFileRead.identifiersCleared': true });
         else if (a === 'delete') {
             if (!confirm('Delete this PDF? The case and its score stay.')) return;
@@ -176,10 +202,15 @@
         document.body.append(d); paint(); d.showModal();
     }
 
+    document.addEventListener('input', e => { if (e.target.classList && e.target.classList.contains('crf-line')) fit(e.target); });
+    document.addEventListener('change', e => {
+        if (!e.target.matches || !e.target.matches('.crf-line, .crf-head')) return;
+        saveRow(e.target).catch(err => { console.warn('caseFile row', err); toast('Could not save: ' + err.message, 'error'); });
+    });
     document.addEventListener('click', e => {
         const b = e.target.closest && e.target.closest('#case-file-box [data-a], #edit-case-file-box [data-a]');
         if (!b) return;
-        act(b.dataset.a).catch(err => { console.warn('caseFile', err); toast('Could not finish: ' + err.message, 'error'); });
+        act(b.dataset.a, b.dataset.m).catch(err => { console.warn('caseFile', err); toast('Could not finish: ' + err.message, 'error'); });
     });
 
     window.caseFileReview = {
@@ -193,8 +224,9 @@
             if (!current.caseFile) return;
             stop = db.collection('cases').doc(caseItem.id).onSnapshot(s => {
                 if (!current || current.id !== caseItem.id) return;
-                current = pick(s.data() || {});
-                render();
+                const next = pick(s.data() || {}), same = wide && JSON.stringify(next.caseFileRead) === JSON.stringify(current.caseFileRead);
+                current = next;
+                if (!same) render();   // an edit comes back as the same read: keep the pages and the scroll
             }, e => console.warn('caseFile watch', e));
         },
         stop() {
