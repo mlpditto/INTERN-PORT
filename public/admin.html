@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.549)</title>
+    <title>Nika Admin (V102.551)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -5658,6 +5658,15 @@
         #reflectiveReviewModal :is(.reflective-review-feedback, #reflective-grammar-card) .text-ai-chips > button.glass-toggle-item { min-height:24px; padding:2px 7px; font-size:10.5px; font-weight:800; border-radius:8px; background:#f8fafc; border-color:#e2e8f0; color:#334155; }
         #reflectiveReviewModal :is(.reflective-review-feedback, #reflective-grammar-card) .text-ai-chips > button.glass-toggle-item:hover { border-color:#f59e0b; }
         /* V102.507: the 📰 personal-review panel in the quiz Review reuses the light rail */
+        /* V102.551: draft state, the intern's view, and a time badge only where the time stands out */
+        .rv-wu-st { display:inline-flex; align-items:center; padding:3px 9px; border-radius:999px; border:1px solid #fde68a; background:#fff; color:#92400e; font-size:.74em; font-weight:800; white-space:nowrap; }
+        .rv-wu-st[hidden] { display:none; } .rv-wu-st.sent { border-color:#86efac; background:#dcfce7; color:#166534; } .rv-wu-st.edited { border-color:#fdba74; background:#fff7ed; color:#9a3412; }
+        #rv-writeup-view { max-height:320px; overflow:auto; padding:14px 16px; border:1.5px solid #fde68a; border-radius:12px; background:#fffdf8; color:#1f2937; }
+        #rv-writeup-view[hidden] { display:none; } .rv-wv-as { font-size:.76em; font-weight:800; color:#92400e; } .rv-wv-as[hidden] { display:none; }
+        #rv-writeup-view .rv-wv-h { margin-bottom:6px; font-weight:800; font-size:1.05em; color:#92400e; } #rv-writeup-view .rv-wv-b { font-size:.95em; line-height:1.55; white-space:pre-wrap; }
+        #rv-writeup-view .adm-key { font-weight:800; background:#fef3c7; color:#92400e; padding:0 3px; border-radius:3px; }
+        .rv-time { display:none; align-items:center; gap:3px; margin-left:8px; padding:2px 8px; border-radius:999px; background:#e9ecef; color:#495057; font-size:.7em; font-weight:800; vertical-align:middle; }
+        .rv-time.fast { display:inline-flex; background:#fef3c7; color:#92400e; } .rv-time.slow { display:inline-flex; background:#e0e7ff; color:#3730a3; } #reviewQuizOverlay[data-rv-sort] .rv-time { display:inline-flex; }
         #rv-writeup[hidden] { display:none !important; }   /* the inline display:flex would otherwise beat the hidden attribute */
         #rv-writeup .text-ai-chips { flex:1 1 auto; padding:0 !important; gap:3px !important; background:transparent; border:0; }
         #rv-writeup .text-ai-chips > button.glass-toggle-item { min-height:24px; padding:2px 7px; font-size:10.5px; font-weight:800; border-radius:8px; background:#f8fafc; border-color:#e2e8f0; color:#334155; }
@@ -31904,6 +31913,27 @@ ${JSON.stringify(sourceObj)}`;
             const u = window._rvUi;
             root.querySelectorAll('.rv-q').forEach(w => { if (Object.prototype.hasOwnProperty.call(u.open, w.dataset.rvI)) w.dataset.rvOpen = u.open[w.dataset.rvI] ? '1' : '0'; });
             window.rvSetFilter(u.filter || 'all');
+            window.rvApplySort();
+        };
+        // V102.551: ⏱ Time: slowest first, fastest first, then the quiz order; while sorted every card shows its time
+        window.rvApplySort = function () {
+            const root = document.getElementById('reviewQuizOverlay'), mode = (window._rvUi && window._rvUi.sort) || '';
+            const ws = root ? [...root.querySelectorAll('.rv-q')] : [];
+            if (!ws.length) return;
+            const sec = w => Number(w.dataset.rvSec) || 0, at = w => Number(w.dataset.rvI);
+            const order = [...ws].sort((a, b) => (mode === 'slow' ? sec(b) - sec(a) : mode === 'fast' ? sec(a) - sec(b) : 0) || at(a) - at(b));
+            const mark = document.createComment('');
+            ws[0].parentNode.insertBefore(mark, ws[0]);
+            order.forEach(w => mark.parentNode.insertBefore(w, mark));
+            mark.remove();
+            if (mode) root.dataset.rvSort = mode; else delete root.dataset.rvSort;
+            const chip = document.getElementById('rv-time-sort');
+            if (chip) { chip.textContent = { slow: '⏱ Slowest', fast: '⏱ Fastest' }[mode] || '⏱ Time'; chip.setAttribute('aria-pressed', mode ? 'true' : 'false'); }
+        };
+        window.rvCycleTimeSort = function () {
+            if (!window._rvUi) return;
+            window._rvUi.sort = { '': 'slow', slow: 'fast', fast: '' }[window._rvUi.sort || ''];
+            window.rvApplySort();
         };
 
         window.copyReviewQuestion = async function(btn) {
@@ -31982,6 +32012,38 @@ ${JSON.stringify(sourceObj)}`;
             const ta = document.getElementById('rv-writeup-text'), note = document.getElementById('rv-writeup-note');
             if (open && ta && !ta.value.trim() && note && !note.textContent) note.textContent = 'Pick the language and model, then ✨';
         }
+        // V102.551: the draft stays in this browser until Send, so an intern can never read it from their own attempt
+        function rvWriteupLoadDraft(id) {
+            try { const d = JSON.parse(localStorage.getItem('rv_draft_' + id) || 'null'); return d && typeof d.text === 'string' ? d : null; } catch (e) { return null; }
+        }
+        function rvWriteupStatus() {
+            const s = window._rvWriteup, ta = document.getElementById('rv-writeup-text'), el = document.getElementById('rv-writeup-state'), send = document.getElementById('rv-writeup-send');
+            if (!s || !ta || !el) return;
+            const text = ta.value.trim(), clock = ms => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            const sent = !!s.sent && text === s.sent, edited = !!s.sent && !sent;
+            el.className = 'rv-wu-st' + (sent ? ' sent' : edited ? ' edited' : '');
+            el.textContent = sent ? '✓ Sent' + (s.sentAt ? ' ' + clock(s.sentAt) : '') : edited ? 'Edited · not sent' : text ? 'Draft' + (s.savedAt ? ' · saved ' + clock(s.savedAt) : '') : '';
+            el.hidden = !el.textContent;
+            if (send) { send.disabled = sent; send.style.opacity = sent ? '.45' : ''; send.textContent = edited ? '📨 Send again' : '📨 Send'; }
+        }
+        function rvWriteupTyped() {
+            const s = window._rvWriteup, ta = document.getElementById('rv-writeup-text');
+            if (!s || !ta) return;
+            const text = ta.value.trim();
+            try {
+                if (text && text !== s.sent) { s.savedAt = Date.now(); localStorage.setItem('rv_draft_' + s.id, JSON.stringify({ text: ta.value, at: s.savedAt })); }
+                else localStorage.removeItem('rv_draft_' + s.id);
+            } catch (e) { s.savedAt = 0; }
+            rvWriteupStatus();
+        }
+        function rvWriteupPreview(on) {
+            const ta = document.getElementById('rv-writeup-text'), view = document.getElementById('rv-writeup-view'), as = document.getElementById('rv-writeup-as'), b = document.getElementById('rv-writeup-preview');
+            if (!ta || !view) return;
+            const show = on && !!ta.value.trim();
+            if (show) view.innerHTML = '<div class="rv-wv-h"><i class="fa-solid fa-user-shield"></i> Admin Feedback</div><div class="rv-wv-b">' + escapeHtml(ta.value.trim()).replace(/\*\*([^*\n]{1,200}?)\*\*/g, '<strong class="adm-key">$1</strong>') + '</div>';   // the intern app's fmtAdminNote
+            view.hidden = as.hidden = !show; ta.hidden = show;
+            if (b) b.setAttribute('aria-pressed', String(show));
+        }
         function rvWriteupLang() {
             const chip = document.getElementById('rv-writeup-lang');
             return (chip && chip.dataset.lang) || localStorage.getItem('ai_review_writeup_lang') || 'th';
@@ -32028,6 +32090,7 @@ ${qs}`;
                 const txt = String(resp && typeof resp === 'object' ? (resp.text || resp.outputText || resp.response || '') : (resp || '')).trim();
                 if (!txt) throw new Error('the model sent back nothing.');
                 ta.value = txt;
+                rvWriteupPreview(false); rvWriteupTyped();
                 if (note) note.textContent = '✨ ' + model + ' · ' + Math.max(1, Math.round((Date.now() - t0) / 1000)) + ' s — read it, edit, then Send';
             } catch (e) {
                 if (note) note.textContent = '✨ ' + ((e && e.message) || 'AI draft failed');
@@ -32045,10 +32108,12 @@ ${qs}`;
                     adminCommentBy: ALLOWED_EMAIL || 'admin'
                 });
                 if (note) note.textContent = '✓ Sent — on their quiz result and History';
+                const s = window._rvWriteup;
+                if (s) { s.sent = text; s.sentAt = Date.now(); try { localStorage.removeItem('rv_draft_' + s.id); } catch (e) { /* the draft only stays */ } }
                 showToast('📰 Personal review sent');
             } catch (e) {
                 alert('Send failed: ' + ((e && e.message) || e));
-            } finally { if (btn) btn.disabled = false; }
+            } finally { if (btn) btn.disabled = false; rvWriteupStatus(); }
         }
 
         async function reviewQuiz(attemptId) {
@@ -32127,7 +32192,9 @@ ${qs}`;
                 const telemetryQuestionCount = Math.max(rawDurations.length, activeDurations.length, answerChanges.length, firstLatency.length, (quiz.questions || []).length || 0);
                 const totalRawSec = rawDurations.reduce((sum, val) => sum + Math.max(0, val), 0);
                 const totalActiveSec = activeDurations.reduce((sum, val) => sum + Math.max(0, val), 0);
-                const activeRatio = totalRawSec > 0 ? (totalActiveSec / totalRawSec) : null;
+                // V102.551: nothing records active time now, so no active seconds means no reading, not 0% active
+                const activeRatio = totalRawSec > 0 && totalActiveSec > 0 ? (totalActiveSec / totalRawSec) : null;
+                const rvTimed = rawDurations.filter(v => v > 0).sort((a, b) => a - b), rvTimeMedian = rvTimed.length >= 4 ? rvTimed[Math.floor(rvTimed.length / 2)] : 0;
                 const totalAnswerChanges = answerChanges.reduce((sum, val) => sum + Math.max(0, val), 0);
                 const timingResolution = getActiveTimingRiskRules();
                 const timingRules = timingResolution.rules;
@@ -32427,7 +32494,8 @@ ${qs}`;
                         const studentActiveDuration = (att.durationsActive || [])[i];
                         const answerChanges = (att.answerChangeCounts || [])[i];
                         const firstAnswerLatency = (att.firstAnswerLatencySec || [])[i];
-                        const durationHtml = studentDuration !== undefined ? `<span style="font-size:0.7em; background:#e9ecef; color:#495057; padding:2px 8px; border-radius:10px; margin-left:8px;"><i class="fa-regular fa-clock"></i> Raw ${studentDuration}s</span>` : '';
+                        const rvSec = Number(studentDuration) || 0, rvTimeKind = rvTimeMedian && rvSec > 0 ? (rvSec < rvTimeMedian / 3 ? 'fast' : rvSec > rvTimeMedian * 3 ? 'slow' : '') : '';
+                        const durationHtml = studentDuration !== undefined ? `<span class="rv-time ${rvTimeKind}" title="${rvSec}s${rvTimeMedian ? ` · the middle time here is ${rvTimeMedian}s` : ''}">${rvTimeKind === 'fast' ? '⚡' : rvTimeKind === 'slow' ? '🐢' : '<i class="fa-regular fa-clock"></i>'} ${rvSec}s</span>` : '';
                         const activeDurationHtml = studentActiveDuration !== undefined ? `<span style="font-size:0.7em; background:#d1fae5; color:#065f46; padding:2px 8px; border-radius:10px; margin-left:6px;"><i class="fa-solid fa-user-clock"></i> Active ${studentActiveDuration}s</span>` : '';
                         const answerChangesHtml = answerChanges !== undefined ? `<span style="font-size:0.7em; background:#ede9fe; color:#5b21b6; padding:2px 8px; border-radius:10px; margin-left:6px;"><i class="fa-solid fa-arrow-pointer"></i> ${answerChanges} changes</span>` : '';
                         const firstLatencyHtml = firstAnswerLatency !== undefined && firstAnswerLatency !== null ? `<span style="font-size:0.7em; background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:10px; margin-left:6px;"><i class="fa-solid fa-stopwatch"></i> First ${firstAnswerLatency}s</span>` : '';
@@ -32441,7 +32509,7 @@ ${qs}`;
                         const copyPayload = encodeURIComponent(copyLines.join('\n'));
 
                         cardsHtml += `
-                            <div class="rv-q" data-rv-i="${i}" data-rv-state="${rvState}" data-rv-rank="${rankSc ? 1 : 0}" data-rv-open="${rvOpen ? 1 : 0}" data-rv-hide="0">${rvBar}<div class="lang-no-toggle rv-card" style="border:2px solid ${cardBorder}; padding:15px; margin-bottom:15px; border-radius:12px; background:${cardBg}; border-left:8px solid ${cardBorder}; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                            <div class="rv-q" data-rv-i="${i}" data-rv-sec="${Number((att.durations || [])[i]) || 0}" data-rv-state="${rvState}" data-rv-rank="${rankSc ? 1 : 0}" data-rv-open="${rvOpen ? 1 : 0}" data-rv-hide="0">${rvBar}<div class="lang-no-toggle rv-card" style="border:2px solid ${cardBorder}; padding:15px; margin-bottom:15px; border-radius:12px; background:${cardBg}; border-left:8px solid ${cardBorder}; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
                                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; flex-wrap: wrap; gap:8px;">
                                     <b style="font-size:1.1em; flex:1; min-width:200px; word-wrap: break-word; overflow-wrap: break-word; white-space: normal;">${rvFold}${cardIcon} Q${i + 1}: ${window.renderMdInline(q.q)} ${durationHtml}${activeDurationHtml}${answerChangesHtml}${firstLatencyHtml}</b>
                                     <span class="badge" style="background:#6c757d; font-size:0.7em; padding:2px 8px; margin-left:8px; flex-shrink:0;">${isChoice ? 'Choice' : (rankSc ? (q.mode === 'tier' ? 'Rank · tiers' : 'Rank') : 'Short Answer')}</span>${partialBadgeHtml}
@@ -32498,7 +32566,7 @@ ${qs}`;
                     if (rvStates.length && (rvDefs.length - 1 >= 2 || rvStates.some(s => !s.open))) {
                         const rvRail = `<div id="rv-rail" class="lang-no-toggle" data-attempt="${attemptId}" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:0 0 12px;">`
                             + rvDefs.map(d => `<button type="button" class="rv-chip" data-f="${d[0]}" aria-pressed="false" onclick="rvSetFilter('${d[0]}')">${d[1]} <b>${rvCount(d[0])}</b></button>`).join('')
-                            + `<span style="flex:1"></span><button type="button" class="rv-chip rv-xall" onclick="rvExpandAll()">⊞ Expand all</button></div>`;
+                            + `<span style="flex:1"></span>${rvTimed.length >= 2 ? '<button type="button" id="rv-time-sort" class="rv-chip" aria-pressed="false" onclick="rvCycleTimeSort()" title="Sort by time spent">⏱ Time</button>' : ''}<button type="button" class="rv-chip rv-xall" onclick="rvExpandAll()">⊞ Expand all</button></div>`;
                         cardsHtml = cardsHtml.slice(0, rvCardsStart) + rvRail + cardsHtml.slice(rvCardsStart);
                     }
                 }
@@ -32579,16 +32647,22 @@ ${qs}`;
                 window._reviewWrongForWriteup = { quizTitle: String(quiz.title || quiz.shortTitle || ''), items: rvWrongItems };
                 const rvWriteupLangSaved = localStorage.getItem('ai_review_writeup_lang') || 'th';
                 const rvWriteupModelId = 'ai-review-writeup-model-' + Date.now();   // V102.508: one hidden input per open; bindRegistryModelInput builds the vendor-first rail after it
+                const rvDraftSaved = rvWriteupLoadDraft(attemptId);
+                window._rvWriteup = { id: attemptId, sent: String(att.adminComment || '').trim(), sentAt: att.adminCommentAt && att.adminCommentAt.toMillis ? att.adminCommentAt.toMillis() : 0, savedAt: rvDraftSaved ? rvDraftSaved.at : 0 };
                 const rvWriteupHtml = `<div id="rv-writeup" hidden class="lang-no-toggle" style="padding:10px 16px;border-bottom:1px solid #fde68a;background:#fffbeb;display:flex;flex-direction:column;gap:8px;">
                         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                             <span style="font-weight:800;color:#92400e;font-size:0.9em;white-space:nowrap;">📰 Personal review</span>
+                            <span id="rv-writeup-state" class="rv-wu-st" hidden></span>
                             ${rvWriteupLangChip(rvWriteupLangSaved)}
                             <input type="hidden" id="${rvWriteupModelId}" value="${normalizeTextAIModel(localStorage.getItem('ai_review_writeup_model'))}">
-                            <span id="rv-writeup-note" style="font-size:0.78em;color:#78716c;margin-left:auto;"></span>
+                            <span id="rv-writeup-note" style="flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;font-size:0.78em;color:#78716c;margin-left:auto;"></span>
                             <button type="button" id="rv-writeup-draft" onclick="rvWriteupDraft()" class="rv-ib" style="${rvIconBtn}" title="Draft again with AI (replaces the text in the box)" data-th-title="ให้ AI ร่างใหม่ (แทนที่ข้อความในกล่อง)" data-kr-title="AI로 다시 초안 작성 (상자의 텍스트를 대체)" aria-label="Draft with AI">✨</button>
+                            <button type="button" id="rv-writeup-preview" onclick="rvWriteupPreview(this.getAttribute('aria-pressed') !== 'true')" class="rv-ib" style="${rvIconBtn}" aria-pressed="false" title="Preview as the intern sees it" data-th-title="ดูแบบที่ผู้เรียนเห็น" data-kr-title="인턴이 보는 화면 미리보기" aria-label="Preview as the intern sees it"><i class="fa-regular fa-eye"></i></button>
                             <button type="button" id="rv-writeup-send" onclick="rvWriteupSend('${attemptId}')" style="width:auto;height:34px;min-height:0;margin:0;background:#f59e0b;color:#fff;border:1.5px solid #d97706;padding:0 14px;border-radius:10px;font-weight:800;cursor:pointer;" title="Send — it shows on their quiz result and in History" data-th-title="ส่ง — ขึ้นในผลควิซและ History ของเขา" data-kr-title="보내기 — 퀴즈 결과와 History에 표시됩니다">📨 Send</button>
                         </div>
-                        <textarea id="rv-writeup-text" rows="7" placeholder="What they got wrong and why — one short review for this intern, AI-drafted, yours to edit before it goes out" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #fcd34d;border-radius:10px;font-size:0.92em;line-height:1.5;resize:vertical;background:#fff;font-family:inherit;">${escapeHtml(att.adminComment || '')}</textarea>
+                        <div id="rv-writeup-as" class="rv-wv-as" hidden>As the intern sees it · nothing has been sent</div>
+                        <div id="rv-writeup-view" hidden></div>
+                        <textarea id="rv-writeup-text" rows="7" oninput="rvWriteupTyped()" placeholder="What they got wrong and why — one short review for this intern, AI-drafted, yours to edit before it goes out" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #fcd34d;border-radius:10px;font-size:0.92em;line-height:1.5;resize:vertical;background:#fff;font-family:inherit;">${escapeHtml(rvDraftSaved ? rvDraftSaved.text : (att.adminComment || ''))}</textarea>
                     </div>`;
 
                 // Create overlay directly on document.body
@@ -32636,6 +32710,7 @@ ${qs}`;
                 overlay.addEventListener('click', function(e) { if (e.target === overlay) closeReviewOverlay(); });
                 document.body.appendChild(overlay);
                 if (window.rvApplyUi) window.rvApplyUi(attemptId);
+                rvWriteupStatus();
                 { const fl = document.getElementById('rv-writeup-lang'); if (fl && window.twemoji) twemoji.parse(fl, { folder: 'svg', ext: '.svg' }); }   // V100.79: flag emoji render as letters on Windows
                 if (rvWrongItems.length && window.bindRegistryModelInput) window.bindRegistryModelInput(rvWriteupModelId, 'ai_review_writeup_model');   // V102.508: vendor icons first, then that vendor's chips (ai-model-ui.js V102.487 rail)
 
