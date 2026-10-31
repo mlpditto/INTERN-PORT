@@ -2318,6 +2318,41 @@ exports.notifyOnAdminEdit = onCall(
 // ============================================================
 // V102.496: one "New Case Submitted" push per case is retired — the same case already arrives by e-mail. true brings the LINE bubbles back (admin 1:1 + group).
 const CASE_LINE_PUSH = false;
+// V102.547: Gemini reads the PDF on a Case right after Send (a callable from the page: Firestore triggers cannot deploy in this region).
+// The intern's call reads once; the admin's retry reads again. A failure leaves the case as it is and says so on it.
+exports.readCaseFile = onCall({ secrets: ['GEMINI_API_KEY'], timeoutSeconds: 120, memory: '512MiB' }, async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
+    const { caseDocId, retry } = request.data || {};
+    if (!caseDocId || typeof caseDocId !== 'string') throw new HttpsError('invalid-argument', 'caseDocId required');
+    const callerAdmin = isAdminToken(request.auth.token);
+    const ref = admin.firestore().collection('cases').doc(caseDocId);
+    const snap = await ref.get();
+    if (!snap.exists) return { skipped: true, reason: 'case-not-found' };
+    const c = snap.data() || {};
+    if (!callerAdmin && c.authUid !== request.auth.uid) throw new HttpsError('permission-denied', 'Not your case');
+    const file = c.caseFile || {};
+    const reader = require('./case-file-read');
+    if (!reader.allowedPath(file.path, c.authUid)) return { skipped: true, reason: 'no-file' };
+    if (c.caseFileRead && !(callerAdmin && retry)) return { skipped: true, reason: 'already-read' };
+    const stamp = () => admin.firestore.FieldValue.serverTimestamp();
+    await ref.update({ caseFileRead: { status: 'reading', at: stamp() } });
+    try {
+        const obj = admin.storage().bucket('intern-port-edfa7.firebasestorage.app').file(file.path);
+        const [meta] = await obj.getMetadata();
+        if (Number(meta.size) > reader.MAX_BYTES || meta.contentType !== 'application/pdf') throw new Error('not a PDF under the limit');
+        const [buf] = await obj.download();
+        const out = await reader.readPdf(buf, process.env.GEMINI_API_KEY);
+        recordAiUsage('gemini-aistudio', reader.MODEL, out.tokens, callerAdmin, 'case_file_read', { inputTokens: out.inputTokens, outputTokens: out.outputTokens });
+        if (!out.read) throw new Error('unusable answer');
+        await ref.update({ caseFileRead: { status: 'done', model: reader.MODEL, at: stamp(), ...out.read } });
+        return { ok: true, pages: out.read.pages };
+    } catch (err) {
+        console.warn(`[readCaseFile] ${caseDocId}:`, err.message);
+        await ref.update({ caseFileRead: { status: 'failed', at: stamp() } }).catch(() => {});
+        return { ok: false };
+    }
+});
+
 exports.notifyAdminOnNewCase = onCall(
     { secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID', 'GMAIL_APP_PASSWORD'] },   // 2026-10-22: + the mail
     async (request) => {
