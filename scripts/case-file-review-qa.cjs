@@ -37,7 +37,16 @@ assert.equal(split({ cases: two, splitSure: true }).parts.length, 2);
 assert.deepEqual([split({ cases: two, splitSure: false }).parts, split({ cases: two, splitSure: false }).unsplit], [[], true], 'not sure: one card, and it says so');
 assert.deepEqual([split({ cases: [two[0]], splitSure: true }).parts, split({ cases: [two[0]], splitSure: true }).unsplit], [[], undefined], 'one case: nothing to split');
 assert.equal(split({ cases: [two[0], { title: 'B', pageFrom: 5, pageTo: 6 }], splitSure: true }).unsplit, true, 'a page left out');
-assert.equal(validParts([{ from: 1, to: 2 }, { from: 2, to: 3 }], 3), false, 'overlap');
+// V102.549: the owner's real file: five cases, each starting halfway down a page
+const mid = [[1, 2], [2, 3], [3, 4], [4, 5], [5, 6]].map(([pageFrom, pageTo], i) => ({ title: 'C' + i, pageFrom, pageTo }));
+const shared = parseRead(JSON.stringify({ pages: 6, rows: [{ page: 2, case: 1, text: 'end of one' }, { page: 2, case: 2, text: 'start of two' }], identifiers: [], cases: mid, splitSure: true }));
+assert.equal(shared.parts.length, 5, 'cases that share a page still split');
+assert.deepEqual(partRead(shared, shared.parts[0]).rows.map(r => r.text), ['end of one'], 'a shared page: each card keeps only its own lines');
+assert.deepEqual(partRead(shared, shared.parts[1]).rows.map(r => r.text), ['start of two']);
+assert.equal(validParts([{ from: 1, to: 2 }, { from: 2, to: 3 }], 3), true, 'sharing a page is fine');
+assert.equal(validParts([{ from: 1, to: 2 }, { from: 1, to: 3 }], 3), false, 'going back is not');
+assert.deepEqual(partRead({ rows: [{ page: 2, text: 'a' }], identifiers: [] }, { from: 2, to: 3 }).rows.length, 1, 'no case number: the page decides');
+assert.equal(validParts([{ from: 1, to: 1 }, { from: 3, to: 3 }], 3), false, 'a page left out');
 assert.equal(validParts([{ from: 1, to: 3 }], 3), true);
 assert.deepEqual(partRead({ rows: [{ page: 1 }, { page: 4 }], identifiers: [{ page: 4 }] }, { from: 4, to: 6 }), { pages: 3, rows: [{ page: 4 }], identifiers: [{ page: 4 }] }, 'a card holds only its pages');
 

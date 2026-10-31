@@ -143,11 +143,11 @@
         } else { pages = Number(c.caseFileRead && c.caseFileRead.pages) || 1; parts = [{ title: '', from: 1, to: pages }]; }
         const d = document.createElement('dialog');
         d.id = 'crf-fix'; d.className = 'crf-fix lang-no-toggle';
-        d.innerHTML = '<div class="crf-fx-h"><b>Fix the split</b><button type="button" class="csr-x" aria-label="Close">&times;</button></div><p>Every page must be in one case, in order. Reviewed cards keep their score.</p><div id="crf-fx-list"></div>'
+        d.innerHTML = '<div class="crf-fx-h"><b>Fix the split</b><button type="button" class="csr-x" aria-label="Close">&times;</button></div><p>Cases run in order. Two cases can share a page. Reviewed cards keep their score.</p><div id="crf-fx-list"></div>'
             + '<div class="crf-fx-foot"><span id="crf-fx-used"></span><button type="button" class="csr-save" data-fx="apply">Apply</button></div>';
         const read = () => { d.querySelectorAll('.crf-fx').forEach(r => { const p = parts[+r.dataset.i], x = parseRange(r.querySelector('.crf-fx-p').value); p.title = r.querySelector('.crf-fx-t').value.trim(); if (x) Object.assign(p, x); else p.bad = true; }); };
         const used = () => {
-            const ok = parts.every(p => !p.bad) && parts.every((p, i) => p.from === (i ? parts[i - 1].to + 1 : 1) && p.to >= p.from) && parts[parts.length - 1].to === pages;
+            const ok = parts.every(p => !p.bad) && parts.every((p, i) => (i ? p.from === parts[i - 1].to || p.from === parts[i - 1].to + 1 : p.from === 1) && p.to >= p.from) && parts[parts.length - 1].to === pages;
             $('crf-fx-used').textContent = ok ? pages + ' of ' + pages + ' pages used' : 'Pages must run 1 to ' + pages + ' with no gap';
             d.querySelector('[data-fx="apply"]').disabled = !ok;
         };

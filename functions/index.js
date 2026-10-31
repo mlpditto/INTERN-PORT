@@ -2373,7 +2373,7 @@ exports.applyCaseSplit = onCall(async (request) => {
     const group = c.caseGroup ? (await db.collection('cases').where('caseGroup.id', '==', c.caseGroup.id).get()).docs.map(d => d.data()) : [c];
     const pages = (c.caseGroup && c.caseGroup.filePages) || (c.caseFileRead && c.caseFileRead.pages) || 0;
     const clean = (Array.isArray(parts) ? parts : []).map(p => ({ title: String((p && p.title) || '').trim().slice(0, 60), from: Number(p && p.from), to: Number(p && p.to) }));
-    if (!c.caseFile || !reader.validParts(clean, pages)) throw new HttpsError('invalid-argument', 'Every page must be in one case, in order');
+    if (!c.caseFile || !reader.validParts(clean, pages)) throw new HttpsError('invalid-argument', 'Cases must run in order with no page left out');
     const read = { pages, rows: group.flatMap(d => (d.caseFileRead && d.caseFileRead.rows) || []), identifiers: group.flatMap(d => (d.caseFileRead && d.caseFileRead.identifiers) || []) };
     try { return { cases: await reader.applySplit(db, ref, c, clean, read, admin.firestore.FieldValue) }; } catch (e) {
         if (e.message === 'reviewed card') throw new HttpsError('failed-precondition', 'A reviewed card cannot be removed');
