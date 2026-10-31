@@ -96,6 +96,12 @@
         }));
     }
 
+    // V101.258: chip text; a system added later through the taxonomy editor falls back to its English name
+    const CASE_SYSTEM_SHORT = { cardio: 'Cardio', neuro: 'Neuro', msk: 'MSK', renal: 'Renal', endocrine: 'Endo/NCD', heme: 'Heme', mental: 'Mental' };
+    window.caseSystemShort = key => CASE_SYSTEM_SHORT[key] || window.CASE_SYSTEM_BY_KEY[key]?.label.en || key;
+    // V101.258: ' + 🧠 Neuro' for the systems after the primary one (cases.diseaseSystemKeys, only on a multi-system case)
+    window.caseMoreSystems = c => (c.diseaseSystemKeys || []).slice(1).map(k => ' + ' + (window.CASE_SYSTEM_EMOJI[k] || '') + ' ' + window.caseSystemShort(k)).join('');
+
     // Synchronous boot — static fallback. Callers that read globals before
     // the Firestore overlay completes see the bundled 12 systems and never
     // get a null/undefined. Identical shape to legacy V91.84 behavior.
