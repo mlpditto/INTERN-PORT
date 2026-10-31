@@ -12,7 +12,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
 // ---- static pins
 assert.ok(/<script src="case-dup\.js\?v=V102\.\d+"><\/script>/.test(admin), 'script loaded');
-assert.ok(/<div class="alabasta-case-sub">[^\n]*<\/div>\n\s*\$\{window\.caseDup \? caseDup\.html\(c\)[^\n]*: ''\}\n\s*<div class="ib-note"/.test(admin), 'the chip sits between the system line and the note of a case card');
+assert.ok(/<div class="ib-sub-row">[\s\S]{0,900}?<\/div>\n\s*<\/div>\n\s*\$\{window\.caseDup \? caseDup\.html\(c\)[^\n]*: ''\}\n\s*<div class="ib-note"/.test(admin), 'the chip sits between the system line and the note of a case card');
 assert.ok(/<div class="alabasta-inbox-card lang-no-toggle\$\{window\.caseDup \? caseDup\.cls\(c\) : ''\}">[\s\S]{0,700}<span class="cdup-hn-code">/.test(admin), 'the card root takes the pair class and the HN is the bold code');
 const fn = admin.slice(admin.indexOf('async function updateCaseStatus('));
 assert.ok(/reopenUpdate\.duplicateOf = firebase\.firestore\.FieldValue\.delete\(\)/.test(fn.slice(0, 9000)), 'reopening a folded case clears duplicateOf');

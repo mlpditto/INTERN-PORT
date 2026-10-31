@@ -16,7 +16,7 @@ assert.ok(/caseArticle\.btns\(c\)/.test(table) && /\$\{isPending \? '' : makeBtn
 assert.ok(!/Generate Case Card<\/button>/.test(table), 'the ⋯ menu no longer lists Case Card (it is a button)');
 assert.ok(/openAlabastaPoneglyph/.test(table) && /generateQuizFromCase/.test(table) && /deleteCaseSubmission/.test(table), 'the other tools stay in ⋯');
 const inbox = admin.slice(admin.lastIndexOf('<div class="ib-actions">'), admin.lastIndexOf('<div class="ib-actions">') + 2000);
-assert.ok(/alabasta-go-btn is-icon"[^>]*>✅<\/button>/.test(inbox) && /caseArticle\.btns\(c\)/.test(inbox), 'inbox card: ✅ icon + 🖼️ 📰');
+assert.ok(!/updateCaseStatus/.test(inbox) && /caseArticle\.btns\(c\)/.test(inbox) && /caseOpenDecide\('review'\)/.test(admin), 'inbox card: 👁 🖼️ 📰, ✅ lives in Open case');
 assert.ok(/\.alabasta-action-btn\.is-case-article\.is-done/.test(admin) && /\.alabasta-go-btn\.is-icon/.test(admin), 'styles');
 
 // ---- the module
