@@ -154,7 +154,7 @@
     function paint() {
         var counts = { meds: filledRows('meds').length, labs: filledRows('labs').length, rights: rights ? 1 : 0, appt: apptFilled() ? 1 : 0, adr: adrFilled() ? 1 : 0, log: dlFilled() ? 1 : 0 };
         var score = adrScore(), level = adrLevel(score);
-        document.querySelectorAll('#u-case-opt .u-opt-tile').forEach(function (t) {
+        document.querySelectorAll('#u-case-opt .u-opt-tile, #u-foot-case [data-opt]').forEach(function (t) {
             var k = t.dataset.opt, n = counts[k] || 0, b = t.querySelector('.u-opt-n');
             t.classList.toggle('has', n > 0);
             if (b) { b.hidden = !n; b.textContent = k === 'meds' || k === 'labs' ? String(n) : k === 'adr' ? String(score) : '✓'; }
@@ -170,19 +170,60 @@
         if (dl) dl.innerHTML = filledRows('meds').map(function (p) { return p[0]; }).filter(Boolean).map(function (n) { return '<option value="' + n.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '"></option>'; }).join('');
     }
 
+    // V101.260: 📄 PDF. The file's own name stays on this phone (it can hold a patient's name); the upload uses a random one.
+    var PDF_MAX = 5 * 1024 * 1024, pdfFile = null;
+    function pdfPaint() {
+        var has = !!pdfFile;
+        $('u-pdf-blk').hidden = !has;
+        $('u-pdf-cond').hidden = has;
+        $('u-pdf-btn').classList.toggle('has', has);
+        $('u-pdf-name').textContent = has ? pdfFile.name : '';
+        $('u-pdf-size').textContent = has ? (pdfFile.size / 1048576).toFixed(1) + ' MB' : '';
+    }
+    function pdfRefuse(msg) { window.showToast(msg); }
+    function pdfPicked(input) {
+        var f = input.files && input.files[0];
+        input.value = '';
+        if (!f) return;
+        if (f.size >= PDF_MAX) return pdfRefuse('PDF must be under 5 MB · ไฟล์ต้องไม่เกิน 5 MB');
+        f.slice(0, 5).text().then(function (head) {
+            if (head !== '%PDF-') return pdfRefuse('This file is not a PDF · ไฟล์นี้ไม่ใช่ PDF');
+            pdfFile = f; pdfPaint();
+        }).catch(function () { pdfRefuse('Could not open this file · เปิดไฟล์ไม่ได้'); });
+    }
+    function pdfInit() {
+        if (!$('u-pdf-btn')) return;
+        $('u-pdf-btn').addEventListener('click', function () { $('u-pdf-input').click(); });
+        $('u-pdf-input').addEventListener('change', function (e) { pdfPicked(e.target); });
+        $('u-pdf-x').addEventListener('click', function () { pdfFile = null; pdfPaint(); });
+    }
+    window.caseFileUpload = async function () {
+        if (!pdfFile) return null;
+        var user = await ensureFirebaseAuthReady(10000);
+        if (!user) throw new Error('Firebase auth is required');
+        var path = 'case-files/' + user.uid + '/' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10) + '.pdf';
+        await firebase.storage().ref(path).put(pdfFile, { contentType: 'application/pdf' });
+        return { path: path, size: pdfFile.size };
+    };
+    window.caseFileDiscard = function (file) {
+        firebase.storage().ref(file.path).delete().catch(function (e) { console.warn('caseFile discard', e); });
+    };
+
     function init() {
         var wrap = $('u-case-opt');
         if (!wrap || wrap.dataset.ready) return;
         wrap.dataset.ready = '1';
         buildDailyLog();
-        wrap.querySelectorAll('.u-opt-tile').forEach(function (t) {
+        document.querySelectorAll('#u-case-opt .u-opt-tile, #u-foot-case [data-opt]').forEach(function (t) {
             t.addEventListener('click', function () {
                 var blk = $('u-opt-' + t.dataset.opt); if (!blk) return;
                 blk.hidden = !blk.hidden;
                 t.setAttribute('aria-pressed', String(!blk.hidden));
                 if (!blk.hidden && KINDS[t.dataset.opt] && !rowsOf(t.dataset.opt).length) addRow(t.dataset.opt);
+                if (!blk.hidden && t.closest('#u-foot-case')) blk.scrollIntoView({ block: 'center', behavior: 'smooth' });
             });
         });
+        pdfInit();
         wrap.querySelectorAll('.u-opt-add').forEach(function (b) { b.addEventListener('click', function () { addRow(b.dataset.add); }); });
         wrap.querySelectorAll('#u-opt-rights .u-opt-chip').forEach(function (c) {
             c.addEventListener('click', function () { rights = rights === c.dataset.v ? '' : c.dataset.v; paint(); if (rights === 'other') { var o = $('u-opt-rights-other'); if (o) o.focus(); } });
@@ -231,21 +272,24 @@
             ['2 · Optional', 'Patient name, symptoms and the five tiles (Medications, Lab results, Rights, Appointment, ADR). Open only what you have; skip the rest.'],
             ['3 · Daily log', 'For your instructor\'s table. Tell the case in your own words, without the name or HN → ✨ Split into the table fills the empty boxes → check every box, AI can be wrong.'],
             ['4 · Plan + Assessment', 'Write these yourself: they are your thinking. 🔍 What am I missing lists the gaps and never writes for you.'],
-            ['5 · Submit', 'Then find the case in Work → Cases.']
+            ['5 · PDF', 'Optional. Cover the patient name, HN, ID number and address on every page first. Gemini reads the file for the admin after you send it.'],
+            ['6 · Send', 'Then find the case in Work → Cases.']
         ], note: '🔒 Never put a patient name or HN in the story. Crop anything that identifies the patient from photos.' },
         th: { title: '🩺 วิธีส่งเคส', close: 'ปิดคำแนะนำ', steps: [
             ['1 · ต้องกรอก', 'Case No. (HN) และ Disease System อย่างน้อย 1 ระบบ เลือกได้หลายระบบถ้าเคสเกี่ยวข้อง ระบบแรกที่แตะคือระบบหลัก'],
             ['2 · ไม่บังคับ', 'ชื่อผู้ป่วย อาการ และ 5 ช่อง (ยา ผลแล็บ สิทธิการรักษา นัดหมาย ADR) เปิดเฉพาะที่มีข้อมูล ที่เหลือข้ามได้'],
             ['3 · Daily log', 'สำหรับตารางส่งอาจารย์ เล่าเคสด้วยคำของตัวเอง ไม่ต้องใส่ชื่อหรือ HN → กด ✨ แยกลงตาราง ระบบจะเติมช่องที่ว่าง → ตรวจทุกช่อง เพราะ AI อาจผิดได้'],
             ['4 · Plan + Assessment', 'เขียนเอง เพราะเป็นความคิดของคุณ ปุ่ม 🔍 ตรวจว่าขาดอะไร จะบอกสิ่งที่ยังขาด แต่ไม่เขียนให้'],
-            ['5 · Submit', 'จากนั้นดูเคสได้ที่ Work → Cases']
+            ['5 · PDF', 'ไม่บังคับ ปิดชื่อผู้ป่วย, HN, เลขบัตร และที่อยู่ทุกหน้าก่อนแนบ Gemini จะอ่านไฟล์ให้ admin หลังคุณส่ง'],
+            ['6 · Send', 'จากนั้นดูเคสได้ที่ Work → Cases']
         ], note: '🔒 ห้ามใส่ชื่อหรือ HN ของผู้ป่วยในเรื่องเล่า และครอปส่วนที่ระบุตัวผู้ป่วยออกจากรูป' },
         ko: { title: '🩺 케이스 제출 방법', close: '도움말 닫기', steps: [
             ['1 · 필수', 'Case No. (HN)와 Disease System 1개 이상. 여러 계통을 선택할 수 있으며 처음 누른 계통이 주 계통입니다.'],
             ['2 · 선택', '환자 이름, 증상, 5개 항목(약물, 검사 결과, 권리, 예약, ADR). 있는 내용만 열고 나머지는 건너뛰세요.'],
             ['3 · Daily log', '지도교수 제출용 표입니다. 이름이나 HN 없이 케이스를 직접 설명 → ✨ 표로 나누기가 빈칸을 채움 → AI가 틀릴 수 있으니 모든 칸을 확인하세요.'],
             ['4 · Plan + Assessment', '본인의 사고이므로 직접 작성하세요. 🔍 빠진 내용 확인은 부족한 점만 알려 주고 대신 쓰지 않습니다.'],
-            ['5 · Submit', '제출 후 Work → Cases에서 확인하세요.']
+            ['5 · PDF', '선택 사항입니다. 먼저 모든 페이지의 환자 이름, HN, 신분증 번호, 주소를 가리세요. 제출 후 Gemini가 관리자를 위해 파일을 읽습니다.'],
+            ['6 · Send', '제출 후 Work → Cases에서 확인하세요.']
         ], note: '🔒 설명에 환자 이름이나 HN을 쓰지 마세요. 사진에서 환자를 알아볼 수 있는 부분은 잘라 내세요.' }
     };
     window.caseHelp = function (trigger) {
@@ -267,7 +311,9 @@
         DAILY_LOG.forEach(function (r) { var e = $('u-dl-' + r[0]); if (e) { e.value = ''; e.classList.remove('ai'); } });
         if ($('u-dl-story')) { $('u-dl-story').value = ''; dlMsg('', ''); $('u-dl-hints').hidden = true; }
         document.querySelectorAll('#u-case-opt .u-opt-blk').forEach(function (b) { b.hidden = true; });
-        document.querySelectorAll('#u-case-opt .u-opt-tile').forEach(function (t) { t.setAttribute('aria-pressed', 'false'); });
+        document.querySelectorAll('#u-case-opt .u-opt-tile, #u-foot-case [data-opt]').forEach(function (t) { t.setAttribute('aria-pressed', 'false'); });
+        pdfFile = null;
+        if ($('u-pdf-btn')) pdfPaint();
         paint();
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();

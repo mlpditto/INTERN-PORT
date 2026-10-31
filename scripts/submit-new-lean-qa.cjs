@@ -244,7 +244,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
             caseExtrasReset(); o.afterReset = [caseExtrasCollect(), $('u-opt-adr').hidden, $('u-opt-adr-score').querySelector('em').textContent, $('u-opt-adr-drug').value, document.querySelector('.u-opt-tile[data-opt="adr"] .u-opt-n').hidden];
             return o;
         });
-        assert.deepEqual(adr.tiles, ['meds', 'labs', 'rights', 'appt', 'adr', 'log'], 'five tiles, ⚠️ ADR last, then the 📋 Daily log row');
+        assert.deepEqual(adr.tiles, ['meds', 'labs', 'rights', 'appt', 'adr'], 'five tiles, ⚠️ ADR last; 📋 Daily log moved to the footer');
         assert.ok(adr.hidden0 && !adr.hidden1 && adr.rows === 10, 'the ADR block folds open with the 10 Naranjo questions');
         assert.ok(adr.oneLine.every(x => x[1] <= x[2] + 1 && x[3] < 24), 'every question fits one line on the phone: ' + JSON.stringify(adr.oneLine));
         assert.deepEqual(adr.default, ['0', 'doubtful', 'uuuuuuuuuu'], 'every answer starts at ? (0) → 0 Doubtful');
@@ -258,12 +258,12 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.deepEqual(adr.afterReset, [null, true, '0', '', true], 'reset folds the block and clears answers, score, drug and badge');
         // ---- V101.256: 📋 Daily log — folds open, only what is filled goes into one `dailyLog` field, reset clears it
         const dl = await page.evaluate(() => {
-            const $ = i => document.getElementById(i), o = {}, tile = document.querySelector('.u-opt-tile[data-opt="log"]');
+            const $ = i => document.getElementById(i), o = {}, tile = document.querySelector('.u-foot-btn[data-opt="log"]');
             o.closed = $('u-opt-log').hidden; tile.click(); o.open = !$('u-opt-log').hidden;
             o.ids = [...document.querySelectorAll('#u-opt-log .u-dl-row textarea')].map(t => t.id.replace('u-dl-', ''));
             o.empty = caseExtrasCollect();
             $('u-dl-cc').value = ' sneezing '; $('u-dl-all').value = 'NKDA'; $('u-dl-assessment').value = 'fits allergic rhinitis'; $('u-dl-all').dispatchEvent(new Event('input', { bubbles: true }));
-            o.badge = [tile.querySelector('.u-opt-n').textContent, tile.classList.contains('has')];
+            o.filled = tile.classList.contains('has');   // V101.260: a green frame, no mark
             o.collected = JSON.parse(JSON.stringify(caseExtrasCollect()));
             caseExtrasReset(); o.after = [caseExtrasCollect(), $('u-opt-log').hidden, $('u-dl-cc').value];
             return o;
@@ -271,7 +271,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.deepEqual([dl.closed, dl.open], [true, true], 'the Daily log row folds its block');
         assert.deepEqual(dl.ids, ['pt', 'cc', 'hpi', 'pmh', 'ud', 'mh', 'all', 'drps', 'plan', 'assessment'], 'every column of the faculty table has a field');
         assert.equal(dl.empty, null, 'open but empty sends nothing');
-        assert.deepEqual(dl.badge, ['✓', true], 'the row shows it holds data');
+        assert.equal(dl.filled, true, 'the footer button shows it holds data');
         assert.deepEqual(dl.collected, { dailyLog: { cc: 'sneezing', all: 'NKDA', assessment: 'fits allergic rhinitis' } }, 'only what is filled, trimmed');
         assert.deepEqual(dl.after, [null, true, ''], 'reset clears and folds it');
         // ---- V101.258: Daily log AI — fills only empty case fields, never Plan / Assessment; name + HN masked; 🔍 lists gaps and writes nothing; a failure leaves the form usable
@@ -280,7 +280,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
             let reply = '', fail = false;
             window.ensureFirebaseAuthReady = async () => ({ getIdToken: async () => 't' });
             window.fetch = async (u, init) => { const b = JSON.parse(init.body); calls.push([u, b]); if (fail) return { ok: false, status: 500 }; return { ok: true, json: async () => ({ text: reply }) }; };
-            document.querySelector('.u-opt-tile[data-opt="log"]').click();
+            document.querySelector('.u-foot-btn[data-opt="log"]').click();
             $('u-case-id').value = 'HN12345'; $('u-case-customer').value = 'สมศรี ใจดี';
             await $('u-dl-split').click(); o.noStory = [calls.length, $('u-dl-msg').dataset.kind];
             $('u-dl-story').value = 'คุณสมศรี HN12345 หญิง 34 ปี น้ำมูกใส'; $('u-dl-cc').value = 'typed by me';
@@ -344,6 +344,45 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.deepEqual(sent, [{ primary: 'renal', disease: 'Renal/Urinary / ระบบทางเดินปัสสาวะ', keys: ['renal', 'gi'] }, 0, { primary: 'neuro', disease: 'Neurological / ระบบประสาท', keys: undefined }, 0], 'what submitCase receives, and the chips clear after a send: ' + JSON.stringify(sent));
 
         // ---- V101.259: ⓘ teaches the Case form, in the language on screen
+        // V101.260: the footer row, and 📄 PDF: picked here, uploaded on Send, the file's own name never leaves the phone
+        const foot = await page.evaluate(async () => {
+            const $ = i => document.getElementById(i), o = {};
+            selectSubmissionType('case');
+            const row = $('u-foot-case').getBoundingClientRect(), send = $('u-submit-btn').getBoundingClientRect();
+            o.sameRow = Math.abs(row.top - send.top) < 8 && row.right <= send.left + 1 && send.right <= $('unified-submit-modal').getBoundingClientRect().right + 1;
+            o.label = $('u-submit-btn').textContent.trim();
+            o.tilesNoLog = !document.querySelector('#u-case-opt [data-opt="log"]');
+            o.condShown = !$('u-pdf-cond').hidden;
+            const pick = async file => { const t = new DataTransfer(); t.items.add(file); $('u-pdf-input').files = t.files; $('u-pdf-input').dispatchEvent(new Event('change')); await new Promise(r => setTimeout(r, 60)); };
+            await pick(new File(['nope!!'], 'a.pdf', { type: 'application/pdf' }));
+            o.notPdf = $('u-pdf-blk').hidden;
+            await pick(new File([new Uint8Array(5 * 1024 * 1024)], 'b.pdf', { type: 'application/pdf' }));
+            o.tooBig = $('u-pdf-blk').hidden;
+            await pick(new File(['%PDF-1.7 sample'], 'Somchai case.pdf', { type: 'application/pdf' }));
+            o.picked = [$('u-pdf-blk').hidden, $('u-pdf-name').textContent, $('u-pdf-btn').classList.contains('has'), $('u-pdf-btn').textContent.trim(), $('u-pdf-cond').hidden];
+            const puts = [], realStorage = firebase.storage, realAuth = window.ensureFirebaseAuthReady;
+            firebase.storage = () => ({ ref: p => ({ put: async (f, m) => { puts.push([p, m.contentType]); }, delete: async () => { puts.push(['rm', p]); } }) });
+            ensureFirebaseAuthReady = async () => ({ uid: 'u1' });
+            const up = await caseFileUpload();
+            o.path = up.path; o.puts = puts.slice();
+            caseFileDiscard(up); await new Promise(r => setTimeout(r, 10));
+            o.rm = puts[puts.length - 1];
+            firebase.storage = realStorage; ensureFirebaseAuthReady = realAuth;
+            $('u-pdf-x').click();
+            o.removed = [$('u-pdf-blk').hidden, $('u-pdf-btn').classList.contains('has'), await caseFileUpload()];
+            selectSubmissionType('work');
+            o.workHidden = getComputedStyle($('u-foot-case')).display === 'none' && getComputedStyle($('u-pdf-cond')).display === 'none';
+            selectSubmissionType('case');
+            return o;
+        });
+        assert.ok(foot.sameRow && foot.tilesNoLog && foot.condShown, 'Daily log + PDF beside Send, the condition shows before a file is picked: ' + JSON.stringify(foot));
+        assert.ok(/^🚀 Send/.test(foot.label), 'short Send: ' + foot.label);
+        assert.ok(foot.notPdf && foot.tooBig, 'refuses a non-PDF and a file of 5 MB or more');
+        assert.deepEqual(foot.picked, [false, 'Somchai case.pdf', true, '📄 PDF 첨부', true], 'green frame, no mark');
+        assert.ok(/^case-files\/u1\/[a-z0-9-]+\.pdf$/.test(foot.path) && !/Somchai/.test(foot.path) && foot.puts[0][1] === 'application/pdf', 'random name in the own folder: ' + foot.path);
+        assert.equal(foot.rm[0], 'rm', 'a failed send removes its upload');
+        assert.deepEqual(foot.removed, [true, false, null], '× takes it back');
+        assert.ok(foot.workHidden, 'Case only');
         const help = await page.evaluate(() => {
             const b = document.getElementById('u-case-help'), r = b.getBoundingClientRect(), o = { size: [r.width, r.height], line: b.parentElement.scrollWidth <= b.parentElement.clientWidth + 1 && !!b.closest('#unified-submit-modal') };
             b.click();
@@ -354,7 +393,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
             return o;
         });
         assert.ok(help.size[0] >= 36 && help.size[1] >= 36 && help.line, 'tappable, inside the form line: ' + JSON.stringify(help));
-        assert.ok(help.open && help.oneOnly && help.steps === 6, 'one dialog, five steps + the privacy line: ' + JSON.stringify(help));
+        assert.ok(help.open && help.oneOnly && help.steps === 7, 'one dialog, five steps + the privacy line: ' + JSON.stringify(help));
         assert.ok(/Split into the table/.test(help.en) && /What am I missing/.test(help.en) && /Never put a patient name or HN/.test(help.en), 'names the real buttons and the privacy rule');
         await page.waitForFunction(() => !document.getElementById('case-help-dialog'));
         const helpTh = await page.evaluate(() => {
