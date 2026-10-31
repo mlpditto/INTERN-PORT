@@ -27457,8 +27457,11 @@ async function archiveDoneCard(cardId) {
                 });
                 profileActivityState.cases = 'ready';
                 achievementSourceReady('cases');
-                window.myCasesCache = cases;
-                renderCaseGrouped(cases);
+                // V101.261: one PDF split into cards is one send: it counts once here, and its first card lists the rest
+                window.myCaseParts = cases.filter(x => x.caseGroup && x.caseGroup.total > 1);
+                const ownCases = cases.filter(x => !(x.caseGroup && x.caseGroup.index > 1));
+                window.myCasesCache = ownCases;
+                renderCaseGrouped(ownCases);
                 renderCaseSystemCards(); // V94.79: refresh the per-system counters on the Log Case cards
                 updateGrandLineDashboard();
                 renderDailyCheckinCard(); // V95.45: case dates feed the unified streak
@@ -27553,7 +27556,8 @@ async function archiveDoneCard(cardId) {
                     </div>
                     ${groups[sys].map((c, ci) => {
                 const status = (c.status || '').toLowerCase();
-                const isPending = status === 'pending' || c.status === 'รอตรวจ';
+                const parts = c.caseGroup ? (window.myCaseParts || []).filter(x => x.caseGroup.id === c.caseGroup.id).sort((x, y) => x.caseGroup.index - y.caseGroup.index) : [];
+                const isPending = parts.length ? parts.some(x => (x.status || 'pending') === 'pending') : (status === 'pending' || c.status === 'รอตรวจ');
                 const symptoms = Array.isArray(c.symptomTags) ? c.symptomTags : [];
                 const dateText = c.timestamp && typeof c.timestamp.toDate === 'function'
                     ? window.formatUiDate(c.timestamp, c.timestamp.toDate().getFullYear() === new Date().getFullYear() ? {} : { year: '2-digit' })   // V101.189: same short date as the timeline
@@ -27562,12 +27566,13 @@ async function archiveDoneCard(cardId) {
                             <div class="case-card${isPending ? '' : ' is-reviewed'}" data-emoji="${sysEmoji(sys)}" data-n="${ci + 1}" style="--h:${sysHue(sys)}">
                                 <div class="case-card-top">
                                     <div class="case-card-line">
-                                        <div class="case-card-id"><span class="case-card-pre">HN / Ref: </span>${c.caseId}</div>
+                                        <div class="case-card-id"><span class="case-card-pre">HN / Ref: </span>${escapeHtml(c.caseGroup?.base || c.caseId)}${parts.length ? ' <span class="case-parts-n">PDF · ' + parts.length + ' cases</span>' : ''}</div>
                                         <div class="case-card-meta">
                                             ${c.customer ? `<span class="lang-no-toggle"><i class="fa-solid fa-user"></i> ${c.customer}</span>` : '<span><i class="fa-solid fa-user"></i> Unnamed patient</span>'}
                                             ${dateText ? `<span><i class="fa-solid fa-calendar"></i> ${dateText}</span>` : ''}
                                         </div>
                                     </div>
+                                    ${parts.length ? '<div class="case-parts">' + parts.map(x => '<span class="' + ((x.status || 'pending') === 'pending' ? '' : 'ok') + '">' + x.caseGroup.index + ' ' + ((x.status || 'pending') === 'pending' ? 'Pending' : 'Reviewed' + (x.adminBonus ? ' +' + x.adminBonus : '')) + '</span>').join('') + '</div>' : ''}
                                     ${isPending ? '<span class="case-status-badge pending">Pending Review</span>' : ''}
                                 </div>
                                 ${symptoms.length ? `<div class="case-chip-group" style="margin:0 0 8px;">${symptoms.map(tag => `<span class="case-chip case-chip-neutral">${tag}</span>`).join('')}</div>` : ''}
