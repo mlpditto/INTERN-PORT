@@ -153,20 +153,39 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.ok(form.noteH <= 48 && form.labelHidden, 'note is one line, labels are screen-reader only');
         assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('u-case-note')).resize), 'none', 'no resize grip on the one-line note (inline resize:vertical must not win)');
 
-        // ---- V101.132: Disease System = ONE dropdown, nothing chosen, nothing that nudges the choice (no counts, no colour levels)
-        const sys = await page.evaluate(() => { const e = document.getElementById('u-case-system'); const r = e.getBoundingClientRect(); return { tag: e.tagName, visible: r.height >= 40 && getComputedStyle(e).display !== 'none', value: e.value, first: e.options[0].textContent, labels: [...e.options].map(o => o.textContent).join('|'), grid: !!document.getElementById('u-case-system-grid'), legend: !!document.querySelector('.sg-legend') }; });
-        assert.ok(sys.tag === 'SELECT' && sys.visible, 'a visible dropdown: ' + JSON.stringify(sys));
-        assert.equal(sys.value, '', 'nothing pre-selected'); assert.match(sys.first, /Select system/);
-        assert.ok(!sys.grid && !sys.legend, 'the button grid and its green legend are gone');
-        assert.ok(!/\d/.test(sys.labels), 'no case counts in the options: ' + sys.labels);
+        // ---- V101.258: Disease System = small chips from the taxonomy, nothing chosen, nothing that nudges the choice (no counts, no colour levels)
+        const sys = await page.evaluate(() => { const e = document.getElementById('u-case-system'); const c = [...e.querySelectorAll('.u-sys-chip')]; return { tag: e.tagName, n: c.length, want: CASE_SYSTEMS.length, pressed: c.filter(b => b.getAttribute('aria-pressed') === 'true').length, text: c.map(b => b.textContent).join(' '), bgs: new Set(c.map(b => getComputedStyle(b).backgroundColor)).size, emoji: c.every(b => b.firstElementChild.textContent.length > 0), maxH: Math.max(...c.map(b => b.getBoundingClientRect().height)), width: e.scrollWidth <= e.clientWidth + 1, select: !!e.querySelector('select') }; });
+        assert.ok(sys.tag === 'DIV' && sys.n === sys.want && sys.n >= 13 && !sys.select, 'one chip per taxonomy system, no dropdown: ' + JSON.stringify(sys));
+        assert.equal(sys.pressed, 0, 'nothing pre-selected');
+        assert.ok(!/\d/.test(sys.text), 'no case counts on the chips: ' + sys.text);
+        assert.equal(sys.bgs, 1, 'no colour levels: every chip starts the same');
+        assert.ok(sys.emoji && /MSK/.test(sys.text) && /Cardio/.test(sys.text) && !/Musculoskeletal|Cardiovascular/.test(sys.text), 'icon + short text: ' + sys.text);
+        assert.ok(sys.maxH <= 40 && sys.width, 'small chips that wrap inside the form: ' + JSON.stringify(sys));
         // required = pale green, skippable = pale grey-blue
-        const bg = await page.evaluate(() => Object.fromEntries(['u-case-id', 'u-case-system', 'u-case-customer', 'u-case-note'].map(i => [i, getComputedStyle(document.getElementById(i)).backgroundColor])));
-        assert.equal(bg['u-case-id'], 'rgb(236, 253, 245)', 'HN: pale green'); assert.equal(bg['u-case-system'], 'rgb(236, 253, 245)', 'Disease System: pale green');
+        const bg = await page.evaluate(() => Object.fromEntries(['u-case-id', 'u-case-customer', 'u-case-note'].map(i => [i, getComputedStyle(document.getElementById(i)).backgroundColor])));
+        assert.equal(bg['u-case-id'], 'rgb(236, 253, 245)', 'HN: pale green'); assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.u-sys-chip')).backgroundColor), 'rgb(236, 253, 245)', 'Disease System chip: pale green');
         assert.equal(bg['u-case-customer'], 'rgb(241, 245, 249)', 'patient name (optional): pale'); assert.equal(bg['u-case-note'], 'rgb(241, 245, 249)', 'note (optional): pale');
         // picking works and opens the symptoms
-        await page.selectOption('#u-case-system', 'gi');
-        assert.equal(await page.evaluate(() => document.getElementById('u-case-system').value), 'gi');
+        const chip = k => page.locator(`.u-sys-chip[data-key="${k}"]`);
+        const symptomsOn = () => page.evaluate(() => [...document.querySelectorAll('#u-case-symptoms-list .symptom-chip')].map(b => b.textContent.trim()));
+        await chip('gi').click();
         assert.equal(await page.evaluate(() => document.getElementById('u-case-symptoms-section').style.display), 'block', 'symptoms follow the pick');
+        assert.ok((await symptomsOn()).includes('Nausea'));
+        await page.locator('#u-case-symptoms-list .symptom-chip', { hasText: 'Nausea' }).click();
+        await chip('neuro').click();   // a system with its own list (and one the old dropdown did not have: renal)
+        await chip('renal').click();
+        assert.deepEqual(await page.evaluate(() => selectedCaseSystems), ['gi', 'neuro', 'renal'], 'several systems, in tap order');
+        const merged = await symptomsOn();
+        assert.ok(merged.includes('Nausea') && merged.includes('Headache') && merged.includes('Dysuria'), 'symptoms of every picked system: ' + merged);
+        assert.deepEqual(await page.evaluate(() => selectedSymptoms), ['Nausea'], 'a second system keeps the ticked symptom');
+        assert.equal(await page.evaluate(() => document.querySelector('#u-case-symptoms-list .symptom-chip[data-symptom="Nausea"]').style.color), 'white', 'and it still looks ticked');
+        await chip('gi').click();
+        assert.deepEqual(await page.evaluate(() => selectedSymptoms), [], 'untapping a system drops its symptoms');
+        assert.equal(await chip('gi').getAttribute('aria-pressed'), 'false');
+        assert.equal(await page.evaluate(() => caseMoreSystems({ diseaseSystemKeys: ['neuro', 'renal', 'msk'] })), ' + 💧 Renal + 🦴 MSK', 'admin line for the extra systems');
+        assert.equal(await page.evaluate(() => caseMoreSystems({ diseaseSystemKey: 'gi' })), '', 'an older or one-system case adds nothing');
+        await page.evaluate(() => resetCaseSystems());
+        await chip('gi').click();
 
         // ---- V101.132: optional details — the tiles fold blocks open, only what is filled is collected, rights has an "other" box (V101.204: 5 tiles, + ⚠️ ADR)
         assert.equal(await page.evaluate(() => caseExtrasCollect()), null, 'nothing filled → nothing sent');
@@ -200,7 +219,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.deepEqual(opt.collected, { medications: [{ name: 'Metformin', dose: '500 mg 2x/day' }], labResults: [{ test: 'HbA1c', value: '8.2 %' }], treatmentRights: { type: 'other', other: 'ประกันสังคม' }, appointment: { date: '2026-10-26', place: 'อายุรกรรม' } }, 'only filled things, trimmed');
         assert.equal(opt.toggledOff, null, 'a second tap clears the rights choice'); assert.equal(opt.afterReset, null, 'reset empties everything'); assert.deepEqual(opt.resetClosed, [true, true, true, true, true]);
         assert.ok(/\.\.\.caseExtras,\s*status: "pending"/.test(idx) && /\.\.\.caseExtras,\s*sourceType: 'cases'/.test(idx), 'the extras are written to the cases doc AND its submissions mirror');
-        await page.selectOption('#u-case-system', '');
+        await page.evaluate(() => resetCaseSystems());
 
         // ---- V101.204: ⚠️ ADR / Naranjo — 5th tile, 10 questions as Yes / No / ? chips, live score + category, saved as one `adr` field
         const adr = await page.evaluate(() => {
@@ -255,7 +274,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.deepEqual(dl.badge, ['✓', true], 'the row shows it holds data');
         assert.deepEqual(dl.collected, { dailyLog: { cc: 'sneezing', all: 'NKDA', assessment: 'fits allergic rhinitis' } }, 'only what is filled, trimmed');
         assert.deepEqual(dl.after, [null, true, ''], 'reset clears and folds it');
-        // ---- V101.257: Daily log AI — fills only empty case fields, never Plan / Assessment; name + HN masked; 🔍 lists gaps and writes nothing; a failure leaves the form usable
+        // ---- V101.258: Daily log AI — fills only empty case fields, never Plan / Assessment; name + HN masked; 🔍 lists gaps and writes nothing; a failure leaves the form usable
         const dlai = await page.evaluate(async () => {
             const $ = i => document.getElementById(i), o = {}, calls = [], realFetch = window.fetch, realAuth = window.ensureFirebaseAuthReady;
             let reply = '', fail = false;
@@ -299,7 +318,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         }
 
         // ---- required fields: red frame + scrolled into view, cleared when touched
-        await page.evaluate(() => { document.getElementById('u-case-id').value = ''; document.getElementById('u-case-system').value = ''; });
+        await page.evaluate(() => { document.getElementById('u-case-id').value = ''; resetCaseSystems(); });
         const r1 = await page.evaluate(async () => { try { await submitUnifiedCase(); return 'no throw'; } catch (e) { return e.message; } });
         assert.ok(/Case No\. is required/.test(r1), 'toast text unchanged: ' + r1);
         assert.ok(await page.evaluate(() => document.getElementById('u-case-id').classList.contains('u-err')), 'HN gets the red frame');
@@ -307,7 +326,22 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.ok(!(await page.evaluate(() => document.getElementById('u-case-id').classList.contains('u-err'))), 'typing clears it');
         const r2 = await page.evaluate(async () => { try { await submitUnifiedCase(); return 'no throw'; } catch (e) { return e.message; } });
         assert.ok(/disease system/.test(r2), 'then the system is asked for: ' + r2);
-        assert.ok(await page.evaluate(() => document.getElementById('u-case-system').classList.contains('u-err')), 'the dropdown gets the red frame');
+        assert.ok(await page.evaluate(() => document.getElementById('u-case-system').classList.contains('u-err')), 'the chip row gets the red frame');
+
+        // ---- V101.258: the first pick stays diseaseSystemKey for every existing reader; only a multi-system case gets diseaseSystemKeys
+        const sent = await page.evaluate(async () => {
+            const out = [], realSubmit = submitCase;
+            submitCase = async () => { out.push({ primary: document.getElementById('c-disease-system').value, disease: document.getElementById('c-disease').value, keys: window.caseExtras?.diseaseSystemKeys }); };
+            for (const picks of [['renal', 'gi'], ['neuro']]) {
+                document.getElementById('u-case-id').value = '12345';
+                picks.forEach(k => document.querySelector(`.u-sys-chip[data-key="${k}"]`).click());
+                await submitUnifiedCase();
+                out.push(document.querySelectorAll('.u-sys-chip[aria-pressed="true"]').length);
+            }
+            submitCase = realSubmit;
+            return out;
+        });
+        assert.deepEqual(sent, [{ primary: 'renal', disease: 'Renal/Urinary / ระบบทางเดินปัสสาวะ', keys: ['renal', 'gi'] }, 0, { primary: 'neuro', disease: 'Neurological / ระบบประสาท', keys: undefined }, 0], 'what submitCase receives, and the chips clear after a send: ' + JSON.stringify(sent));
 
         // ---- footer: only Submit, and it stays reachable mid-form on a short screen (keyboard up)
         assert.equal(await page.locator('#u-submit-btn').count(), 1);
@@ -327,7 +361,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.equal(await page.evaluate(() => document.getElementById('u-submit-btn').parentElement.style.display), 'flex');
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true, 'no sideways scroll');
         if (process.env.SHOT) {
-            await page.evaluate(() => { const e = document.getElementById('u-case-system'); e.classList.remove('u-err'); e.value = ''; document.getElementById('unified-submit-modal').firstElementChild.scrollTop = 0; });
+            await page.evaluate(() => { const e = document.getElementById('u-case-system'); e.classList.remove('u-err'); resetCaseSystems(); document.getElementById('unified-submit-modal').firstElementChild.scrollTop = 0; });
             const card = await page.evaluate(() => { const r = document.getElementById('unified-submit-modal').firstElementChild.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
             await page.screenshot({ path: path.join(process.env.SHOT, 'submit_new_real.png'), clip: { x: card.x, y: card.y, width: card.w, height: card.h } });
         }
@@ -335,6 +369,6 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.equal(await page.evaluate(() => document.getElementById('unified-submit-modal').style.display), 'none', '✕ closes the dialog');
         assert.deepEqual(errors.filter(e => !/firebase\./.test(e)), [], 'no page errors');
         await ctx.close();
-        console.log('PASS: Submit New lean — no header/label, ✕ in the launchers row, inline HN + patient, one-line note, Disease System = one unbiased dropdown, required = pale green / optional = pale, optional details (meds / labs / rights / appointment / ⚠️ ADR Naranjo: 10 questions, live score, saved as `adr`), red frame on a missing field, Submit pinned (no Cancel)');
+        console.log('PASS: Submit New lean — no header/label, ✕ in the launchers row, inline HN + patient, one-line note, Disease System = unbiased multi-select chips, required = pale green / optional = pale, optional details (meds / labs / rights / appointment / ⚠️ ADR Naranjo: 10 questions, live score, saved as `adr`), red frame on a missing field, Submit pinned (no Cancel)');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

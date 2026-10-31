@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.257)</title>
+    <title>Internship Portfolio (V101.258)</title>
     <link rel="stylesheet" href="daily-canvas.css?v=V101.234">
     <link rel="stylesheet" href="halloween.css?v=V101.249">
     <script>/* V101.235: 20 Oct – 2 Nov (Bangkok) the Journal wears Halloween (halloween.css), then it goes back on its own */(function () { try { var d = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).slice(5); if (d >= '10-20' && d <= '11-02') document.documentElement.classList.add('hw'); } catch (e) { /* none */ } })();</script>
@@ -2483,9 +2483,9 @@
 <link rel="stylesheet" href="personal-profile-tabs.css?v=V101.192">
 <script src="personal-profile-tabs.js?v=V101.163"></script>
 <link rel="stylesheet" href="submit-system-grid.css?v=V101.133">
-<link rel="stylesheet" href="case-extras.css?v=V101.257">
+<link rel="stylesheet" href="case-extras.css?v=V101.258">
 <script defer src="submit-system-grid.js?v=V101.133"></script>
-<script defer src="case-extras.js?v=V101.257"></script>
+<script defer src="case-extras.js?v=V101.258"></script>
 <link rel="stylesheet" href="invite-ticket.css?v=V101.168">
 <script defer src="invite-ticket.js?v=V101.168"></script>
 <link rel="stylesheet" href="learning-review.css?v=V99.81">
@@ -5261,21 +5261,8 @@
 
                             </div>
 <div style="margin-bottom:16px;">
-                                <label class="u-sec">🏥 Disease System / 질환 체계 <b class="u-star">*</b></label>
-<select id="u-case-system" aria-label="Disease System" onchange="updateCaseSymptoms()"
-                                        style="width:100%; padding:12px; border:1px solid #e2e8f0; border-radius:10px; font-size:0.95em; background:white;">
-                                    <option value="">Select system / เลือกระบบ…</option>
-                                    <option value="respiratory">🫁 Respiratory / 호흡기</option>
-                                    <option value="cardio">❤️ Cardiovascular / 심혈관</option>
-                                    <option value="gi">🫃 GI / 위장관</option>
-                                    <option value="neuro">🧠 Neurological / 신경계</option>
-                                    <option value="ent">👂 ENT / 이비인후과</option>
-                                    <option value="skin">🩹 Skin / 피부</option>
-                                    <option value="msk">🦴 Musculoskeletal / 근골격계</option>
-                                    <option value="endocrine">💊 Endocrine/NCDs / 내분비</option>
-                                    <option value="mental">🧘 Mental Health / 정신건강</option>
-                                    <option value="other">📋 Other / 기타</option>
-</select>
+                                <label class="u-sec" id="u-case-system-label">🏥 Disease System / 질환 체계 <b class="u-star">*</b><span class="u-sec-note">· Multiple · เลือกได้หลายข้อ · 복수 선택</span></label>
+<div id="u-case-system" class="u-sys-chips" role="group" aria-labelledby="u-case-system-label"></div>
                             </div>
 
                             <div id="u-case-symptoms-section" style="margin-bottom:16px; display:none;">
@@ -6966,7 +6953,7 @@
     <!-- V94.55: cache-bust on taxonomy.js for the LP Firestore overlay rollout -->
     <script src="taxonomy.js?v=V94.55"></script>
     <!-- V94.22: cache-busting on case-taxonomy.js so browser refetches when shim changes (script URL is otherwise constant) -->
-    <script src="case-taxonomy.js?v=V94.53"></script>
+    <script src="case-taxonomy.js?v=V101.258"></script>
     <script src="codex-vision.js?v=V100.88"></script>
     <!-- V94.29 fix: walker now skips q-text-preview / md-render / lang-no-toggle subtrees so user content (markdown previews, quiz content) displays as-typed -->
     <script src="lang-toggle.js?v=V101.248"></script>
@@ -26042,6 +26029,7 @@ async function archiveDoneCard(cardId) {
         // 🔥 Phase 3: Unified Modal Functions
         let currentSubmissionType = 'case';
         let selectedSymptoms = [];
+        let selectedCaseSystems = [];   // V101.258: Disease System chips, in tap order; the first one is the case's primary system
 
         function selectSubmissionType(type) {
             if (document.getElementById('u-submit-btn').disabled) return;
@@ -26109,35 +26097,49 @@ async function archiveDoneCard(cardId) {
             box.append(t, a);
         }
 
+        // V101.258: small chips, nothing chosen, no counts or colour levels (the V101.133 rule — nothing nudges the choice); the list comes from the shared taxonomy
+        function renderCaseSystemChips() {
+            const box = document.getElementById('u-case-system');
+            if (!box) return;
+            box.innerHTML = (window.CASE_SYSTEMS || []).map(s => {
+                const names = [s.label.en, s.label.th, s.label.ko].filter(Boolean).join(' / ');
+                return `<button type="button" class="u-sys-chip" data-key="${escapeHtml(s.key)}" aria-pressed="${selectedCaseSystems.includes(s.key)}" title="${escapeHtml(names)}" aria-label="${escapeHtml(names)}" onclick="toggleCaseSystem(this)"><span aria-hidden="true">${escapeHtml(s.emoji)}</span>${escapeHtml(window.caseSystemShort(s.key))}</button>`;
+            }).join('');
+        }
+
+        function toggleCaseSystem(btn) {
+            const key = btn.dataset.key, idx = selectedCaseSystems.indexOf(key);
+            if (idx >= 0) selectedCaseSystems.splice(idx, 1); else selectedCaseSystems.push(key);
+            btn.setAttribute('aria-pressed', String(idx < 0));
+            updateCaseSymptoms();
+        }
+
+        function resetCaseSystems() {
+            selectedCaseSystems = [];
+            renderCaseSystemChips();
+            updateCaseSymptoms();
+        }
+
         function updateCaseSymptoms() {
-            const systemKey = document.getElementById('u-case-system').value;
             const symptomsSection = document.getElementById('u-case-symptoms-section');
             const symptomsList = document.getElementById('u-case-symptoms-list');
-            if (!systemKey) {
+            if (!selectedCaseSystems.length) {
                 symptomsSection.style.display = 'none';
+                selectedSymptoms = [];
                 return;
             }
             symptomsSection.style.display = 'block';
-            const symptomMap = {
-                respiratory: ['Cough', 'Dyspnea', 'Sore Throat', 'Fever', 'Wheezing'],
-                cardio: ['Chest Pain', 'Palpitations', 'Edema', 'Fatigue', 'High BP'],
-                gi: ['Abdominal Pain', 'Nausea', 'Vomiting', 'Diarrhea', 'Constipation'],
-                neuro: ['Headache', 'Dizziness', 'Numbness', 'Weakness', 'Insomnia'],
-                ent: ['Ear Pain', 'Hearing Loss', 'Tinnitus', 'Nasal Congestion'],
-                skin: ['Rash', 'Itching', 'Redness', 'Swelling', 'Lesion'],
-                msk: ['Back Pain', 'Joint Pain', 'Stiffness', 'Sprain'],
-                endocrine: ['Hyperglycemia', 'Polyuria', 'Weight Loss', 'Poor Adherence'],
-                mental: ['Stress', 'Anxiety', 'Low Mood', 'Poor Sleep', 'Panic'],
-                other: ['Follow-up', 'Medication Q', 'Unclear Symptom']
-            };
-            const symptoms = symptomMap[systemKey] || [];
-            selectedSymptoms = [];
-            symptomsList.innerHTML = symptoms.map(symptom => `
-                <button type="button" class="symptom-chip" onclick="toggleSymptom(this, '${symptom}')" 
-                        style="padding:8px 14px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:20px; font-size:0.85em; cursor:pointer; transition:all 0.2s;">
-                    ${symptom}
+            const symptoms = [...new Set(selectedCaseSystems.flatMap(k => getCaseTaxonomyByKey(k)?.symptoms || []))];
+            selectedSymptoms = selectedSymptoms.filter(s => symptoms.includes(s));   // a second system keeps what is already ticked
+            symptomsList.innerHTML = symptoms.map(symptom => {
+                const on = selectedSymptoms.includes(symptom);
+                return `
+                <button type="button" class="symptom-chip" data-symptom="${escapeHtml(symptom)}" onclick="toggleSymptom(this, this.dataset.symptom)"
+                        style="padding:8px 14px; background:${on ? '#4361ee' : '#f1f5f9'}; border:1px solid ${on ? '#4361ee' : '#e2e8f0'}; ${on ? 'color:white; ' : ''}border-radius:20px; font-size:0.85em; cursor:pointer; transition:all 0.2s;">
+                    ${escapeHtml(symptom)}
                 </button>
-            `).join('');
+            `;
+            }).join('');
         }
 
         function toggleSymptom(btn, symptom) {
@@ -26202,7 +26204,7 @@ async function archiveDoneCard(cardId) {
             if (!requireRegistered()) return;   // V101.159
             const caseId = document.getElementById('u-case-id').value.trim();
             const customer = document.getElementById('u-case-customer').value.trim();
-            const systemKey = document.getElementById('u-case-system').value;
+            const systemKey = selectedCaseSystems[0] || '';
             const note = document.getElementById('u-case-note').value.trim();
             if (!caseId) { markUnifiedErr('u-case-id'); throw new Error('Case No. is required · กรุณากรอก Case No.'); }
             if (!systemKey) { markUnifiedErr('u-case-system'); throw new Error('Please pick a disease system · กรุณาเลือกระบบโรค'); }
@@ -26220,20 +26222,21 @@ async function archiveDoneCard(cardId) {
             };
             document.getElementById('c-id').value = caseId;
             document.getElementById('c-customer').value = customer;
-            document.getElementById('c-disease').value = systemLabels[systemKey] || systemKey;
+            const systemEntry = getCaseTaxonomyByKey(systemKey);
+            document.getElementById('c-disease').value = systemLabels[systemKey] || (systemEntry ? `${systemEntry.label} / ${systemEntry.thaiLabel}` : systemKey);
             document.getElementById('c-note').value = note;
             document.getElementById('case-note-details').open = !!note;
             const diseaseSystemSelect = document.getElementById('c-disease-system');
             if (diseaseSystemSelect) diseaseSystemSelect.value = systemKey;
             window.caseComposerState = { selectedSymptoms: [...selectedSymptoms] };
             window.caseExtras = (window.caseExtrasCollect && window.caseExtrasCollect()) || null;   // V101.132: the optional details, only what was filled in
+            if (selectedCaseSystems.length > 1) window.caseExtras = { ...window.caseExtras, diseaseSystemKeys: [...selectedCaseSystems] };   // V101.258: diseaseSystemKey stays the first pick, so every existing reader keeps working
             try { await submitCase(); } finally { window.caseExtras = null; }
             document.getElementById('u-case-id').value = '';
             document.getElementById('u-case-customer').value = '';
-            document.getElementById('u-case-system').value = '';
             document.getElementById('u-case-note').value = '';
             window.caseExtrasReset?.();
-            selectedSymptoms = [];
+            resetCaseSystems();
         }
 
         async function submitUnifiedWork() {
@@ -26255,6 +26258,7 @@ async function archiveDoneCard(cardId) {
             document.querySelectorAll('#unified-submit-modal .u-err').forEach(e => e.classList.remove('u-err'));
             document.getElementById('event-form-section')._resetInviteAudience?.();
             document.getElementById('unified-submit-modal').style.display = 'flex';
+            renderCaseSystemChips();
             selectSubmissionType('case');
         }
 
