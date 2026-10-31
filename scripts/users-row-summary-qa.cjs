@@ -4,10 +4,20 @@
 // summary slice and the REAL copy / sort helpers.
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
+const vm = require('node:vm');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const html = fs.readFileSync('public/admin.html', 'utf8').replace(/\r\n/g, '\n');
 
 assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(html));
+// V102.545: opening Users redraws the rows — the journal listeners skip the redraw on any other tab, which left J0 on the screen
+{
+    const from = html.indexOf('        function switchTab(id) {');
+    const src = html.slice(from, html.indexOf('\n        }\n', from) + 10);
+    const drawn = [];
+    const box = { document: { getElementById: () => ({ classList: { add() {} } }), querySelectorAll: () => [], querySelector: () => null }, localStorage: { setItem() {} }, console, renderTable: t => drawn.push(t), activeTab: 'tab-dashboard' };
+    vm.runInNewContext(src + '\nswitchTab("tab-users");', box);
+    assert.deepEqual(drawn, ['users'], 'switching to Users draws the table with the journals that arrived meanwhile');
+}
 assert.ok(!html.includes('group-users-panel') && !html.includes('renderGroupUsersPanel'), 'the panel, its renderer and its callers are gone');
 assert.ok(/id="user-seen-sort" onclick="toggleUserSeenSort\(\)"/.test(html) && /id="user-copy-all" onclick="copyAllUserRows\(\)"/.test(html), '🕓↕ and ⧉ all in the header');
 assert.ok(html.includes("onclick=\"copyUserRow(this)\" title=\"Copy this row"), '⧉ in the row rail');
