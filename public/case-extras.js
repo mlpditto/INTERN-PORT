@@ -224,6 +224,41 @@
         }
         return Object.keys(out).length ? out : null;
     };
+    // V101.259: how to use the form, in the form. Same sheet as Schedule's ⓘ (shielded from the language toggle, so the language is chosen when it opens)
+    var CASE_HELP = {
+        en: { title: '🩺 How to send a case', close: 'Close help', steps: [
+            ['1 · Required', 'Case No. (HN) and at least one Disease System. Tap several systems if the case needs them: the first one you tap is the main system.'],
+            ['2 · Optional', 'Patient name, symptoms and the five tiles (Medications, Lab results, Rights, Appointment, ADR). Open only what you have; skip the rest.'],
+            ['3 · Daily log', 'For your instructor\'s table. Tell the case in your own words, without the name or HN → ✨ Split into the table fills the empty boxes → check every box, AI can be wrong.'],
+            ['4 · Plan + Assessment', 'Write these yourself: they are your thinking. 🔍 What am I missing lists the gaps and never writes for you.'],
+            ['5 · Submit', 'Then find the case in Work → Cases.']
+        ], note: '🔒 Never put a patient name or HN in the story. Crop anything that identifies the patient from photos.' },
+        th: { title: '🩺 วิธีส่งเคส', close: 'ปิดคำแนะนำ', steps: [
+            ['1 · ต้องกรอก', 'Case No. (HN) และ Disease System อย่างน้อย 1 ระบบ เลือกได้หลายระบบถ้าเคสเกี่ยวข้อง ระบบแรกที่แตะคือระบบหลัก'],
+            ['2 · ไม่บังคับ', 'ชื่อผู้ป่วย อาการ และ 5 ช่อง (ยา ผลแล็บ สิทธิการรักษา นัดหมาย ADR) เปิดเฉพาะที่มีข้อมูล ที่เหลือข้ามได้'],
+            ['3 · Daily log', 'สำหรับตารางส่งอาจารย์ เล่าเคสด้วยคำของตัวเอง ไม่ต้องใส่ชื่อหรือ HN → กด ✨ แยกลงตาราง ระบบจะเติมช่องที่ว่าง → ตรวจทุกช่อง เพราะ AI อาจผิดได้'],
+            ['4 · Plan + Assessment', 'เขียนเอง เพราะเป็นความคิดของคุณ ปุ่ม 🔍 ตรวจว่าขาดอะไร จะบอกสิ่งที่ยังขาด แต่ไม่เขียนให้'],
+            ['5 · Submit', 'จากนั้นดูเคสได้ที่ Work → Cases']
+        ], note: '🔒 ห้ามใส่ชื่อหรือ HN ของผู้ป่วยในเรื่องเล่า และครอปส่วนที่ระบุตัวผู้ป่วยออกจากรูป' },
+        ko: { title: '🩺 케이스 제출 방법', close: '도움말 닫기', steps: [
+            ['1 · 필수', 'Case No. (HN)와 Disease System 1개 이상. 여러 계통을 선택할 수 있으며 처음 누른 계통이 주 계통입니다.'],
+            ['2 · 선택', '환자 이름, 증상, 5개 항목(약물, 검사 결과, 권리, 예약, ADR). 있는 내용만 열고 나머지는 건너뛰세요.'],
+            ['3 · Daily log', '지도교수 제출용 표입니다. 이름이나 HN 없이 케이스를 직접 설명 → ✨ 표로 나누기가 빈칸을 채움 → AI가 틀릴 수 있으니 모든 칸을 확인하세요.'],
+            ['4 · Plan + Assessment', '본인의 사고이므로 직접 작성하세요. 🔍 빠진 내용 확인은 부족한 점만 알려 주고 대신 쓰지 않습니다.'],
+            ['5 · Submit', '제출 후 Work → Cases에서 확인하세요.']
+        ], note: '🔒 설명에 환자 이름이나 HN을 쓰지 마세요. 사진에서 환자를 알아볼 수 있는 부분은 잘라 내세요.' }
+    };
+    window.caseHelp = function (trigger) {
+        if ($('case-help-dialog')) return;
+        var c = document.body.classList, h = CASE_HELP[c.contains('lang-th-on') ? 'th' : c.contains('lang-kr-on') ? 'ko' : 'en'];
+        var d = document.createElement('dialog');
+        d.id = 'case-help-dialog'; d.className = 'ip-share ip-help-dialog lang-no-toggle'; d.setAttribute('aria-labelledby', 'case-help-title');
+        d.innerHTML = '<header><h3 id="case-help-title">' + h.title + '</h3><button type="button" class="ip-help-close" aria-label="' + h.close + '">×</button></header><section>'
+            + h.steps.map(function (s) { return '<p><b>' + s[0] + '</b><br>' + s[1] + '</p>'; }).join('') + '<p>' + h.note + '</p></section>';
+        d.querySelector('.ip-help-close').onclick = function () { d.close(); };
+        d.addEventListener('close', function () { d.remove(); if (trigger) trigger.focus(); });
+        document.body.append(d); d.showModal();
+    };
     window.caseExtrasReset = function () {
         rights = '';
         adr = NARANJO.map(function () { return 'u'; });
