@@ -179,6 +179,9 @@
         $('u-pdf-btn').classList.toggle('has', has);
         $('u-pdf-name').textContent = has ? pdfFile.name : '';
         $('u-pdf-size').textContent = has ? (pdfFile.size / 1048576).toFixed(1) + ' MB' : '';
+        $('u-pdf-idle').hidden = has;   // V101.261: attached = the button shows the size instead of the word
+        $('u-pdf-mb').hidden = !has;
+        $('u-pdf-mb').textContent = has ? '📄 ' + $('u-pdf-size').textContent : '';
     }
     function pdfRefuse(msg) { window.showToast(msg); }
     function pdfPicked(input) {

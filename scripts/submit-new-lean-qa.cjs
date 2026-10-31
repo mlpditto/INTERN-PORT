@@ -177,6 +177,16 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.deepEqual(await page.evaluate(() => selectedCaseSystems), ['gi', 'neuro', 'renal'], 'several systems, in tap order');
         const merged = await symptomsOn();
         assert.ok(merged.includes('Nausea') && merged.includes('Headache') && merged.includes('Dysuria'), 'symptoms of every picked system: ' + merged);
+        // V101.261: small chips side by side, the optional box on the same flow, and it survives a redraw
+        const symp = await page.evaluate(() => {
+            const chips = [...document.querySelectorAll('#u-case-symptoms-list .symptom-chip')], a = chips[0].getBoundingClientRect(), b = chips[1].getBoundingClientRect(), box = document.getElementById('u-case-symptom-other');
+            box.value = 'Hiccups'; updateCaseSymptoms();
+            const row = box.parentElement, last = document.querySelectorAll('#u-case-symptoms-list .symptom-chip');
+            return { h: a.height, sameRow: a.top === b.top, narrow: a.width < 200, kept: box.value, boxAfter: !!(last[last.length - 1].compareDocumentPosition(box) & 4), fit: row.scrollWidth <= row.clientWidth + 1, empty: selectedSymptoms.length };
+        });
+        assert.ok(symp.h <= 34 && symp.sameRow && symp.narrow && symp.boxAfter && symp.fit, 'lean chips: ' + JSON.stringify(symp));
+        assert.equal(symp.kept, 'Hiccups', 'the typed symptom stays when the chips redraw');
+        await page.evaluate(() => { document.getElementById('u-case-symptom-other').value = ''; });
         assert.deepEqual(await page.evaluate(() => selectedSymptoms), ['Nausea'], 'a second system keeps the ticked symptom');
         assert.equal(await page.evaluate(() => document.querySelector('#u-case-symptoms-list .symptom-chip[data-symptom="Nausea"]').style.color), 'white', 'and it still looks ticked');
         await chip('gi').click();
@@ -359,7 +369,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
             await pick(new File([new Uint8Array(5 * 1024 * 1024)], 'b.pdf', { type: 'application/pdf' }));
             o.tooBig = $('u-pdf-blk').hidden;
             await pick(new File(['%PDF-1.7 sample'], 'Somchai case.pdf', { type: 'application/pdf' }));
-            o.picked = [$('u-pdf-blk').hidden, $('u-pdf-name').textContent, $('u-pdf-btn').classList.contains('has'), $('u-pdf-btn').textContent.trim(), $('u-pdf-cond').hidden];
+            o.picked = [$('u-pdf-blk').hidden, $('u-pdf-name').textContent, $('u-pdf-btn').classList.contains('has'), $('u-pdf-idle').hidden, $('u-pdf-mb').textContent, $('u-pdf-cond').hidden];
             const puts = [], realStorage = firebase.storage, realAuth = window.ensureFirebaseAuthReady;
             firebase.storage = () => ({ ref: p => ({ put: async (f, m) => { puts.push([p, m.contentType]); }, delete: async () => { puts.push(['rm', p]); } }) });
             ensureFirebaseAuthReady = async () => ({ uid: 'u1' });
@@ -369,7 +379,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
             o.rm = puts[puts.length - 1];
             firebase.storage = realStorage; ensureFirebaseAuthReady = realAuth;
             $('u-pdf-x').click();
-            o.removed = [$('u-pdf-blk').hidden, $('u-pdf-btn').classList.contains('has'), await caseFileUpload()];
+            o.removed = [$('u-pdf-blk').hidden, $('u-pdf-btn').classList.contains('has'), await caseFileUpload(), $('u-pdf-idle').hidden];
             selectSubmissionType('work');
             o.workHidden = getComputedStyle($('u-foot-case')).display === 'none' && getComputedStyle($('u-pdf-cond')).display === 'none';
             selectSubmissionType('case');
@@ -378,10 +388,10 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.ok(foot.sameRow && foot.tilesNoLog && foot.condShown, 'Daily log + PDF beside Send, the condition shows before a file is picked: ' + JSON.stringify(foot));
         assert.ok(/^🚀 Send/.test(foot.label), 'short Send: ' + foot.label);
         assert.ok(foot.notPdf && foot.tooBig, 'refuses a non-PDF and a file of 5 MB or more');
-        assert.deepEqual(foot.picked, [false, 'Somchai case.pdf', true, '📄 PDF 첨부', true], 'green frame, no mark');
+        assert.deepEqual(foot.picked, [false, 'Somchai case.pdf', true, true, '📄 0.0 MB', true], 'green frame, the size instead of the word');
         assert.ok(/^case-files\/u1\/[a-z0-9-]+\.pdf$/.test(foot.path) && !/Somchai/.test(foot.path) && foot.puts[0][1] === 'application/pdf', 'random name in the own folder: ' + foot.path);
         assert.equal(foot.rm[0], 'rm', 'a failed send removes its upload');
-        assert.deepEqual(foot.removed, [true, false, null], '× takes it back');
+        assert.deepEqual(foot.removed, [true, false, null, false], '× takes it back and the word returns');
         assert.ok(foot.workHidden, 'Case only');
         const help = await page.evaluate(() => {
             const b = document.getElementById('u-case-help'), r = b.getBoundingClientRect(), o = { size: [r.width, r.height], line: b.parentElement.scrollWidth <= b.parentElement.clientWidth + 1 && !!b.closest('#unified-submit-modal') };
