@@ -102,6 +102,17 @@ service firebase.storage {
       allow update, delete: if isAdmin();
     }
 
+    // V102.547: the PDF an intern attaches to a Case, under the uploader's anonymous auth uid.
+    // Only the admin reads it (the Function uses the Admin SDK): it may carry patient details.
+    // The owner may delete, so a failed send removes its own upload. It is deleted after review.
+    match /case-files/{ownerUid}/{fileName} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == ownerUid
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf';
+      allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == ownerUid);
+    }
+
     // Applicant documents (a CV/résumé handed in with a pre-registration), keyed by the
     // pre_users doc id and content-addressed by SHA-256 like every path above.
     // ADMIN ONLY, both directions: at this stage the applicant has no account at all —
