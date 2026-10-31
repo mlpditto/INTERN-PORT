@@ -4,7 +4,7 @@ const axios = require('axios');
 
 const MODEL = 'gemini-3.8-flash';
 const MAX_BYTES = 5 * 1024 * 1024;
-const LIM = { rows: 60, label: 40, text: 1000, marks: 20 };
+const LIM = { rows: 240, label: 40, text: 1000, marks: 20 };
 const KINDS = ['hn', 'name', 'id', 'address', 'phone'];
 
 const PROMPT = 'This PDF is a pharmacy intern\'s case log, typed, scanned or handwritten, in Thai and English. Copy what is written, line by line, in reading order, in the same language. '

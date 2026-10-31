@@ -39,6 +39,8 @@ assert.ok(/exports\.readCaseFile = onCall\(\{ secrets: \['GEMINI_API_KEY'\]/.tes
 assert.ok(/c\.authUid !== request\.auth\.uid/.test(fn) && /reader\.allowedPath\(file\.path, c\.authUid\)/.test(fn), 'own case, own folder');
 assert.ok(/callerAdmin && retry/.test(fn), 'only the admin reads twice');
 assert.ok(/<script src="case-file-review\.js\?v=V102\.\d+"><\/script>/.test(admin));
+assert.ok(admin.includes('<div id="edit-case-file-box" class="lang-no-toggle" hidden></div>') && /caseFileReview\.start\(casesData\.find\(x => x\.id === caseDocId\), 'edit-case-file-box'\)/.test(admin), 'Edit Case Note shows the file too');
+assert.equal((admin.match(/class="crf-mark"/g) || []).length, 2, 'the row and the queue card mark a case with a file');
 assert.equal((admin.match(/caseFileReview\.purge\(/g) || []).length, 4, 'review, bulk review, delete, bulk delete drop the file');
 assert.ok(!/score|bonus/i.test(js.replace(/^\/\/.*$/gm, '').replace(/its score stay|case-score-modal-shell/g, '')), 'never touches the score');
 
@@ -99,6 +101,11 @@ window.confirm = () => true; window.showToast = () => {};
             const calls = await p.evaluate(() => window.calls);
             assert.deepEqual(calls.slice(-2), [['rm', file.path], ['update', 'c1', ['caseFile', 'caseFileRead']]], 'file first, then the fields; the case stays');
 
+            await p.evaluate(() => { const d = document.createElement('div'); d.id = 'edit-case-file-box'; d.hidden = true; document.body.append(d); });
+            await p.evaluate(f => window.caseFileReview.start({ id: 'c3', caseFile: f, caseFileRead: { status: 'done', pages: 6, rows: [{ page: 1, label: 'CC', text: 'x', unsure: true }], identifiers: [] } }, 'edit-case-file-box'), file);
+            assert.match(await p.textContent('#edit-case-file-box'), /6 pages.*1 line to check/s, 'the same row in Edit Case Note');
+            await p.click('#edit-case-file-box [data-a="compare"]');
+            await p.waitForSelector('#edit-case-file-box iframe.crf-page');
             await p.evaluate(() => window.caseFileReview.stop());
             assert.ok((await p.evaluate(() => window.calls)).includes('unwatch'), 'stops listening when the modal closes');
             await p.evaluate(f => window.caseFileReview.purge({ id: 'c2', caseFile: f }, true), file);

@@ -4,7 +4,7 @@
 (function () {
     const STALE_MS = 2 * 60 * 1000;
     const KIND = { hn: 'an HN', name: 'a patient name', id: 'an ID number', address: 'an address', phone: 'a phone number' };
-    let stop = null, current = null, wide = false, url = '';
+    let stop = null, current = null, wide = false, url = '', boxId = 'case-file-box';
 
     const $ = id => document.getElementById(id);
     const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -31,7 +31,7 @@
         return '<div class="crf-two"><iframe class="crf-page" title="The intern\'s PDF" src="' + esc(url) + '"></iframe><div class="crf-text"><div class="crf-tl"><span>Text read</span><span class="crf-of">Gemini · ' + Number(read.pages || 1) + (read.pages > 1 ? ' pages' : ' page') + '</span></div><table>' + rows + '</table><div class="crf-warn">⚠️ <span>Check each line against the page.</span></div></div></div>';
     }
     function render() {
-        const box = $('case-file-box'), shell = box && box.closest('.case-score-modal-shell');
+        const box = $(boxId), shell = box && box.closest('.case-score-modal-shell');
         if (!box) return;
         const c = current, f = c && c.caseFile;
         if (shell) shell.classList.toggle('crf-wide', !!(f && wide));
@@ -66,14 +66,15 @@
     }
 
     document.addEventListener('click', e => {
-        const b = e.target.closest && e.target.closest('#case-file-box [data-a]');
+        const b = e.target.closest && e.target.closest('#case-file-box [data-a], #edit-case-file-box [data-a]');
         if (!b) return;
         act(b.dataset.a).catch(err => { console.warn('caseFile', err); if (typeof showToast === 'function') showToast('Could not finish: ' + err.message, 'error'); });
     });
 
     window.caseFileReview = {
-        start(caseItem) {
+        start(caseItem, box) {
             this.stop();
+            boxId = box || 'case-file-box';
             if (!caseItem || !caseItem.id) return;
             current = { id: caseItem.id, caseFile: caseItem.caseFile || null, caseFileRead: caseItem.caseFileRead || null };
             render();

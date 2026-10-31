@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.547)</title>
+    <title>Nika Admin (V102.548)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -3677,7 +3677,7 @@
         .csr-reply-row button:disabled { opacity: .45; cursor: default; }
         .csr-hint { font-size: 0.75em; color: #94a3b8; }
         /* V102.547: the intern's PDF in Review (case-file-review.js) */
-        #case-file-box[hidden] { display: none; }
+        #case-file-box[hidden], #edit-case-file-box[hidden] { display: none; }
         #caseReviewScoreModal .case-score-modal-shell.crf-wide { max-width: 980px; }
         .crf-file { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; }
         .crf-name { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
@@ -3701,6 +3701,7 @@
         .crf-flag button { width: auto; min-height: 0; margin: 0; padding: 5px 12px; border-radius: 999px; font-size: .92em; font-weight: 800; cursor: pointer; }
         .crf-del { border: 0; background: #dc2626; color: #fff; } .crf-keep { border: 1px solid #fca5a5; background: #fff; color: #7f1d1d; }
         @media (max-width: 640px) { .crf-two { grid-template-columns: minmax(0, 1fr); } }
+        .crf-mark { margin-left: 5px; font-size: .9em; }
         .crai-dot { width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; margin-right: 6px; animation: crai-pulse 1s ease-in-out infinite; }
         @keyframes crai-pulse { 50% { opacity: .25; } }
         .crai-fu { flex: none !important; }
@@ -8423,7 +8424,7 @@
 <script src="dca-ai-trail.js?v=V102.390"></script>
 <script src="dxa-ai-trail.js?v=V102.389"></script>
 <script src="case-review-ai.js?v=V102.423"></script>
-<script src="case-file-review.js?v=V102.547"></script>
+<script src="case-file-review.js?v=V102.548"></script>
 <script src="up-next.js?v=V102.501"></script>
 <script src="quiz-matrix.js?v=V102.503"></script>
 <script src="rank-quiz.js?v=V102.484"></script>
@@ -16220,6 +16221,8 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
                     <div id="edit-case-note-score" style="margin-top:4px; color:#166534; font-weight:900; word-break:break-word;">0.00 pts</div>
                 </div>
             </div>
+
+            <div id="edit-case-file-box" class="lang-no-toggle" hidden></div>
 
             <div class="edit-case-taxonomy-card">
                 <div class="edit-case-taxonomy-head">
@@ -43202,7 +43205,7 @@ They can connect again from LINE.
                         </td>
                         <!-- Patient shown as initials only; the full name is on the case itself (✏️ Edit case). -->
                         <td>
-                            <div style="font-weight:700; color:#7c2d12;">${safe(c.disease || '-')}</div>
+                            <div style="font-weight:700; color:#7c2d12;">${safe(c.disease || '-')}${c.caseFile ? '<span class="crf-mark" title="PDF attached">📄</span>' : ''}</div>
                             <div class="alabasta-case-sub lang-no-toggle"><span style="font-family:monospace;">${safe(c.caseId || '-')}</span>${c.diseaseSystemLabel ? ' · 🏥 ' + safe(c.diseaseSystemLabel) + safe(caseMoreSystems(c)) : ''}${initials ? ' · ' + safe(initials) : ''}</div>
                         </td>
                         <td class="lang-no-toggle alabasta-case-note" title="${safe(c.note || '')}">${safe(c.note || '-')}</td>
@@ -44307,6 +44310,7 @@ They can connect again from LINE.
         }
 
         function closeEditCaseNoteModal() {
+            if (window.caseFileReview) window.caseFileReview.stop();
             forceHideModal('editCaseNoteModal');
             // V92.67 Phase 3-E: drop the ?case= param from the URL when the modal closes so the
             // address bar matches what's on screen. replaceState avoids polluting browser history.
@@ -44536,6 +44540,7 @@ They can connect again from LINE.
             // V94.30: restore the admin's last toggle choice for this modal.
             ecnSetLang(ecnGetLang());
 
+            if (window.caseFileReview) window.caseFileReview.start(casesData.find(x => x.id === caseDocId), 'edit-case-file-box');   // V102.548: the intern's PDF here too
             forceShowModal('editCaseNoteModal');
             // V92.67 Phase 3-E: stamp ?case={id} into the URL so refresh / back-forward / share keep the modal context.
             try {
@@ -55251,7 +55256,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             <div style="min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><b>${safe(c.displayName || 'Anonymous')}</b> <span style="font-size:0.78em; color:#64748b;">· ${safe(alabastaAgo(c.timestamp))}</span></div>
                             <span class="cdup-hn-code">${safe(c.caseId || '—')}</span><button type="button" class="cno-edit" onclick="editCaseNo('${c.id}')" title="Edit Case No." aria-label="Edit Case No.">✎</button>
                         </div>
-                        <div style="font-weight:700; color:#7c2d12; margin-top:6px;">${safe(c.disease || '—')}</div>
+                        <div style="font-weight:700; color:#7c2d12; margin-top:6px;">${safe(c.disease || '—')}${c.caseFile ? '<span class="crf-mark" title="PDF attached">📄</span>' : ''}</div>
                         <div class="alabasta-case-sub">${c.diseaseSystemLabel ? '🏥 ' + safe(c.diseaseSystemLabel) + safe(caseMoreSystems(c)) : ''}${initials ? (c.diseaseSystemLabel ? ' · ' : '') + safe(initials) : ''}</div>
                         ${window.caseDup ? caseDup.html(c) /* V102.398: duplicate / follow-up chip */ : ''}
                         <div class="ib-note" title="${safe(c.note || '')}">${safe(c.note || '')}</div>
