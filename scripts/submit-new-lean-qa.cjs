@@ -343,6 +343,29 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         });
         assert.deepEqual(sent, [{ primary: 'renal', disease: 'Renal/Urinary / ระบบทางเดินปัสสาวะ', keys: ['renal', 'gi'] }, 0, { primary: 'neuro', disease: 'Neurological / ระบบประสาท', keys: undefined }, 0], 'what submitCase receives, and the chips clear after a send: ' + JSON.stringify(sent));
 
+        // ---- V101.259: ⓘ teaches the Case form, in the language on screen
+        const help = await page.evaluate(() => {
+            const b = document.getElementById('u-case-help'), r = b.getBoundingClientRect(), o = { size: [r.width, r.height], line: b.parentElement.scrollWidth <= b.parentElement.clientWidth + 1 && !!b.closest('#unified-submit-modal') };
+            b.click();
+            const d = document.getElementById('case-help-dialog');
+            o.open = d.open; o.en = d.textContent; o.steps = d.querySelectorAll('section p').length;
+            caseHelp(b); o.oneOnly = document.querySelectorAll('#case-help-dialog').length === 1;
+            d.querySelector('.ip-help-close').click();
+            return o;
+        });
+        assert.ok(help.size[0] >= 36 && help.size[1] >= 36 && help.line, 'tappable, inside the form line: ' + JSON.stringify(help));
+        assert.ok(help.open && help.oneOnly && help.steps === 6, 'one dialog, five steps + the privacy line: ' + JSON.stringify(help));
+        assert.ok(/Split into the table/.test(help.en) && /What am I missing/.test(help.en) && /Never put a patient name or HN/.test(help.en), 'names the real buttons and the privacy rule');
+        await page.waitForFunction(() => !document.getElementById('case-help-dialog'));
+        const helpTh = await page.evaluate(() => {
+            const c = document.body.classList, had = [c.contains('lang-th-on'), c.contains('lang-kr-on')], out = {};
+            c.add('lang-th-on'); caseHelp(); out.th = document.getElementById('case-help-dialog').textContent; document.getElementById('case-help-dialog').remove();
+            c.remove('lang-th-on'); c.add('lang-kr-on'); caseHelp(); out.ko = document.getElementById('case-help-dialog').textContent; document.getElementById('case-help-dialog').remove();
+            c.toggle('lang-th-on', had[0]); c.toggle('lang-kr-on', had[1]);
+            return out;
+        });
+        assert.ok(/วิธีส่งเคส/.test(helpTh.th) && /케이스 제출 방법/.test(helpTh.ko), 'Thai and Korean cards');
+
         // ---- footer: only Submit, and it stays reachable mid-form on a short screen (keyboard up)
         assert.equal(await page.locator('#u-submit-btn').count(), 1);
         assert.ok(!/Cancel/.test(await page.evaluate(() => document.querySelector('#u-submit-btn').parentElement.innerText)), 'no Cancel in the footer');
