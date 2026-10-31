@@ -12,8 +12,8 @@ const PROMPT = 'This PDF is a pharmacy intern\'s case log, typed, scanned or han
     + 'Set unsure true on a line when you cannot read it with confidence. '
     + 'NEVER copy a patient name, HN, national ID number, address or phone number: write [hidden] in its place and add one entry to identifiers with its page and kind. '
     + 'A black bar or a covered area is not an identifier. Do not guess a covered value. '
-    + 'One file can hold several patient cases. A case often starts halfway down a page and runs onto the next. List every case in cases, in reading order, with a short clinical title (never an identifier) and pageFrom, pageTo: two cases can share a page. Give every row its case number, starting at 1. Set splitSure true only when where each case starts is clear.';
-const SYSTEM = 'Answer ONLY with JSON of the form {"pages":3,"rows":[{"page":1,"case":1,"label":"CC","text":"...","unsure":false}],"identifiers":[{"page":1,"kind":"hn"}],"cases":[{"title":"COPD exacerbation","pageFrom":1,"pageTo":3}],"splitSure":true}. kind is one of hn, name, id, address, phone.';
+    + 'One file can hold several patient cases. A case often starts halfway down a page and runs onto the next. List every case in cases, in reading order, with a short clinical title (never an identifier) and pageFrom, pageTo: two cases can share a page. Give every row its case number, starting at 1. Always give your best split: the admin checks it.';
+const SYSTEM = 'Answer ONLY with JSON of the form {"pages":3,"rows":[{"page":1,"case":1,"label":"CC","text":"...","unsure":false}],"identifiers":[{"page":1,"kind":"hn"}],"cases":[{"title":"COPD exacerbation","pageFrom":1,"pageTo":3}]}. kind is one of hn, name, id, address, phone.';
 
 function clean(v, max) { return String(v == null ? '' : v).replace(/[\u0000-\u0008\u000b-\u001f]/g, ' ').trim().slice(0, max); }
 
@@ -33,7 +33,7 @@ function parseRead(raw) {
     if (!rows.length && !identifiers.length) return null;
     const pages = Math.max(page(j.pages), ...rows.map(r => r.page), ...identifiers.map(m => m.page));
     const found = (Array.isArray(j.cases) ? j.cases : []).slice(0, LIM.parts).map((c, i) => ({ no: i + 1, title: clean(c && c.title, LIM.label), from: page(c && c.pageFrom), to: page(c && c.pageTo) }));
-    const many = found.length > 1, usable = many && validParts(found, pages) && j.splitSure === true;
+    const many = found.length > 1, usable = many && validParts(found, pages);   // the admin checks every split, so Gemini's best try goes through
     return { pages, rows, identifiers, parts: usable ? found : [], ...(many && !usable ? { unsplit: true } : {}) };
 }
 

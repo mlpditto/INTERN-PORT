@@ -33,13 +33,12 @@ assert.equal(ok.pages, 3, 'pages follow what was seen');
 // the split: every page once, in order; unsure or broken ranges never make cards
 const split = c => parseRead(JSON.stringify({ pages: 6, rows: [{ page: 1, text: 'a' }, { page: 4, text: 'b' }], identifiers: [{ page: 4, kind: 'hn' }], ...c }));
 const two = [{ title: 'A', pageFrom: 1, pageTo: 3 }, { title: 'B', pageFrom: 4, pageTo: 6 }];
-assert.equal(split({ cases: two, splitSure: true }).parts.length, 2);
-assert.deepEqual([split({ cases: two, splitSure: false }).parts, split({ cases: two, splitSure: false }).unsplit], [[], true], 'not sure: one card, and it says so');
-assert.deepEqual([split({ cases: [two[0]], splitSure: true }).parts, split({ cases: [two[0]], splitSure: true }).unsplit], [[], undefined], 'one case: nothing to split');
-assert.equal(split({ cases: [two[0], { title: 'B', pageFrom: 5, pageTo: 6 }], splitSure: true }).unsplit, true, 'a page left out');
+assert.equal(split({ cases: two }).parts.length, 2, 'V102.549: Gemini splits, the admin checks');
+assert.deepEqual([split({ cases: [two[0]] }).parts, split({ cases: [two[0]] }).unsplit], [[], undefined], 'one case: nothing to split');
+assert.deepEqual([split({ cases: [two[0], { title: 'B', pageFrom: 5, pageTo: 6 }] }).parts, split({ cases: [two[0], { title: 'B', pageFrom: 5, pageTo: 6 }] }).unsplit], [[], true], 'a page left out: one card, and it says so');
 // V102.549: the owner's real file: five cases, each starting halfway down a page
 const mid = [[1, 2], [2, 3], [3, 4], [4, 5], [5, 6]].map(([pageFrom, pageTo], i) => ({ title: 'C' + i, pageFrom, pageTo }));
-const shared = parseRead(JSON.stringify({ pages: 6, rows: [{ page: 2, case: 1, text: 'end of one' }, { page: 2, case: 2, text: 'start of two' }], identifiers: [], cases: mid, splitSure: true }));
+const shared = parseRead(JSON.stringify({ pages: 6, rows: [{ page: 2, case: 1, text: 'end of one' }, { page: 2, case: 2, text: 'start of two' }], identifiers: [], cases: mid }));
 assert.equal(shared.parts.length, 5, 'cases that share a page still split');
 assert.deepEqual(partRead(shared, shared.parts[0]).rows.map(r => r.text), ['end of one'], 'a shared page: each card keeps only its own lines');
 assert.deepEqual(partRead(shared, shared.parts[1]).rows.map(r => r.text), ['start of two']);
@@ -59,6 +58,7 @@ assert.ok(/exports\.readCaseFile = onCall\(\{ secrets: \['GEMINI_API_KEY'\]/.tes
 assert.ok(/c\.authUid !== request\.auth\.uid/.test(fn) && /reader\.allowedPath\(file\.path, c\.authUid\)/.test(fn), 'own case, own folder');
 assert.ok(/callerAdmin && retry/.test(fn), 'only the admin reads twice');
 assert.ok(/<script src="case-file-review\.js\?v=V102\.\d+"><\/script>/.test(admin));
+assert.ok(!/onclick="closeEditCaseNoteModal\(\)" style="min-width:120px/.test(admin), 'the ✕ closes Open case: no second Cancel');
 assert.ok(admin.includes('<div id="edit-case-file-box" class="lang-no-toggle" hidden></div>') && /caseFileReview\.start\(casesData\.find\(x => x\.id === caseDocId\), 'edit-case-file-box'\)/.test(admin), 'Edit Case Note shows the file too');
 const waiting = admin.slice(admin.indexOf('<div class="ib-sub-row">'), admin.indexOf('caseDup.html(c)', admin.indexOf('<div class="ib-sub-row">')));
 assert.ok(!/updateCaseStatus|openAlabastaRejectModal/.test(waiting) && /editCaseNote/.test(waiting) && /caseArticle\.btns/.test(waiting), 'the waiting card keeps Open case, Case card, Article');
@@ -152,7 +152,8 @@ window.confirm = () => true; window.showToast = () => {};
             assert.match(await p.textContent(box), /Case 2 of 5.*Pages 3–4 of 6/s);
             assert.equal(await p.locator(box + ' [data-a="open"]').count(), 0, 'one card never opens the whole file');
             await p.evaluate(f => { window.caseFileReview.start({ id: 'c5', caseFile: f, caseFileRead: { status: 'done', pages: 6, unsplit: true, rows: [], identifiers: [] } }); }, file);
-            assert.match(await p.textContent(box), /could not split/);
+            assert.match(await p.textContent(box), /not split/);
+            assert.equal(await p.locator(box + ' .crf-flag [data-a="retry"]').count(), 1, 'Gemini can try again');
             await p.click(box + ' [data-a="fix"]');
             await p.waitForSelector('#crf-fix[open]');
             assert.equal(await p.textContent('#crf-fx-used'), '6 of 6 pages used');

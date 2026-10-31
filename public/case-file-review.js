@@ -32,7 +32,7 @@
     }
     function unsplitHtml(read) {
         if (!read || !read.unsplit) return '';
-        return '<div class="crf-flag"><b>❔ Gemini could not split this file with confidence</b><span>It stays as one card. Score it as one, or split it yourself.</span><div><button type="button" class="crf-keep" data-a="fix">Split it myself</button></div></div>';
+        return '<div class="crf-flag"><b>❔ This file was not split</b><span>Ask Gemini to try, or split it yourself.</span><div><button type="button" class="crf-keep" data-a="retry">✨ Try to split</button><button type="button" class="crf-keep" data-a="fix">Split it myself</button></div></div>';
     }
     function compareHtml(c) {
         const read = c.caseFileRead, g = c.caseGroup;
@@ -207,7 +207,7 @@
             const g = c.caseGroup;
             if (!g || seen.has(g.id)) return '';
             seen.add(g.id);
-            return '<div class="crf-ghead"><span>📄 <b>1 PDF · ' + Number(g.total) + ' cases</b> · ' + Number(g.filePages || 0) + ' pages · Gemini split this file</span><button type="button" class="crf-btn" onclick="caseFileReview.fix(\'' + esc(c.id) + '\')">Fix the split</button></div>';
+            return '<div class="crf-ghead"><span>📄 <b>1 PDF · ' + Number(g.total) + ' cases</b> · ' + Number(g.filePages || 0) + ' pages · Gemini split this file, check it</span><button type="button" class="crf-btn" onclick="caseFileReview.fix(\'' + esc(c.id) + '\')">Fix the split</button></div>';
         },
         fix(id) {
             const c = (casesData || []).find(x => x.id === id);
