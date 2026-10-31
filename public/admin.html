@@ -13526,8 +13526,7 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
                                 aria-selected="false" title="Product" aria-label="Product" onclick="setAlabastaSubtab('product')">🛒 <span class="alabasta-tab-label">Product</span> <span class="alabasta-tab-dot" id="alabasta-subtab-product-count" hidden></span></button>
                     </div>
                     <div class="alabasta-filter-pills-row" id="alabasta-status-rail" style="flex:1 1 auto; margin-bottom:0;" aria-label="Filter by status">
-                    <button type="button" id="alabasta-status-all" class="alabasta-filter-pill active" onclick="setAlabastaStatusFilter('all')">All <span class="pill-count" id="alabasta-case-total">0</span></button>
-                    <button type="button" id="alabasta-status-pending" class="alabasta-filter-pill" title="Pending" aria-label="Pending" onclick="setAlabastaStatusFilter('pending')">📥 <span class="alabasta-pill-label">Pending</span> <span class="pill-count" id="alabasta-case-pending">0</span></button>
+                    <button type="button" id="alabasta-status-history" class="alabasta-filter-pill active" onclick="setAlabastaStatusFilter('history')">History <span class="pill-count" id="alabasta-case-total">0</span></button>
                     <button type="button" id="alabasta-status-reviewed" class="alabasta-filter-pill" title="Reviewed" aria-label="Reviewed" onclick="setAlabastaStatusFilter('reviewed')">✅ <span class="alabasta-pill-label">Reviewed</span> <span class="pill-count" id="alabasta-case-reviewed">0</span></button>
                     <button type="button" id="alabasta-status-rejected" class="alabasta-filter-pill" title="Rejected" aria-label="Rejected" onclick="setAlabastaStatusFilter('rejected')">❌ <span class="alabasta-pill-label">Rejected</span> <span class="pill-count" id="alabasta-case-rejected">0</span></button>
                 <!-- Alabasta lean: one rail — status │ system (icon + count; name in the tooltip). Filled by renderAlabastaSystemFilterPills(). -->
@@ -42823,7 +42822,7 @@ They can connect again from LINE.
         window.alabastaSystemFilter = window.alabastaSystemFilter || 'all';
 
         // Alabasta lean: status rail — 'all' | 'pending' | 'reviewed' | 'rejected' (counts live in the chips)
-        window.alabastaStatusFilter = window.alabastaStatusFilter || 'all';
+        window.alabastaStatusFilter = window.alabastaStatusFilter || 'history';   // V102.548: waiting cases are the cards above; the table is what was decided
 
         function setAlabastaStatusFilter(key) {
             window.alabastaStatusFilter = key || 'all';
@@ -43075,7 +43074,6 @@ They can connect again from LINE.
             if (!tbody) return;
 
             const totalEl = document.getElementById('alabasta-case-total');
-            const pendingEl = document.getElementById('alabasta-case-pending');
             const reviewedEl = document.getElementById('alabasta-case-reviewed');
             const rejectedEl = document.getElementById('alabasta-case-rejected');
             const keyword = ((document.getElementById('alabasta-case-search') || {}).value || '').toLowerCase().trim();
@@ -43122,18 +43120,14 @@ They can connect again from LINE.
             });
 
             const systemFilter = window.alabastaSystemFilter || 'all';
-            // First time data is on screen: land on Pending when something waits, otherwise All. Any chip stays pickable.
-            if (!window._alabastaStatusDefaulted && (casesData || []).length) {
-                window._alabastaStatusDefaulted = true;
-                window.alabastaStatusFilter = casesData.some(c => !c.isArchived && (c.status || 'pending') !== 'reviewed') ? 'pending' : 'all';
-            }
-            const statusFilter = window.alabastaStatusFilter || 'all';
+            const statusFilter = window.alabastaStatusFilter || 'history';
             const isCaseRejected = (c) => (c.status || '') === 'rejected';
             const isCasePending = (c) => !c.isArchived && (c.status || 'pending') !== 'reviewed';
             // Reviewing archives the case (isArchived:true), so "reviewed" = status or archived-but-not-rejected.
             const isCaseReviewed = (c) => !isCaseRejected(c) && (c.isArchived || (c.status || '') === 'reviewed');
             // "All" is every case; Pending / Reviewed / Rejected are matched by status alone.
             const inStatus = (c, st) => st === 'pending' ? isCasePending(c)
+                : st === 'history' ? !isCasePending(c)
                 : st === 'reviewed' ? isCaseReviewed(c)
                 : st === 'rejected' ? isCaseRejected(c)
                 : true;
@@ -43146,18 +43140,16 @@ They can connect again from LINE.
 
             // Chip counts ignore the chosen status (picking one chip must not zero the others) but follow the system filter.
             const chipScope = systemFilter === 'all' ? scoped : scoped.filter(c => systemOf(c) === systemFilter);
-            ['all', 'pending', 'reviewed', 'rejected'].forEach(k => {
+            ['history', 'reviewed', 'rejected'].forEach(k => {
                 const chip = document.getElementById('alabasta-status-' + k);
                 if (chip) chip.classList.toggle('active', statusFilter === k);
             });
-            if (totalEl) totalEl.textContent = chipScope.filter(c => inStatus(c, 'all')).length;
-            if (pendingEl) pendingEl.textContent = chipScope.filter(isCasePending).length;
+            if (totalEl) totalEl.textContent = chipScope.filter(c => inStatus(c, 'history')).length;
             if (reviewedEl) reviewedEl.textContent = chipScope.filter(isCaseReviewed).length;
             if (rejectedEl) rejectedEl.textContent = chipScope.filter(isCaseRejected).length;
 
             if (filtered.length === 0) {
-                const emptyMsg = statusFilter === 'pending' ? '🎉 No cases waiting for review'
-                    : statusFilter === 'rejected' ? 'No rejected cases'
+                const emptyMsg = statusFilter === 'rejected' ? 'No rejected cases'
                     : statusFilter === 'reviewed' ? 'No reviewed cases yet'
                     : systemFilter === 'all'
                     ? 'No case submissions found · 케이스가 없습니다'
@@ -55232,7 +55224,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (chipEl) chipEl.style.display = pendingCases.length > 0 ? 'flex' : 'none';
 
             const isEmpty = pending.length === 0;
-            const isOpen = !!window.alabastaInboxOpen && !isEmpty;
+            const isOpen = window.alabastaInboxOpen !== false && !isEmpty;   // V102.548: open unless closed: this is where waiting work lives
             section.classList.toggle('is-empty', isEmpty);
             section.classList.toggle('is-open', isOpen);
             const toggleBtn = document.getElementById('alabasta-inbox-toggle');
@@ -55280,6 +55272,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 return (window.caseFileReview ? caseFileReview.groupHead(c, fileGroups) : '') + `
                     <div class="alabasta-inbox-card lang-no-toggle${window.caseDup ? caseDup.cls(c) : ''}">
                         <div style="display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" class="alabasta-row-checkbox" data-id="${safe(c.id)}" ${window.alabastaSelectedIds?.has(c.id) ? 'checked' : ''} aria-label="Select this case" onchange="toggleAlabastaSelection('${safe(c.id)}', this.checked)">
                             ${avatarOf(c.pictureUrl)}
                             <div style="min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><b>${safe(c.displayName || 'Anonymous')}</b> <span style="font-size:0.78em; color:#64748b;">· ${safe(alabastaAgo(c.timestamp))}</span></div>
                             <span class="cdup-hn-code">${safe(c.caseId || '—')}</span><button type="button" class="cno-edit" onclick="editCaseNo('${c.id}')" title="Edit Case No." aria-label="Edit Case No.">✎</button>
@@ -55300,7 +55293,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
         // Alabasta lean (Phase 2): fold / unfold the Inbox banner. Folded by default.
         function toggleAlabastaInbox() {
-            window.alabastaInboxOpen = !window.alabastaInboxOpen;
+            window.alabastaInboxOpen = window.alabastaInboxOpen === false;
             renderAlabastaInbox();
         }
 

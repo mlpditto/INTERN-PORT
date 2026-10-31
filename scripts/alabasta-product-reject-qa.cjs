@@ -77,7 +77,6 @@ function grabConst(name) {
 
     // ---- Inbox lists cases AND products
     assert.match(await page.locator('#alabasta-inbox-section').innerText(), /4\s+waiting for review/);
-    await page.locator('#alabasta-inbox-toggle').click();
     assert.equal(await page.locator('#alabasta-inbox-body').isVisible(), true);
     assert.equal(await page.locator('#alabasta-inbox-container .alabasta-inbox-card').count(), 4);
     assert.equal(await page.locator('#alabasta-inbox-container .alabasta-inbox-kind').count(), 2);
