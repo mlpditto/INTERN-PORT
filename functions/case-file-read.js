@@ -12,8 +12,8 @@ const PROMPT = 'This PDF is a pharmacy intern\'s case log, typed, scanned or han
     + 'Set unsure true on a line when you cannot read it with confidence. '
     + 'NEVER copy a patient name, HN, national ID number, address or phone number: write [hidden] in its place and add one entry to identifiers with its page and kind. '
     + 'A black bar or a covered area is not an identifier. Do not guess a covered value. '
-    + 'One file can hold several patient cases. List every case in cases, in page order, with a short clinical title (never an identifier) and pageFrom, pageTo. Set splitSure true only when where each case starts is clear from the pages.';
-const SYSTEM = 'Answer ONLY with JSON of the form {"pages":3,"rows":[{"page":1,"label":"CC","text":"...","unsure":false}],"identifiers":[{"page":1,"kind":"hn"}],"cases":[{"title":"COPD exacerbation","pageFrom":1,"pageTo":3}],"splitSure":true}. kind is one of hn, name, id, address, phone.';
+    + 'One file can hold several patient cases. A case often starts halfway down a page and runs onto the next. List every case in cases, in reading order, with a short clinical title (never an identifier) and pageFrom, pageTo: two cases can share a page. Give every row its case number, starting at 1. Always give your best split: the admin checks it.';
+const SYSTEM = 'Answer ONLY with JSON of the form {"pages":3,"rows":[{"page":1,"case":1,"label":"CC","text":"...","unsure":false}],"identifiers":[{"page":1,"kind":"hn"}],"cases":[{"title":"COPD exacerbation","pageFrom":1,"pageTo":3}]}. kind is one of hn, name, id, address, phone.';
 
 function clean(v, max) { return String(v == null ? '' : v).replace(/[\u0000-\u0008\u000b-\u001f]/g, ' ').trim().slice(0, max); }
 
@@ -28,29 +28,31 @@ function parseRead(raw) {
     try { j = JSON.parse(String(raw || '').replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, '')); } catch (e) { return null; }
     if (!j || !Array.isArray(j.rows)) return null;
     const page = v => { const n = Math.floor(Number(v)); return n >= 1 && n <= 999 ? n : 1; };
-    const rows = j.rows.slice(0, LIM.rows).map(r => ({ page: page(r && r.page), label: clean(r && r.label, LIM.label) || 'Note', text: clean(r && r.text, LIM.text), unsure: !!(r && r.unsure) })).filter(r => r.text);
+    const rows = j.rows.slice(0, LIM.rows).map(r => ({ page: page(r && r.page), ...(Number.isInteger(r && r.case) && r.case > 0 ? { case: r.case } : {}), label: clean(r && r.label, LIM.label) || 'Note', text: clean(r && r.text, LIM.text), unsure: !!(r && r.unsure) })).filter(r => r.text);
     const identifiers = (Array.isArray(j.identifiers) ? j.identifiers : []).slice(0, LIM.marks).map(m => ({ page: page(m && m.page), kind: KINDS.includes(m && m.kind) ? m.kind : 'name' }));
     if (!rows.length && !identifiers.length) return null;
     const pages = Math.max(page(j.pages), ...rows.map(r => r.page), ...identifiers.map(m => m.page));
-    const found = (Array.isArray(j.cases) ? j.cases : []).slice(0, LIM.parts).map(c => ({ title: clean(c && c.title, LIM.label), from: page(c && c.pageFrom), to: page(c && c.pageTo) }));
-    const many = found.length > 1, usable = many && validParts(found, pages) && j.splitSure === true;
+    const found = (Array.isArray(j.cases) ? j.cases : []).slice(0, LIM.parts).map((c, i) => ({ no: i + 1, title: clean(c && c.title, LIM.label), from: page(c && c.pageFrom), to: page(c && c.pageTo) }));
+    const many = found.length > 1, usable = many && validParts(found, pages);   // the admin checks every split, so Gemini's best try goes through
     return { pages, rows, identifiers, parts: usable ? found : [], ...(many && !usable ? { unsplit: true } : {}) };
 }
 
-// every page in exactly one part, in order
+// in order, no page left out; the next case may start on the page the last one ended on
 function validParts(parts, pages) {
     if (!Array.isArray(parts) || !parts.length || parts.length > LIM.parts) return false;
-    let next = 1;
+    let end = 0;
     for (const p of parts) {
-        if (!p || !Number.isInteger(p.from) || !Number.isInteger(p.to) || p.from !== next || p.to < p.from) return false;
-        next = p.to + 1;
+        if (!p || !Number.isInteger(p.from) || !Number.isInteger(p.to) || p.to < p.from) return false;
+        if (end ? p.from !== end && p.from !== end + 1 : p.from !== 1) return false;
+        end = p.to;
     }
-    return next === pages + 1;
+    return end === pages;
 }
 
 function partRead(read, part) {
     const inside = x => x.page >= part.from && x.page <= part.to;
-    return { pages: part.to - part.from + 1, rows: read.rows.filter(inside), identifiers: read.identifiers.filter(inside) };
+    const own = r => (part.no && r.case ? r.case === part.no : inside(r));   // the reader's own case number; a page can hold two cases
+    return { pages: part.to - part.from + 1, rows: read.rows.filter(own), identifiers: read.identifiers.filter(inside) };
 }
 
 // One real Case per part: the sent case stays as the first card, so its +0.1 and mirror are untouched. Reviewed cards are never removed.
