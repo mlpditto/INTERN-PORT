@@ -1,10 +1,14 @@
 // V102.547: the PDF an intern attaches to a Case. Gemini reads it right after Send, so the admin opens Review with the text ready.
 // Text only: never a score, never a verdict. The pages go to Google; the patient's identifiers must not come back into Firestore.
+// V102.550: only an admin's retry can pick another reader, and only then do the pages go to that vendor. The read after Send stays Gemini.
 const axios = require('axios');
+const { extractJson } = require('./modern-ai');
 
 const MODEL = 'gemini-3.8-flash';
+const READERS = { [MODEL]: 'gemini-aistudio', 'claude-opus-5-5': 'anthropic', 'gpt-6-sol': 'openai' };   // Thai hard-word test 3/3 on 2026-09-25
 const MAX_BYTES = 5 * 1024 * 1024;
 const LIM = { rows: 240, label: 60, text: 1000, marks: 20, parts: 20 };
+const MAX_OUT = 32000, TIMEOUT = 270000;
 const KINDS = ['hn', 'name', 'id', 'address', 'phone'];
 
 const PROMPT = 'This PDF is a pharmacy intern\'s case log, typed, scanned or handwritten, in Thai and English. Copy what is written, line by line, in reading order, in the same language. '
@@ -69,7 +73,7 @@ async function applySplit(db, ref, c, parts, read, FieldValue) {
             caseId: total > 1 ? `${base} · ${i + 1}/${total}` : base,
             caseGroup: total > 1 ? { id: groupId, base, index: i + 1, total, from: part.from, to: part.to, title: part.title, filePages: read.pages } : FieldValue.delete(),
             caseFile: first.caseFile,
-            caseFileRead: { status: 'done', model: MODEL, at: stamp, ...partRead(read, part) }
+            caseFileRead: { status: 'done', model: read.model || MODEL, at: stamp, ...partRead(read, part) }
         };
         if (doc) { batch.update(doc.ref, fields); return; }
         const { authUid, userId, displayName, pictureUrl, customer, customerTel, disease, diseaseSystemKey, diseaseSystemLabel, timestamp } = first;
@@ -79,15 +83,35 @@ async function applySplit(db, ref, c, parts, read, FieldValue) {
     return parts.length;
 }
 
-async function readPdf(buf, apiKey) {
-    const res = await axios.post(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`, {
+async function readClaude(data, key, model) {
+    const res = await axios.post('https://api.anthropic.com/v1/messages', {
+        model, max_tokens: MAX_OUT, output_config: { effort: 'low' }, system: SYSTEM, fallbacks: 'default',
+        messages: [{ role: 'user', content: [{ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data } }, { type: 'text', text: PROMPT }] }]
+    }, { timeout: TIMEOUT, headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'server-side-fallback-2026-07-01', 'Content-Type': 'application/json' } });
+    const u = res.data.usage || {}, text = (res.data.content || []).filter(c => c.type === 'text').map(c => c.text || '').join('');
+    return { read: parseRead(extractJson(text)), inputTokens: u.input_tokens || 0, outputTokens: u.output_tokens || 0, tokens: (u.input_tokens || 0) + (u.output_tokens || 0) };
+}
+
+async function readOpenAI(data, key, model) {
+    const res = await axios.post('https://api.openai.com/v1/responses', {
+        model, store: false, reasoning: { effort: 'low' }, instructions: SYSTEM, text: { format: { type: 'json_object' } }, max_output_tokens: MAX_OUT,
+        input: [{ role: 'user', content: [{ type: 'input_file', filename: 'case.pdf', file_data: 'data:application/pdf;base64,' + data }, { type: 'input_text', text: PROMPT }] }]
+    }, { timeout: TIMEOUT, headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' } });
+    const u = res.data.usage || {}, text = (res.data.output || []).flatMap(o => o.content || []).filter(c => c.type === 'output_text').map(c => c.text || '').join('');
+    return { read: parseRead(extractJson(text)), inputTokens: u.input_tokens || 0, outputTokens: u.output_tokens || 0, tokens: u.total_tokens || 0 };
+}
+
+async function readPdf(buf, keys, model = MODEL) {
+    if (READERS[model] === 'anthropic') return readClaude(buf.toString('base64'), keys.anthropic, model);
+    if (READERS[model] === 'openai') return readOpenAI(buf.toString('base64'), keys.openai, model);
+    const res = await axios.post(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${keys.gemini}`, {
         contents: [{ role: 'user', parts: [{ inlineData: { mimeType: 'application/pdf', data: buf.toString('base64') } }, { text: PROMPT }] }],
         generationConfig: { responseMimeType: 'application/json' },
         systemInstruction: { parts: [{ text: SYSTEM }] }
-    }, { timeout: 100000 });
+    }, { timeout: TIMEOUT });
     const parts = (((res.data.candidates || [])[0] || {}).content || {}).parts;
     const usage = res.data.usageMetadata || {};
     return { read: parseRead((parts || []).map(p => p.text || '').join('')), inputTokens: usage.promptTokenCount || 0, outputTokens: usage.candidatesTokenCount || 0, tokens: usage.totalTokenCount || 0 };
 }
 
-module.exports = { MODEL, MAX_BYTES, allowedPath, parseRead, readPdf, validParts, partRead, applySplit };
+module.exports = { MODEL, READERS, MAX_BYTES, allowedPath, parseRead, readPdf, validParts, partRead, applySplit };
