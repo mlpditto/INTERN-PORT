@@ -6,7 +6,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const admin = fs.readFileSync('public/admin.html', 'utf8').replace(/\r\n/g, '\n');
 const js = fs.readFileSync('public/admin-guide.js', 'utf8');
 const adm = { en: fs.readFileSync('public/admin-guide.en.md', 'utf8'), th: fs.readFileSync('public/admin-guide.md', 'utf8'), ko: fs.readFileSync('public/admin-guide.ko.md', 'utf8') };
-const chapter = doc => doc.split(/\r?\n## 7\. /)[1] || '';
+const chapter = doc => (doc.split(/\r?\n## 7\. /)[1] || '').split(/\r?\n## /)[0];
 
 // static: one guide, one button + every named control exists in admin.html
 assert.ok(!/openDeckGuide|deck-guide/.test(admin) && !/openDeckGuide|SETS/.test(js), 'no second guide, no deck 📖 button');
@@ -57,7 +57,7 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</
         assert.ok(/Plan 10 episodes/.test(en) && /\$0\.80/.test(en) && /Intent.*Brief.*Style.*Plan.*Render.*Review/s.test(en) && /Stop after this one/.test(en), 'video');
         assert.ok(/CC ไทย/.test(en) && /Kore \/ Charon \/ Achird/.test(en) && /EPnn-th-voice\.mp4/.test(en), 'Thai clip');
         assert.ok(/Query Brain/.test(en) && /Send to Podcast/.test(en), 'audio + Log Pose');
-        assert.equal(await page.locator('#adminGuideOverlay .ag-go.next').count(), 0, 'last chapter');
+        assert.equal(await page.locator('#adminGuideOverlay .ag-go.next').count(), 1, 'V102.546: 🔣 Icons follows this chapter');
         // the language switch keeps the chapter; reopening lands where it was
         await page.click('#adminGuideOverlay .ag-l[data-l="th"]');
         await page.waitForFunction(() => /ยืนยัน/.test(document.querySelector('#adminGuideOverlay .ag-body').textContent) && /คู่มือ Admin/.test(document.querySelector('#adminGuideOverlay .ag-title').textContent));
