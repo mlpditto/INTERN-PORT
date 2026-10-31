@@ -252,3 +252,143 @@ PDF 텍스트(또는 인턴의 reflection)가 다른 AI 로 가기 전에, Jev �
 - 📎 **Attach Image for Vision Analysis** — 슬라이드·라벨·차트 이미지를 질문과 함께 전송.
 - 사이드바 **Focus on KB Only**는 업로드 문서 안에서만 답하게 함; **Manage Documents**로 문서 추가/삭제.
 - **Clear Chat**으로 새로 시작. 여기서는 DB에 쓰지 않음 — 위의 이미지·클립·대본을 준비하는 메모장.
+
+---
+
+## 8. 🔣 아이콘 — 각 기호의 뜻
+
+단어로 검색하거나, 모양만 기억날 때는 그리드로 바꾸세요. 자주 바뀌는 AI 모델 칩과 제공사 로고는 넣지 않았습니다.
+
+### 🧭 헤더
+
+| 아이콘 | 이름 | 기능 |
+|---|---|---|
+| ➕ | Create | Task, Quest, Event, Article 만들기 |
+| 📥 | Archive | 보관된 항목 보기 |
+| 📱 | UI Preview | LINE 없이 인턴 화면 보기 |
+| 🔮 | AI Engine | AI 키와 모델 설정 |
+| 📖 | Admin guide | 이 안내서 열기 |
+| ⚓ | One Piece theme | Grand Line Deck·Laugh Tale 테마 전환 |
+| 🇺🇸 | Language | 눌러서 라벨 언어 변경 |
+| 🌓 | Theme | 라이트·다크 모드 전환 |
+
+### 📊 Dashboard
+
+| 아이콘 | 이름 | 기능 |
+|---|---|---|
+| ✈️ | LINE pushes | 이번 달 LINE 발송 수, 눌러서 digest 보기 |
+| 🚀 | Escalated | 집중 검토로 표시한 Learning Note |
+| 🗑️ | Note deletion requests | 사용자의 노트 삭제 요청 |
+| 📦 | Show Done | 완료된 Kanban 카드 표시 |
+
+### 🧠 Quiz Engine
+
+| 아이콘 | 이름 | 기능 |
+|---|---|---|
+| 🟢 | Live | 지금 인턴에게 공개 중 |
+| ⏸️ | Paused | 비공개이며 템플릿도 아님 |
+| 📑 | Templates | 퀴즈 템플릿 |
+| 📝 | Graded | 채점되는 퀴즈 |
+| 1️⃣ | One-time | 한 번만 응시 가능 |
+| 🔒 | Locked | 점수가 있어야 열림 |
+| 📎 | Materials | 첨부 자료 있음 |
+| 🧪 | Audit | 감사 전이거나 감사 후 문제 변경 |
+| 🏷️ | Tags | System, Topic, Skill 태그 누락 |
+| 🩺 | Coverage | 질환 계통별 퀴즈 수 |
+| 🌐 | Translate missing | 번역이 없는 문제 번역 |
+| 🗺️ | Topic Map | 주제 그룹과 검토 대기열 |
+| 🚀 | Activate | 선택한 퀴즈 활성화 |
+| ⏹️ | Deactivate | 선택한 퀴즈 비활성화 |
+| 📄 | Export PDF | 선택한 퀴즈 PDF 내보내기 |
+| 🔍 | Compare | 선택한 퀴즈의 중복 확인 |
+
+### 📦 Assignments
+
+| 아이콘 | 이름 | 기능 |
+|---|---|---|
+| 🎓 | Exam | 시험 세션 |
+| 🔗 | Gourmet World | Explore 링크 |
+| 🏪 | A Shop for Killers | Beri 보상 상점 |
+| 🖼️ | Fetch missing logos | 로고 없는 가게의 로고 찾기 |
+| 🎁 | Give Beri | 사용자에게 Beri 지급 |
+
+### 👥 User Hub 도구
+
+| 아이콘 | 이름 | 기능 |
+|---|---|---|
+| 🏆 | Elite Board | 순위표 |
+| 📅 | Score range | 점수 기간 선택 |
+| 🏅 | Badge Stats | 배지가 동기화된 인턴 |
+| 🌸 | CAFE | CAFE·Content Creator·Audit 점수 |
+| 📤 | Share ranking | 순위 공유 |
+| ⚙️ | Divisions & Groups | Division과 그룹 관리 |
+| 👥 | Entry | 사전 등록 |
+| 📇 | Personal data | 상태, 복사, CSV |
+| ⏳ | Decay | 미체크인 감점 미리 보기 |
+
+### 👤 사용자 행
+
+| 아이콘 | 이름 | 기능 |
+|---|---|---|
+| Q | Quiz | 승인된 퀴즈, 눌러서 점수 기록 보기 |
+| J | Journal | Laugh Tale·Learning Note를 포함한 모든 저널 |
+| C | Case | 제출한 케이스 |
+| 📰 | Articles | 읽은 기사 |
+| 🕓 | Last seen | 녹색 1일 미만, 주황 7일 초과 |
+| ⭐ | Score | 총점, 눌러서 조정 |
+| 🪙 | Beri | Beri 잔액, 눌러서 조정 |
+| 📎 | Documents | 지원자 서류 |
+| 📜 | History | 점수 기록 |
+| ⬆️ | Log work | 사용자 대신 작업 기록 |
+| 🎓 | Certificate | 수료증 |
+| ⧉ | Copy | 이 행 복사 |
+| ⋯ | More | 추가 작업 |
+
+### 🏴‍☠️ Grand Line Deck
+
+| 아이콘 | 이름 | 기능 |
+|---|---|---|
+| 🤖 | AI Architecture | AI 채팅과 도구 |
+| 🖼 | Image | 이미지 한 장 만들기 |
+| 🎬 | Series ×10 | 9:16 10편 시리즈 계획 |
+| 🎞 | One clip | 9:16 클립 하나 만들기 |
+| ⚡ | Create now | AI 프롬프트 없이 브리프 그대로 전송 |
+| 🔁 | Re-plan | 시리즈 다시 계획 |
+
+### 🏝️ Laugh Tale
+
+| 아이콘 | 이름 | 기능 |
+|---|---|---|
+| 📓 | Reflections | 성찰 기록 |
+| 🧠 | Quiz | 퀴즈 피드백 |
+| 📖 | Analysis | 분석 보기 |
+| 🪄 | Patterns | 패턴 보기 |
+| 🪶 | Comments | 댓글 보기 |
+| 👒 | Straw Hat Mode | 모든 신원 숨기기·표시 |
+| 📐 | Fullscreen | 전체 화면 |
+| ⚙️ | LP Taxonomy | 분류 편집 |
+
+### 🏜️ Alabasta
+
+| 아이콘 | 이름 | 기능 |
+|---|---|---|
+| 🩺 | Case | 환자 케이스 |
+| 🛒 | Product | 상품 목록 |
+| 📥 | Pending | 검토 대기 |
+| ✅ | Reviewed | 검토 완료 |
+| ❌ | Rejected | 반려됨 |
+| 🔎 | Search | 목록 검색 |
+| ⬇️ | CSV | 표시된 상품 내보내기 |
+| 🔧 | Sync intern view | 검토 완료 항목을 인턴 화면에 동기화 |
+
+### 🪨 Poneglyph
+
+| 아이콘 | 이름 | 기능 |
+|---|---|---|
+| 🧭 | My Path | 내 학습 대기열 |
+| 💊 | Drugs | Drug Codex |
+| 🩺 | Diseases | Disease Codex |
+| 🎟️ | Memories | 끝난 행사와 스탬프 |
+| 🖼️ | Gallery | 저장된 이미지와 클립 |
+| 🤖 | Generate My Path | AI로 경로 생성 |
+| 📊 | Weekly Summary | 주간 요약 |

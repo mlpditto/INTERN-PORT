@@ -6,6 +6,7 @@
     'use strict';
     var SEEN_KEY = 'adminGuideSeen', LANG_KEY = 'adminGuideLang', MD_URL = { en: 'admin-guide.en.md', th: 'admin-guide.md', ko: 'admin-guide.ko.md' };
     var T = { en: { title: '📖 Admin guide', aria: 'Admin guide', fail: 'Could not load the guide' }, th: { title: '📖 คู่มือ Admin', aria: 'คู่มือ Admin', fail: 'โหลดคู่มือไม่สำเร็จ' }, ko: { title: '📖 관리자 가이드', aria: '관리자 가이드', fail: '가이드를 불러오지 못했습니다' } };
+    var ICON_T = { en: { ph: '🔍 Search: journal, history, Beri', list: 'List', grid: 'Grid', none: 'No icon found', tap: 'Tap an icon to see what it does' }, th: { ph: '🔍 ค้นหา เช่น journal, ประวัติ, Beri', list: 'รายการ', grid: 'กริด', none: 'ไม่พบไอคอน', tap: 'แตะไอคอนเพื่อดูความหมาย' }, ko: { ph: '🔍 검색: journal, 기록, Beri', list: '목록', grid: '그리드', none: '아이콘이 없습니다', tap: '아이콘을 눌러 뜻을 확인하세요' } };
     var sections = [], docs = { en: null, th: null, ko: null }, lang = getLang(), cur = 0, opened = false, loading = {}, overlay = null;
 
     function getLang() { try { var l = localStorage.getItem(LANG_KEY); return l === 'th' || l === 'ko' ? l : 'en'; } catch (_) { return 'en'; } }
@@ -49,7 +50,21 @@
         '#adminGuideOverlay .ag-body hr{display:none}' +
         '#adminGuideOverlay .ag-nav{display:flex;justify-content:space-between;gap:8px;margin-top:18px;padding-top:12px;border-top:1px solid var(--border-color,#e2e8f0)}' +
         '#adminGuideOverlay .ag-go{width:auto;min-height:0;white-space:nowrap;border:1px solid var(--primary,#4361ee);background:transparent;color:var(--primary,#4361ee);border-radius:999px;padding:6px 14px;font-size:.85em;line-height:1.4;font-weight:800;cursor:pointer}' +
-        '#adminGuideOverlay .ag-go.next{margin-left:auto}';
+        '#adminGuideOverlay .ag-go.next{margin-left:auto}' +
+        // V102.546: the 🔣 Icons section — list (the usual folds) or grid, one search for both
+        '#adminGuideOverlay .ag-ibar{display:flex;gap:6px;align-items:center;margin:8px 0}' +
+        '#adminGuideOverlay .ag-isearch{flex:1 1 auto;min-width:0;margin:0;padding:7px 11px;border:1px solid var(--border-color,#e2e8f0);border-radius:10px;background:transparent;color:inherit;font:inherit}' +
+        '#adminGuideOverlay .ag-iv{width:auto;min-height:0;margin:0;flex:0 0 auto;padding:6px 11px;border:1px solid var(--border-color,#e2e8f0);border-radius:999px;background:transparent;color:var(--text-sub,#64748b);font:inherit;font-size:.9em;font-weight:700;cursor:pointer}' +
+        '#adminGuideOverlay .ag-iv[aria-pressed="true"]{background:var(--primary,#4361ee);border-color:var(--primary,#4361ee);color:#fff}' +
+        '#adminGuideOverlay .ag-folds[hidden],#adminGuideOverlay .ag-fold[hidden],#adminGuideOverlay .ag-igrid[hidden],#adminGuideOverlay .ag-igroup[hidden],#adminGuideOverlay .ag-itile[hidden],#adminGuideOverlay .ag-inone[hidden],#adminGuideOverlay .ag-body tr[hidden]{display:none}' +
+        '#adminGuideOverlay .ag-igrid h4{margin:10px 0 4px;font-size:.92em}' +
+        '#adminGuideOverlay .ag-itiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:6px}' +
+        '#adminGuideOverlay .ag-itile{display:flex;flex-direction:column;align-items:center;gap:1px;width:auto;min-height:0;margin:0;padding:7px 2px 4px;border:1px solid var(--border-color,#e2e8f0);border-radius:10px;background:transparent;color:inherit;font:inherit;cursor:pointer}' +
+        '#adminGuideOverlay .ag-itile b{font-size:1.25em;line-height:1.3}' +
+        '#adminGuideOverlay .ag-itile small{font-size:.72em;line-height:1.15;text-align:center;color:var(--text-sub,#64748b)}' +
+        '#adminGuideOverlay .ag-itile[aria-pressed="true"]{border-color:var(--primary,#4361ee)}' +
+        '#adminGuideOverlay .ag-ibub{position:sticky;top:0;z-index:1;margin:0;padding:7px 10px;border-radius:10px;background:var(--col-bg,#f1f5f9);min-height:1.5em}' +
+        '#adminGuideOverlay .ag-inone{margin:10px 0;color:var(--text-sub,#64748b)}';
 
     function parse(md) {
         var out = [], c = null;
@@ -141,6 +156,7 @@
             (i < sections.length - 1 ? '<button type="button" class="ag-go next" data-go="' + (i + 1) + '">' + esc(sections[i + 1].chip) + ' &rsaquo;</button>' : '') + '</div>';
         body.innerHTML = html(sections[i].md) + nav;
         fold(body);
+        if (/^🔣/.test(sections[i].chip)) iconIndex(body);
         body.scrollTop = 0;
         overlay.querySelector('.ag-rail').classList.remove('ag-scrolled');
     }
@@ -158,6 +174,51 @@
             }
             if (el && el.classList.contains('ag-nav')) { d = null; grid = null; return; }
             if (d) d.appendChild(n);
+        });
+    }
+
+    // V102.546: search + list / grid over the section's own tables, so the three .md files stay the only source
+    function iconIndex(body) {
+        var t = ICON_T[lang], folds = body.querySelector('.ag-folds');
+        if (!folds) return;
+        var bar = document.createElement('div'); bar.className = 'ag-ibar';
+        bar.innerHTML = '<input type="search" class="ag-isearch" aria-label="' + esc(t.ph) + '" placeholder="' + esc(t.ph) + '">' +
+            '<button type="button" class="ag-iv" data-v="list" aria-pressed="true">' + esc(t.list) + '</button><button type="button" class="ag-iv" data-v="grid" aria-pressed="false">' + esc(t.grid) + '</button>';
+        var groups = Array.prototype.map.call(folds.querySelectorAll('.ag-fold'), function (d) {
+            return { fold: d, title: d.querySelector('summary').textContent, rows: Array.prototype.map.call(d.querySelectorAll('tbody tr'), function (tr) {
+                var c = tr.children; return { tr: tr, icon: c[0].textContent, name: c[1].textContent, what: c[2].textContent, hay: tr.textContent.toLowerCase() };
+            }) };
+        });
+        var grid = document.createElement('div'); grid.className = 'ag-igrid'; grid.hidden = true;
+        grid.innerHTML = '<p class="ag-ibub" role="status">' + esc(t.tap) + '</p>' + groups.map(function (g) {
+            return '<div class="ag-igroup"><h4>' + esc(g.title) + '</h4><div class="ag-itiles">' + g.rows.map(function (r) {
+                return '<button type="button" class="ag-itile" aria-pressed="false" title="' + esc(r.what) + '" data-what="' + esc(r.name + ' — ' + r.what) + '"><b>' + esc(r.icon) + '</b><small>' + esc(r.name) + '</small></button>';
+            }).join('') + '</div></div>';
+        }).join('');
+        var none = document.createElement('p'); none.className = 'ag-inone'; none.hidden = true; none.textContent = t.none;
+        folds.parentNode.insertBefore(bar, folds);
+        folds.parentNode.insertBefore(grid, folds);
+        folds.parentNode.insertBefore(none, folds.nextSibling);
+        var tiles = grid.querySelectorAll('.ag-igroup');
+        function filter() {
+            var q = bar.querySelector('.ag-isearch').value.trim().toLowerCase(), hits = 0;
+            groups.forEach(function (g, k) {
+                var n = 0, btns = tiles[k].querySelectorAll('.ag-itile');
+                g.rows.forEach(function (r, j) { var on = !q || r.hay.indexOf(q) >= 0; r.tr.hidden = !on; btns[j].hidden = !on; if (on) n++; });
+                g.fold.hidden = tiles[k].hidden = !n; g.fold.open = !!q && !!n; hits += n;
+            });
+            none.hidden = !!hits;
+        }
+        bar.addEventListener('input', filter);
+        bar.addEventListener('click', function (e) {
+            var b = e.target.closest('.ag-iv'); if (!b) return;
+            bar.querySelectorAll('.ag-iv').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+            grid.hidden = b.dataset.v !== 'grid'; folds.hidden = !grid.hidden;
+        });
+        grid.addEventListener('click', function (e) {
+            var b = e.target.closest('.ag-itile'); if (!b) return;
+            grid.querySelectorAll('.ag-itile').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+            grid.querySelector('.ag-ibub').textContent = b.dataset.what;
         });
     }
 
