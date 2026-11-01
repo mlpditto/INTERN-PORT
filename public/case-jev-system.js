@@ -1,4 +1,4 @@
-// V102.562 (owner, A): ✨ Check systems on the Inbox banner. Jev only suggests in the system line of a card; ✓ saves, ✕ hides it for this session. Cases whose system Jev agrees with show nothing.
+// V102.562 (owner, A): the Jev logo button on the Inbox banner (V102.565, owner D: logo only). Jev only suggests in the system line of a card; ✓ saves, ✕ hides it for this session. Cases whose system Jev agrees with show nothing.
 (function () {
     const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const picks = new Map(), hidden = new Set(), done = new Set();
@@ -14,7 +14,7 @@
         const key = pickOf(c);
         if (!key) return html;
         const id = esc(c.id);
-        return `<span class="cjs-old">${html}</span><span class="cjs-inl" title="Jev suggests this. Nothing changes until you press ✓">→ ${chipOf(c, key)} <button type="button" class="cjs-y" onclick="caseJevSystem.use('${id}')" title="Use" aria-label="Use this system">✓</button><button type="button" class="cjs-n" onclick="caseJevSystem.hide('${id}')" title="Dismiss" aria-label="Dismiss">✕</button></span>`;
+        return `<span class="cjs-old">${html}</span><span class="cjs-inl" title="Jev suggests this. Nothing changes until you press ✓">${window.jevMarkHtml ? window.jevMarkHtml(14) : ''} → ${chipOf(c, key)} <button type="button" class="cjs-y" onclick="caseJevSystem.use('${id}')" title="Use" aria-label="Use this system">✓</button><button type="button" class="cjs-n" onclick="caseJevSystem.hide('${id}')" title="Dismiss" aria-label="Dismiss">✕</button></span>`;
     }
     const cls = c => (done.has(c.id) ? ' cjs-done' : '');
     function hide(id) { hidden.add(id); renderAlabastaInbox(); }
@@ -48,8 +48,7 @@
         const list = waiting().slice(0, 30);
         if (!list.length || btn.disabled) return;
         btn.disabled = true;
-        const text = btn.textContent;
-        btn.textContent = '✨ Checking…';
+        btn.classList.add('is-run');
         try {
             const systems = (window.alabastaTaxonomyCatalog || []).map(s => ({ key: s.key, label: s.label, symptoms: s.symptoms }));
             const r = (await adminApp.functions().httpsCallable('jevSuggestCaseSystems')({ caseIds: list.map(c => c.id), systems })).data || {};
@@ -64,7 +63,7 @@
             showToast('Jev could not check: ' + (e && e.message ? e.message : 'error'));
         } finally {
             btn.disabled = false;
-            btn.textContent = text;
+            btn.classList.remove('is-run');
         }
     }
 

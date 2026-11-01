@@ -39,6 +39,7 @@ const bar = html.slice(html.indexOf('<div id="alabasta-inbox-section"'), html.in
 
             const clear = await page.evaluate(() => { const a = document.getElementById('alabasta-jev-check').getBoundingClientRect(), b = document.getElementById('alabasta-inbox-cta').getBoundingClientRect(); return getComputedStyle(document.getElementById('alabasta-inbox-toggle')).display === 'flex' && (a.right <= b.left || b.right <= a.left) && a.right <= innerWidth; });
             assert.ok(clear, width + ': the button does not cover Close');
+            assert.equal((await page.locator('#alabasta-jev-check').innerText()).trim(), '', 'V102.565: the logo only');
             assert.equal(await page.locator('.cjs-inl').count(), 0, 'nothing before the button');
             await page.click('#alabasta-jev-check');
             await page.waitForSelector('.cjs-inl');
