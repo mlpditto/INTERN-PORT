@@ -115,6 +115,7 @@ const src = [
     'async function scanQuizPending(' + cut('async function scanQuizPending(', '\n}\n').slice('async function scanQuizPending('.length) + '\n}\n',
     cut('const quizDeadline = require', 'exports.notifyQuizDeadlines = onSchedule(')
 ].join('\n');
+assert.ok(src.includes('const DEADLINE_GROUP_PUSH = false;'), 'the digest carries the group notice');
 
 let DB, pushes, failFor, groupTargets;
 const sentinel = (kind, v) => ({ __s: kind, v });
@@ -164,7 +165,10 @@ const context = {
     })
 };
 vm.createContext(context);
-vm.runInContext(src + '\nthis.runQuizDeadlines = runQuizDeadlines; this.scanQuizPending = scanQuizPending;', context);
+// the group bubble's own rules stay pinned with the switch on, for the day it comes back
+vm.runInContext(src.replace('DEADLINE_GROUP_PUSH = false', 'DEADLINE_GROUP_PUSH = true') + '\nthis.runQuizDeadlines = runQuizDeadlines; this.scanQuizPending = scanQuizPending;', context);
+const offContext = vm.createContext(Object.assign({}, context));
+vm.runInContext(src + '\nthis.runQuizDeadlines = runQuizDeadlines;', offContext);
 const run = ms => context.runQuizDeadlines(ms);
 
 const NOW = bkk(2026, 10, 25, 12, 0);
@@ -186,6 +190,14 @@ const fresh = (quizzes, extraUsers) => {
 const quizAt = (ms, extra) => Object.assign({ isActive: true, title: 'Asthma 1', shortTitle: 'Asthma', deadline: { toMillis: () => ms } }, extra || {});
 
 (async () => {
+    // as shipped: nothing to the group at T-24 h, the personal bubble at T-3 h still goes
+    fresh({ qa: quizAt(NOW + 20 * H) });
+    await offContext.runQuizDeadlines(NOW);
+    assert.equal(pushes.length, 0, 'no group bubble with the switch off');
+    fresh({ qa: quizAt(NOW + 2 * H) });
+    await offContext.runQuizDeadlines(NOW);
+    assert.ok(pushes.length > 0 && pushes.every(p => p.tag === 'quizDeadlineDM'), 'personal bubbles still go');
+
     // A. T-24 h: one group bubble, no names, done/total from the digest's own cohort rules
     fresh({ qa: quizAt(NOW + 20 * H) });
     let r = await run(NOW);
