@@ -5488,8 +5488,6 @@ exports.jevCheckQuiz = onCall({ secrets: ["OPENROUTER_API_KEY", "JEV_AI_API_KEY"
 
 // V102.563: Jev looks for the same content under different terms across a quiz's Read first notes. Quiz content only; admin only, on a button; answers share the Compare cache.
 exports.jevPrimerRepeats = onCall({ secrets: ["OPENROUTER_API_KEY", "JEV_AI_API_KEY"], timeoutSeconds: 300, memory: "256MiB" }, async (request) => {
-// V102.562: Jev suggests the system of waiting cases. Admin only, on a button; the server reads the cases and scrubs each note, so nothing but the scrubbed note leaves. Nothing is cached.
-exports.jevSuggestCaseSystems = onCall({ secrets: ["JEV_AI_API_KEY"], timeoutSeconds: 120, memory: "256MiB" }, async (request) => {
     requireAdminCallable(request);
     const db = admin.firestore();
     const cfg = await db.collection("quiz_dup_scores").doc("_config").get();
@@ -5517,6 +5515,14 @@ exports.jevSuggestCaseSystems = onCall({ secrets: ["JEV_AI_API_KEY"], timeoutSec
     }));
     if (out.calls) recordAiUsage(provider, jev.JEV_MODEL, out.inputTokens, true, "jev_primer_repeats", { inputTokens: out.inputTokens, outputTokens: 0 });
     return { enabled: true, repeats: out.repeats, compared: out.compared, left: out.left, errors: out.errors };
+});
+
+// V102.562: Jev suggests the system of waiting cases. Admin only, on a button; the server reads the cases and scrubs each note, so nothing but the scrubbed note leaves. Nothing is cached.
+exports.jevSuggestCaseSystems = onCall({ secrets: ["JEV_AI_API_KEY"], timeoutSeconds: 120, memory: "256MiB" }, async (request) => {
+    requireAdminCallable(request);
+    const db = admin.firestore();
+    const cfg = await db.collection("quiz_dup_scores").doc("_config").get();
+    if (cfg.exists && cfg.data().enabled === false) return { enabled: false };
     const apiKey = process.env.JEV_AI_API_KEY;
     if (!apiKey) throw new HttpsError("failed-precondition", "No API key configured for Jev");
     const sys = require("./case-system-suggest");
