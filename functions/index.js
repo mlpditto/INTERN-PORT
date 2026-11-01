@@ -5460,6 +5460,28 @@ exports.jevCheckQuiz = onCall({ secrets: ["OPENROUTER_API_KEY", "JEV_AI_API_KEY"
             await batch.commit();
         },
     });
+    // V102.561: the same fact in another quiz. Backups and hidden versions do not count; a failure here leaves the check above intact.
+    try {
+        const all = await db.collection("quizzes").select("title", "shortTitle", "questions", "isHistoryRevision", "curationBackup").get();
+        const others = all.docs.filter(d => d.id !== quizId && !d.data().isHistoryRevision && !d.data().curationBackup).map(d => ({ id: d.id, title: d.data().shortTitle || d.data().title || "Quiz", questions: d.data().questions }));
+        const found = await require("./jev-quiz-check").findRepeats(quiz.questions, others, pairs => jev.compareBatch(pairs, {
+            apiKey, provider, fetch: (url, opts) => fetch(url, opts),
+            readCache: async (keys) => {
+                const m = {};
+                for (let i = 0; i < keys.length; i += 30) {
+                    const snaps = await db.getAll(...keys.slice(i, i + 30).map(k => db.collection("quiz_dup_scores").doc(k)));
+                    snaps.forEach(sn => { if (sn.exists && typeof sn.data().sameFact === "number") m[sn.id] = sn.data(); });
+                }
+                return m;
+            },
+            writeCache: async (entries) => {
+                const batch = db.batch();
+                entries.forEach(e => batch.set(db.collection("quiz_dup_scores").doc(e.key), { sameFact: e.sameFact, sameTopic: e.sameTopic, model: e.model, at: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }));
+                await batch.commit();
+            },
+        }));
+        out.repeats = found.repeats; out.compared = found.compared;
+    } catch (e) { console.warn("[jevCheckQuiz] repeats:", e.message); out.repeatsFailed = true; }
     if (out.calls) recordAiUsage(provider, jev.JEV_MODEL, out.inputTokens, true, "jev_quiz_check", { inputTokens: out.inputTokens, outputTokens: 0 });
     return { enabled: true, ...out };
 });

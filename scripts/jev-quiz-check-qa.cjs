@@ -25,7 +25,7 @@ const ADMIN = pathToFileURL(path.resolve('public/admin.html')).href;
       const btn = () => page.evaluate(() => { document.getElementById('edit-quiz-id').value = window.__id || ''; window.jevQuizCheck.run(window.__jevBtn); });
       const box = () => page.locator('#jqc-box').innerText();
 
-      { const html = require('node:fs').readFileSync('public/admin.html', 'utf8'); assert.ok(html.includes('id="jev-quiz-check" class="review-tab" onclick="jevQuizCheck.run(this)"') && html.includes('${items}${jev}</div>'), 'V102.558: a tab beside Scorecard and Rewrites'); assert.equal(await page.locator('#jev-quiz-check').count(), 0, 'no longer in the editor toolbar'); }
+      { const html = require('node:fs').readFileSync('public/admin.html', 'utf8'); assert.ok(html.includes('id="jev-quiz-check" class="review-tab" aria-label="Jev check" onclick="jevQuizCheck.run(this)"') && html.includes('${items}${jev}</div>'), 'V102.558: a tab beside Scorecard and Rewrites'); assert.equal(await page.locator('#jev-quiz-check').count(), 0, 'no longer in the editor toolbar'); }
       await btn(); await page.waitForTimeout(50);
       assert.match(await box(), /Save the quiz first/);
       assert.equal((await page.evaluate(() => window.__calls)).length, 0, 'an unsaved quiz spends nothing');
@@ -36,7 +36,7 @@ const ADMIN = pathToFileURL(path.resolve('public/admin.html')).href;
       await btn(); await page.waitForTimeout(100);
       const t = await box();
       assert.match(t, /Korean translation is older/); assert.match(t, /Q3[\s\S]*points away from the marked answer[\s\S]*0\.05/); assert.match(t, /Q8[\s\S]*Thai translation may differ/);
-      assert.match(t, /40 checks on 15 questions · 2 without an explanation · 1 could not be checked/);
+      assert.match(t, /38 OK/); assert.match(t, /1 could not be checked/); assert.ok(!/not checked/.test(t.replace('could not be checked', '')), 'no pill for an empty list');
       assert.deepEqual((await page.evaluate(() => window.__calls)).at(-1), ['jevCheckQuiz', { quizId: 'quiz1', questions: [{ q: 'on screen', content: '', type: 'choice', options: ['a'], correct: [0], explanation: 'e' }] }], 'V102.557: the questions on screen go, unsaved edits included');
       assert.equal(await page.locator('.jqc-list .jqc-bad').count(), 2);
       assert.equal(await page.locator('.jqc-list .jqc-go').count(), 2, 'a whole-quiz note has nowhere to open');
@@ -45,6 +45,13 @@ const ADMIN = pathToFileURL(path.resolve('public/admin.html')).href;
       await page.locator('.jqc-go').first().click();
       assert.equal(await page.evaluate(() => window.__page), 2, 'Open goes to Q3'); assert.equal(await page.evaluate(() => window.__closed), 1, 'and closes the Review');
       assert.equal(await page.locator('#jqc-box').isVisible(), false);
+
+      // V102.561: skipped questions are chips, repeats come first with both stems one tap away, and skipped questions are never called clean
+      await page.evaluate(() => { window.__reply = { enabled: true, questions: 5, checked: 2, errors: 0, noExplanation: 2, unchecked: [3, 4], compared: 9, flags: [], repeats: [{ q: 1, quizId: 'b', title: 'Eye 2', otherQ: 2, score: 0.91, stem: 'first stem', otherStem: 'other stem' }] }; });
+      await btn(); await page.waitForTimeout(100);
+      { const u = await box(); assert.match(u, /2 OK/); assert.match(u, /2 not checked/); assert.match(u, /1 repeat/); assert.match(u, /Q2[\s\S]*Same fact as Eye 2 Q3[\s\S]*0\.91/); assert.match(u, /Compared 9 likely pairs/); assert.ok(!/Nothing to look at/.test(u)); }
+      assert.equal(await page.locator('.jqc-pair').isVisible(), false); await page.click('.jqc-cmp'); assert.match(await page.locator('.jqc-pair').innerText(), /first stem[\s\S]*other stem/);
+      await page.locator('.jqc-qs .jqc-go').nth(1).click(); assert.equal(await page.evaluate(() => window.__page), 4, 'a chip opens that question');
 
       await page.evaluate(() => { window.__reply = { enabled: true, questions: 5, checked: 5, errors: 0, noExplanation: 0, flags: [] }; });
       await btn(); await page.waitForTimeout(100);
