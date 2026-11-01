@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.555)</title>
+    <title>Nika Admin (V102.556)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -32141,6 +32141,7 @@ ${qs}`;
             const ta = document.getElementById('rv-writeup-text'), btn = document.getElementById('rv-writeup-send'), note = document.getElementById('rv-writeup-note');
             const text = ta ? ta.value.trim() : '';
             if (!text) return alert('Nothing to send — draft or write the review first.');
+            const copied = Promise.resolve().then(() => navigator.clipboard.writeText(text)).then(() => true, () => false);   // V102.556: Send also copies; asked here, while the click still counts
             if (btn) btn.disabled = true;
             try {
                 await db.collection('quiz_attempts').doc(attemptId).update({
@@ -32152,7 +32153,7 @@ ${qs}`;
                 const s = window._rvWriteup;
                 if (s) { s.sent = text; s.sentAt = Date.now(); try { localStorage.removeItem('rv_draft_' + s.id); } catch (e) { /* the draft only stays */ } }
                 rvWriteupGuide(4);
-                showToast('📰 Personal review sent');
+                showToast(await copied ? '📰 Sent and copied' : '📰 Sent · not copied');
             } catch (e) {
                 alert('Send failed: ' + ((e && e.message) || e));
             } finally { if (btn) btn.disabled = false; rvWriteupStatus(); }
