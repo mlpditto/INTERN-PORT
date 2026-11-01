@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.565)</title>
+    <title>Nika Admin (V102.566)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -8513,6 +8513,8 @@
     <link rel="stylesheet" href="jev-quiz-check.css?v=V102.561">
     <link rel="stylesheet" href="jev-primer-repeats.css?v=V102.563">
     <script src="jev-primer-repeats.js?v=V102.563"></script>
+    <link rel="stylesheet" href="case-card-multi.css?v=V102.566">
+    <script src="case-card-multi.js?v=V102.566"></script>
     <link rel="stylesheet" href="quiz-compact-toolbar.css?v=V102.406">
     <script src="taxonomy.js?v=V94.55"></script>
     <!-- V91.84: cache-busting on case-taxonomy.js so browser refetches when shim changes (script URL is otherwise constant) -->
@@ -13500,6 +13502,18 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
              casesData listeners / action handlers all keep working. -->
         <div id="tab-alabasta" class="tab-content">
             <!-- V92.64 Phase 2a: Inbox section — surfaces pending cases (LIFF submissions awaiting admin review) above the existing Cases repository. Same casesData global, just filtered to status==='pending' && !isArchived. -->
+                <!-- V91.91: Bulk action toolbar — visible only when ≥1 case is selected via row checkboxes -->
+                <div id="alabasta-bulk-toolbar" class="alabasta-bulk-toolbar" style="display:none;" aria-label="Bulk actions for selected cases">
+                    <span class="alabasta-bulk-count">
+                        <i class="fa-solid fa-square-check"></i>
+                        <b id="alabasta-bulk-count-num">0</b> selected · 선택됨
+                    </span>
+                    <span class="alabasta-bulk-spacer"></span>
+                    <button type="button" id="alabasta-bulk-cards" class="alabasta-bulk-btn ccm-open" onclick="caseCardMulti.open()">🖼 Cards</button>
+                    <button type="button" class="alabasta-bulk-btn is-review" onclick="bulkAlabastaReview()">✅ Bulk Review · 일괄 검토</button>
+                    <button type="button" class="alabasta-bulk-btn is-delete" onclick="bulkAlabastaDelete()">🗑️ Bulk Delete · 일괄 삭제</button>
+                    <button type="button" class="alabasta-bulk-btn is-clear" onclick="clearAlabastaSelection()">✕ Clear · 해제</button>
+                </div>
             <!-- Alabasta lean (Phase 2): the Inbox card folds into one banner. Collapsed by default; the compact
                  cards open under it. Ids kept (alabasta-inbox-container/-empty/-count) for renderAlabastaInbox(). -->
             <div id="alabasta-inbox-section" class="alabasta-inbox-bar is-empty" style="margin-top:18px;">
@@ -13661,17 +13675,6 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
                     </div>
                 </div>
                 <div id="alabasta-case-pane">
-                <!-- V91.91: Bulk action toolbar — visible only when ≥1 case is selected via row checkboxes -->
-                <div id="alabasta-bulk-toolbar" class="alabasta-bulk-toolbar" style="display:none;" aria-label="Bulk actions for selected cases">
-                    <span class="alabasta-bulk-count">
-                        <i class="fa-solid fa-square-check"></i>
-                        <b id="alabasta-bulk-count-num">0</b> selected · 선택됨
-                    </span>
-                    <span class="alabasta-bulk-spacer"></span>
-                    <button type="button" class="alabasta-bulk-btn is-review" onclick="bulkAlabastaReview()">✅ Bulk Review · 일괄 검토</button>
-                    <button type="button" class="alabasta-bulk-btn is-delete" onclick="bulkAlabastaDelete()">🗑️ Bulk Delete · 일괄 삭제</button>
-                    <button type="button" class="alabasta-bulk-btn is-clear" onclick="clearAlabastaSelection()">✕ Clear · 해제</button>
-                </div>
                 <div style="overflow-x:auto;">
                     <table id="alabastaCaseTable" class="admin-table">
                         <thead>
@@ -43147,6 +43150,8 @@ They can connect again from LINE.
             const n = window.alabastaSelectedIds.size;
             if (num) num.textContent = String(n);
             bar.style.display = n > 0 ? 'flex' : 'none';
+            const cardsBtn = document.getElementById('alabasta-bulk-cards');
+            if (cardsBtn) cardsBtn.textContent = '🖼 Cards (' + n + ')';
         }
 
         function syncAlabastaSelectAllCheckbox() {
@@ -45241,6 +45246,27 @@ They can connect again from LINE.
             return String((document.getElementById('alabasta-case-card-dispensed') || {}).value || '').replace(/["\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
         }
 
+        // V102.409: "GI 소화기 - Abdominal Pain, Diarrhea" → system "GI" + tags; the poster's title / subtitle are English only
+        // V102.564: apart from the modal's inputs, so several cards can be made at once
+        function alabastaCaseCardPromptFor(safeSummary, taxonomyLabel, consent, dispensed) {
+            const cutAt = taxonomyLabel.indexOf(' - ');
+            const systemEn = alabastaEnglishOnly(cutAt < 0 ? taxonomyLabel : taxonomyLabel.slice(0, cutAt));
+            const tagsEn = (cutAt < 0 ? [] : taxonomyLabel.slice(cutAt + 3).split(',')).map(alabastaEnglishOnly).filter(Boolean);
+            const payload = {
+                primarySystemLabel: systemEn || 'General medicine',
+                symptomTags: tagsEn,
+                safeSummary,
+                allowDetails: consent,
+                textContent: {
+                    title: systemEn && systemEn !== 'Other' ? `${systemEn} Case Brief` : 'Medical Case Brief',
+                    subtitle: tagsEn.slice(0, 3).join(' / ')
+                }
+            };
+            let prompt = buildAlabastaCaseCardPrompt(payload);
+            if (dispensed) prompt += '\n\n### DISPENSED MEDICINE ###\nShow exactly one clearly labelled line "Dispensed: ' + dispensed + '" (for example inside the recommendations area or as a small footer chip). Use this generic drug name as written; no brand, no price, no pharmacy name, and no dose advice beyond it.';
+            return prompt;
+        }
+
         async function rebuildAlabastaCaseCardPromptFromInputs(options = {}) {
             const safeSummaryEl = document.getElementById('alabasta-case-card-safe-summary');
             const taxonomyEl = document.getElementById('alabasta-case-card-taxonomy');
@@ -45257,29 +45283,11 @@ They can connect again from LINE.
             const consent = !!(document.getElementById('alabasta-case-card-consent') || {}).checked;   // V102.414
             const englishSummary = await translateAlabastaSummaryToEnglish(currentSummary, taxonomyLabel, consent);
             if (englishSummary) { safeSummaryEl.value = englishSummary; safeSummaryEl.dataset.auto = englishSummary; }
-            // V102.409: "GI 소화기 - Abdominal Pain, Diarrhea" → system "GI" + tags; the poster's title / subtitle are English only
-            const cutAt = taxonomyLabel.indexOf(' - ');
-            const systemEn = alabastaEnglishOnly(cutAt < 0 ? taxonomyLabel : taxonomyLabel.slice(0, cutAt));
-            const tagsEn = (cutAt < 0 ? [] : taxonomyLabel.slice(cutAt + 3).split(',')).map(alabastaEnglishOnly).filter(Boolean);
-            const payload = {
-                primarySystemLabel: systemEn || 'General medicine',
-                symptomTags: tagsEn,
-                safeSummary: englishSummary || currentSummary,
-                allowDetails: consent,
-                textContent: {
-                    title: systemEn && systemEn !== 'Other' ? `${systemEn} Case Brief` : 'Medical Case Brief',
-                    subtitle: tagsEn.slice(0, 3).join(' / ')
-                }
-            };
-            let prompt = buildAlabastaCaseCardPrompt(payload);
-            const dispensed = alabastaCaseCardDispensed();   // V102.438
-            if (dispensed) prompt += '\n\n### DISPENSED MEDICINE ###\nShow exactly one clearly labelled line "Dispensed: ' + dispensed + '" (for example inside the recommendations area or as a small footer chip). Use this generic drug name as written; no brand, no price, no pharmacy name, and no dose advice beyond it.';
+            const prompt = alabastaCaseCardPromptFor(englishSummary || currentSummary, taxonomyLabel, consent, alabastaCaseCardDispensed());
             promptEl.value = prompt;
             if (metaEl && !options.quiet) metaEl.textContent = 'Ready — review the summary, pick a model, then generate.';
             return prompt;
         }
-
-
         async function refineAlabastaCaseCardPromptWithSelectedModel() {
             const modelSelect = document.getElementById('alabasta-case-card-refine-model');
             const modelName = modelSelect ? modelSelect.value : 'claude-3-5-sonnet-latest';
@@ -45804,52 +45812,8 @@ They can connect again from LINE.
                 setAlabastaCaseCardImageLoadingState(true, modelLabelMap[selectedModel] || selectedModel);
                 if (metaEl) metaEl.textContent = '';   // V102.446: the pill + caption under the image already say it
 
-                const imageResponse = await window.callUniversalAI(
-                    selectedModel,
-                    prompt,
-                    false,
-                    null,
-                    '',
-                    /^or\/x-ai\/grok-imagine/.test(selectedModel)
-                        ? { feature: 'casecard_image', imageApi: true, aspectRatio: _CASECARD_WIDE.includes(getCaseCardLayout()) ? '16:9' : '4:3', maxOutputTokens: 1024 }   // V102.409: the Image API, landscape (16:9 for the wide templates)
-                        : { size: '1024x1024', feature: 'casecard_image' }
-                );
-                const { model } = imageResponse || {};
-                const rawImage = imageResponse?.text
-                    || imageResponse?.imageDataUrl
-                    || imageResponse?.dataUrl
-                    || imageResponse?.raw?.imageDataUrl
-                    || imageResponse?.raw?.dataUrl
-                    || imageResponse?.raw?.text
-                    || imageResponse?.raw?.data?.[0]?.url
-                    || imageResponse?.raw?.data?.[0]?.b64_json
-                    || '';
-                const imageDataUrl = String(rawImage).startsWith('data:image/')
-                    ? String(rawImage)
-                    : (String(rawImage).length > 100 ? `data:image/png;base64,${rawImage}` : '');
-
-                if (!imageDataUrl) {
-                    throw new Error('Image response not returned as a valid data URL');
-                }
-
-                // V94.32: if HTML overlay mode is selected, composite the AI
-                // illustration with real-font disease/system/tags via html2canvas
-                // before showing/downloading. Falls back to the raw AI image on
-                // composite failure so a single broken render doesn't lose the
-                // generated illustration.
-                let finalDataUrl = imageDataUrl;
-                let compositedNote = '';
-                if (compositeMode === 'html-overlay') {
-                    try {
-                        if (metaEl) metaEl.textContent = 'Compositing with HTML overlay...';
-                        finalDataUrl = await _renderCaseCardHtmlComposite(imageDataUrl, caseItem);
-                        compositedNote = ' · composited';
-                    } catch (compErr) {
-                        console.warn('[V94.32] HTML composite failed, falling back to raw AI image:', compErr);
-                        if (typeof showToast === 'function') showToast('⚠ HTML overlay composite failed — showing raw AI image');
-                        finalDataUrl = imageDataUrl;
-                    }
-                }
+                const made = await alabastaCaseCardMakeImage(caseItem, prompt, selectedModel, compositeMode, metaEl);
+                const { imageResponse, model, finalDataUrl, compositedNote } = made;
 
                 if (imageEl) imageEl.src = finalDataUrl;
                 const stampedUrl = await stampCaseIdOnImage(finalDataUrl, caseItem.caseId);
@@ -45909,6 +45873,57 @@ They can connect again from LINE.
                     genBtn.innerHTML = originalHtml || '<i class="fa-solid fa-image"></i> GenMage';
                 }
             }
+        }
+
+        // V102.564: one image for a case: the AI call, the optional HTML overlay. No modal in here, so the multi sheet uses it too.
+        async function alabastaCaseCardMakeImage(caseItem, prompt, selectedModel, compositeMode, metaEl) {
+            const imageResponse = await window.callUniversalAI(
+                selectedModel,
+                prompt,
+                false,
+                null,
+                '',
+                /^or\/x-ai\/grok-imagine/.test(selectedModel)
+                    ? { feature: 'casecard_image', imageApi: true, aspectRatio: _CASECARD_WIDE.includes(getCaseCardLayout()) ? '16:9' : '4:3', maxOutputTokens: 1024 }   // V102.409: the Image API, landscape (16:9 for the wide templates)
+                    : { size: '1024x1024', feature: 'casecard_image' }
+            );
+            const { model } = imageResponse || {};
+            const rawImage = imageResponse?.text
+                || imageResponse?.imageDataUrl
+                || imageResponse?.dataUrl
+                || imageResponse?.raw?.imageDataUrl
+                || imageResponse?.raw?.dataUrl
+                || imageResponse?.raw?.text
+                || imageResponse?.raw?.data?.[0]?.url
+                || imageResponse?.raw?.data?.[0]?.b64_json
+                || '';
+            const imageDataUrl = String(rawImage).startsWith('data:image/')
+                ? String(rawImage)
+                : (String(rawImage).length > 100 ? `data:image/png;base64,${rawImage}` : '');
+
+            if (!imageDataUrl) {
+                throw new Error('Image response not returned as a valid data URL');
+            }
+
+            // V94.32: if HTML overlay mode is selected, composite the AI
+            // illustration with real-font disease/system/tags via html2canvas
+            // before showing/downloading. Falls back to the raw AI image on
+            // composite failure so a single broken render doesn't lose the
+            // generated illustration.
+            let finalDataUrl = imageDataUrl;
+            let compositedNote = '';
+            if (compositeMode === 'html-overlay') {
+                try {
+                    if (metaEl) metaEl.textContent = 'Compositing with HTML overlay...';
+                    finalDataUrl = await _renderCaseCardHtmlComposite(imageDataUrl, caseItem);
+                    compositedNote = ' · composited';
+                } catch (compErr) {
+                    console.warn('[V94.32] HTML composite failed, falling back to raw AI image:', compErr);
+                    if (typeof showToast === 'function') showToast('⚠ HTML overlay composite failed — showing raw AI image');
+                    finalDataUrl = imageDataUrl;
+                }
+            }
+            return { imageResponse, model, finalDataUrl, compositedNote };
         }
 
         function buildAlabastaPoneglyphDraft(caseItem) {
