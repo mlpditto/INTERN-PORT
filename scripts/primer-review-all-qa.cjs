@@ -130,10 +130,10 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
             const after = await page.evaluate(() => ({ rows: [...new Set([...document.querySelectorAll('#quizManageModal .q-primer-model')].map(i => i.value))], stored: localStorage.getItem('ai_primer_model'), rail: document.getElementById('pra-model-pick').value }));
             assert.deepEqual(after, { rows: [next], stored: next, rail: next }, 'one pick everywhere: ' + JSON.stringify(after));
         }
-        assert.match((await page.locator('#praOverlay .pra-sum').innerText()).replace(/\s+/g, ' '), /4 Q · ⚪ none yet$/, 'the header says so instead of zeros');
-        assert.equal(await page.locator('#praOverlay .pra-chip[data-f="dup"]').isDisabled(), true, 'Repeated only is disabled');
-        assert.equal((await page.locator('#praOverlay .pra-none-t').innerText()).trim(), '📖 No Read first yet');
-        assert.equal((await page.locator('#praOverlay .pra-none .pra-all').innerText()).trim(), '✨ All · 4');
+        assert.equal((await page.locator('#praOverlay .pra-sum').innerText()).trim(), '4 Q', 'V102.555: one row, the count alone');
+        assert.equal(await page.locator('#praOverlay .pra-chip[data-f]').count(), 0, 'no filters with nothing to filter');
+        assert.equal(await page.locator('#praOverlay .pra-hd').count(), 1, 'one row: no second header and no box'); assert.equal(await page.locator('#praOverlay .pra-body').isVisible(), false, 'the empty body takes no room');
+        assert.equal((await page.locator('#praOverlay .pra-none .pra-all').innerText()).trim(), '4'); assert.equal(await page.locator('#praOverlay .pra-none .pra-all').getAttribute('aria-label'), 'Draft all 4 questions');
         await page.locator('#praOverlay .pra-none .pra-all').evaluate(b => b.click());
         assert.equal(await page.locator('#praOverlay').count(), 1, 'V102.524: the popup stays open'); assert.equal(await page.evaluate(() => window.__all), 'pra-all', 'and ✨ All runs on the popup\'s own button');
         await page.evaluate(() => { _qPrimerReviewAll(); }); await page.locator('#praOverlay .pra-none .pra-chip').evaluate(b => b.click()); assert.equal(await page.locator('#praOverlay').count(), 0, '✎ Write by hand closes');
