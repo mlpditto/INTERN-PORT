@@ -9,7 +9,7 @@ Admin: Assignments ▸ Quiz Engine.
 ## Scripts that drive it
 
 - `quiz-row-lean-qa` — row = title + badges, icon chips line, actions
-- `quiz-deadline-check` — LINE deadline alerts (`notifyQuizDeadlines`): T-24 h group bubble, T-3 h personal bubble to interns who have not submitted, quiet hours 22:00–07:00, idempotent markers, daily cap, quota guard, truthful Beri line; the digest shares `scanQuizPending`
+- `quiz-deadline-check` — LINE deadline alerts (`notifyQuizDeadlines`): T-3 h personal bubble to interns who have not submitted (the T-24 h group bubble is off, the 23:00 digest carries it), quiet hours 22:00–07:00, idempotent markers, daily cap, quota guard, truthful Beri line; the digest shares `scanQuizPending`
 - `quiz-chips-fit-qa` — chips fold into "+n" only when the line has no room
 - `quiz-tools-rail-qa` — row tools as one icon grid > 1100 px, ⋯ below
 - `quiz-list-phone-qa` — phone rows are cards; desktop one card + header

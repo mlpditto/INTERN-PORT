@@ -38,8 +38,9 @@ Open **Mission ▸ Quiz**. Each card is one quiz with its **deadline** — the s
 - 📰 **Personal review** — the admin may send a review of your wrong answers. It appears on the quiz result and in **History**; highlights mark what to get right
 
 **Daily Quiz Digest (LINE group)**
-The bot posts a **Daily Quiz Digest** in the intern LINE group at **16:00**:
+The bot posts a **Daily Quiz Digest** in the intern LINE group at **23:00**:
 - ✅ **Done today** — what was submitted since yesterday
+- 🩺 **New cases** — who sent a new case in the last 24 hours
 - ⏳ **Due soon** — quizzes still pending and when they close
 - Tap **Open quizzes** to jump straight to the Quiz tab
 
