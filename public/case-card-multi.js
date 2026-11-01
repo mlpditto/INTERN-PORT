@@ -14,7 +14,7 @@
         return ids.map(id => getAlabastaCaseById(id)).filter(Boolean).map(c => {
             const short = String(c.note || '').trim().length < MIN_NOTE, hn = String(c.caseId || '').trim(), dup = !!hn && seen.has(hn), has = !!(c.caseCardImage && c.caseCardImage.downloadUrl);
             if (hn) seen.add(hn);
-            const warn = short ? 'Note is short: add detail here or leave it out' : dup ? 'Same HN as a case above' : has ? 'Already has a card' : '';
+            const warn = short ? ['Short note', 'Add detail here or leave it out'] : dup ? ['Same HN', 'Same HN as a case above'] : has ? ['Has card', 'This case already has a card'] : null;
             const pay = buildSafeAlabastaCaseVisualPayload(c);
             return { c, on: !warn, warn, taxonomy: pay.taxonomySummary, summary: pay.safeSummary.replace(SCRUB_LEAD, ''), english: false, state: 'idle', error: '', url: '', cost: null };
         });
@@ -23,9 +23,10 @@
 
     async function translate(r) {
         if (r.english || !r.summary.trim()) return;
-        r.translating = true;
+        const mark = on => { r.translating = on; const el = document.querySelector('.ccm-row[data-i="' + rows.indexOf(r) + '"]'); if (el) el.classList.toggle('is-tr', on); };
+        mark(true);
         const from = r.summary, en = await translateAlabastaSummaryToEnglish(from, r.taxonomy, consentOf(r));
-        r.translating = false;
+        mark(false);
         if (r.summary !== from) return;   // the admin typed meanwhile: their words stay
         r.summary = en || from; r.english = true;
         const ta = document.querySelector('.ccm-row[data-i="' + rows.indexOf(r) + '"] textarea');
@@ -41,25 +42,30 @@
     const chips = (list, on, fn) => list.map(([v, t]) => `<button type="button" class="ccm-chip" aria-pressed="${v === on}" onclick="caseCardMulti.${fn}('${esc(v)}')">${esc(t)}</button>`).join('');
     function head() {
         const done = rows.filter(r => r.state === 'done').length, failed = rows.filter(r => r.state === 'failed').length, picked = rows.filter(r => r.on).length, wait = rows.filter(r => r.on && r.state !== 'done').length, left = rows.filter(r => r.on && r.state === 'idle').length;
+        const retryAll = !busy && failed >= 2 ? '<button type="button" class="ccm-ghost" onclick="caseCardMulti.retryFailed()">↻ Retry failed</button>' : '';
         const action = busy ? `<span class="ccm-count">${done + failed} of ${picked}</span><button type="button" class="ccm-ghost" onclick="caseCardMulti.halt()"${stop ? ' disabled' : ''}>${stop ? 'Stopping…' : 'Stop'}</button>`
-            : done || failed ? `<span class="ccm-count">${done} ready${failed ? ' · ' + failed + ' failed' : ''}</span>${left ? '<button type="button" class="ccm-go" onclick="caseCardMulti.run()">Generate ' + left + '</button>' : ''}${done ? '<button type="button" class="ccm-go" onclick="caseCardMulti.zip(this)">⬇ ZIP (' + done + ')</button>' : ''}`
-                : `<button type="button" class="ccm-go" onclick="caseCardMulti.run()"${wait ? '' : ' disabled'}>Generate ${wait} card${wait === 1 ? '' : 's'}</button>`;
+            : done || failed ? `<span class="ccm-count">${done} ready${failed ? ' · ' + failed + ' failed' : ''}</span>${retryAll}${left ? '<button type="button" class="ccm-go" onclick="caseCardMulti.run()">Generate ' + left + '</button>' : ''}${done ? '<button type="button" class="ccm-go" onclick="caseCardMulti.zip(this)">⬇ ZIP (' + done + ')</button>' : ''}`
+                : wait ? `<button type="button" class="ccm-go" onclick="caseCardMulti.run()">Generate ${wait} card${wait === 1 ? '' : 's'}</button>`
+                    : '<span class="ccm-count">Select at least 1 case</span><button type="button" class="ccm-go" disabled>Generate</button>';
         return `<div class="ccm-hd"><b>Case cards</b><span class="ccm-acts">${action}<button type="button" class="ccm-x" onclick="caseCardMulti.close()" aria-label="Close"${busy ? ' disabled' : ''}>✕</button></span></div>` +
-            (busy || done || failed ? '' : `<div class="ccm-rail">${chips(MODELS, model, 'pickModel')}</div><div class="ccm-rail">${chips(LAYOUTS, getCaseCardLayout(), 'pickLayout')}</div>`);
+            (busy ? `<div class="ccm-bar"><span style="width:${picked ? Math.round((done + failed) / picked * 100) : 0}%"></span></div>` : done || failed ? ''
+                : `<div class="ccm-rail">${chips(MODELS, model, 'pickModel')}</div><div class="ccm-rail">${chips(LAYOUTS, getCaseCardLayout(), 'pickLayout')}</div><label class="ccm-all"><input type="checkbox" id="ccm-all" onchange="caseCardMulti.all(this.checked)" aria-label="Select all"> ${picked} of ${rows.length} selected</label>`);
     }
     function rowHtml(r, i) {
         const c = r.c, hn = `<i>${esc(c.caseId || '—')}</i>`, sys = esc(alabastaEnglishOnly(c.diseaseSystemLabel || '') || 'Other');
-        if (r.state === 'idle') return `<div class="ccm-row${r.warn ? ' warn' : ''}" data-i="${i}"><input type="checkbox" ${r.on ? 'checked' : ''} onchange="caseCardMulti.tick(${i}, this.checked)" aria-label="Include ${esc(c.caseId || '')}"><div class="ccm-txt"><b>${hn} ${sys}</b>${r.warn ? `<small>⚠️ ${esc(r.warn)}</small>` : ''}<textarea rows="2" oninput="caseCardMulti.edit(${i}, this.value)" aria-label="Summary">${esc(r.summary)}</textarea></div></div>`;
-        if (r.state === 'done') return `<div class="ccm-res ok"><img src="${esc(r.url)}" alt="Case card ${esc(c.caseId || '')}"><small>${hn} ✓ ${r.saved === false ? 'Gallery save failed' : 'Saved'} <a href="${esc(r.url)}" download="${esc(fileOf(c))}">⬇ PNG</a></small></div>`;
+        if (r.state === 'idle') return `<div class="ccm-row${r.translating ? ' is-tr' : ''}" data-i="${i}"><input type="checkbox" ${r.on ? 'checked' : ''} onchange="caseCardMulti.tick(${i}, this.checked)" aria-label="Include ${esc(c.caseId || '')}"><div class="ccm-txt"><b>${hn} ${sys}${r.warn ? ` <button type="button" class="ccm-flag" title="${esc(r.warn[1])}" onclick="showToast(this.title)">${esc(r.warn[0])}</button>` : ''}<span class="ccm-tr" title="Translating"></span></b><textarea rows="2" oninput="caseCardMulti.edit(${i}, this.value)" aria-label="Summary">${esc(r.summary)}</textarea></div></div>`;
+        if (r.state === 'done') return `<div class="ccm-res ok"><img src="${esc(r.url)}" alt="Case card ${esc(c.caseId || '')}" onclick="caseCardMulti.zoom(${i})"><small>${hn} ✓ ${r.saved === false ? 'Gallery save failed' : 'Saved'} <a href="${esc(r.url)}" download="${esc(fileOf(c))}">⬇ PNG</a><button type="button" class="ccm-re" onclick="caseCardMulti.again(${i})" title="Make this card again" aria-label="Regenerate ${esc(c.caseId || '')}"${busy ? ' disabled' : ''}>↻</button></small></div>`;
         if (r.state === 'failed') return `<div class="ccm-res bad"><small>${hn} ✕ ${esc(r.error)}</small><button type="button" class="ccm-ghost" onclick="caseCardMulti.retry(${i})"${busy ? ' disabled' : ''}>↻ Retry</button></div>`;
-        return `<div class="ccm-row"><span class="ccm-s">${r.state === 'running' ? '⟳' : '·'}</span><div class="ccm-txt"><b>${hn} ${sys}</b><p>${esc(r.summary)}</p></div></div>`;
+        return `<div class="ccm-row"><span class="ccm-s">${r.state === 'running' ? '⟳' : '·'}</span><div class="ccm-txt"><b>${hn} ${sys}</b></div></div>`;
     }
     const fileOf = c => (c.caseId ? 'case-' + String(c.caseId).replace(/[^\w.-]+/g, '_') : 'case-' + c.id) + '.png';
     function draw() {
         const box = $('ccm-sheet');
         if (!box) return;
         const shown = rows.map((r, i) => [r, i]).filter(([r]) => !ran || r.on);
-        box.innerHTML = head() + `<div class="ccm-body${shown.every(([r]) => r.state === 'done' || r.state === 'failed') ? ' grid' : ''}">${shown.map(([r, i]) => rowHtml(r, i)).join('')}</div>`;
+        box.innerHTML = head() + `<div class="ccm-body${shown.length && shown.every(([r]) => r.state === 'done' || r.state === 'failed') ? ' grid' : ''}">${shown.map(([r, i]) => rowHtml(r, i)).join('')}</div>`;
+        const all = $('ccm-all'), n = rows.filter(r => r.on).length;
+        if (all) { all.checked = n === rows.length; all.indeterminate = n > 0 && n < rows.length; }
     }
 
     function open() {
@@ -116,6 +122,15 @@
         draw();
     }
 
+    function zoom(i) {
+        const r = rows[i], ov = document.createElement('div');
+        ov.id = 'ccm-zoom';
+        ov.innerHTML = `<div class="ccm-zb"><img src="${esc(r.url)}" alt="Case card ${esc(r.c.caseId || '')}"><span><button type="button" class="ccm-ghost" onclick="caseCardMulti.again(${i})">↻ Regenerate</button><a class="ccm-go" href="${esc(r.url)}" download="${esc(fileOf(r.c))}">⬇ PNG</a><button type="button" class="ccm-ghost" onclick="caseCardMulti.unzoom()">Close</button></span></div>`;
+        ov.addEventListener('click', e => { if (e.target === ov) unzoom(); });
+        document.body.appendChild(ov);
+    }
+    function unzoom() { const ov = $('ccm-zoom'); if (ov) ov.remove(); }
+
     async function zip(btn) {
         btn.disabled = true;
         try {
@@ -134,11 +149,15 @@
     window.caseCardMulti = {
         open, close, zip,
         tick(i, on) { const r = rows[i]; r.on = on; draw(); if (on) translate(r); },
+        all(on) { rows.forEach(r => { r.on = on; }); draw(); if (on) pool(rows.slice(), WORKERS, translate); },
+        zoom, unzoom,
         edit(i, v) { rows[i].summary = v; rows[i].english = true; },
         pickModel(m) { model = m; try { localStorage.setItem(prefKey(), m); } catch (e) { /* this sheet still uses it */ } draw(); },
         pickLayout(l) { selectCaseCardLayout(l); draw(); },
         run() { runList(rows.filter(r => r.on && r.state !== 'done')); },
         retry(i) { runList([rows[i]]); },
+        retryFailed() { runList(rows.filter(r => r.state === 'failed')); },
+        again(i) { unzoom(); rows[i].state = 'idle'; runList([rows[i]]); },
         halt() { stop = true; draw(); },
     };
 })();
