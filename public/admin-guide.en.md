@@ -142,6 +142,10 @@ The **Admin Portal** page has 3 ways in — use any one:
 
 ---
 
+### Several Case Cards at once
+
+In 🏜️ **Alabasta**, tick the cases and press **🖼 Cards**. Check each summary, untick what is not ready, then press **Generate**. A failed card can be retried on its own; every card goes to the Codex Gallery.
+
 ## 6. 🧠 Jev — the AI helper
 
 **Jev** is a small AI that answers short questions such as “do these two questions test the same fact?” or “which category is this shop?”. You can always recognise it by its **logo (a dark square with a teal J)** and the dark + teal colours.
