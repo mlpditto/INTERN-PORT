@@ -49,7 +49,21 @@ assert.ok(/async function generateAlabastaCaseCardImage[\s\S]{0,5000}await alaba
             assert.deepEqual(await rows.evaluateAll(r => r.map(x => x.querySelector('input').checked)), [true, true, false, false, false], 'short note, same HN and existing card start unticked');
             assert.equal(await page.evaluate(() => window.__tr.length), 2, 'only ticked rows are translated');
             assert.equal(await page.evaluate(() => window.__tr[1]), true, 'each case keeps its own consent');
-            assert.ok((await rows.nth(2).innerText()).includes('Note is short'));
+            assert.ok((await rows.nth(2).innerText()).includes('Short note') && (await rows.nth(3).innerText()).includes('Same HN') && (await rows.nth(4).innerText()).includes('Has card'), 'a small chip, no banner');
+            assert.equal(await page.locator('.ccm-row.warn').count(), 0);
+            assert.equal(await page.locator('.ccm-all').innerText(), '2 of 5 selected');
+            assert.equal(await page.locator('#ccm-all').evaluate(e => e.indeterminate), true);
+            await page.locator('#ccm-all').check({ force: true });   // a mixed box ticks all first
+            await page.locator('#ccm-all').uncheck({ force: true });
+            assert.equal(await page.locator('.ccm-count').innerText(), 'Select at least 1 case');
+            assert.equal(await page.locator('.ccm-go').isDisabled(), true);
+            await page.locator('#ccm-all').check({ force: true });
+            await page.waitForFunction(() => document.querySelector('.ccm-go').textContent === 'Generate 5 cards');
+            await page.locator('.ccm-row input').nth(2).uncheck(); await page.locator('.ccm-row input').nth(3).uncheck(); await page.locator('.ccm-row input').nth(4).uncheck();
+            const box = page.locator('.ccm-row textarea').first(), h0 = (await box.boundingBox()).height;
+            await box.focus();
+            await page.waitForTimeout(50);
+            assert.ok((await box.boundingBox()).height > h0, 'the box opens while editing');
             assert.equal(await page.locator('.ccm-go').innerText(), 'Generate 2 cards');
             assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no side scroll');
 
@@ -72,6 +86,10 @@ assert.ok(/async function generateAlabastaCaseCardImage[\s\S]{0,5000}await alaba
             await page.click('.ccm-res.bad .ccm-ghost');
             await page.waitForFunction(() => document.querySelectorAll('.ccm-res.ok').length === 2);
             assert.equal(await page.evaluate(() => window.__made.filter(m => m.id === 'a').length), 1, 'Retry makes only the failed card');
+            await page.locator('.ccm-res.ok img').first().click();
+            await page.click('#ccm-zoom .ccm-ghost');
+            await page.waitForFunction(() => !document.getElementById('ccm-zoom') && document.querySelectorAll('.ccm-res.ok').length === 2 && window.__active === 0);
+            assert.equal(await page.evaluate(() => window.__made.length), 4, 'Regenerate makes that one card again');
             await page.click('.ccm-x');
             assert.equal(await page.evaluate(() => !!window.__cleared && !document.getElementById('ccm-overlay')), true);
 
@@ -84,12 +102,25 @@ assert.ok(/async function generateAlabastaCaseCardImage[\s\S]{0,5000}await alaba
             });
             await page.click('.ccm-go');
             await page.waitForFunction(() => window.__active === 2);
+            assert.equal(await page.locator('.ccm-bar').count(), 1, 'a thin bar while it runs');
+            assert.equal(await page.locator('.ccm-txt p').count(), 0, 'rows show status only');
             await page.click('.ccm-ghost');
             await page.evaluate(() => window.__go());
             await page.waitForFunction(() => window.__active === 0 && !!document.querySelector('.ccm-go, .ccm-count') && !document.querySelector('.ccm-ghost[disabled]'));
             await page.waitForTimeout(100);
             assert.equal(await page.evaluate(() => window.__peak), 2, 'never over two');
             assert.equal(await page.evaluate(() => window.__made.length), 2, 'Stop starts nothing new');
+            await page.evaluate(() => { caseCardMulti.halt(); window.__gate = null; window.__failOnce = new Set(['n0', 'n1']); });
+            await page.evaluate(() => caseCardMulti.close());
+            await page.evaluate(() => { window.__made = []; caseCardMulti.open(); });
+            await page.locator('#ccm-all').uncheck({ force: true });
+            await page.locator('.ccm-row input').nth(0).check(); await page.locator('.ccm-row input').nth(1).check();
+            await page.click('.ccm-go');
+            await page.waitForFunction(() => document.querySelectorAll('.ccm-res.bad').length === 2);
+            await page.click('text=Retry failed');
+            await page.waitForFunction(() => document.querySelectorAll('.ccm-res.ok').length === 2);
+            assert.equal(await page.evaluate(() => window.__made.length), 4, 'Retry failed makes both again');
+            assert.equal(await page.locator('text=Retry failed').count(), 0);
             assert.deepEqual(errs, []);
             await page.close();
         }
