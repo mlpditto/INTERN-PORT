@@ -689,8 +689,7 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
             db.collection('quiz_attempts').where('quizId', '==', ref.id).get({ source: 'server' }),
             db.collection('exam_sessions').where('examId', '==', ref.id).get({ source: 'server' })
         ]);
-        if (split && (!attempts.empty || !sessions.empty)) throw new Error('This quiz has attempts or exam sessions. Use Save as new quiz to preserve its history.');
-        const history = [...attempts.docs, ...sessions.docs].filter(doc => !doc.data().quizRevisionId);
+        const history = [...attempts.docs, ...sessions.docs].filter(doc => !doc.data().quizRevisionId);   // V102.556 (owner): a split keeps them the way Remove does, on the Before Split version
         if (history.length > 450) throw new Error('This quiz has too many history records for one atomic removal. No changes saved.');
         if (!unchanged(s)) { s.stale = true; throw new Error('The editor changed since Curate opened. Select ↻ Use latest questions.'); }
         const removed = s.source.form.questions.map((_, i) => i + 1).filter(id => !s.keep.has(id));
@@ -698,7 +697,7 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
         const preserveVersion = createBackup || history.length > 0;
         const backupMessage = createBackup ? 'Create an inactive backup quiz.' : history.length ? 'No backup quiz in the list. A hidden version preserves existing answers and scores.' : 'No backup will be created. Removed questions cannot be restored from a backup.';
         const confirmation = split
-            ? 'Split into two quizzes: ' + s.source.form.title + '\n\nOriginal keeps ' + ids.length + ': ' + ids.map(id => 'Q' + id).join(', ') + '\nNew inactive quiz receives ' + removed.length + ': ' + removed.map(id => 'Q' + id).join(', ') + '\n\nA Before Split backup will preserve all ' + s.source.form.questions.length + ' questions. Current editor settings will be saved; each resulting quiz retains the current total points.\n\nยืนยันแยก Keep ไว้ชุดเดิม และย้าย Remove ไปชุดใหม่ พร้อมสำเนาก่อนแยก?'
+            ? 'Split into two quizzes: ' + s.source.form.title + '\n\nOriginal keeps ' + ids.length + ': ' + ids.map(id => 'Q' + id).join(', ') + '\nNew inactive quiz receives ' + removed.length + ': ' + removed.map(id => 'Q' + id).join(', ') + '\n\nA Before Split backup will preserve all ' + s.source.form.questions.length + ' questions.' + (history.length ? ' Existing answers and scores stay with it.' : '') + ' Current editor settings will be saved; each resulting quiz retains the current total points.\n\nยืนยันแยก Keep ไว้ชุดเดิม และย้าย Remove ไปชุดใหม่ พร้อมสำเนาก่อนแยก?'
             : 'Apply to current quiz: ' + s.source.form.title + '\n\nRemove: ' + removed.map(id => 'Q' + id).join(', ') + '\n' + s.source.form.questions.length + ' → ' + ids.length + ' questions.\n\nCurrent editor settings will also be saved. ' + backupMessage + '\n\nยืนยันตัดข้อที่ระบุออกจากชุดเดิม และบันทึกการตั้งค่าปัจจุบัน?';
         const lead = deactivate ? '⚠️ This quiz is ACTIVE — it will be deactivated first (interns can no longer open it).\n\n' : '';
         if (!await confirmInDialog(s, lead + confirmation, split ? (deactivate ? 'Deactivate · split' : 'Confirm split') : (deactivate ? 'Deactivate · remove ' : 'Confirm · remove ') + removed.length) || state !== s) return false;

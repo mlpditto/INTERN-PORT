@@ -113,6 +113,7 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
       assert.equal(await btn.getAttribute('aria-expanded'), 'true');
       assert.equal(await panel.evaluate(p => p.getBoundingClientRect().top >= document.querySelector('#reviewQuizOverlay > div > div').getBoundingClientRect().bottom - 1), true, 'under the header row');
       assert.equal(await page.evaluate(() => window.__prompts.length), 0, 'V102.511: opening the panel runs no AI');
+      await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: t => { window.__clip = t; return Promise.resolve(); } } }));
       // V102.555: the neon guide walks Language → Model → ✨ → Send, and never blocks
       const guide = () => page.evaluate(() => ({ on: [...document.querySelectorAll('#rv-writeup .rv-g-on')].map(e => e.id || 'rail'), done: document.querySelectorAll('#rv-writeup .rv-g-done').length, note: document.getElementById('rv-writeup-note').textContent }));
       assert.deepEqual(await guide(), { on: ['rv-writeup-lang'], done: 0, note: '1/4 Language' }, 'step 1 is the flag');
@@ -187,7 +188,7 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
       await page.locator('#rv-writeup-text').fill(DRAFT + '\nแก้โดยแอดมิน');
       await page.locator('#rv-writeup-send').click(); await page.waitForTimeout(150);
       assert.deepEqual(await page.evaluate(() => window.__writes), [['update', 'quiz_attempts', 'a1', ['adminComment', 'adminCommentAt', 'adminCommentBy'], DRAFT + '\nแก้โดยแอดมิน', 'medlifeplus@gmail.com']], 'Send = one update of adminComment on the attempt, nothing else');
-      assert.equal(await page.locator('#rv-writeup-note').innerText(), '', 'V102.554: no note, the pill says it'); assert.equal(await page.locator('#rv-writeup .rv-g-on, #rv-writeup .rv-g-done, #rv-writeup.rv-guiding').count(), 0, 'V102.555: Send ends the guide'); assert.match(await page.locator('#rv-writeup-state').innerText(), /^✓ Sent/); assert.deepEqual(await page.evaluate(() => window.__toasts), ['📰 Personal review sent']);
+      assert.equal(await page.locator('#rv-writeup-note').innerText(), '', 'V102.554: no note, the pill says it'); assert.equal(await page.locator('#rv-writeup .rv-g-on, #rv-writeup .rv-g-done, #rv-writeup.rv-guiding').count(), 0, 'V102.555: Send ends the guide'); assert.match(await page.locator('#rv-writeup-state').innerText(), /^✓ Sent/); assert.deepEqual(await page.evaluate(() => window.__toasts), ['📰 Sent and copied']); assert.equal(await page.evaluate(() => window.__clip), await page.locator('#rv-writeup-text').inputValue(), 'V102.556: Send copies the box');
       await btn.click(); assert.equal(await panel.isHidden(), true, 'the button folds the panel again'); assert.equal(await btn.getAttribute('aria-expanded'), 'false');
       assert.deepEqual(errs.filter(e => !noise(e)), [], 'no page errors: ' + errs);
       await ctx.close();
