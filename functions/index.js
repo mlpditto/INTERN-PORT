@@ -5421,7 +5421,9 @@ exports.jevCheckQuiz = onCall({ secrets: ["OPENROUTER_API_KEY", "JEV_AI_API_KEY"
     if (!quizId) throw new HttpsError("invalid-argument", "quizId required");
     const snap = await db.collection("quizzes").doc(quizId).get();
     if (!snap.exists) throw new HttpsError("not-found", "Quiz not found");
-    const out = await require("./jev-quiz-check").checkQuiz(snap.data(), {
+    const onScreen = (request.data || {}).questions;   // the editor's questions, unsaved edits included; the translations still come from the saved quiz
+    const quiz = Array.isArray(onScreen) ? { ...snap.data(), questions: onScreen.filter(q => q && typeof q === "object").slice(0, 200) } : snap.data();
+    const out = await require("./jev-quiz-check").checkQuiz(quiz, {
         apiKey, provider, fetch: (url, opts) => fetch(url, opts),
         readCache: async (keys) => {
             const m = {};

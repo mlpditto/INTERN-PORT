@@ -1,4 +1,4 @@
-// Jev's check of the saved quiz, in the editor's whole-quiz tools: explanation vs marked answer, translation vs source. It only points; nothing is changed.
+// Jev's check of the questions on screen, saved or not, in the editor's whole-quiz tools: explanation vs marked answer, translation vs source. It only points; nothing is changed.
 (function () {
     const LANG = { th: 'Thai', ko: 'Korean', ja: 'Japanese', zh: 'Chinese' };
     const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -23,16 +23,17 @@
         goTo(i) { quizQPageIndex = i; updateQuizPagination(); },
         async run(btn) {
             const quizId = document.getElementById('edit-quiz-id').value;
-            if (!quizId) return open('<p class="jqc-n">Save the quiz first. Jev reads the saved version.</p>');
+            if (!quizId) return open('<p class="jqc-n">Save the quiz first. Jev needs its translations.</p>');
+            const questions = getQuizFormData().questions.map(({ q, content, type, options, correct, explanation }) => ({ q, content, type, options, correct, explanation }));   // V102.557: what the admin sees, not what was last saved
             btn.disabled = true;
             open('<p class="jqc-n" role="status">Jev is reading this quiz…</p>');
             try {
-                const r = (await adminApp.functions().httpsCallable('jevCheckQuiz')({ quizId })).data || {};
+                const r = (await adminApp.functions().httpsCallable('jevCheckQuiz')({ quizId, questions })).data || {};
                 if (r.enabled === false) return open('<p class="jqc-n">Jev is switched off.</p>');
                 const list = r.flags || [];
                 const sum = `${r.checked} checks on ${r.questions} questions` + (r.noExplanation ? ` · ${r.noExplanation} without an explanation` : '') + (r.errors ? ` · ${r.errors} could not be checked` : '');
                 open((list.length ? `<ul class="jqc-list">${list.map(row).join('')}</ul>` : '<p class="jqc-ok">✓ Nothing to look at</p>')
-                    + `<p class="jqc-n">${esc(sum)}. Jev reads the saved version and changes nothing. Check the book before you edit.</p>`);
+                    + `<p class="jqc-n">${esc(sum)}. Jev reads the questions on screen and changes nothing. Check the book before you edit.</p>`);
             } catch (e) {
                 console.warn('jevCheckQuiz', e && e.message);
                 open('<p class="jqc-n">Could not reach Jev. Please try again.</p>');
