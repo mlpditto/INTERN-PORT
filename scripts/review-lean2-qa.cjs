@@ -29,7 +29,7 @@ const mkQuiz = () => ({
 const mkAttempt = () => ({
   quizId: 'q1', userId: 'u1', displayName: 'Sample Intern', pictureUrl: '', status: 'pending', correctCount: 1, totalQuestions: 11,
   answers: ['', 'ANTACID', 'BILASTINE', 'OXYMETAZOLINE', 1, 0, 2, null, '', '', null],
-  durations: [17, 37, 25, 49, 20, 15, 12, 195, 6, 4, 32], durationsActive: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], firstAnswerLatencySec: [5, 9, 8, 12, 6, 4, 3, 40, 2, 1, 10],
+  durations: [17, 37, 25, 49, 20, 15, 12, 195, 6, 4, 32], durationsActive: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], firstAnswerLatencySec: [5, 9, 8, 12, 6, 4, 3, 40, 2, 1, 10],
   answerChangeCounts: [0, 1, 0, 1, 0, 0, 0, 3, 0, 0, 2],
 });
 
@@ -170,12 +170,12 @@ const openMap = (page) => page.evaluate(() => [...document.querySelectorAll('#re
       assert(stripTxt.includes(actual + ' / 1.00 pts'), 'the points chip equals the Actual button (' + actual + '): ' + stripTxt);
       const flag = strip.locator('.rv-flag');
       assert.equal(await flag.count(), 1, 'the Low active chip sits on the strip');
-      assert.match(await flag.innerText(), /Low active \(0%\)/);
+      assert.match(await flag.innerText(), /Low active \(3%\)/);
       assert.equal(await page.locator('#rv-sig-timing').isHidden(), true, 'its only flag is Low active → the Timing card stays folded behind the chip');
       await flag.click();
       assert.equal(await page.locator('#rv-sig-timing').isVisible(), true, 'the ⚠ chip opens the Timing details');
       assert.equal(await page.locator('#reviewQuizOverlay .rv-sig[aria-controls="rv-sig-timing"]').getAttribute('aria-expanded'), 'true');
-      assert.match(await page.locator('#rv-sig-timing').innerText(), /Low active ratio \(0%\)/);
+      assert.match(await page.locator('#rv-sig-timing').innerText(), /Low active ratio \(3%\)/);
       await ctx.close();
     }
     {
