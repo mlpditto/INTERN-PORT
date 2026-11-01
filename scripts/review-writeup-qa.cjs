@@ -177,7 +177,7 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
       await page.locator('#rv-writeup-text').fill(DRAFT + '\nแก้โดยแอดมิน');
       await page.locator('#rv-writeup-send').click(); await page.waitForTimeout(150);
       assert.deepEqual(await page.evaluate(() => window.__writes), [['update', 'quiz_attempts', 'a1', ['adminComment', 'adminCommentAt', 'adminCommentBy'], DRAFT + '\nแก้โดยแอดมิน', 'medlifeplus@gmail.com']], 'Send = one update of adminComment on the attempt, nothing else');
-      assert.match(await page.locator('#rv-writeup-note').innerText(), /✓ Sent/); assert.deepEqual(await page.evaluate(() => window.__toasts), ['📰 Personal review sent']);
+      assert.equal(await page.locator('#rv-writeup-note').innerText(), '', 'V102.554: no note, the pill says it'); assert.match(await page.locator('#rv-writeup-state').innerText(), /^✓ Sent/); assert.deepEqual(await page.evaluate(() => window.__toasts), ['📰 Personal review sent']);
       await btn.click(); assert.equal(await panel.isHidden(), true, 'the button folds the panel again'); assert.equal(await btn.getAttribute('aria-expanded'), 'false');
       assert.deepEqual(errs.filter(e => !noise(e)), [], 'no page errors: ' + errs);
       await ctx.close();

@@ -35,7 +35,9 @@ const save = async (id, score, note) => { ops.length = 0; alerts.length = 0; toa
 
     // 2. first credit: one batch — the feedback doc, the user's score, a 'feedback' log
     setFb([fb('F1')]);
+    els['qfp-admin-bonus-F1'] = { style: { display: '' } };
     await save('F1', 0.5, 'good comment');
+    assert.strictEqual(els['qfp-admin-bonus-F1'].style.display, 'none', 'V102.554: a saved add-on folds its box');
     assert.deepStrictEqual(ops, [
         ['update', 'quiz_feedback', 'F1', { adminExtraScore: 0.5, adminScoreNote: 'good comment', addOnCredited: 0.5, adminScoreUpdatedAt: 'ts' }],
         ['update', 'users', 'U1', { score: { inc: 0.5 } }],
