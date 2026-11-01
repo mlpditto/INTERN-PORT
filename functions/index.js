@@ -3863,26 +3863,6 @@ async function runQuizDigest(kind, options) {
         console.error('[notifyQuizDigest] product_listings read failed:', err.message);
     }
 
-    // --- new cases in the same window ---
-    // 2026-11-01 (owner): cases have no LINE bubble of their own (CASE_LINE_PUSH), so the
-    // group hears about them here. Who and how many only: no HN, patient or disease.
-    const caseRows = [];
-    try {
-        const snap = await db.collection('cases')
-            .where('timestamp', '>=', cutoff)
-            .orderBy('timestamp', 'asc')
-            .get();
-        snap.forEach(doc => {
-            const c = doc.data() || {};
-            caseRows.push({
-                name: userNames.get(c.userId) || digestCleanName(String(c.displayName || 'Intern')).slice(0, 40),
-                unnamed: unnamedIds.has(c.userId)
-            });
-        });
-    } catch (err) {
-        console.error('[notifyQuizDigest] cases read failed:', err.message);
-    }
-
     // --- section 5: queues waiting on the ADMIN (1-on-1 copy only) ---
     // Everything above reports what the interns did. These three are the reverse:
     // work sitting on the admin, invisible until someone opens the right tab.
@@ -3947,7 +3927,7 @@ async function runQuizDigest(kind, options) {
     }
     const adminQueueTotal = queueCounts.requests + queueCounts.escalated + queueCounts.followUp;
 
-    if (!doneRows.length && !pendingBlocks.length && !newlyLive.length && !productRows.length && !adminQueue.length && !caseRows.length) {
+    if (!doneRows.length && !pendingBlocks.length && !newlyLive.length && !productRows.length && !adminQueue.length) {
         console.log('[notifyQuizDigest] nothing to report — no push');
         return { sent: false, reason: 'nothing-to-report' };
     }
@@ -3986,7 +3966,6 @@ async function runQuizDigest(kind, options) {
         const summaryParts = [];
         if (newlyLive.length) summaryParts.push(`${newlyLive.length} new`);
         summaryParts.push(`${doneQuizzes.length} done`);
-        if (caseRows.length) summaryParts.push(`${caseRows.length} ${caseRows.length === 1 ? 'case' : 'cases'}`);
         if (pendingBlocks.length) summaryParts.push(`${pendingBlocks.length} pending`);
         if (target.withScores && productRows.length) summaryParts.push(`${productRows.length} products`);
         const headerSummary = summaryParts.join(' · ');
@@ -4057,20 +4036,6 @@ async function runQuizDigest(kind, options) {
             }
         } else {
             body.push({ type: 'text', text: 'No submissions today', size: 'sm', color: '#94a3b8', margin: 'xs' });
-        }
-
-        if (caseRows.length) {
-            const perPerson = new Map();
-            let others = 0;
-            caseRows.forEach(c => {
-                if (!target.withScores && c.unnamed) others++;
-                else perPerson.set(c.name, (perPerson.get(c.name) || 0) + 1);
-            });
-            const who = [...perPerson].map(([name, n]) => (n > 1 ? `${name} ${n}` : name));
-            if (others) who.push(`+${others} ${others === 1 ? 'other' : 'others'}`);
-            body.push({ type: 'separator', margin: 'md' });
-            body.push({ type: 'text', text: `🩺 New cases · ${caseRows.length}`, size: 'xs', weight: 'bold', color: '#0369a1', margin: 'md' });
-            body.push({ type: 'text', text: who.join(', '), size: 'sm', color: '#1f2937', wrap: true, margin: 'xs' });
         }
 
         // Sits with "Done today" — both are "what happened in the last 24h" —
@@ -4292,11 +4257,11 @@ async function runQuizDigest(kind, options) {
     // ("Done today · 0"): a bubble that only repeats the pending list is noise
     // in the intern chat and spends a push of the monthly quota. The manual
     // "Send digest now" button is an explicit ask, so it still goes out.
-    // 2026-11-01: a new case, or a quiz closing before the next run, is not quiet:
-    // this bubble is the group's only notice of both.
+    // 2026-11-01: a quiz closing before the next run is not quiet: this bubble is
+    // the group's only notice of it.
     const closingSoon = pendingBlocks.some(b => b.deadlineMs <= now.toMillis() + 24 * 60 * 60 * 1000);
-    const groupHasContent = newlyLive.length > 0 || doneQuizzes.length > 0 || pendingBlocks.length > 0 || caseRows.length > 0;
-    const quietDay = kind !== 'manual' && doneQuizzes.length === 0 && !closingSoon && caseRows.length === 0;
+    const groupHasContent = newlyLive.length > 0 || doneQuizzes.length > 0 || pendingBlocks.length > 0;
+    const quietDay = kind !== 'manual' && doneQuizzes.length === 0 && !closingSoon;
     const sendTargets = groupHasContent && !quietDay ? targets : [];
     if (!sendTargets.length) {
         console.log('[notifyQuizDigest] nothing for the group today — no push');
@@ -4307,7 +4272,6 @@ async function runQuizDigest(kind, options) {
         newlyLive: newlyLive.length,
         doneQuizzes: doneQuizzes.length,
         donePeople: donePeopleCount,
-        cases: caseRows.length,
         products: productRows.length,
         urgent: urgentBlocks.length,
         later: laterBlocks.length,
@@ -4333,7 +4297,7 @@ async function runQuizDigest(kind, options) {
         };
     }
 
-    const results = await pushLineFlex(tag, sendTargets, buildFlex, `kind=${kind}  newlyLive=${newlyLive.length}  doneQuizzes=${doneQuizzes.length} donePeople=${donePeopleCount} (attempts=${doneRows.length})  cases=${caseRows.length}  products=${productRows.length} (pending=${productPendingCount})  urgent=${urgentBlocks.length}  later=${laterBlocks.length}  waitingOnAdmin=${adminQueueTotal} (req=${queueCounts.requests} esc=${queueCounts.escalated} fu=${queueCounts.followUp})  cohort=${activeUsers.length}/${users.length}`);
+    const results = await pushLineFlex(tag, sendTargets, buildFlex, `kind=${kind}  newlyLive=${newlyLive.length}  doneQuizzes=${doneQuizzes.length} donePeople=${donePeopleCount} (attempts=${doneRows.length})  products=${productRows.length} (pending=${productPendingCount})  urgent=${urgentBlocks.length}  later=${laterBlocks.length}  waitingOnAdmin=${adminQueueTotal} (req=${queueCounts.requests} esc=${queueCounts.escalated} fu=${queueCounts.followUp})  cohort=${activeUsers.length}/${users.length}`);
     const pushed = results.filter(r => r.ok).length;
 
     // Marks the day as sent so the manual button can warn about a duplicate.
@@ -4364,7 +4328,7 @@ async function runQuizDigest(kind, options) {
 }
 
 // 2026-11-01 (owner): one round a day. LINE charges a group push per member, so the
-// digest also carries the group's deadline notice and the day's new cases.
+// digest also carries the group's deadline notice.
 exports.notifyQuizDigest = onSchedule({
     schedule: '0 23 * * *',
     timeZone: 'Asia/Bangkok',

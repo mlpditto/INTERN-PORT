@@ -1,5 +1,5 @@
-// 2026-11-01: the real runQuizDigest with a fake Firestore. One 23:00 round over 24 h; a quiet day stays quiet unless a quiz closes before the next run
-// or a case came in; the case section names who and how many, never HN, patient or disease; the group copy keeps Pharmacists / Public names out.
+// 2026-11-01: the real runQuizDigest with a fake Firestore. One 23:00 round over 24 h; a quiet day stays quiet unless a quiz closes before the next run;
+// a case is e-mailed, so the digest never carries one and a case alone sends nothing.
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
 const backend = fs.readFileSync('functions/index.js', 'utf8').replace(/\r\n/g, '\n');
 const cut = (from, to) => { const a = backend.indexOf(from); assert.ok(a >= 0, 'missing ' + from); const b = backend.indexOf(to, a); assert.ok(b > a, 'missing end ' + to); return backend.slice(a, b); };
@@ -64,7 +64,6 @@ const fresh = () => {
 };
 const texts = () => JSON.stringify(pushes[0].flex.contents.body.contents) + JSON.stringify(pushes[0].flex.contents.header);
 const quizDue = ms => ({ isActive: true, title: 'Asthma 1', shortTitle: 'Asthma', deadline: ts(ms), lastLiveAt: ts(NOW - 200 * H) });
-const aCase = (userId, atMs) => ({ userId, displayName: userId, timestamp: ts(atMs), caseId: 'HN-777', customer: 'Patient Name', disease: 'Rare disease' });
 
 (async () => {
     // a quiet day stays quiet, as long as nothing closes before the next run
@@ -78,22 +77,12 @@ const aCase = (userId, atMs) => ({ userId, displayName: userId, timestamp: ts(at
     assert.equal(pushes.length, 1); assert.equal(pushes[0].to, 'Cgroup', 'group only');
     assert.match(texts(), /Due soon · 1/); assert.match(texts(), /due tomorrow 19:00/);
 
-    // a case alone is reason enough, and the group copy says who and how many only
-    fresh();
-    DB.cases = { c1: aCase('U1', NOW - 2 * H), c2: aCase('U1', NOW - 3 * H), c3: aCase('U2', NOW - 23 * H), c4: aCase('U3', NOW - H), old: aCase('U2', NOW - 25 * H) };
-    r = await context.runQuizDigest('scheduled');
-    assert.equal(pushes.length, 1);
-    const t = texts();
-    assert.match(t, /🩺 New cases · 4/, 'the 24 h window, the older one is out');
-    assert.match(t, /Ann 2, Bee, \+1 other/, 'count per person; Public stays unnamed in the group');
-    assert.match(t, /4 cases/, 'the header line counts them');
-    assert.doesNotMatch(t, /HN-777|Patient Name|Rare disease|Cat/, 'no patient detail in the group');
-    assert.equal(r.counts.cases, 4);
-
-    // no case, no section
-    fresh(); DB.quizzes.q1 = quizDue(NOW + 20 * H);
+    // a case goes by mail, so LINE does not repeat it
+    fresh(); DB.cases = { c1: { userId: 'U1', timestamp: ts(NOW - H) } };
     await context.runQuizDigest('scheduled');
-    assert.doesNotMatch(texts(), /New cases/);
+    assert.equal(pushes.length, 0, 'a case alone sends nothing');
+    assert.ok(!cut('const DIGEST_TAGS', 'exports.notifyQuizDigest = onSchedule(').includes("collection('cases')"), 'the digest never reads cases');
+    assert.ok(/const CASE_LINE_PUSH = false;/.test(backend) && /const FLOOD_LINE_PUSH = false;/.test(backend), 'what is mailed stays off LINE');
 
-    console.log('PASS: digest one round — 23:00, quiet days stay quiet unless a quiz closes or a case came in, cases name who and how many only');
+    console.log('PASS: digest one round — 23:00, quiet days stay quiet unless a quiz closes, mailed cases stay off LINE');
 })().catch(e => { console.error(e); process.exit(1); });

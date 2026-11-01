@@ -40,7 +40,6 @@
 **Daily Quiz Digest (กลุ่ม LINE)**
 บอทจะโพสต์ **Daily Quiz Digest** ในกลุ่ม LINE ของ intern เวลา **23:00**:
 - ✅ **Done today** — สิ่งที่ส่งแล้วตั้งแต่เมื่อวาน
-- 🩺 **New cases** — ใครส่งเคสใหม่ในรอบ 24 ชั่วโมง
 - ⏳ **Due soon** — quiz ที่ยังค้างและวันที่ปิด
 - กด **Open quizzes** เพื่อเข้าแท็บ Quiz ได้ทันที
 
