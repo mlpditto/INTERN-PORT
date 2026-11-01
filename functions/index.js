@@ -2755,6 +2755,16 @@ exports.syncNikaContent = onSchedule({
     console.log('[syncNikaContent]', out);
 });
 
+// 🌞 Nika: an intern asks, the search store answers (nika-ask.js). Callable, so the count and the quiz pause live on the server.
+exports.askNika = onCall({ timeoutSeconds: 60 }, async (request) => {
+    const auth = new GoogleAuth({ scopes: 'https://www.googleapis.com/auth/cloud-platform' });
+    return require('./nika-ask').handle(request, {
+        db: admin.firestore(), FieldValue: admin.firestore.FieldValue, HttpsError, isAdmin: isAdminToken, dayKey: digestDayKey(), now: Date.now(),
+        token: async () => { const t = await (await auth.getClient()).getAccessToken(); return t.token || t; },
+        post: async (url, body, token) => (await axios.post(url, body, { headers: { Authorization: 'Bearer ' + token, 'x-goog-user-project': 'intern-port-edfa7' }, timeout: 45000 })).data
+    });
+});
+
 exports.notifyPurgeDigest = onSchedule({
     schedule: 'every monday 09:00',
     timeZone: 'Asia/Bangkok',
