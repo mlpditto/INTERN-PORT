@@ -8485,6 +8485,8 @@
 <script src="dxa-ai-trail.js?v=V102.389"></script>
 <script src="case-review-ai.js?v=V102.423"></script>
 <script src="case-file-review.js?v=V102.550"></script>
+<link rel="stylesheet" href="case-import.css?v=V102.560">
+<script src="case-import.js?v=V102.560"></script>
 <script src="up-next.js?v=V102.501"></script>
 <script src="quiz-matrix.js?v=V102.503"></script>
 <script src="rank-quiz.js?v=V102.484"></script>
@@ -14961,7 +14963,7 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
                     <label data-ic="🎓" class="logic-chip m-green" title="Practice: after each choice question the intern presses Check and sees right / wrong, the answer and the explanation straight away (the choice then locks). Leave OFF for exam sets — it shows the key. · ฝึก: เฉลยทีละข้อระหว่างทำ"><input type="checkbox" id="quiz-instant-answer"> <span>Practice</span></label>
                     <i class="qe-sep" aria-hidden="true"></i>
                     <label data-ic="🔔" class="logic-chip m-cy" title="Notify LINE every submit. OFF (normal): an active quiz already announces two milestones to the LINE group by itself — the first intern to submit, and when everyone eligible has finished. ON: announce EVERY submission instead — one message per intern, so only use it on quizzes worth watching live (the OA's monthly message quota is shared with the case and digest pushes). · แจ้ง LINE ทุกครั้งที่ส่ง"><input type="checkbox" id="quiz-notify-group"> <span>Notify</span></label>
-                    <label data-ic="⏰" class="logic-chip m-red" title="Deadline alert (LINE). ON (default): once the quiz has a Deadline, LINE alerts the intern group when it closes within 24 h, then messages each intern who has not submitted yet 3 h before. Nothing is sent 22:00–07:00. Personal messages stop when the month's LINE quota is critical or the daily cap is reached. Turn OFF for a quiz that should close quietly. · เตือนก่อนหมดเวลาทาง LINE"><input type="checkbox" id="quiz-notify-deadline" checked> <span>Deadline</span></label>
+                    <label data-ic="⏰" class="logic-chip m-red" title="Deadline alert (LINE). ON (default): once the quiz has a Deadline, LINE alerts the intern group when it closes within 24 h, then sends each intern who has not submitted yet one message in the last hour, with their other quizzes closing within 6 h in it. Nothing is sent 22:00–07:00. Personal messages stop when the month's LINE quota is critical or the daily cap is reached. Turn OFF for a quiz that should close quietly. · เตือนก่อนหมดเวลาทาง LINE"><input type="checkbox" id="quiz-notify-deadline" checked> <span>Deadline</span></label>
                 </span>
                     <button type="button" class="qe-head-gear" id="qe-head-settings" onclick="toggleQuizEditorSettings()" aria-expanded="false" aria-controls="quiz-editor-settings" aria-label="Quiz settings" title="Quiz settings — title, group, points, dates" data-th-title="ตั้งค่าชุดข้อสอบ — ชื่อ กลุ่ม คะแนน วันที่" data-kr-title="퀴즈 설정">⚙️</button>
                     <span class="close-modal qe-head-x" onclick="forceHideModal('quizManageModal')" style="position: static; color: #94a3b8; font-size: 24px; font-weight: bold; cursor: pointer; background: rgba(255,255,255,0.05); border-radius: 50%; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.3s; border: 1px solid rgba(255,255,255,0.1);">&times;</span>
@@ -29481,8 +29483,16 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             }
         }
 
+        // V102.559: a copy can lose the line break before A ("...ขณะนี้?A. แนะนำ..."); with B on its own line that A is an option, not the end of the stem
+        function splitGluedOptionA(text) {
+            const t = String(text);
+            if (!/^\s*B[.)]\s/m.test(t) || /^\s*A[.)]\s/m.test(t)) return t;
+            return t.replace(/([?？:：])[ \t]*(A[.)][ \t])/, '$1\n$2').replace(/(\S)(คำถาม\s*[:：])/, '$1\n$2');
+        }
+
         function processQuizPaste(text, item) {
             if (!text) return;
+            text = splitGluedOptionA(text);
             // Handle both \n and \r\n
             const rawLines = text.split(/\r?\n/);
             const optionPrefixRegex = /^([A-I]|[1-9]|[ก-ฮ])[\.\)\-\:]+\s*(.*)/i;
@@ -39010,7 +39020,7 @@ RULES:
                 notifyQuizSubmitted: 'milestone',
                 notifyAdminOnNewCase: 'case',
                 notifyQuizReminder: 'reminder',
-                // V102.480: deadline alerts (T-24 h group bubble, T-3 h personal) carry their own tags.
+                // V102.480: deadline alerts (T-24 h group bubble, last-hour personal) carry their own tags.
                 quizDeadlineGroup: 'deadline group',
                 quizDeadlineDM: 'deadline 1:1'
             };

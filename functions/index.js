@@ -2321,6 +2321,17 @@ const CASE_LINE_PUSH = false;
 // V102.547: Gemini reads the PDF on a Case right after Send (a callable from the page: Firestore triggers cannot deploy in this region).
 // The intern's call reads once; the admin's retry reads again. A failure leaves the case as it is and says so on it.
 // V102.550: the admin's retry may name another reader; the intern's call cannot.
+// V102.560: Import PDF in Alabasta. Covered JPEGs in, text out; nothing is stored here (case-import.js).
+exports.importCaseRead = onCall({ secrets: ['GEMINI_API_KEY'], timeoutSeconds: 150, memory: '512MiB' }, async (request) => {
+    if (!request.auth || !isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Admin only');
+    const reader = require('./case-import');
+    const images = (request.data || {}).images;
+    if (!reader.validImages(images)) throw new HttpsError('invalid-argument', 'JPEG pages only');
+    const out = await reader.readImages(images, process.env.GEMINI_API_KEY);
+    recordAiUsage('gemini-aistudio', reader.MODEL, out.tokens, true, 'case_import_read', { inputTokens: out.inputTokens, outputTokens: out.outputTokens });
+    return { read: out.read };
+});
+
 exports.readCaseFile = onCall({ secrets: ['GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY'], timeoutSeconds: 300, memory: '512MiB' }, async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
     const { caseDocId, retry } = request.data || {};
@@ -4353,7 +4364,7 @@ exports.notifyQuizDigest = onSchedule({
 // ============================================================
 // notifyQuizDeadlines  (hourly — quizzes closing within 24 h)
 // ------------------------------------------------------------
-// T-3 h: a personal bubble to each intern who still has NOT submitted.
+// Last hour: one personal bubble to each intern who still has NOT submitted, their other quizzes closing within 6 h in it.
 // The T-24 h group bubble is off (DEADLINE_GROUP_PUSH): the digest carries it.
 // Timing, copy and bubble validation are pure and live in quiz-deadline.js.
 //
@@ -4406,7 +4417,7 @@ async function runQuizDeadlines(nowMs) {
         due.push({ id: qDoc.id, q: q, deadlineMs: deadlineMs, plan: plan, mid: mid, marker: marker });
     }
     const wantGroup = DEADLINE_GROUP_PUSH ? due.filter(d => d.plan.group && !d.marker.groupAt) : [];
-    const wantPersonal = due.filter(d => d.plan.personal);
+    const wantPersonal = due.filter(d => d.plan.personal), rideAlong = due.filter(d => d.plan.bundle);
     if (!wantGroup.length && !wantPersonal.length) return { due: 0 };
 
     // 2. quota
@@ -4495,6 +4506,16 @@ async function runQuizDeadlines(nowMs) {
                     if (!byUser.has(u.id)) byUser.set(u.id, []);
                     byUser.get(u.id).push({ item: item, mid: d.mid });
                 }
+            }
+            // 2026-11-01 (owner): one bubble, not one per quiz. Another quiz closing soon joins a bubble that is going anyway and is marked sent, so it is not pushed again.
+            for (const d of byUser.size ? rideAlong : []) {
+                const scan = await scanQuizPending(db, d.id, d.q, cohort);
+                const sent = new Set(Array.isArray(d.marker.personalSent) ? d.marker.personalSent : []);
+                const item = {
+                    quizId: d.id, name: digestQuizName(d.q, 60), deadlineMs: d.deadlineMs,
+                    deadlineBeriMax: typeof d.q.deadlineBeriMax === 'number' ? d.q.deadlineBeriMax : null
+                };
+                for (const u of scan.missing) if (!sent.has(u.id) && byUser.has(u.id)) byUser.get(u.id).push({ item: item, mid: d.mid });
             }
             // soonest-closing first, so the cap never drops the most urgent
             const queue = [...byUser.entries()].sort((a, b) =>
