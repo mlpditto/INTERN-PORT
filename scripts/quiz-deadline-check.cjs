@@ -254,10 +254,10 @@ const quizAt = (ms, extra) => Object.assign({ isActive: true, title: 'Asthma 1',
     assert.ok(/Second/.test(JSON.stringify(pushes.find(p => p.to === 'U3').flex)) && /Asthma/.test(JSON.stringify(pushes.find(p => p.to === 'U3').flex)));
 
     // E. transient failure retries next hour; permanent failure does not
-    fresh({ qa: quizAt(NOW + 1 * H) });
+    fresh({ qa: quizAt(NOW + 80 * 60000) });
     failFor = (tag, t) => (t.to === 'U2' ? 'transient' : (t.to === 'U3' ? 'no-friend' : null));
     await run(NOW);
-    let mk = DB.quiz_deadline_alerts[D.markerId('qa', NOW + 1 * H)];
+    let mk = DB.quiz_deadline_alerts[D.markerId('qa', NOW + 80 * 60000)];
     assert.deepEqual(mk.personalSent, ['U3'], 'U3 (not a friend) is final; U2 (transient) is not marked');
     pushes = []; failFor = null; await run(NOW + H);
     assert.deepEqual(pushes.map(p => p.to), ['U2'], 'only the transient failure is retried');
