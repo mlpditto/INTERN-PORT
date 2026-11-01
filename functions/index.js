@@ -5408,6 +5408,39 @@ async function groupUrgentFeedback(db) {
     return out;
 }
 
+// Jev reads a saved quiz for the admin (jev-quiz-check.js): same kill switch, same client-closed cache collection, nothing written to the quiz.
+exports.jevCheckQuiz = onCall({ secrets: ["OPENROUTER_API_KEY", "JEV_AI_API_KEY"], timeoutSeconds: 120, memory: "256MiB" }, async (request) => {
+    requireAdminCallable(request);
+    const db = admin.firestore();
+    const cfg = await db.collection("quiz_dup_scores").doc("_config").get();
+    if (cfg.exists && cfg.data().enabled === false) return { enabled: false };
+    const provider = jev.providerOf(cfg.exists ? cfg.data().provider : null);
+    const apiKey = jevApiKey(provider);
+    if (!apiKey) throw new HttpsError("failed-precondition", "No API key configured for provider " + provider);
+    const quizId = String((request.data || {}).quizId || "");
+    if (!quizId) throw new HttpsError("invalid-argument", "quizId required");
+    const snap = await db.collection("quizzes").doc(quizId).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Quiz not found");
+    const out = await require("./jev-quiz-check").checkQuiz(snap.data(), {
+        apiKey, provider, fetch: (url, opts) => fetch(url, opts),
+        readCache: async (keys) => {
+            const m = {};
+            for (let i = 0; i < keys.length; i += 30) {
+                const snaps = await db.getAll(...keys.slice(i, i + 30).map(k => db.collection("quiz_dup_scores").doc(k)));
+                snaps.forEach(sn => { if (sn.exists && typeof sn.data().score === "number") m[sn.id] = sn.data().score; });
+            }
+            return m;
+        },
+        writeCache: async (entries) => {
+            const batch = db.batch();
+            entries.forEach(e => batch.set(db.collection("quiz_dup_scores").doc(e.key), { score: e.score, at: admin.firestore.FieldValue.serverTimestamp() }));
+            await batch.commit();
+        },
+    });
+    if (out.calls) recordAiUsage(provider, jev.JEV_MODEL, out.inputTokens, true, "jev_quiz_check", { inputTokens: out.inputTokens, outputTokens: 0 });
+    return { enabled: true, ...out };
+});
+
 // ---- Jev: "same fact?" verdicts for the Compare modal (Phase 0 + use #1 of the Jev plan) ----
 // Admin-only, suggest-only (the page shows a chip next to the n-gram %, nothing is written because of it).
 // Answers are cached by content hash in quiz_dup_scores (client-closed: no rule = no access), so re-opening a

@@ -154,6 +154,7 @@ The **Admin Portal** page has 3 ways in — use any one:
 |---|---|---|
 | 📦 **Assignments** → tick 2+ quizzes → **🔍 Compare** | Puts a **chip** next to each “≈ %” match: **✓ 92%** = same fact · **✗** = different · **?** = not sure | Read both questions and decide which to keep or edit |
 | 📦 **Assignments** → 🔗 **Gourmet World** → **Categories (n)** | Suggests a category for every shop that has none | Tick the ones you agree with → **Save** |
+| 📝 **Quiz editor** → **Jev check** | Reads the saved quiz: does each explanation support the marked answer, and does each translation say the same thing? | Open the listed questions, check the source, edit yourself |
 | **Quiz editor → PDF** (import questions) and **Reflective Review → AI suggestion** | A silent **guardrail**: checks the text for “ignore your instructions…” tricks before it goes to another AI | Only if it warns you: choose **Cancel** (stop) or **OK** (continue) |
 
 ### 🔍 Compare — duplicate questions
@@ -175,6 +176,18 @@ The **Admin Portal** page has 3 ways in — use any one:
 2. Jev shows up to three guesses per shop with a %. **Confident answers (80% or more) are already ticked; doubtful ones are not** and are shown in amber (2).
 3. Tap another chip to change a guess, tick the shops you agree with, press **Save**. Only the ticked ones are saved.
 
+### ✅ Jev check — before a quiz goes live
+
+![Jev check: the button (1) and what it lists (2)](assets/guide/jev-check.png)
+
+1. Open a saved quiz in the **Quiz editor** and press **Jev check** (1), with the whole-quiz tools on the right. Save first: Jev reads the saved version.
+2. Jev checks two things (2):
+   - **Answer key:** does the explanation support the marked answer? Questions with no explanation are skipped and counted.
+   - **Translations:** Thai, Korean, Japanese and Chinese against the source. A translation older than its question is listed without using Jev.
+3. How to read the list: **red** = looks wrong (below 0.35) · **yellow** = have a look (0.35–0.69) · nothing listed = fine. **Open** goes to that question.
+4. Jev compares the explanation with the key; it does **not** prove which answer is medically right. If both are wrong in the same way, it will not notice. Check the source, then edit and save yourself.
+5. Asking again about unchanged text costs nothing: answers are remembered.
+
 ### 🛡️ Guardrail — when Jev warns you
 
 ![The Jev guardrail pop-up](assets/guide/jev-guardrail.png)
@@ -184,7 +197,7 @@ Before a PDF's text (or an intern's reflection) goes to another AI, Jev checks t
 ### Cost and where to look
 
 - Jev runs on the **Jev AI** account (tokens). One comparison or one shop costs roughly 300–600 tokens; the balance is on the Jev AI dashboard (**Token account**).
-- **For the technical admin:** in Firestore, `quiz_dup_scores/_config` → `{ enabled: false }` turns Compare chips and Categories off; `{ provider: "openrouter" }` sends the same questions through OpenRouter instead (no deploy needed).
+- **For the technical admin:** in Firestore, `quiz_dup_scores/_config` → `{ enabled: false }` turns Compare chips, Categories and Jev check off; `{ provider: "openrouter" }` sends the same questions through OpenRouter instead (no deploy needed).
 
 ---
 
