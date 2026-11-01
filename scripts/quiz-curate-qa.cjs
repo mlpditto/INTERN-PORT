@@ -434,14 +434,25 @@ const { chromium } = require('playwright');
         assert.equal(await page.evaluate(() => quizForAttempt(records['source-quiz'], records['old-attempt'], Object.entries(records).map(([id,q]) => ({...q,id}))).questions.length), 14);
         await page.evaluate(() => { records = { 'source-quiz': structuredClone(stored) }; atomicWrites = 0; hasAttempts = hasSessions = false; });
         const split = () => page.locator('#curate-split').click();
-        for (const flag of ['active', 'attempts', 'sessions']) {
-            await page.evaluate(flag => { records['source-quiz'].isActive = flag === 'active'; hasAttempts = flag === 'attempts'; hasSessions = flag === 'sessions'; }, flag);
-            await open(); await suggest(result()); await split();
-            if (flag === 'active') { assert.match(await confirmText(), /deactivated first/); assert.equal(await page.locator('#curate-confirm-ok').innerText(), 'Deactivate · split'); await confirmCancel(); assert.equal(await page.evaluate(() => atomicWrites), 0); }   // V102.513
-            else assert.match(await feedback(), /attempts or exam sessions/);
-            await close();
-        }
-        await page.evaluate(() => { hasSessions = false; records['source-quiz'] = structuredClone(stored); });
+        await page.evaluate(() => { records['source-quiz'].isActive = true; });
+        await open(); await suggest(result()); await split();
+        assert.match(await confirmText(), /deactivated first/); assert.equal(await page.locator('#curate-confirm-ok').innerText(), 'Deactivate · split'); await confirmCancel(); assert.equal(await page.evaluate(() => atomicWrites), 0);   // V102.513
+        await close();
+        // V102.556: a quiz with attempts or sessions splits too; they stay on the Before Split version, answers and scores untouched
+        await page.evaluate(() => {
+            records = { 'source-quiz': structuredClone(stored), 'old-attempt': { quizId: 'source-quiz', answers: [0,1], score: 7, status: 'approved' }, 'old-session': { examId: 'source-quiz', state: 'done', finalAnswers: {0:1} } };
+            hasAttempts = hasSessions = true;
+        });
+        await open(); await suggest(result()); await split();
+        assert.match(await confirmText(), /Existing answers and scores stay with it/);
+        await confirmOk();
+        await page.waitForFunction(() => /Split complete/.test(document.getElementById('curate-feedback').textContent));
+        { const after = await page.evaluate(() => records), kept = after['source-quiz'], rev = kept.curation.backupQuizId;
+          assert.equal(after['old-attempt'].quizRevisionId, rev); assert.equal(after['old-session'].quizRevisionId, rev);
+          assert.deepEqual([after['old-attempt'].answers, after['old-attempt'].score], [[0,1], 7]);
+          assert.deepEqual([kept.questions.length, after[rev].questions.length, after[kept.curation.splitQuizId].questions.length], [10, 14, 4]); }
+        await close();
+        await page.evaluate(() => { hasAttempts = hasSessions = false; atomicWrites = 0; records = { 'source-quiz': structuredClone(stored) }; });
         await open(); await suggest(result());
         await split(); assert.match(await confirmText(), /Original keeps 10/); assert.match(await confirmText(), /New inactive quiz receives 4: Q11, Q12, Q13, Q14/);
         assert.equal(await page.locator('#curate-confirm-ok').innerText(), 'Confirm split');
