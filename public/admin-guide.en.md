@@ -154,7 +154,7 @@ The **Admin Portal** page has 3 ways in — use any one:
 |---|---|---|
 | 📦 **Assignments** → tick 2+ quizzes → **🔍 Compare** | Puts a **chip** next to each “≈ %” match: **✓ 92%** = same fact · **✗** = different · **?** = not sure | Read both questions and decide which to keep or edit |
 | 📦 **Assignments** → 🔗 **Gourmet World** → **Categories (n)** | Suggests a category for every shop that has none | Tick the ones you agree with → **Save** |
-| 📝 **Quiz editor** → **Jev check** | Reads the saved quiz: does each explanation support the marked answer, and does each translation say the same thing? | Open the listed questions, check the source, edit yourself |
+| 📝 **Quiz editor** → **Review** → **Jev check** | Reads the questions on screen: does each explanation support the marked answer, and does each translation say the same thing? | Open the listed questions, check the source, edit yourself |
 | **Quiz editor → PDF** (import questions) and **Reflective Review → AI suggestion** | A silent **guardrail**: checks the text for “ignore your instructions…” tricks before it goes to another AI | Only if it warns you: choose **Cancel** (stop) or **OK** (continue) |
 
 ### 🔍 Compare — duplicate questions
@@ -180,7 +180,7 @@ The **Admin Portal** page has 3 ways in — use any one:
 
 ![Jev check: the button (1) and what it lists (2)](assets/guide/jev-check.png)
 
-1. Open a saved quiz in the **Quiz editor** and press **Jev check** (1), with the whole-quiz tools on the right. Jev reads the questions on screen, unsaved edits included.
+1. Open a saved quiz in the **Quiz editor** press **Review**, then the **Jev check** tab (1). Jev reads the questions on screen, unsaved edits included.
 2. Jev checks two things (2):
    - **Answer key:** does the explanation support the marked answer? Questions with no explanation are skipped and counted.
    - **Translations:** Thai, Korean, Japanese and Chinese against the source. A translation older than its question is listed without using Jev.

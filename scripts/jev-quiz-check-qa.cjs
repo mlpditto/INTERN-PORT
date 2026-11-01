@@ -19,13 +19,13 @@ const ADMIN = pathToFileURL(path.resolve('public/admin.html')).href;
         const g = document.getElementById('adminGuideOverlay'); if (g) g.remove();
         window.__calls = []; window.__reply = null;
         window.adminApp = { functions: () => ({ httpsCallable: n => async d => { window.__calls.push([n, d]); if (window.__reply instanceof Error) throw window.__reply; return { data: window.__reply }; } }) };
-        window.updateQuizPagination = () => { window.__page = quizQPageIndex; };
+        window.updateQuizPagination = () => { window.__page = quizQPageIndex; }; window.__closed = 0; window.closeQuizReview = () => { window.__closed++; }; window.__jevBtn = document.createElement('button');
         window.getQuizFormData = () => ({ questions: [{ q: 'on screen', content: '', type: 'choice', options: ['a'], correct: [0], explanation: 'e', timer: 60, tags: [], primer: 'not sent' }] });
       });
-      const btn = () => page.evaluate(() => { document.getElementById('edit-quiz-id').value = window.__id || ''; window.jevQuizCheck.run(document.getElementById('jev-quiz-check')); });
+      const btn = () => page.evaluate(() => { document.getElementById('edit-quiz-id').value = window.__id || ''; window.jevQuizCheck.run(window.__jevBtn); });
       const box = () => page.locator('#jqc-box').innerText();
 
-      assert.equal(await page.locator('#qe-whole-quiz #jev-quiz-check').count(), 1, 'in the whole-quiz tools');
+      { const html = require('node:fs').readFileSync('public/admin.html', 'utf8'); assert.ok(html.includes('id="jev-quiz-check" class="review-tab" onclick="jevQuizCheck.run(this)"') && html.includes('${items}${jev}</div>'), 'V102.558: a tab beside Scorecard and Rewrites'); assert.equal(await page.locator('#jev-quiz-check').count(), 0, 'no longer in the editor toolbar'); }
       await btn(); await page.waitForTimeout(50);
       assert.match(await box(), /Save the quiz first/);
       assert.equal((await page.evaluate(() => window.__calls)).length, 0, 'an unsaved quiz spends nothing');
@@ -43,7 +43,7 @@ const ADMIN = pathToFileURL(path.resolve('public/admin.html')).href;
       const r = await page.locator('#jqc-box').boundingBox();
       assert.ok(r.x >= 0 && r.x + r.width <= width, 'the box fits @' + width);
       await page.locator('.jqc-go').first().click();
-      assert.equal(await page.evaluate(() => window.__page), 2, 'Open goes to Q3');
+      assert.equal(await page.evaluate(() => window.__page), 2, 'Open goes to Q3'); assert.equal(await page.evaluate(() => window.__closed), 1, 'and closes the Review');
       assert.equal(await page.locator('#jqc-box').isVisible(), false);
 
       await page.evaluate(() => { window.__reply = { enabled: true, questions: 5, checked: 5, errors: 0, noExplanation: 0, flags: [] }; });
@@ -57,7 +57,7 @@ const ADMIN = pathToFileURL(path.resolve('public/admin.html')).href;
       await page.evaluate(() => { window.__reply = new Error('down'); });
       await btn(); await page.waitForTimeout(100);
       assert.match(await box(), /Could not reach Jev/);
-      assert.equal(await page.locator('#jev-quiz-check').isDisabled(), false, 'can try again');
+      assert.equal(await page.evaluate(() => window.__jevBtn.disabled), false, 'can try again');
       await page.context().close();
     }
     console.log('PASS: Jev check — whole-quiz button, unsaved quiz, flags in order, Open jumps, clean, off, error, 390 px');
