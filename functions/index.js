@@ -5486,6 +5486,37 @@ exports.jevCheckQuiz = onCall({ secrets: ["OPENROUTER_API_KEY", "JEV_AI_API_KEY"
     return { enabled: true, ...out };
 });
 
+// V102.563: Jev looks for the same content under different terms across a quiz's Read first notes. Quiz content only; admin only, on a button; answers share the Compare cache.
+exports.jevPrimerRepeats = onCall({ secrets: ["OPENROUTER_API_KEY", "JEV_AI_API_KEY"], timeoutSeconds: 300, memory: "256MiB" }, async (request) => {
+    requireAdminCallable(request);
+    const db = admin.firestore();
+    const cfg = await db.collection("quiz_dup_scores").doc("_config").get();
+    if (cfg.exists && cfg.data().enabled === false) return { enabled: false };
+    const provider = jev.providerOf(cfg.exists ? cfg.data().provider : null);
+    const apiKey = jevApiKey(provider);
+    if (!apiKey) throw new HttpsError("failed-precondition", "No API key configured for provider " + provider);
+    const primers = (request.data || {}).primers, pr = require("./jev-primer-repeats");
+    if (!Array.isArray(primers) || !primers.length || primers.length > pr.MAX_PRIMERS) throw new HttpsError("invalid-argument", "1-" + pr.MAX_PRIMERS + " notes");
+    const out = await pr.findRepeats(primers.map(p => String(p || "").slice(0, 6000)), pairs => jev.compareBatch(pairs, {
+        apiKey, provider, fetch: (url, opts) => fetch(url, opts),
+        readCache: async (keys) => {
+            const m = {};
+            for (let i = 0; i < keys.length; i += 30) {
+                const snaps = await db.getAll(...keys.slice(i, i + 30).map(k => db.collection("quiz_dup_scores").doc(k)));
+                snaps.forEach(sn => { if (sn.exists && typeof sn.data().sameFact === "number") m[sn.id] = sn.data(); });
+            }
+            return m;
+        },
+        writeCache: async (entries) => {
+            const batch = db.batch();
+            entries.forEach(e => batch.set(db.collection("quiz_dup_scores").doc(e.key), { sameFact: e.sameFact, sameTopic: e.sameTopic, model: e.model, at: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }));
+            await batch.commit();
+        },
+    }));
+    if (out.calls) recordAiUsage(provider, jev.JEV_MODEL, out.inputTokens, true, "jev_primer_repeats", { inputTokens: out.inputTokens, outputTokens: 0 });
+    return { enabled: true, repeats: out.repeats, compared: out.compared, left: out.left, errors: out.errors };
+});
+
 // V102.562: Jev suggests the system of waiting cases. Admin only, on a button; the server reads the cases and scrubs each note, so nothing but the scrubbed note leaves. Nothing is cached.
 exports.jevSuggestCaseSystems = onCall({ secrets: ["JEV_AI_API_KEY"], timeoutSeconds: 120, memory: "256MiB" }, async (request) => {
     requireAdminCallable(request);
