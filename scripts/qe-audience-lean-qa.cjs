@@ -55,12 +55,14 @@ const IDS = ['quiz-system-select', 'quiz-campaign-chips', 'quiz-campaign', 'quiz
     await page.evaluate(() => setQuizTargetGroupValue('Public'));
 
     // Modes: real checkboxes, grey off, coloured on, no visible box
+    assert.equal(await page.evaluate(() => document.getElementById('qe-modes').closest('.qe-head') !== null), true, 'V102.561: on the title row');
+    await page.evaluate(() => { const m = document.getElementById('qe-modes'); document.body.appendChild(m); m.style.setProperty('display', 'inline-flex', 'important'); });   // this harness shows the Audience block alone
     const shuffle = page.locator('label.logic-chip:has(#quiz-shuffle-choices)'), poll = page.locator('label.logic-chip:has(#quiz-is-poll)');
-    assert.equal(await page.locator('#qe-aud .logic-chip').count(), 8);
-    assert.equal(await poll.innerText(), 'Poll');
+    assert.equal(await page.locator('#qe-modes .logic-chip').count(), 8); assert.equal(await page.locator('#qe-aud .logic-chip').count(), 0);
+    assert.equal((await poll.textContent()).trim(), 'Poll', 'the name stays in the DOM for screen readers');
     assert.ok((await poll.getAttribute('title')).includes('·'), 'the full name + TH in the tooltip');
     assert.equal(await page.$eval('#quiz-shuffle-choices', i => getComputedStyle(i).opacity), '0', 'no visible box');
-    assert.notEqual(await shuffle.evaluate(n => getComputedStyle(n).color), await poll.evaluate(n => getComputedStyle(n).color), 'on looks different from off');
+    assert.notEqual(await shuffle.evaluate(n => getComputedStyle(n).backgroundColor), await poll.evaluate(n => getComputedStyle(n).backgroundColor), 'on looks different from off');
     assert.equal(await page.$eval('#quiz-is-poll', i => i.checked), false);
     await poll.click();
     assert.equal(await page.$eval('#quiz-is-poll', i => i.checked), true, 'a click toggles the real checkbox');

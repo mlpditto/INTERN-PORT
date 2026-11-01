@@ -4,7 +4,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const admin = fs.readFileSync('public/admin.html', 'utf8').replace(/\r/g, '');
 assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(admin));
 const grab = marker => { const i = admin.indexOf(marker); assert.ok(i >= 0, marker); let d = 0, k = admin.indexOf('{', admin.indexOf(')', i)); for (; k < admin.length; k++) { if (admin[k] === '{') d++; else if (admin[k] === '}' && --d === 0) break; } return admin.slice(i, k + 1); };
-const fns = [grab('window._qImproveCtx = function'), grab('window._qPrimerDraft = async function'), grab('window._qImproveShowPanel = function'), grab('window._qImproveActionBar = function'), grab('window._qImproveRemovePanel = function'), grab('window._qPrimerModelSelect = function'), grab('window._qPrimerTermsInstead = function'), grab('window._qPrimerDraftAll = async function')].join(';\n');
+const fns = [grab('window._qPrimerSeenTerms = function'),grab('window._qImproveCtx = function'), grab('window._qPrimerDraft = async function'), grab('window._qImproveShowPanel = function'), grab('window._qImproveActionBar = function'), grab('window._qImproveRemovePanel = function'), grab('window._qPrimerModelSelect = function'), grab('window._qPrimerTermsInstead = function'), grab('window._qPrimerDraftAll = async function')].join(';\n');
 const boxStart = admin.indexOf('<div class="q-primer-row"'), box = admin.slice(boxStart, admin.indexOf('</div>', admin.indexOf('</textarea>', boxStart)) + 6).replace(/\$\{data && data\.primer \? String\(data\.primer\)\.replace\(\/<\/g, '&lt;'\) : ''\}/, '');
 assert.ok(box.includes('${window._qPrimerModelSelect()}'), 'the model input sits in the label row, before the icon buttons (V102.509: a hidden input the vendor-first rail binds to)');
 assert.ok(box.includes("_qPrimerDraft(this, 'full')") && !box.includes("'terms'") && !box.includes('_qPrimerDraftAll(this)') && box.includes('_qPrimerReviewAll()'), 'V102.524 (owner, option 1): the row keeps ✨ and 📖 All only — ☰ moved into the panel after a draft, ✨ All into the popup');
@@ -71,6 +71,11 @@ assert.ok(/aria-label="Draft Read first with AI">✨</.test(box) && /The correct
             return out;
         }, [fns, box]);
         const [pFull, pTerms] = r.prompts;
+        assert.ok(/ห้ามเขียนคำว่า "ความรู้พื้นฐาน"/.test(pFull) && /ไม่เกิน ~70 คำ/.test(pFull) && /ไม่เกิน 3 คำ/.test(pFull), 'V102.561: short, memorable, no heading');
+        { const h = require('node:fs').readFileSync('public/admin.html', 'utf8'), a = h.indexOf('window._qPrimerSeenTerms = function'), b = h.indexOf('window._qPrimerDraft = async', a);
+          const items = [{ querySelector: () => ({ value: '**ความรู้พื้นฐาน**\ntext\n- **OAB** — x\n- **IOP (pressure)** — y' }) }, { querySelector: () => ({ value: '- **BAK** — z' }) }, {}];
+          const win = {}; new Function('window', 'document', h.slice(a, b))(win, { querySelectorAll: () => items });
+          assert.deepEqual(win._qPrimerSeenTerms(items[1]), ['OAB', 'IOP (pressure)'], 'only earlier questions, only term lines'); assert.deepEqual(win._qPrimerSeenTerms(items[0]), []); }
         assert.ok(pFull.includes('Which drug is a LABA?') && ['Ipratropium', 'Salmeterol', 'Salbutamol'].every(o => pFull.includes(o)), 'the prompt carries the stem and every option');
         assert.ok(!/คำตอบที่ถูก|correct|ข้อ 2/.test(pFull.replace('ห้ามระบุ ห้ามบอกใบ้ หรือเปรียบเทียบว่าตัวเลือกใดถูก/ผิด', '')), 'NO answer key in the prompt (no "correct answer", no index of the ticked option)');
         assert.ok(/ไม่มีการระบุคำตอบ/.test(pFull) && /ห้ามเฉลย/.test(pFull), 'the prompt forbids giving the answer away');

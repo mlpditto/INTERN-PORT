@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.558)</title>
+    <title>Nika Admin (V102.561)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -8345,6 +8345,23 @@
         #quizManageModal .qe-pay b { color:#fbbf24; }
         #quizManageModal .qe-head-gear { margin:0 0 0 auto; flex-shrink:0; width:34px; height:34px; min-height:0; padding:0; border-radius:10px; background:#2b3450; border:1px solid #3a4562; font-size:1em; line-height:1; cursor:pointer; }
         #quizManageModal .qe-head-gear:hover { filter:brightness(1.15); }
+        /* V102.561 (owner, A + D + E): the quiz modes are on the title row. Off = a grey icon; on = colour, frame and its name; three groups: who can take it, how it is marked, LINE */
+        #qe-modes { margin-left:auto; display:inline-flex; align-items:center; gap:3px; flex-wrap:wrap; min-width:0; }
+        #qe-modes .qe-sep { width:1px; height:20px; margin:0 4px; background:#3a4562; }
+        #qe-modes .logic-chip { position:relative; display:inline-flex; align-items:center; justify-content:center; gap:4px; height:32px; min-width:32px; padding:0 5px; box-sizing:border-box; border:1px solid transparent; border-radius:9px; font-size:.72em; font-weight:800; color:var(--mc); cursor:pointer; white-space:nowrap; }
+        #qe-modes .logic-chip::before { content:attr(data-ic); font-size:16px; line-height:1; filter:grayscale(1); opacity:.42; }
+        #qe-modes .logic-chip:hover::before { opacity:.8; }
+        #qe-modes .logic-chip span { display:none; }
+        #qe-modes .logic-chip input { position:absolute; opacity:0; width:100%; height:100%; left:0; top:0; margin:0; min-height:0; cursor:pointer; }
+        #qe-modes .logic-chip:has(input:focus-visible) { outline:2px solid #818cf8; outline-offset:1px; }
+        #qe-modes .logic-chip:has(input:checked) { padding:0 8px; background:var(--mb); border-color:var(--mc); }
+        #qe-modes .logic-chip:has(input:checked)::before { filter:none; opacity:1; }
+        #qe-modes .logic-chip:has(input:checked) span { display:inline; }
+        #qe-modes .m-blue { --mc:#93c5fd; --mb:rgba(59,130,246,.18); } #qe-modes .m-red { --mc:#fca5a5; --mb:rgba(239,68,68,.18); }
+        #qe-modes .m-green { --mc:#6ee7b7; --mb:rgba(16,185,129,.18); } #qe-modes .m-vio { --mc:#c4b5fd; --mb:rgba(167,139,250,.2); }
+        #qe-modes .m-amb { --mc:#fcd34d; --mb:rgba(245,158,11,.18); } #qe-modes .m-cy { --mc:#67e8f9; --mb:rgba(6,182,212,.18); }
+        #quizManageModal #qe-modes + .qe-head-gear { margin-left:0; }
+        @media (max-width:700px) { #quizManageModal .qe-head { flex-wrap:wrap; } #qe-modes { order:9; width:100%; margin-left:0; } #quizManageModal #qe-modes + .qe-head-gear { margin-left:auto; } }
         #quizManageModal .qe-head-gear[aria-expanded="true"] { background:#4361ee; border-color:#4361ee; }
         #quizManageModal #quiz-editor-settings > summary { display:none; }
         #quizManageModal #quiz-editor-settings:not([open]) { display:none; }
@@ -8488,8 +8505,8 @@
     <script src="drug-materials.js?v=V102.130"></script>
     <script src="quiz-generation-rules.js?v=V99.40"></script>
     <script src="quiz-compact-toolbar.js?v=V102.323"></script>
-    <script src="jev-quiz-check.js?v=V102.558"></script>
-    <link rel="stylesheet" href="jev-quiz-check.css?v=V102.552">
+    <script src="jev-quiz-check.js?v=V102.561"></script>
+    <link rel="stylesheet" href="jev-quiz-check.css?v=V102.561">
     <link rel="stylesheet" href="quiz-compact-toolbar.css?v=V102.406">
     <script src="taxonomy.js?v=V94.55"></script>
     <!-- V91.84: cache-busting on case-taxonomy.js so browser refetches when shim changes (script URL is otherwise constant) -->
@@ -8500,7 +8517,7 @@
     <script src="topic-map.js?v=V102.541"></script>
     <script src="topic-map-admin.js?v=V102.541" defer></script>
     <script src="admin-guide.js?v=V102.546" defer></script>
-<link rel="stylesheet" href="audit-toolbar.css?v=V102.558">
+<link rel="stylesheet" href="audit-toolbar.css?v=V102.561">
 <link rel="stylesheet" href="quiz-curate.css?v=V102.478">
 <script src="quiz-revision.js?v=V100.07"></script>
 <script src="ai-usage-overview.js?v=V102.528"></script>
@@ -14934,6 +14951,18 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
                     <span class="qe-head-pill" id="qe-head-group" title="Target group" data-th-title="กลุ่มเป้าหมาย" data-kr-title="대상 그룹">👥 Public</span>
                     <span class="qe-head-pill" id="qe-head-points" title="Points" data-th-title="คะแนน" data-kr-title="점수">⭐ 1</span>
                     <span class="qe-head-pill qe-head-live" id="qe-head-live" hidden></span>
+                    <span id="qe-modes" role="group" aria-label="Quiz modes">
+                    <label data-ic="📊" class="logic-chip m-blue" title="Collection Form (Poll) · ฟอร์มเก็บข้อมูล"><input type="checkbox" id="quiz-is-poll"> <span>Poll</span></label>
+                    <label data-ic="1️⃣" class="logic-chip m-red" title="Single Attempt Only · ทำได้ครั้งเดียว"><input type="checkbox" id="quiz-one-time"> <span>One attempt</span></label>
+                    <label data-ic="📚" class="logic-chip m-green" title="Homework Assignment · มอบหมายการบ้าน"><input type="checkbox" id="quiz-is-homework" onchange="toggleHomeworkUI()"> <span>Homework</span></label>
+                    <i class="qe-sep" aria-hidden="true"></i>
+                    <label data-ic="🔀" class="logic-chip m-vio" title="Shuffle Choices · สลับตัวเลือก"><input type="checkbox" id="quiz-shuffle-choices" checked> <span>Shuffle</span></label>
+                    <label data-ic="➗" class="logic-chip m-amb" title="Partial Credit (multi-answer): (correct − wrong) / total correct, min 0. Single-answer unaffected. · ให้คะแนนบางส่วนในข้อหลายคำตอบ"><input type="checkbox" id="quiz-partial-credit"> <span>Partial</span></label>
+                    <label data-ic="🎓" class="logic-chip m-green" title="Practice: after each choice question the intern presses Check and sees right / wrong, the answer and the explanation straight away (the choice then locks). Leave OFF for exam sets — it shows the key. · ฝึก: เฉลยทีละข้อระหว่างทำ"><input type="checkbox" id="quiz-instant-answer"> <span>Practice</span></label>
+                    <i class="qe-sep" aria-hidden="true"></i>
+                    <label data-ic="🔔" class="logic-chip m-cy" title="Notify LINE every submit. OFF (normal): an active quiz already announces two milestones to the LINE group by itself — the first intern to submit, and when everyone eligible has finished. ON: announce EVERY submission instead — one message per intern, so only use it on quizzes worth watching live (the OA's monthly message quota is shared with the case and digest pushes). · แจ้ง LINE ทุกครั้งที่ส่ง"><input type="checkbox" id="quiz-notify-group"> <span>Notify</span></label>
+                    <label data-ic="⏰" class="logic-chip m-red" title="Deadline alert (LINE). ON (default): once the quiz has a Deadline, LINE alerts the intern group when it closes within 24 h, then messages each intern who has not submitted yet 3 h before. Nothing is sent 22:00–07:00. Personal messages stop when the month's LINE quota is critical or the daily cap is reached. Turn OFF for a quiz that should close quietly. · เตือนก่อนหมดเวลาทาง LINE"><input type="checkbox" id="quiz-notify-deadline" checked> <span>Deadline</span></label>
+                </span>
                     <button type="button" class="qe-head-gear" id="qe-head-settings" onclick="toggleQuizEditorSettings()" aria-expanded="false" aria-controls="quiz-editor-settings" aria-label="Quiz settings" title="Quiz settings — title, group, points, dates" data-th-title="ตั้งค่าชุดข้อสอบ — ชื่อ กลุ่ม คะแนน วันที่" data-kr-title="퀴즈 설정">⚙️</button>
                     <span class="close-modal qe-head-x" onclick="forceHideModal('quizManageModal')" style="position: static; color: #94a3b8; font-size: 24px; font-weight: bold; cursor: pointer; background: rgba(255,255,255,0.05); border-radius: 50%; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.3s; border: 1px solid rgba(255,255,255,0.1);">&times;</span>
                 </div>
@@ -15114,18 +15143,8 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
                                     </div>
                                 </div>
                                 <div class="aud-r">
-                                    <span class="aud-l">Modes</span>
+                                    <span class="aud-l">Limits</span>
                                     <div class="aud-who">
-                                    <div class="aud-rail">
-                                    <label class="logic-chip m-blue" title="Collection Form (Poll) · ฟอร์มเก็บข้อมูล"><input type="checkbox" id="quiz-is-poll"> <span>Poll</span></label>
-                                    <label class="logic-chip m-red" title="Single Attempt Only · ทำได้ครั้งเดียว"><input type="checkbox" id="quiz-one-time"> <span>One attempt</span></label>
-                                    <label class="logic-chip m-green" title="Homework Assignment · มอบหมายการบ้าน"><input type="checkbox" id="quiz-is-homework" onchange="toggleHomeworkUI()"> <span>Homework</span></label>
-                                    <label class="logic-chip m-vio" title="Shuffle Choices · สลับตัวเลือก"><input type="checkbox" id="quiz-shuffle-choices" checked> <span>Shuffle</span></label>
-                                    <label class="logic-chip m-amb" title="Partial Credit (multi-answer): (correct − wrong) / total correct, min 0. Single-answer unaffected. · ให้คะแนนบางส่วนในข้อหลายคำตอบ"><input type="checkbox" id="quiz-partial-credit"> <span>Partial</span></label>
-                                    <label class="logic-chip m-green" title="Practice: after each choice question the intern presses Check and sees right / wrong, the answer and the explanation straight away (the choice then locks). Leave OFF for exam sets — it shows the key. · ฝึก: เฉลยทีละข้อระหว่างทำ"><input type="checkbox" id="quiz-instant-answer"> <span>Practice</span></label>
-                                    <label class="logic-chip m-cy" title="Notify LINE every submit. OFF (normal): an active quiz already announces two milestones to the LINE group by itself — the first intern to submit, and when everyone eligible has finished. ON: announce EVERY submission instead — one message per intern, so only use it on quizzes worth watching live (the OA's monthly message quota is shared with the case and digest pushes). · แจ้ง LINE ทุกครั้งที่ส่ง"><input type="checkbox" id="quiz-notify-group"> <span>Notify</span></label>
-                                    <label class="logic-chip m-red" title="Deadline alert (LINE). ON (default): once the quiz has a Deadline, LINE alerts the intern group when it closes within 24 h, then messages each intern who has not submitted yet 3 h before. Nothing is sent 22:00–07:00. Personal messages stop when the month's LINE quota is critical or the daily cap is reached. Turn OFF for a quiz that should close quietly. · เตือนก่อนหมดเวลาทาง LINE"><input type="checkbox" id="quiz-notify-deadline" checked> <span>Deadline</span></label>
-                                    </div>
                                     <div class="aud-nums">
                                             <label class="aud-n" title="Hide this quiz until the user's cumulative score ≥ this value (0 = no gate) · ซ่อน Quiz จนกว่าคะแนนสะสมถึงค่านี้">🔒 Unlock<input type="number" id="quiz-unlock-score" value="0" min="0" step="0.5" aria-label="Unlock at score"></label>
                                             <label class="aud-n" title="Max characters for the per-quiz feedback note · จำกัดจำนวนตัวอักษรของ Feedback">💬 Limit<input type="number" id="quiz-feedback-limit" value="280" min="0" max="1000" aria-label="Feedback limit"></label>
@@ -20713,10 +20732,10 @@ RULES:
         window.reviewTabsHtml = function(activeId, count) {
             const items = window.REVIEW_TABS.map(t => {
                 const title = t.id === 'audit' ? 'ตรวจคะแนนและคุณภาพข้อสอบ' : 'เสนอการปรับปรุงคำถาม';
-                return `<button type="button" class="review-tab" data-review-tab="${t.id}" aria-pressed="${t.id === activeId}" onclick="window.showReviewTab('${t.id}')" title="${title}"${count && t.id === 'specialist' ? ` data-count="${count}"` : ''}>${t.label}</button>`;
+                return `<button type="button" class="review-tab" data-ic="${t.icon}" data-review-tab="${t.id}" aria-pressed="${t.id === activeId}" onclick="window.showReviewTab('${t.id}')" title="${title}"${count && t.id === 'specialist' ? ` data-count="${count}"` : ''} aria-label="${t.label}">${t.label}</button>`;
             }).join('');
             // V102.558 (owner): Jev check lives beside the two AI tabs; it opens its own box over the Review and spends nothing there
-            const jev = '<button type="button" id="jev-quiz-check" class="review-tab" onclick="jevQuizCheck.run(this)" title="Jev reads the questions on screen: explanation vs marked answer, translation vs source" data-th-title="Jev ตรวจคำอธิบายกับเฉลย และคำแปลกับต้นฉบับ" data-kr-title="Jev가 해설과 정답, 번역과 원문을 확인합니다">Jev check</button>';
+            const jev = '<button type="button" id="jev-quiz-check" class="review-tab" aria-label="Jev check" onclick="jevQuizCheck.run(this)" title="Jev reads the questions on screen: explanation vs marked answer, translation vs source" data-th-title="Jev ตรวจคำอธิบายกับเฉลย และคำแปลกับต้นฉบับ" data-kr-title="Jev가 해설과 정답, 번역과 원문을 확인합니다">Jev check</button>';
             return `<div class="review-tabs" role="group" aria-label="Review mode">${items}${jev}</div>`;
         };
 
@@ -26295,18 +26314,25 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             picked = window.normalizeTextAIModel(picked);
             return '<input type="hidden" class="q-primer-model" id="q-primer-model-' + (++window._qPrimerModelSeq) + '" value="' + escapeHtml(picked) + '" onchange="try{localStorage.setItem(\'ai_primer_model\', this.value)}catch(e){}">';
         };
+        // V102.561 (owner): terms an earlier question already explains are not explained again
+        window._qPrimerSeenTerms = function(item) {
+            const items = [...document.querySelectorAll('#quizManageModal .quiz-q-item')], at = items.indexOf(item), seen = new Set();
+            items.slice(0, Math.max(0, at)).forEach(it => { const t = (it.querySelector('.q-primer') || {}).value || ''; (t.match(/^\s*-\s*\*\*[^*\n]{2,80}\*\*/gm) || []).forEach(m => seen.add(m.replace(/^\s*-\s*\*\*|\*\*$/g, '').trim())); });
+            return [...seen].slice(0, 40);
+        };
         window._qPrimerDraft = async function(btn, mode, modelOverride, silent) {
             const item = btn.closest('.quiz-q-item'), ctx = window._qImproveCtx(item), ta = item && item.querySelector('.q-primer');
             if (!ta) return;
             if (!ctx.question) { showToast('Write the question first'); return; }
-            const opts = ctx.options.filter(Boolean);
+            const opts = ctx.options.filter(Boolean), seenTerms = window._qPrimerSeenTerms(item);
             const prompt = [
                 'ภาษา: เขียนเป็นภาษาเดียวกับโจทย์ (โจทย์ไทย→ไทย) คงศัพท์เทคนิคภาษาอังกฤษไว้',
                 mode === 'terms'
                     ? 'งานของคุณ: ทำ "อภิธานศัพท์สั้นๆ" ของคำเฉพาะ/ศัพท์วิชาการในโจทย์และตัวเลือก ที่ผู้เรียนควรรู้ก่อนตอบ (ไม่เกิน 6 คำ) รูปแบบบรรทัดละคำ: - **คำ** — ความหมายสั้นๆ 1 บรรทัด'
-                    : 'งานของคุณ: เขียน "หน้าอ่านก่อนทำ" ให้ผู้เรียนอ่านก่อนตอบข้อนี้ ประกอบด้วย (1) ความรู้พื้นฐานที่ต้องมี 2–4 ประโยคสั้น (2) คำศัพท์สำคัญ ไม่เกิน 5 คำ บรรทัดละคำ: - **คำ** — ความหมายสั้นๆ',
+                    : 'งานของคุณ: เขียน "หน้าอ่านก่อนทำ" ให้ผู้เรียนอ่านก่อนตอบข้อนี้ ประกอบด้วย (1) สรุปแก่นที่ต้องรู้ 1–2 ประโยคสั้น เข้าใจง่าย ช่วยให้จำได้ ไม่อธิบายยืดยาว ไม่ต้องมีหัวข้อ ห้ามเขียนคำว่า "ความรู้พื้นฐาน" (2) คำศัพท์สำคัญเท่าที่จำเป็น ไม่เกิน 3 คำ บรรทัดละคำ: - **คำ** — ความหมายสั้นๆ',
+                seenTerms.length ? 'ข้อก่อนหน้าอธิบายคำเหล่านี้แล้ว ห้ามอธิบายซ้ำ และให้เน้นสิ่งใหม่ของข้อนี้: ' + seenTerms.join(', ') : '',
                 'กฎเด็ดขาด: ห้ามระบุ ห้ามบอกใบ้ หรือเปรียบเทียบว่าตัวเลือกใดถูก/ผิด ห้ามเฉลยโจทย์ เขียนเฉพาะความรู้ที่ผู้เรียนต้องมีก่อนคิดเอง ห้ามคัดลอกตัวเลือกมาทั้งประโยค',
-                'ไม่เกิน ~120 คำ ใช้ markdown เบาๆ ได้ ห้ามแต่งข้อมูลที่ไม่แน่ใจ',
+                'ไม่เกิน ~70 คำ ใช้ markdown เบาๆ ได้ ห้ามแต่งข้อมูลที่ไม่แน่ใจ',
                 '',
                 'โจทย์: ' + JSON.stringify(ctx.question),
                 'ตัวเลือก (ไม่มีการระบุคำตอบ):\n' + opts.map((o, i) => (i + 1) + '. ' + o).join('\n'),
@@ -26319,7 +26345,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 const res = await window.callUniversalAI(modelOverride || ((item.querySelector('.q-primer-model') || {}).value) || window._qImproveModel(item), prompt, true, null, ctx.quickApiKey, { feature: 'question_primer' });
                 const data = safeJsonParse(res.text);
                 if (!data || typeof data.primer !== 'string' || !data.primer.trim()) throw new Error('AI ไม่ได้ส่งเนื้อหากลับมา');
-                const text = data.primer.trim();
+                const text = data.primer.replace(/^\s*(?:#+\s*)?\*{0,2}ความรู้พื้นฐาน\*{0,2}\s*:?\s*/, '').trim();
                 const low = text.toLowerCase();
                 const leaks = ctx.correctIndices.map(i => String(ctx.options[i] || '').trim()).filter(t => t.length >= 4 && low.includes(t.toLowerCase()));
                 const warn = leaks.length ? ' — ⚠️ it repeats a correct option, check it' : '', took = ' · ' + Math.max(1, Math.round((Date.now() - t0) / 1000)) + ' s';

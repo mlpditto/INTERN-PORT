@@ -30,11 +30,12 @@ function planCheck(quiz) {
     const questions = Array.isArray(quiz && quiz.questions) ? quiz.questions : [];
     const items = [], found = [];
     let noExplanation = 0;
+    const unchecked = [];
     questions.forEach((q, i) => {
         const options = opts(q.options), marks = (Array.isArray(q.correct) ? q.correct : []).filter(n => options[n]);
         if (!options.length || !marks.length) return;   // short answer, poll, or no key: the save check owns that
         const explanation = clean(q.explanation, 1500);
-        if (!explanation) { noExplanation++; return; }
+        if (!explanation) { noExplanation++; unchecked.push(i); return; }
         const state = { question: clean(q.q, 800), options, explanation, marked_answer: marks.map(n => options[n]).join(' + ') };
         items.push({ kind: 'key', q: i, state, key: hash('key', state) });
     });
@@ -50,7 +51,7 @@ function planCheck(quiz) {
             items.push({ kind: 'lang', lang, q: i, state, key: hash('lang', state) });
         });
     });
-    return { items, found, noExplanation, questions: questions.length };
+    return { items, found, noExplanation, unchecked, questions: questions.length };
 }
 
 // deps: { apiKey, provider, fetch, readCache(keys) -> { key: score }, writeCache([{ key, score }]) }
@@ -82,7 +83,44 @@ async function checkQuiz(quiz, deps) {
     });
     const order = { bad: 0, look: 1, unsure: 2 };
     const flags = [...plan.found, ...results].sort((a, b) => order[a.verdict] - order[b.verdict] || (a.q == null ? -1 : a.q) - (b.q == null ? -1 : b.q));
-    return { flags, checked: plan.items.length - errors, errors, noExplanation: plan.noExplanation, questions: plan.questions, calls: todo.length, inputTokens, provider };
+    return { flags, checked: plan.items.length - errors, errors, noExplanation: plan.noExplanation, unchecked: plan.unchecked, questions: plan.questions, calls: todo.length, inputTokens, provider };
 }
 
-module.exports = { checkQuiz, planCheck, verdictOf, srcSig, BAD_BELOW, LOOK_BELOW, MAX_ITEMS };
+// V102.561: which questions in other quizzes are worth asking Jev about. Comparing everything is too many pairs, so a pair needs a shared word
+// that few questions use. Words only: 5+ Latin letters or 4+ Thai characters, and a word in over 12 questions says nothing.
+const COMMON = 12, PER_QUESTION = 3, MAX_PAIRS = 60;
+const wordsOf = q => new Set((clean(q && q.q, 800) + ' ' + opts(q && q.options).join(' ')).toLowerCase().match(/[a-z][a-z-]{4,}|[\u0E00-\u0E7F]{4,}/g) || []);
+function repeatCandidates(questions, others) {
+    const pool = [], df = new Map();
+    (others || []).forEach(o => (Array.isArray(o.questions) ? o.questions : []).forEach((q, i) => {
+        if (!clean(q && q.q, 10)) return;
+        const words = wordsOf(q);
+        words.forEach(w => df.set(w, (df.get(w) || 0) + 1));
+        pool.push({ quizId: o.id, title: o.title, q, i, words });
+    }));
+    const out = [];
+    (Array.isArray(questions) ? questions : []).forEach((q, i) => {
+        const mine = wordsOf(q), hits = [];
+        pool.forEach(p => {
+            const shared = [...mine].filter(w => p.words.has(w) && df.get(w) <= COMMON);
+            if (shared.length) hits.push({ p, n: shared.length, rare: Math.min(...shared.map(w => df.get(w))) });
+        });
+        hits.sort((a, b) => b.n - a.n || a.rare - b.rare);
+        hits.slice(0, PER_QUESTION).forEach(h => out.push({ q: i, quizId: h.p.quizId, title: h.p.title, otherQ: h.p.i, n: h.n, mine: q, other: h.p.q }));
+    });
+    return out.sort((a, b) => b.n - a.n).slice(0, MAX_PAIRS);
+}
+const side = (q, title) => ({ quiz: title, stem: q && q.q, options: q && q.options });
+// deps: compare(pairs) -> { results: [{ sameFact, verdict } | { error }] }. Only "same fact" is shown; one failed batch reports and costs nothing else.
+async function findRepeats(questions, others, compare) {
+    const cand = repeatCandidates(questions, others);
+    if (!cand.length) return { repeats: [], compared: 0 };
+    const out = await compare(cand.map(c => ({ a: side(c.mine, ''), b: side(c.other, c.title) })));
+    const repeats = cand.flatMap((c, i) => {
+        const r = out.results[i];
+        return r && r.verdict === 'dup' ? [{ q: c.q, quizId: c.quizId, title: clean(c.title, 80), otherQ: c.otherQ, score: Math.round(r.sameFact * 100) / 100, stem: clean(c.mine.q, 300), otherStem: clean(c.other.q, 300) }] : [];
+    }).sort((a, b) => b.score - a.score);
+    return { repeats, compared: cand.length };
+}
+
+module.exports = { repeatCandidates, findRepeats, checkQuiz, planCheck, verdictOf, srcSig, BAD_BELOW, LOOK_BELOW, MAX_ITEMS };
