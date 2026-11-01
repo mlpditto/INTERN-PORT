@@ -5,7 +5,8 @@
 //   • "รวมที่ ✔" (when BOTH sides win some row): the stronger one is the base; the other side's ✔ structured fields (symptoms / drugs / appointment · ADR · labs) move in, the whole note
 //     comes from the side that wins it, the other is folded away — the base keeps its old values in `mergePrev`, so Undo (and Reopen of the folded one) put them back;
 //   • "เก็บใบนี้" folds the OTHER one away: reviewed with 0 points + duplicateOf, kept (never deleted), an Undo toast; a case that is already reviewed can't be folded;
-//   • "ไม่ซ้ำ" dismisses the pair (this browser). Same HN with a very different note = a quiet follow-up chip, no buttons. Never automatic.
+//   • "ไม่ซ้ำ" dismisses the pair (this browser). Never automatic.
+//   • V102.568 (owner, A): two cases with different notes (the follow-up chip, or two ticked cases) open a Merge sheet with a preview: both notes and both systems stay, the other case folds with 0 points, Undo as above.
 // Pair rule: same intern + same HN + the earlier case ≤ 7 days older + notes ≥ 90% alike (bigram Dice).
 (function () {
     const DAY = 86400000, WINDOW = 7 * DAY, FOLLOW_WINDOW = 30 * DAY, SAME = 0.9;
@@ -126,6 +127,32 @@
         return { base, other, baseSide: side, set, prev, parts };
     }
 
+    // ---- V102.568: Merge keeps both notes (pure). null = these two cannot be merged: another intern, or one is reviewed already.
+    const systemsOf = (c) => (Array.isArray(c.diseaseSystemKeys) && c.diseaseSystemKeys.length ? c.diseaseSystemKeys : (c.diseaseSystemKey ? [c.diseaseSystemKey] : []));
+    const systemLabel = (key, c) => {
+        const e = (window.alabastaTaxonomyCatalog || []).find(s => s.key === key);
+        return e ? e.label + ' / ' + (e.thaiLabel || e.label) : (c.diseaseSystemKey === key ? c.diseaseSystemLabel : key);
+    };
+    function joinPlan(a, b) {
+        if (!a || !b || a.id === b.id || !a.userId || a.userId !== b.userId || reviewed(a) || reviewed(b)) return null;
+        const side = hasCard(a) !== hasCard(b) ? (hasCard(a) ? 'a' : 'b') : 'b';   // the one with a Case Card stays the base, else the newer
+        const base = side === 'a' ? a : b, other = side === 'a' ? b : a, set = {}, prev = {};
+        const put = (k, v) => { const was = base[k] === undefined ? null : base[k]; if (JSON.stringify(was) !== JSON.stringify(v)) { prev[k] = was; set[k] = v; } };
+        put('note', [base.note, other.note].map(n => String(n || '').trim()).filter(Boolean).join('\n\n'));
+        ['symptomTags', 'medications'].forEach(k => { const u = unionOf(base[k], other[k]); if (u.length) put(k, u); });
+        EXTRA_KEYS.filter(k => !has(base, k) && has(other, k)).forEach(k => put(k, other[k]));
+        let keys = [...new Set(systemsOf(base).concat(systemsOf(other)))];
+        if (keys[0] === 'other' && keys.length > 1) keys = keys.slice(1).concat('other');   // a real system leads
+        if (keys.length > 1) put('diseaseSystemKeys', keys);
+        if (keys[0] && keys[0] !== base.diseaseSystemKey) {
+            const label = systemLabel(keys[0], other), head = s => String(s || '').split('/')[0].trim();
+            if (head(base.disease) === head(base.diseaseSystemLabel)) put('disease', label);   // a title that only repeats the old system follows it
+            put('diseaseSystemKey', keys[0]); put('diseaseSystemLabel', label);
+        }
+        const warn = [normHn(a.caseId) !== normHn(b.caseId) ? 'Different HN' : '', normNote(a.customer) !== normNote(b.customer) ? 'Different patient name' : ''].filter(Boolean);
+        return { base, other, baseSide: side, set, prev, keys, warn, parts: ['both notes kept'] };
+    }
+
     // ---- the chip on a card (+ the tint class the card root takes)
     const dismissed = (id) => { try { return localStorage.getItem(dismissKey(id)) === '1'; } catch (_) { return false; } };
     function cls(c) {
@@ -139,7 +166,12 @@
             if (dismissed(p.a.id) || dismissed(p.b.id)) return '';
             return `<button type="button" class="cdup-chip" onclick="caseDup.open('${esc(p.a.id)}', '${esc(p.b.id)}')" title="Possible duplicate — compare side by side · อาจซ้ำ เทียบก่อนเก็บ">⛓ ${p.role === 'older' ? '1/2' : '2/2'} · same HN <i>›</i></button>`;
         }
-        if (f && f.kind === 'follow') return `<span class="cdup-chip soft" title="Same HN as ${esc(f.orig.caseId)}, different note — a follow-up, not a duplicate · HN เดียวกัน อาการต่างกัน">↺ HN ${esc(f.orig.caseId)} · follow-up?</span>`;
+        if (f && f.kind === 'follow') {
+            if (dismissed(c.id) && dismissed(f.orig.id)) return '';
+            const words = `↺ HN ${esc(f.orig.caseId)} · follow-up?`;
+            if (joinPlan(f.orig, c)) return `<button type="button" class="cdup-chip soft" onclick="caseDup.open('${esc(f.orig.id)}', '${esc(c.id)}')" title="Same HN, different note. Open to merge or keep both · HN เดียวกัน อาการต่างกัน">${words} <i>›</i></button>`;
+            return `<span class="cdup-chip soft" title="Same HN as ${esc(f.orig.caseId)}, different note — a follow-up, not a duplicate · HN เดียวกัน อาการต่างกัน">${words}</span>`;
+        }
         return '';
     }
 
@@ -158,12 +190,26 @@
             + `<div class="cdup-pick">${btn('a', a, b, cmp.winsA, b)}${btn('b', b, a, cmp.winsB, a)}</div>${mergeBtn}`
             + `<div class="cdup-ft"><button type="button" class="cdup-no" onclick="caseDup.dismiss('${esc(a.id)}', '${esc(b.id)}')">ไม่ซ้ำ</button></div></div>`;
     }
+    // V102.568: notes that differ: the two side by side, then what the merge gives
+    function joinHtml(a, b, pl) {
+        const sys = keys => keys.map(k => esc(((window.CASE_SYSTEM_EMOJI || {})[k] || '') + ' ' + (window.caseSystemShort ? caseSystemShort(k) : k))).join(' + ');
+        const side = (c, n) => `<div class="cmg-side"><small>Case ${n} · ${esc(c.displayName || '')} · ${esc(ago(c.timestamp))}</small><b>${sys(systemsOf(c))}</b><p>${esc(c.note || '')}</p></div>`;
+        const hn = a.caseId === b.caseId ? esc(a.caseId) : esc(a.caseId) + ' · ' + esc(b.caseId);
+        const keepBtn = (keepIt, foldIt, n) => `<button type="button" class="cdup-keep alt" onclick="caseDup.keep('${esc(keepIt.id)}', '${esc(foldIt.id)}')"><span>Keep case ${n}</span><small>Fold case ${3 - n}</small></button>`;
+        return `<div class="cdup-win" role="dialog" aria-label="Merge cases"><div class="cdup-hd"><b>⛓ Merge</b> <span class="cdup-hn">${hn}</span><span class="cdup-sp"></span><button type="button" class="cdup-x" onclick="caseDup.close()" aria-label="Close">✕</button></div>`
+            + (pl.warn.length ? `<div class="cmg-warn">⚠️ ${pl.warn.map(esc).join(' · ')}</div>` : '')
+            + `<div class="cmg-2">${side(a, 1)}${side(b, 2)}</div>`
+            + `<div class="cmg-res"><small>After merge</small><b>${sys(pl.keys)}</b><p>${esc(pl.base.note || '')}</p><hr><p>${esc(pl.other.note || '')}</p><small class="cmg-pts">One case stays. The other is kept folded with 0 points. Undo is available.</small></div>`
+            + `<div class="cdup-pick"><button type="button" class="cdup-keep rec" onclick="caseDup.merge('${esc(a.id)}', '${esc(b.id)}', true)"><span>⛓ Merge</span><small>Keep both notes</small></button>${keepBtn(a, b, 1)}${keepBtn(b, a, 2)}</div>`
+            + `<div class="cdup-ft"><button type="button" class="cdup-no" onclick="caseDup.dismiss('${esc(a.id)}', '${esc(b.id)}')">Not the same case</button></div></div>`;
+    }
     function open(aId, bId) {
         const all = cases(), a = all.find(c => c.id === aId), b = all.find(c => c.id === bId);
         if (!a || !b) return;
         close();
         const back = document.createElement('div'); back.id = 'cdup-back'; back.className = 'cdup-back lang-no-toggle';
-        back.innerHTML = modalHtml(a, b, similarity(a.note, b.note));
+        const sim = similarity(a.note, b.note), pl = sim < SAME ? joinPlan(a, b) : null;
+        back.innerHTML = pl ? joinHtml(a, b, pl) : modalHtml(a, b, sim);
         back.addEventListener('click', (e) => { if (e.target === back) close(); });
         document.body.appendChild(back);
     }
@@ -206,8 +252,8 @@
         } catch (e) { console.error('[case-dup] undo failed', e); if (typeof showToast === 'function') showToast('Could not undo: ' + (e && e.message ? e.message : 'error')); }
     }
     // merge = ONE batch: the base gets the ✔ parts (+ its old values in mergePrev, the id it absorbed in mergedFrom), the other is folded (mergedInto)
-    async function merge(aId, bId) {
-        const all = cases(), a = all.find(c => c.id === aId), b = all.find(c => c.id === bId), pl = a && b && plan(a, b);
+    async function merge(aId, bId, join) {
+        const all = cases(), a = all.find(c => c.id === aId), b = all.find(c => c.id === bId), pl = a && b && (join ? joinPlan(a, b) : plan(a, b));
         if (!pl) { if (typeof showToast === 'function') showToast('Nothing to merge here.'); return; }
         close();
         try {
@@ -238,7 +284,17 @@
             if (typeof showToast === 'function') showToast('↩ Both cases are back as they were');
         } catch (e) { console.error('[case-dup] undo merge failed', e); if (typeof showToast === 'function') showToast('Could not undo: ' + (e && e.message ? e.message : 'error')); }
     }
+    // V102.568: the Merge button on the bulk bar: exactly two ticked cases, the older one first
+    function picked() {
+        const ids = Array.from(window.alabastaSelectedIds || []);
+        if (ids.length !== 2) return null;
+        const [x, y] = ids.map(id => cases().find(c => c.id === id));
+        if (!x || !y) return null;
+        const [a, b] = ms(x.timestamp) <= ms(y.timestamp) ? [x, y] : [y, x];
+        return joinPlan(a, b) ? { a, b } : null;
+    }
+    function openPicked() { const p = picked(); if (p) open(p.a.id, p.b.id); }
     function dismiss(aId, bId) { try { localStorage.setItem(dismissKey(aId), '1'); localStorage.setItem(dismissKey(bId), '1'); } catch (_) { /* private mode */ } close(); repaint(); }
 
-    window.caseDup = { find, pair, compare, plan, similarity, html, cls, open, close, keep, fold, merge, stageRestore, undo, undoMerge, dismiss };
+    window.caseDup = { find, pair, compare, plan, joinPlan, picked, openPicked, similarity, html, cls, open, close, keep, fold, merge, stageRestore, undo, undoMerge, dismiss };
 })();

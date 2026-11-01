@@ -146,6 +146,10 @@ The **Admin Portal** page has 3 ways in — use any one:
 
 In 🏜️ **Alabasta**, tick the cases and press **🖼 Cards**. Check each summary, untick what is not ready, then press **Generate**. A failed card can be retried on its own; every card goes to the Codex Gallery.
 
+### Merge two cases
+
+Tick two cases from the same intern and press **⛓ Merge**, or tap **follow-up?** on a card. Check the preview, then merge. Both notes and systems stay, the other case is kept folded with 0 points, and Undo puts both back.
+
 ## 6. 🧠 Jev — the AI helper
 
 **Jev** is a small AI that answers short questions such as “do these two questions test the same fact?” or “which category is this shop?”. You can always recognise it by its **logo (a dark square with a teal J)** and the dark + teal colours.

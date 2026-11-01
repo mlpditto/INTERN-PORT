@@ -125,11 +125,11 @@ assert.equal(ctx.caseDup.plan(Object.assign({}, MA, { isArchived: true }), MB), 
     const txt = (s) => page.$eval(s, e => e.textContent.replace(/\s+/g, ' ').trim());
     // both cards of the pair are tinted and chipped; the others are not
     assert.deepEqual(await page.$$eval('.alabasta-inbox-card', e => e.map(c => [c.dataset.id, c.classList.contains('cdup-pair'), (c.querySelector('.cdup-chip') || {}).textContent ? c.querySelector('.cdup-chip').textContent.replace(/\s+/g, ' ').trim() : ''])),
-        [['a', true, '⛓ 1/2 · same HN ›'], ['b', true, '⛓ 2/2 · same HN ›'], ['f0', false, ''], ['f', false, '↺ HN F1 · follow-up?']]);
+        [['a', true, '⛓ 1/2 · same HN ›'], ['b', true, '⛓ 2/2 · same HN ›'], ['f0', false, ''], ['f', false, '↺ HN F1 · follow-up? ›']]);
     assert.ok(await page.$eval('.alabasta-inbox-card[data-id="a"]', e => getComputedStyle(e).backgroundImage.includes('gradient')), 'the tint is applied');
     const hn = await page.$$eval('.cdup-hn-code', e => e.map(x => getComputedStyle(x).fontWeight));
     assert.ok(hn.every(w => Number(w) >= 800), 'the HN is bold on every card');
-    assert.equal(await page.$$eval('.cdup-chip.soft button, .cdup-chip.soft[onclick]', e => e.length), 0, 'the follow-up chip is quiet');
+    assert.equal(await page.$$eval('.cdup-chip.soft button, .cdup-chip.soft[onclick]', e => e.length), 1, 'V102.568: the follow-up chip opens the Merge sheet');
     // the chip → the scorecard
     await page.click('.alabasta-inbox-card[data-id="b"] .cdup-chip');
     assert.equal(await page.$$eval('#cdup-back', e => e.length), 1);
