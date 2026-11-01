@@ -12,7 +12,7 @@ const harness = `<!doctype html><meta charset="utf-8"><title>Nika Admin (V9.9)</
 <style>.queue-empty{display:none!important}</style>
 <div id="dashboard-work"></div>
 <script>
-window.__q = []; window.__upd = []; window.__set = []; window.__failSet = false;
+window.__q = []; window.__upd = []; window.__set = []; window.__failSet = false; window.__toast = []; window.showToast = m => window.__toast.push(m);
 const T = ms => ({ toMillis: () => ms, toDate: () => new Date(ms) });
 const docs = [
   { id: 'a', data: () => ({ type: 'journal_feedback', authUid: 'auth-a', userId: 'U-a', userName: 'Mint', message: 'อยากได้โจทย์คำนวณยาเด็กเพิ่มครับ', attachment: { content: 'Learned: x', mood: '😊', moodSecondary: '' }, read: false, timestamp: T(2000) }), ref: { update: d => { window.__upd.push(['a', d]); return Promise.resolve(); } } },
@@ -39,8 +39,45 @@ const db = { app: { auth: () => ({ currentUser: { email: 'admin@test' }, onAuthS
         await page.evaluate(() => { document.querySelector('#dashboard-work details.lr-admin').open = true; });
         await page.waitForSelector('#dashboard-work .lr-request');
         assert.deepEqual(await page.evaluate(() => window.__q), [['admin_notifications', 'type', '==', 'journal_feedback'], ['intern_messages']], 'reads the notifications and, alongside, the interns’ copies (admins read all)');
-        const rows = await page.$$eval('.lr-request > summary', els => els.map(e => e.textContent));
-        assert.deepEqual(rows, ['💬 New · Mint', '↩ Replied · Ploy'], 'newest first; a replied one says so in the summary');
+        // V102.553: a message with no intern copy gets one, once, so it reaches History; one with a copy is left alone
+        await page.waitForFunction(() => window.__set.length === 1);
+        const fill = await page.evaluate(() => { const [n, id, d, o] = window.__set[0]; return { n, id, o, status: d.status, userId: d.userId, authUid: d.authUid, attached: d.attached, reply: d.reply }; });
+        assert.deepEqual(fill, { n: 'intern_messages', id: 'a', o: { merge: true }, status: 'sent', userId: 'U-a', authUid: 'auth-a', attached: true, reply: undefined }, 'the backfill is the plain copy, not a reply');
+        await page.evaluate(() => window.__okCopies({ docs: copies, size: 1 }));
+        assert.equal(await page.evaluate(() => window.__set.length), 1, 'not written twice');
+        await page.evaluate(() => { window.__set.length = 0; });
+
+        // scan without opening: count, preview, time, attachment, filters
+        const scan = await page.$eval('.lr-request[data-id="a"] > summary', e => ({ av: e.querySelector('.jf-av').textContent, pv: e.querySelector('.jf-pv').textContent, t: e.querySelector('time').textContent, att: !!e.querySelector('.jf-att') }));
+        assert.equal(scan.pv, 'อยากได้โจทย์คำนวณยาเด็กเพิ่มครับ'); assert.ok(scan.t && scan.att && scan.av === 'MI', JSON.stringify(scan));
+        assert.equal(await page.$eval('.jf-count', e => e.textContent), '1', 'the unread count');
+        assert.deepEqual(await page.$$eval('.jf-tab', e => e.map(x => x.textContent)), ['All 2', 'Unread 1', 'Needs reply 1', 'Replied 1']);
+        const tab = async i => { await page.locator('.jf-tab').nth(i).click(); return page.$$eval('.lr-request', e => e.map(x => x.dataset.id)); };
+        assert.deepEqual(await tab(1), ['a']); assert.deepEqual(await tab(3), ['b']); assert.deepEqual(await tab(0), ['a', 'b']);
+
+        // one open at a time; Esc closes; Ctrl+Enter sends; typing shows Draft
+        await page.evaluate(() => { document.querySelector('.lr-request[data-id="a"]').open = true; });
+        await page.waitForTimeout(50);
+        await page.evaluate(() => { document.querySelector('.lr-request[data-id="b"]').open = true; });
+        await page.waitForTimeout(50);
+        assert.deepEqual(await page.$$eval('.lr-request[open]', e => e.map(x => x.dataset.id)), ['b'], 'one open at a time');
+        await page.focus('.lr-request[data-id="b"] textarea'); await page.keyboard.press('Escape');
+        assert.equal(await page.locator('.lr-request[open]').count(), 0, 'Esc closes');
+        await page.evaluate(() => { document.querySelector('.lr-request[data-id="a"]').open = true; });
+        await page.fill('.lr-request[data-id="a"] textarea', 'x');
+        assert.equal(await page.locator('.lr-request[data-id="a"] .jf-st.draft').count(), 1, 'Draft shows on the row');
+        assert.equal(await page.$eval('.lr-request[data-id="a"] .jf-len', e => e.textContent), '1/2000');
+        await page.fill('.lr-request[data-id="a"] textarea', '');
+        assert.equal(await page.locator('.lr-request[data-id="a"] .jf-st.draft').count(), 0);
+        await page.evaluate(() => { document.querySelector('.lr-request[data-id="a"]').open = false; });
+
+        // a new message while open: one toast; the first load had none
+        assert.deepEqual(await page.evaluate(() => window.__toast), [], 'the first load is quiet');
+        await page.evaluate(() => { const n = { id: 'c', data: () => ({ type: 'journal_feedback', userName: 'Nam', message: 'hi', read: false, timestamp: T(4000) }), ref: { update: () => Promise.resolve() } }; window.__ok({ docs: [n].concat(docs), size: 3 }); window.__ok({ docs: docs, size: 2 }); });
+        assert.deepEqual(await page.evaluate(() => window.__toast), ['💬 New Journal feedback from Nam']);
+
+        const rows = await page.$$eval('.lr-request > summary', els => els.map(e => e.querySelector('b').textContent + ':' + e.querySelector('.jf-st').textContent));
+        assert.deepEqual(rows, ['Mint:New', 'Ploy:↩ Replied'], 'newest first; a replied one says so in the summary');
         const b = await page.$eval('.lr-request[data-id="b"]', r => ({ have: r.querySelector('.jf-have').textContent, ph: r.querySelector('textarea').placeholder, btn: r.querySelector('.jf-send').textContent, read: !!r.querySelector('button:not(.jf-send)') }));
         assert.match(b.have, /^↩ Under \*\*Settings ▸ Quiz\*\*\./, 'the existing reply shows under the message'); assert.match(b.have, /admin@test/);
         assert.deepEqual([b.ph.startsWith('Edit the reply'), b.btn, b.read], [true, '↩ Update reply', false], 'a replied row offers to update; already read → no Mark read');
@@ -49,7 +86,7 @@ const db = { app: { auth: () => ({ currentUser: { email: 'admin@test' }, onAuthS
         // empty reply refused
         await page.evaluate(() => { document.querySelector('.lr-request[data-id="a"]').open = true; });
         await page.click('.lr-request[data-id="a"] .jf-send');
-        assert.equal(await page.$eval('.lr-admin > p', e => e.textContent), 'Write a reply first.');
+        assert.equal(await page.$eval('.lr-admin > p[role=status]', e => e.textContent), 'Write a reply first.');
         assert.equal(await page.evaluate(() => window.__set.length), 0, 'nothing written');
         // a draft survives a snapshot re-render
         await page.fill('.lr-request[data-id="a"] textarea', 'เพิ่มให้แล้ว **10 ข้อ**');
@@ -59,22 +96,22 @@ const db = { app: { auth: () => ({ currentUser: { email: 'admin@test' }, onAuthS
         // a failed write keeps the text, re-enables the button
         await page.evaluate(() => { window.__failSet = true; });
         await page.click('.lr-request[data-id="a"] .jf-send');
-        await page.waitForFunction(() => /Could not send/.test(document.querySelector('.lr-admin > p').textContent));
+        await page.waitForFunction(() => /Could not send/.test(document.querySelector('.lr-admin > p[role=status]').textContent));
         assert.deepEqual(await page.$eval('.lr-request[data-id="a"]', r => [r.querySelector('textarea').value, r.querySelector('.jf-send').disabled]), ['เพิ่มให้แล้ว **10 ข้อ**', false], 'failure keeps the text, button usable again');
         assert.deepEqual(await page.evaluate(() => window.__upd), [], 'not marked read on a failure');
         // the reply: set(merge) on the copy with the six fields backfilled + the reply fields; the notification is marked read
         await page.evaluate(() => { window.__failSet = false; });
-        await page.click('.lr-request[data-id="a"] .jf-send');
+        await page.focus('.lr-request[data-id="a"] textarea'); await page.keyboard.press('Control+Enter');   // V102.553: Ctrl / ⌘ + Enter sends
         await page.waitForFunction(() => window.__set.length === 1 && window.__upd.length === 1);
         const w = await page.evaluate(() => { const [n, id, d, o] = window.__set[0]; return { n, id, d: Object.assign({}, d, { createdAt: d.createdAt && d.createdAt.toMillis() }), o }; });
         assert.deepEqual(w, { n: 'intern_messages', id: 'a', o: { merge: true }, d: { authUid: 'auth-a', userId: 'U-a', message: 'อยากได้โจทย์คำนวณยาเด็กเพิ่มครับ', attached: true, createdAt: 2000, status: 'answered', reply: 'เพิ่มให้แล้ว **10 ข้อ**', repliedAt: 'TS', repliedBy: 'admin@test' } }, 'the copy gets the reply (same id, merge, backfilled fields, who / when)');
         assert.deepEqual(await page.evaluate(() => window.__upd), [['a', { read: true }]], 'and the notification is read');
-        assert.match(await page.$eval('.lr-admin > p', e => e.textContent), /Reply sent/);
+        assert.match(await page.$eval('.lr-admin > p[role=status]', e => e.textContent), /Reply sent/);
         // the copies snapshot brings the reply back → shown, summary flips, button says update, draft cleared
         await page.evaluate(() => window.__okCopies({ docs: copies.concat([{ id: 'a', data: () => ({ status: 'answered', reply: 'เพิ่มให้แล้ว **10 ข้อ**', repliedAt: T(3000), repliedBy: 'admin@test' }) }]), size: 2 }));
         await page.evaluate(() => { document.querySelector('.lr-request[data-id="a"]').open = true; });
-        const after = await page.$eval('.lr-request[data-id="a"]', r => [r.querySelector('summary').textContent, r.querySelector('.jf-have').textContent.startsWith('↩ เพิ่มให้แล้ว **10 ข้อ**'), r.querySelector('.jf-send').textContent, r.querySelector('textarea').value]);
-        assert.deepEqual(after, ['↩ Replied · Mint', true, '↩ Update reply', ''], 'after the reply lands: ↩ Replied, the text under the message, Update reply, empty box');
+        const after = await page.$eval('.lr-request[data-id="a"]', r => [r.querySelector('.jf-st').textContent, r.querySelector('.jf-have').textContent.startsWith('↩ เพิ่มให้แล้ว **10 ข้อ**'), r.querySelector('.jf-send').textContent, r.querySelector('textarea').value]);
+        assert.deepEqual(after, ['↩ Replied', true, '↩ Update reply', ''], 'after the reply lands: ↩ Replied, the text under the message, Update reply, empty box');
         // ✓ Mark read still works on its own
         await page.evaluate(() => window.__okCopies({ docs: copies, size: 1 }));
         await page.evaluate(() => { document.querySelector('.lr-request[data-id="a"]').open = true; });

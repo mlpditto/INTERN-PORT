@@ -2,25 +2,75 @@ document.addEventListener('DOMContentLoaded', () => {
     const host = document.getElementById('dashboard-work');
     if (!host) return;
     const section = document.createElement('details');
-    section.className = 'lr-admin lang-no-toggle';
-    section.innerHTML = '<summary>💬 Journal feedback</summary><div></div><p role="status"></p>';
+    section.id = 'jf-panel'; section.className = 'lr-admin lang-no-toggle';
+    section.innerHTML = '<summary>💬 Journal feedback <b class="jf-count" hidden></b></summary><div class="jf-tabs" role="group" aria-label="Filter"></div><div class="jf-list"></div><p role="status"></p>';
     host.prepend(section);
-    const list = section.querySelector('div'), status = section.querySelector('p');
-    let unsubscribe, unsubCopies, snapDocs = [], copies = {};
+    const list = section.querySelector('.jf-list'), status = section.querySelector('p'), count = section.querySelector('.jf-count'), tabs = section.querySelector('.jf-tabs');
+    let unsubscribe, unsubCopies, snapDocs = [], copies = {}, copiesLoaded = false, seen = null, filter = 'all';
+    const backfilled = new Set();
     const drafts = {};   // V102.526: a reply being typed survives the re-render a snapshot causes
     const when = ts => ts?.toDate?.().toLocaleString() || '';
+    function ago(ts) {
+        const ms = ts?.toMillis?.(); if (!ms) return '';
+        const m = Math.max(0, Math.round((Date.now() - ms) / 60000));
+        return m < 1 ? 'now' : m < 60 ? m + 'm ago' : m < 1440 ? Math.round(m / 60) + 'h ago' : Math.round(m / 1440) + 'd ago';
+    }
+    const isReplied = id => { const c = copies[id]; return !!(c && c.status === 'answered' && c.reply); };
+    const MATCH = { all: () => true, unread: d => !d.data().read, needs: d => !isReplied(d.id), replied: d => isReplied(d.id) };
+    const LABEL = { all: 'All', unread: 'Unread', needs: 'Needs reply', replied: 'Replied' };
+    const initials = name => [...String(name || '?').trim()].slice(0, 2).join('').toUpperCase();
+    const hue = s => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+    function rowHead(summary, data, id) {
+        const name = data.userName || data.userId, replied = isReplied(id);
+        const av = document.createElement('span'); av.className = 'jf-av'; av.textContent = initials(name); av.style.background = `hsl(${hue(name)} 55% 92%)`; av.style.color = `hsl(${hue(name)} 45% 32%)`;
+        const main = document.createElement('span'); main.className = 'jf-main';
+        const top = document.createElement('span'); top.className = 'jf-top';
+        const who = document.createElement('b'); who.textContent = name;
+        const pill = document.createElement('span'); pill.className = 'jf-st ' + (replied ? 'replied' : data.read ? 'read' : 'new'); pill.textContent = replied ? '↩ Replied' : data.read ? '✓ Read' : 'New';
+        top.append(who, pill);
+        if (drafts[id]) { const d = document.createElement('span'); d.className = 'jf-st draft'; d.textContent = 'Draft'; top.append(d); }
+        const line = document.createElement('span'); line.className = 'jf-pv'; line.textContent = String(data.message || '').replace(/\s+/g, ' ');
+        main.append(top, line);
+        const side = document.createElement('span'); side.className = 'jf-side';
+        const t = document.createElement('time'); t.textContent = ago(data.timestamp); t.title = when(data.timestamp); side.append(t);
+        if (data.attachment) { const a = document.createElement('span'); a.className = 'jf-att'; a.title = 'Daily Canvas attached'; a.textContent = '📎 ' + (data.attachment.mood || ''); side.append(a); }
+        summary.append(av, main, side);
+    }
+    // V102.553: a message sent before V101.247 has no intern copy, so it never reached History. The admin may create it; once per load.
+    function backfill() {
+        if (!copiesLoaded) return;
+        snapDocs.forEach(doc => {
+            const d = doc.data();
+            if (copies[doc.id] || backfilled.has(doc.id) || !d.authUid || !d.userId) return;
+            backfilled.add(doc.id);
+            db.collection('intern_messages').doc(doc.id).set({ authUid: d.authUid, userId: d.userId, message: d.message, attached: !!d.attachment, status: 'sent', createdAt: d.timestamp }, { merge: true })
+                .catch(e => console.warn('intern_messages backfill:', e && e.message));
+        });
+    }
+    function paintTabs() {
+        tabs.replaceChildren(...Object.keys(LABEL).map(k => {
+            const b = document.createElement('button'); b.type = 'button'; b.className = 'jf-tab'; b.setAttribute('aria-pressed', String(filter === k));
+            b.textContent = LABEL[k] + ' ' + snapDocs.filter(MATCH[k]).length;
+            b.onclick = () => { filter = k; paint(); };
+            return b;
+        }));
+    }
     function paint() {
-        section.classList.toggle('queue-empty', !snapDocs.some(doc => !doc.data().read));
+        const unread = snapDocs.filter(doc => !doc.data().read).length;
+        section.classList.toggle('queue-empty', !unread);
+        count.hidden = !unread; count.textContent = unread;
+        paintTabs();
         const open = new Set([...list.querySelectorAll('details[open]')].map(d => d.dataset.id));
         list.replaceChildren();
-        snapDocs.slice().sort((a, b) => (b.data().timestamp?.toMillis?.() || 0) - (a.data().timestamp?.toMillis?.() || 0)).forEach(doc => {
+        snapDocs.filter(MATCH[filter]).sort((a, b) => (b.data().timestamp?.toMillis?.() || 0) - (a.data().timestamp?.toMillis?.() || 0)).forEach(doc => {
             const data = doc.data(), row = document.createElement('details');
             row.className = 'lr-request'; row.dataset.id = doc.id; row.open = open.has(doc.id);
-            const copy = copies[doc.id], replied = !!(copy && copy.status === 'answered' && copy.reply);
+            row.addEventListener('toggle', () => { if (row.open) list.querySelectorAll('details.lr-request[open]').forEach(o => { if (o !== row) o.open = false; }); });   // one open at a time
+            const copy = copies[doc.id], replied = isReplied(doc.id);
             const summary = document.createElement('summary');
-            summary.textContent = (replied ? '↩ Replied' : data.read ? '✅ Read' : '💬 New') + ' · ' + (data.userName || data.userId);
+            rowHead(summary, data, doc.id);
             row.append(summary);
-            const message = document.createElement('p'); message.style.whiteSpace = 'pre-wrap'; message.textContent = data.message; row.append(message);
+            const message = document.createElement('p'); message.className = 'jf-msg'; message.style.whiteSpace = 'pre-wrap'; message.textContent = data.message; row.append(message);
             if (data.attachment) {
                 const attachment = document.createElement('details');
                 const label = document.createElement('summary'); label.textContent = '📎 Daily Canvas · ' + (data.attachment.mood || '') + ' ' + (data.attachment.moodSecondary || '');
@@ -40,7 +90,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const ta = document.createElement('textarea'); ta.rows = 2; ta.maxLength = 2000; ta.style.minHeight = '56px';
             ta.placeholder = replied ? 'Edit the reply — the intern sees the new text' : 'Reply to the intern — shows in their History under this message (**bold** = highlighted)';
             ta.setAttribute('aria-label', 'Reply to ' + (data.userName || 'the intern'));
-            ta.value = drafts[doc.id] || ''; ta.oninput = () => { drafts[doc.id] = ta.value; };
+            ta.value = drafts[doc.id] || '';
+            const left = document.createElement('small'); left.className = 'jf-len'; left.textContent = ta.value.length + '/2000';
+            ta.oninput = () => {
+                const had = !!drafts[doc.id];
+                if (ta.value) drafts[doc.id] = ta.value; else delete drafts[doc.id];
+                left.textContent = ta.value.length + '/2000';
+                if (had !== !!drafts[doc.id]) { const top = summary.querySelector('.jf-top'), d = top.querySelector('.draft'); if (d) d.remove(); else { const c = document.createElement('span'); c.className = 'jf-st draft'; c.textContent = 'Draft'; top.append(c); } }
+            };
+            ta.onkeydown = e => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); go.click(); }
+                if (e.key === 'Escape') { e.stopPropagation(); row.open = false; summary.focus(); }
+            };
             const acts = document.createElement('div'); acts.style.cssText = 'display:flex; gap:8px; flex-wrap:wrap; align-items:center;';
             const go = document.createElement('button'); go.type = 'button'; go.className = 'jf-send'; go.textContent = replied ? '↩ Update reply' : '↩ Reply';
             go.onclick = async () => {
@@ -66,24 +127,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
                 acts.append(button);
             }
+            acts.append(left);
             box.append(ta, acts); row.append(box);
             list.append(row);
         });
-        if (!snapDocs.length) list.textContent = 'No journal feedback yet.';
+        if (!list.firstChild) { const none = document.createElement('p'); none.className = 'jf-none'; none.textContent = snapDocs.length ? 'Nothing here. Well done.' : 'No journal feedback yet.'; list.append(none); }
     }
     function listen() {
         if (unsubscribe || !db.app.auth().currentUser) return;
         unsubscribe = db.collection('admin_notifications').where('type', '==', 'journal_feedback').onSnapshot(snap => {
-            snapDocs = snap.docs; paint();
+            // a message that arrives while the Dashboard is open says so once; the first load does not
+            const fresh = seen ? snap.docs.filter(d => !seen.has(d.id) && !d.data().read) : [];
+            seen = new Set(snap.docs.map(d => d.id));
+            if (fresh.length && typeof showToast === 'function') showToast('💬 New Journal feedback from ' + (fresh[0].data().userName || 'an intern'));
+            snapDocs = snap.docs; paint(); backfill();
         }, () => { section.classList.remove('queue-empty'); unsubscribe = null; status.textContent = 'Could not load. Close and reopen to retry.'; });
         // V102.526: the interns' copies carry the replies — read alongside (admins read all); missing or denied = no reply shown, nothing else changes
         if (!unsubCopies) unsubCopies = db.collection('intern_messages').onSnapshot(snap => {
-            copies = {}; snap.docs.forEach(d => { copies[d.id] = d.data(); }); paint();
+            copies = {}; snap.docs.forEach(d => { copies[d.id] = d.data(); }); copiesLoaded = true; paint(); backfill();
         }, e => { console.warn('intern_messages:', e && e.message); unsubCopies = null; });
     }
     section.addEventListener('toggle', () => { if (section.open) listen(); });
     db.app.auth().onAuthStateChanged(user => {
-        unsubscribe?.(); unsubscribe = null; unsubCopies?.(); unsubCopies = null; copies = {}; snapDocs = [];
+        unsubscribe?.(); unsubscribe = null; unsubCopies?.(); unsubCopies = null; copies = {}; snapDocs = []; copiesLoaded = false; seen = null;
         section.classList.remove('queue-empty');
         if (user) listen();
     });
