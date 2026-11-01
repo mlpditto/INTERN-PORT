@@ -180,7 +180,7 @@ The **Admin Portal** page has 3 ways in — use any one:
 
 ![Jev check: the button (1) and what it lists (2)](assets/guide/jev-check.png)
 
-1. Open a saved quiz in the **Quiz editor** and press **Jev check** (1), with the whole-quiz tools on the right. Save first: Jev reads the saved version.
+1. Open a saved quiz in the **Quiz editor** and press **Jev check** (1), with the whole-quiz tools on the right. Jev reads the questions on screen, unsaved edits included.
 2. Jev checks two things (2):
    - **Answer key:** does the explanation support the marked answer? Questions with no explanation are skipped and counted.
    - **Translations:** Thai, Korean, Japanese and Chinese against the source. A translation older than its question is listed without using Jev.

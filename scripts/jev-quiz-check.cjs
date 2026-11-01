@@ -50,6 +50,7 @@ const run = async (quiz, score, cacheIn = {}) => {
     const fn = src.slice(src.indexOf('exports.jevCheckQuiz'), src.indexOf('// ---- Jev: "same fact?"'));
     assert.ok(fn.includes('requireAdminCallable(request)'), 'admin only');
     assert.ok(fn.includes('enabled === false'), 'shares the kill switch');
+    assert.ok(fn.includes('Array.isArray(onScreen)') && fn.includes('.slice(0, 200)'), 'V102.557: checks the questions on screen, capped');
     assert.ok(!/collection\("quizzes"\)[^;]*\.(set|update)\(/.test(fn), 'never writes to the quiz');
     const admin = fs.readFileSync('public/admin.html', 'utf8');
     assert.ok(/function qtSrcSig[\s\S]{0,260}join\('\\u0001'\)/.test(admin) && fs.readFileSync('functions/jev-quiz-check.js', 'utf8').includes("join('\\u0001')"), 'same signature as the page');
