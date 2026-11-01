@@ -55,14 +55,15 @@ const type = async (p, t) => { await p.fill('#rv-writeup-text', t); };
     await type(p, 'Line one\n**keep this** <b>x</b>');
     assert.match(await state(p), /^Draft · saved \d\d:\d\d$/);
 
-    // 👁: bold as the intern sees it, escaped, nothing written
-    await p.click('#rv-writeup-preview');
+    // V102.555: the intern's card sits beside the box and follows the typing; bold, escaped, nothing written
+    assert.equal(await p.locator('#rv-writeup-preview').count(), 0, 'no preview button to press');
     assert.equal(await p.locator('#rv-writeup-view strong.adm-key').innerText(), 'keep this');
     assert.equal(await p.locator('#rv-writeup-view b').count(), 0, 'text is escaped');
-    assert.equal(await p.locator('#rv-writeup-text').isHidden(), true);
-    assert.equal(await p.evaluate(() => window.__writes.length), 0, 'preview sends nothing');
-    await p.click('#rv-writeup-preview');
-    assert.equal(await p.locator('#rv-writeup-text').isVisible(), true, 'back to editing');
+    { const t = await p.locator('#rv-writeup-text').boundingBox(), v = await p.locator('#rv-writeup-view').boundingBox(); assert.ok(v.x >= t.x + t.width && Math.abs(v.y - t.y) < 2, 'side by side: ' + JSON.stringify([t, v])); }
+    assert.equal(await p.evaluate(() => window.__writes.length), 0, 'the preview sends nothing');
+    await type(p, '');
+    assert.equal(await p.locator('#rv-writeup-view').isHidden(), true, 'an empty box has no card');
+    await type(p, 'Line one\n**keep this** <b>x</b>');
     await p.close();
 
     // the draft comes back in this browser; Send clears it
