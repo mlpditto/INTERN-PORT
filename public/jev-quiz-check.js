@@ -1,4 +1,4 @@
-// Jev's check of the questions on screen, saved or not, in the editor's whole-quiz tools: explanation vs marked answer, translation vs source. It only points; nothing is changed.
+// Jev's check of the questions on screen, saved or not, from the Review tabs: explanation vs marked answer, translation vs source. It only points; nothing is changed.
 (function () {
     const LANG = { th: 'Thai', ko: 'Korean', ja: 'Japanese', zh: 'Chinese' };
     const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -20,7 +20,7 @@
         if (!box.open) box.showModal();
     }
     window.jevQuizCheck = {
-        goTo(i) { quizQPageIndex = i; updateQuizPagination(); },
+        goTo(i) { if (window.closeQuizReview) closeQuizReview(); quizQPageIndex = i; updateQuizPagination(); },
         async run(btn) {
             const quizId = document.getElementById('edit-quiz-id').value;
             if (!quizId) return open('<p class="jqc-n">Save the quiz first. Jev needs its translations.</p>');
