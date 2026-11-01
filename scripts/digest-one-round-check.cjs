@@ -1,11 +1,12 @@
-// 2026-11-01: the real runQuizDigest with a fake Firestore. One 23:00 round over 24 h; a quiet day stays quiet unless a quiz closes before the next run;
+// 2026-11-01: the real runQuizDigest with a fake Firestore. Two rounds a week, Sun + Thu 23:00, each reaching back to the last; a quiet day stays quiet unless a quiz closes before the next run;
 // a case is e-mailed, so the digest never carries one and a case alone sends nothing.
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
 const backend = fs.readFileSync('functions/index.js', 'utf8').replace(/\r\n/g, '\n');
 const cut = (from, to) => { const a = backend.indexOf(from); assert.ok(a >= 0, 'missing ' + from); const b = backend.indexOf(to, a); assert.ok(b > a, 'missing end ' + to); return backend.slice(a, b); };
 const fnSrc = name => cut(`function ${name}(`, '\n}\n') + '\n}\n';
 
-assert.ok(/exports\.notifyQuizDigest = onSchedule\(\{\s*schedule: '0 23 \* \* \*',\s*timeZone: 'Asia\/Bangkok'/.test(backend), 'one round, 23:00 Bangkok');
+assert.ok(/exports\.notifyQuizDigest = onSchedule\(\{\s*schedule: '0 23 \* \* 0,4',\s*timeZone: 'Asia\/Bangkok'/.test(backend), 'Sun + Thu, 23:00 Bangkok');
+assert.ok(backend.includes("sunday ? { windowHours: 72, doneWhen: 'since Thu' } : { windowHours: 96, doneWhen: 'since Sun' }"), 'each round reaches back to the last');
 assert.ok(!backend.includes('notifyQuizDigestEvening'), 'the 22:00 round is gone');
 
 const src = [
@@ -77,6 +78,17 @@ const quizDue = ms => ({ isActive: true, title: 'Asthma 1', shortTitle: 'Asthma'
     assert.equal(pushes.length, 1); assert.equal(pushes[0].to, 'Cgroup', 'group only');
     assert.match(texts(), /Due soon · 1/); assert.match(texts(), /due tomorrow 19:00/);
 
+    // the wider window: a submission from three days ago, a quiz closing before the next round
+    fresh();
+    DB.quiz_attempts = { q1_U1: { status: 'completed', timestamp: ts(NOW - 90 * H), correctCount: 1, totalQuestions: 2 } };
+    DB.quizzes.q1 = quizDue(NOW + 90 * H);
+    await context.runQuizDigest('scheduled', { windowHours: 96, doneWhen: 'since Sun' });
+    assert.match(texts(), /Done since Sun · 1 quiz/); assert.match(texts(), /Due soon · 1/, 'closing before the next round shows in full');
+    assert.doesNotMatch(texts(), /today/);
+    fresh(); DB.quizzes.q1 = quizDue(NOW + 90 * H);
+    await context.runQuizDigest('scheduled', { windowHours: 96, doneWhen: 'since Sun' });
+    assert.equal(pushes.length, 1, 'closes before the next round: no one else will tell the group');
+
     // a case goes by mail, so LINE does not repeat it
     fresh(); DB.cases = { c1: { userId: 'U1', timestamp: ts(NOW - H) } };
     await context.runQuizDigest('scheduled');
@@ -84,5 +96,5 @@ const quizDue = ms => ({ isActive: true, title: 'Asthma 1', shortTitle: 'Asthma'
     assert.ok(!cut('const DIGEST_TAGS', 'exports.notifyQuizDigest = onSchedule(').includes("collection('cases')"), 'the digest never reads cases');
     assert.ok(/const CASE_LINE_PUSH = false;/.test(backend) && /const FLOOD_LINE_PUSH = false;/.test(backend), 'what is mailed stays off LINE');
 
-    console.log('PASS: digest one round — 23:00, quiet days stay quiet unless a quiz closes, mailed cases stay off LINE');
+    console.log('PASS: digest two rounds a week — Sun + Thu 23:00, quiet rounds stay quiet unless a quiz closes, mailed cases stay off LINE');
 })().catch(e => { console.error(e); process.exit(1); });

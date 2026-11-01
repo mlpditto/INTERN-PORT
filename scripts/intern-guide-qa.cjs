@@ -27,8 +27,8 @@ for (const t of ['Mission', 'Journal', 'Explore', 'DD Codex', 'History', 'Submit
     assert.ok(admin.includes(t), 'index.html has "' + t + '" the guide mentions');
 assert.ok(/Daily check-in/i.test(admin) && /My Cases/.test(admin), 'check-in and My Cases exist in index.html');
 const fnSrc = fs.readFileSync('functions/index.js', 'utf8');
-assert.ok(fnSrc.includes('Daily Quiz Digest') && fnSrc.includes('Open quizzes') && fnSrc.includes("'0 23 * * *'"), 'digest name, button and 23:00 match functions/index.js');
-assert.ok(mdEn.includes('Daily Quiz Digest') && mdEn.includes('Open quizzes') && mdEn.includes('at **23:00**'), 'EN guide describes the digest');
+assert.ok(fnSrc.includes('Daily Quiz Digest') && fnSrc.includes('Open quizzes') && fnSrc.includes("'0 23 * * 0,4'"), 'digest name, button and Sun + Thu 23:00 match functions/index.js');
+assert.ok(mdEn.includes('Daily Quiz Digest') && mdEn.includes('Open quizzes') && mdEn.includes('**Sunday and Thursday at 23:00**'), 'EN guide describes the digest');
 const rules = fs.readFileSync('firestore.rules', 'utf8');
 const adminHtml = fs.readFileSync('public/admin.html', 'utf8');
 const gfAdmin = fs.readFileSync('public/guide-feedback-admin.js', 'utf8');

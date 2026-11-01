@@ -3493,7 +3493,7 @@ const DIGEST_MAX_ROWS = 12;
 // filter can never silently shrink the cohort unnoticed.
 // (B) Only quizzes due within this many days get a full name list; everything
 // else collapses to one summary line so the message stays skimmable.
-const DIGEST_URGENT_DAYS = 3;
+const DIGEST_URGENT_DAYS = 4;   // the longest gap between rounds
 // V97.76: cap for the who-COMPLETED roster. Deliberately tighter than
 // DIGEST_MAX_ROWS (12): that cap sized a list of who was MISSING, which
 // shrinks toward zero as a deadline nears. This list runs the other way —
@@ -3656,10 +3656,10 @@ async function runQuizDigest(kind, options) {
 
     const db = admin.firestore();
     const now = admin.firestore.Timestamp.now();
-    // Activity window: the last 24h, so the one 23:00 run reports a submission
-    // exactly once.
+    // Activity window: back to the last round, so each submission is reported
+    // once. Manual and preview keep 24h, an explicit "what happened today" ask.
     const windowHours = Number(options && options.windowHours) || 24;
-    const windowLabel = String((options && options.windowLabel) || '');
+    const doneWhen = String((options && options.doneWhen) || 'today');
     const cutoff = admin.firestore.Timestamp.fromMillis(now.toMillis() - windowHours * 60 * 60 * 1000);
 
     // --- users: name lookup + eligibility source ---
@@ -3995,7 +3995,7 @@ async function runQuizDigest(kind, options) {
         // action rather than review, and it is short enough not to push the
         // roster down. Same for both targets — no scores involved.
         if (newlyLive.length) {
-            body.push({ type: 'text', text: `🆕 Went live today · ${newlyLive.length}`, size: 'xs', weight: 'bold', color: '#4338ca' });
+            body.push({ type: 'text', text: `🆕 Went live ${doneWhen} · ${newlyLive.length}`, size: 'xs', weight: 'bold', color: '#4338ca' });
             newlyLive.slice(0, DIGEST_MAX_ROWS).forEach(n => {
                 body.push({
                     type: 'text',
@@ -4010,8 +4010,8 @@ async function runQuizDigest(kind, options) {
         }
 
         const doneHeader = doneQuizzes.length
-            ? `✅ Done today · ${doneQuizzes.length} ${doneQuizzes.length === 1 ? 'quiz' : 'quizzes'} · ${donePeopleCount} ${donePeopleCount === 1 ? 'person' : 'people'}`
-            : '✅ Done today · 0';
+            ? `✅ Done ${doneWhen} · ${doneQuizzes.length} ${doneQuizzes.length === 1 ? 'quiz' : 'quizzes'} · ${donePeopleCount} ${donePeopleCount === 1 ? 'person' : 'people'}`
+            : `✅ Done ${doneWhen} · 0`;
         body.push({ type: 'text', text: doneHeader, size: 'xs', weight: 'bold', color: '#059669', margin: (newlyLive.length || showQueue) ? 'md' : 'none' });
         if (doneQuizzes.length) {
             doneQuizzes.slice(0, DIGEST_MAX_ROWS).forEach(q => {
@@ -4035,7 +4035,7 @@ async function runQuizDigest(kind, options) {
                 body.push({ type: 'text', text: `+${doneQuizzes.length - DIGEST_MAX_ROWS} more`, size: 'xs', color: '#94a3b8', margin: 'xs' });
             }
         } else {
-            body.push({ type: 'text', text: 'No submissions today', size: 'sm', color: '#94a3b8', margin: 'xs' });
+            body.push({ type: 'text', text: `No submissions ${doneWhen}`, size: 'sm', color: '#94a3b8', margin: 'xs' });
         }
 
         // Sits with "Done today" — both are "what happened in the last 24h" —
@@ -4209,7 +4209,7 @@ async function runQuizDigest(kind, options) {
             // V97.84: the group's altText must not advertise a products count its
             // bubble no longer contains — altText is what shows in the chat list and
             // on the lock screen, so a mismatch is visible before the bubble is opened.
-            altText: `📊 Quiz digest — ${newlyLive.length ? `${newlyLive.length} new · ` : ''}${doneQuizzes.length} done today${(target.withScores && productRows.length) ? ` · ${productRows.length} products` : ''}`.slice(0, 400),
+            altText: `📊 Quiz digest — ${newlyLive.length ? `${newlyLive.length} new · ` : ''}${doneQuizzes.length} done ${doneWhen}${(target.withScores && productRows.length) ? ` · ${productRows.length} products` : ''}`.slice(0, 400),
             contents: {
                 type: 'bubble',
                 size: 'kilo',
@@ -4217,7 +4217,7 @@ async function runQuizDigest(kind, options) {
                     type: 'box', layout: 'vertical', backgroundColor: '#0f766e', paddingAll: '12px',
                     contents: [
                         { type: 'text', text: '📊 Daily Quiz Digest', weight: 'bold', size: 'sm', color: '#ffffff' },
-                        { type: 'text', text: new Date(now.toMillis()).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', weekday: 'short', day: '2-digit', month: 'short' }) + (windowLabel ? ` · ${windowLabel}` : ''), size: 'xs', color: '#ccfbf1', margin: 'xs' },
+                        { type: 'text', text: new Date(now.toMillis()).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', weekday: 'short', day: '2-digit', month: 'short' }), size: 'xs', color: '#ccfbf1', margin: 'xs' },
                         // The whole state in one line, so the bubble answers "is
                         // there anything for me today" before it is scrolled. Every
                         // figure here is one the body already prints, so the two can
@@ -4259,7 +4259,7 @@ async function runQuizDigest(kind, options) {
     // "Send digest now" button is an explicit ask, so it still goes out.
     // 2026-11-01: a quiz closing before the next run is not quiet: this bubble is
     // the group's only notice of it.
-    const closingSoon = pendingBlocks.some(b => b.deadlineMs <= now.toMillis() + 24 * 60 * 60 * 1000);
+    const closingSoon = pendingBlocks.some(b => b.deadlineMs <= now.toMillis() + windowHours * 60 * 60 * 1000);
     const groupHasContent = newlyLive.length > 0 || doneQuizzes.length > 0 || pendingBlocks.length > 0;
     const quietDay = kind !== 'manual' && doneQuizzes.length === 0 && !closingSoon;
     const sendTargets = groupHasContent && !quietDay ? targets : [];
@@ -4327,22 +4327,24 @@ async function runQuizDigest(kind, options) {
     };
 }
 
-// 2026-11-01 (owner): one round a day. LINE charges a group push per member, so the
-// digest also carries the group's deadline notice.
+// 2026-11-01 (owner): Sunday and Thursday. LINE charges a group push per member, so
+// two rounds a week fit the 300 a month, and the digest carries the group's deadline
+// notice. Sunday looks back 72 h to Thursday, Thursday 96 h to Sunday.
 exports.notifyQuizDigest = onSchedule({
-    schedule: '0 23 * * *',
+    schedule: '0 23 * * 0,4',
     timeZone: 'Asia/Bangkok',
     region: 'us-central1',
     secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID']
 }, async (event) => {
-    await runQuizDigest('scheduled');
+    const sunday = new Date().toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', weekday: 'short' }) === 'Sun';
+    await runQuizDigest('scheduled', sunday ? { windowHours: 72, doneWhen: 'since Thu' } : { windowHours: 96, doneWhen: 'since Sun' });
 });
 
 // ============================================================
 // notifyQuizDeadlines  (hourly — quizzes closing within 24 h)
 // ------------------------------------------------------------
 // T-3 h: a personal bubble to each intern who still has NOT submitted.
-// The T-24 h group bubble is off (DEADLINE_GROUP_PUSH): the 23:00 digest carries it.
+// The T-24 h group bubble is off (DEADLINE_GROUP_PUSH): the digest carries it.
 // Timing, copy and bubble validation are pure and live in quiz-deadline.js.
 //
 // Defaults (owner decision 2026-10-24): on for every active quiz that has a
@@ -4357,7 +4359,7 @@ exports.notifyQuizDigest = onSchedule({
 // personal pushes.
 // ============================================================
 const quizDeadline = require('./quiz-deadline');
-// 2026-11-01 (owner): the digest's Due soon says the same thing for one push a day. true brings the T-24 h group bubble back.
+// 2026-11-01 (owner): the digest's Due soon says the same thing for two pushes a week. true brings the T-24 h group bubble back.
 const DEADLINE_GROUP_PUSH = false;
 const DEADLINE_LINE_MONTHLY_QUOTA = 300;
 const DEADLINE_QUOTA_CRITICAL = 0.9;      // personal pushes stop at 90 % of the month
