@@ -8,20 +8,22 @@
 // scripts/quiz-deadline-check.cjs can pin it.
 //
 //   T-24 h  ONE bubble to the intern group listing every quiz closing soon.
-//   T-3 h   a personal bubble to each intern who still has NOT submitted.
+//   Last hour: one personal bubble to each intern who still has NOT submitted,
+//   with their other quizzes closing within 6 h in the same bubble (owner, 2026-11-01).
 //
 // Nothing is pushed in quiet hours (22:00–07:00 Bangkok). The cron is hourly,
-// so the two moments are snapped to the hour grid instead of firing "at"
-// T-24 / T-3:
+// so the two moments are snapped to the hour grid. The personal window opens at
+// T-80 min, so a deadline at 12:10 is chased at 11:00 and not lost to the 20 min floor:
 //   - group: waits for 07:00 when T-24 h falls in quiet hours, and is skipped
 //     once the personal window has opened (the personal bubble covers it).
-//   - personal: when deadline-3h falls in quiet hours it moves to 21:00 the
-//     evening before, so a 08:00 deadline is chased at 21:00, not 05:00.
+//   - personal: when the next run after the window opens is in quiet hours it
+//     moves to 21:00 the evening before, so a 07:30 deadline is chased at 21:00.
 // ============================================================
 
 const HOUR = 3600000;
 const GROUP_LEAD_H = 24;
-const PERSONAL_LEAD_H = 3;
+const PERSONAL_LEAD_MS = 80 * 60000;
+const BUNDLE_LEAD_H = 6;
 const QUIET_FROM = 22;   // Bangkok hour, inclusive
 const QUIET_TO = 7;      // Bangkok hour, exclusive
 const PERSONAL_EVENING_H = 21;
@@ -33,22 +35,23 @@ const MAX_ROWS_PERSONAL = 3;
 function bkkHour(ms) { return new Date(ms + 7 * HOUR).getUTCHours(); }
 function isQuietHour(ms) { const h = bkkHour(ms); return h >= QUIET_FROM || h < QUIET_TO; }
 
-// Start of the personal window: deadline-3h, or 21:00 the evening before when
-// that instant is a quiet hour.
+// Start of the personal window: T-80 min, or 21:00 the evening before when the
+// first hourly run after that instant is in quiet hours.
 function personalStartMs(deadlineMs) {
-    const t = deadlineMs - PERSONAL_LEAD_H * HOUR;
-    if (!isQuietHour(t)) return t;
+    const t = deadlineMs - PERSONAL_LEAD_MS;
+    if (!isQuietHour(Math.ceil(t / HOUR) * HOUR)) return t;
     const h = bkkHour(t);
-    // 22:00–23:59 → 21:00 the same Bangkok day; 00:00–06:59 → 21:00 the day before.
-    const hoursBack = h >= QUIET_FROM ? (h - PERSONAL_EVENING_H) : (h + 24 - PERSONAL_EVENING_H);
+    // 21:01–23:59 → 21:00 the same Bangkok day; 00:00–06:59 → 21:00 the day before.
+    const hoursBack = h >= PERSONAL_EVENING_H ? (h - PERSONAL_EVENING_H) : (h + 24 - PERSONAL_EVENING_H);
     const minutes = new Date(t + 7 * HOUR).getUTCMinutes();
     return t - hoursBack * HOUR - minutes * 60000;
 }
 
-// What this hourly run owes one quiz: { group, personal }. Both false for a
-// finished quiz, a quiz more than 24 h away, or quiet hours.
+// What this hourly run owes one quiz: { group, personal, bundle }. All false for a
+// finished quiz, a quiz more than 24 h away, or quiet hours. bundle = it may ride in
+// a bubble another quiz has started, and then it is not chased on its own.
 function planDeadline(nowMs, deadlineMs) {
-    const out = { group: false, personal: false };
+    const out = { group: false, personal: false, bundle: false };
     if (!Number.isFinite(deadlineMs) || !Number.isFinite(nowMs)) return out;
     const remaining = deadlineMs - nowMs;
     if (remaining < MIN_REMAINING_MS) return out;
@@ -56,7 +59,7 @@ function planDeadline(nowMs, deadlineMs) {
     if (isQuietHour(nowMs)) return out;
     const pStart = personalStartMs(deadlineMs);
     if (nowMs >= pStart) out.personal = true;
-    else out.group = true;
+    else { out.group = true; out.bundle = remaining <= BUNDLE_LEAD_H * HOUR; }
     return out;
 }
 
@@ -199,7 +202,7 @@ function validateFlex(msg) {
 }
 
 module.exports = {
-    HOUR, GROUP_LEAD_H, PERSONAL_LEAD_H, MIN_REMAINING_MS,
+    HOUR, GROUP_LEAD_H, PERSONAL_LEAD_MS, BUNDLE_LEAD_H, MIN_REMAINING_MS,
     bkkHour, isQuietHour, personalStartMs, planDeadline, markerId, beatBeri,
     closesLabel, countdown, buildGroupFlex, buildPersonalFlex, validateFlex, liffUri
 };

@@ -65,6 +65,14 @@ const fresh = () => { DB = { user_auth_links: { anon1: { effectiveUserId: 'U1' }
     assert.ok(!JSON.stringify(DB.nika_questions).includes('U1') && !JSON.stringify(DB.nika_questions).includes('anon1'));
 
     // no guessing
+    // the lead-in goes; a sentence that merely mentions a source stays
+    { const said = t => N.parseAnswer({ answer: { answerText: t, citations: [{ sources: [{ referenceId: '0' }] }], references: [{ chunkInfo: { documentMetadata: { structData: { kind: 'drug', sourceId: 'd1', title: 'T' } } } }] } }).answer;
+      assert.equal(said('Based on the provided sources, warfarin needs INR checks.'), 'Warfarin needs INR checks.');
+      assert.equal(said('According to the sources: • one'), '• one');
+      assert.equal(said('Based on the provided sources, here is what they say:\n• one\n• two'), '• one\n• two');
+      assert.equal(said('จากแหล่งข้อมูลที่ให้มา ยานี้ใช้ได้, ระวังไต'), 'ระวังไต');
+      assert.equal(said('Warfarin, based on the sources, needs INR checks.'), 'Warfarin, based on the sources, needs INR checks.'); }
+    assert.match(N.requestBody('q').answerGenerationSpec.promptSpec.preamble, /never mention the sources/);
     for (const none of [{ answer: { answerText: 'NOT_IN_LIBRARY' } }, { answer: { answerText: '' } }, { answer: { answerText: 'x', answerSkippedReasons: ['OUT_OF_DOMAIN_QUERY_IGNORED'] } }, { answer: { answerText: 'Unsourced claim', references: [] } }]) {
         assert.equal(N.parseAnswer(none).notFound, true, JSON.stringify(none));
     }

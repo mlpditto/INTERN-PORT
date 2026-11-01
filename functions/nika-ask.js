@@ -6,7 +6,7 @@ const QUIZ_LOCK_MS = 3 * 60 * 60 * 1000;   // a quiz closed without finishing st
 const MIN_Q = 3, MAX_Q = 300, MAX_SOURCES = 5;
 const NONE = 'NOT_IN_LIBRARY';
 const ANSWER_URL = 'https://discoveryengine.googleapis.com/v1/projects/intern-port-edfa7/locations/global/collections/default_collection/engines/nika-search/servingConfigs/default_search:answer';
-const PREAMBLE = `Answer in the language of the question. Use at most 5 short bullets. Use only the sources. If the sources do not cover the exact drug, disease or topic asked about, reply with exactly ${NONE} and nothing else. Never suggest other drugs in that case.`;
+const PREAMBLE = `Answer in the language of the question. Use at most 5 short bullets. Use only the sources. Start with the answer itself and never mention the sources. If the sources do not cover the exact drug, disease or topic asked about, reply with exactly ${NONE} and nothing else. Never suggest other drugs in that case.`;
 
 function requestBody(question) {
     return {
@@ -17,6 +17,15 @@ function requestBody(question) {
 }
 
 // Cited references first, one chip per entry. A reference is chunkInfo or unstructuredDocumentInfo depending on the store's parsing.
+// the model still opens with "Based on the provided sources, …" now and then; the answer starts at the answer
+const LEAD_IN = /^\s*(?:(?:based on|according to|from)\s+(?:the\s+)?(?:provided\s+|given\s+|available\s+)?(?:sources?|documents?|information|context|library)|จาก(?:แหล่งข้อมูล|เอกสาร|ข้อมูล)(?:ที่(?:ให้มา|ได้รับ|มี))?)[^:,\n]*[:,]\s*/i;
+function dropLeadIn(text) {
+    const rest = text.replace(LEAD_IN, '');
+    if (rest === text || !rest) return text;
+    const lines = rest.split(/\r?\n/);
+    const body = lines.length > 1 && /:\s*$/.test(lines[0]) ? lines.slice(1).join('\n').trim() : rest;   // "here is what they say:" goes with it
+    return body.charAt(0).toUpperCase() + body.slice(1);
+}
 function parseAnswer(data) {
     const a = (data && data.answer) || {};
     const text = String(a.answerText || '').trim();
@@ -33,7 +42,7 @@ function parseAnswer(data) {
         seen.add(key);
         sources.push({ kind: s.kind, id: s.sourceId, title: String(s.title || meta.title || '').slice(0, 80) });
     });
-    return sources.length ? { answer: text, sources } : { notFound: true };   // an answer with no source is not one we can stand behind
+    return sources.length ? { answer: dropLeadIn(text), sources } : { notFound: true };   // an answer with no source is not one we can stand behind
 }
 
 async function quizOpen(db, userId, now) {
