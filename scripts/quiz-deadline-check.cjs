@@ -1,6 +1,6 @@
 // V102.480 — quiz deadline LINE alerts. No browser: (1) functions/quiz-deadline.js (pure timing, copy, Flex validity) and
 // (2) the REAL runQuizDeadlines() + scanQuizPending() sliced out of functions/index.js and run in vm with a fake Firestore and a
-// recording pushLineFlex. Pins: T-24 h group bubble, T-3 h personal only to interns who have not submitted, quiet hours,
+// recording pushLineFlex. Pins: T-24 h group bubble, last-hour personal only to interns who have not submitted, quiet hours,
 // idempotency, re-arm on a moved deadline, opt-outs, daily cap, critical quota, retry after a transient failure, truthful Beri line.
 //   TZ=Asia/Bangkok node scripts/quiz-deadline-check.cjs
 const fs = require('node:fs');
@@ -22,8 +22,8 @@ const plan = (now, deadline) => { const p = D.planDeadline(now, deadline); retur
 assert.equal(plan(dl - 25 * H, dl), 'none', '25 h out: too early');
 assert.equal(plan(dl - 24 * H, dl), 'group', 'T-24 h: group');
 assert.equal(plan(dl - 10 * H, dl), 'group', 'between: still the group window');
-assert.equal(plan(dl - 4 * H, dl), 'group', 'T-4 h still group (personal opens at T-3 h)');
-assert.equal(plan(dl - 3 * H, dl), 'personal', 'T-3 h: personal');
+assert.equal(plan(dl - 2 * H, dl), 'group', 'T-2 h still group (personal opens at T-80 min)');
+assert.equal(plan(dl - 80 * 60000, dl), 'personal', 'T-80 min: personal');
 assert.equal(plan(dl - 1 * H, dl), 'personal', 'T-1 h: personal');
 assert.equal(plan(dl - 10 * 60000, dl), 'none', 'closer than 20 min: noise');
 assert.equal(plan(dl + 1, dl), 'none', 'after the deadline');
@@ -32,20 +32,27 @@ assert.equal(plan(NaN, dl), 'none'); assert.equal(plan(dl, NaN), 'none');
 const late = bkk(2026, 10, 25, 23, 59);
 assert.equal(plan(bkk(2026, 10, 24, 23, 59), late), 'none', 'T-24 h at 23:59 is quiet');
 assert.equal(plan(bkk(2026, 10, 25, 7, 0), late), 'group', '07:00 sends the group bubble');
-// deadline 08:00 -> deadline-3h = 05:00 (quiet) -> personal moves to 21:00 the evening before
+// deadline 08:00 -> T-80 = 06:40, chased at 07:00 with an hour left
 const early = bkk(2026, 10, 25, 8, 0);
-assert.equal(new Date(D.personalStartMs(early) + 7 * H).toISOString().slice(0, 16), '2026-10-24T21:00', '05:00 moves to 21:00 the day before');
+assert.equal(new Date(D.personalStartMs(bkk(2026, 10, 25, 7, 10)) + 7 * H).toISOString().slice(0, 16), '2026-10-24T21:00', 'a 07:10 deadline would need the quiet 06:00 run: 21:00 the evening before');
+assert.equal(new Date(D.personalStartMs(early) + 7 * H).toISOString().slice(0, 16), '2026-10-25T06:40', 'T-80 min is 06:40 and the 07:00 run is not quiet, so it stays');
 assert.equal(plan(bkk(2026, 10, 24, 20, 0), early), 'group');
-assert.equal(plan(bkk(2026, 10, 24, 21, 0), early), 'personal');
+assert.equal(plan(bkk(2026, 10, 24, 21, 0), early), 'group');
 assert.equal(plan(bkk(2026, 10, 25, 2, 0), early), 'none', '02:00 is quiet');
 assert.equal(plan(bkk(2026, 10, 25, 7, 0), early), 'personal', 'still owed at 07:00 with 1 h left');
-// deadline 00:30 -> deadline-3h = 21:30 (not quiet) -> personal at 21:30, never later in the night
+// deadline 00:30 -> T-80 = 23:10 (quiet) -> 21:00
 const mid = bkk(2026, 10, 26, 0, 30);
-assert.equal(new Date(D.personalStartMs(mid) + 7 * H).toISOString().slice(11, 16), '21:30');
-// deadline 01:00 -> -3h = 22:00 (quiet) -> 21:00
+assert.equal(new Date(D.personalStartMs(mid) + 7 * H).toISOString().slice(11, 16), '21:00');
+// deadline 23:00 -> T-80 = 21:40, but the next run is 22:00 (quiet) -> 21:00, or it would never be chased
+assert.equal(new Date(D.personalStartMs(bkk(2026, 10, 25, 23, 0)) + 7 * H).toISOString().slice(11, 16), '21:00');
+// every minute of a day: a deadline in daytime always gets a run in its window, at 20 min or more; the marker stops a second push
+for (let m = 8 * 60 + 30; m < 21 * 60; m++) { const d = bkk(2026, 10, 25, 0, 0) + m * 60000; let n = 0; for (let t = d - 3 * H - (d % H); t < d; t += H) if (D.planDeadline(t, d).personal) n++; assert.ok(n >= 1, 'a run for minute ' + m); }
+// a quiz closing within 6 h may ride along; further out it may not
+assert.equal(D.planDeadline(dl - 6 * H, dl).bundle, true); assert.equal(D.planDeadline(dl - 7 * H, dl).bundle, false); assert.equal(D.planDeadline(dl - H, dl).bundle, false);
+// deadline 01:00 -> T-80 = 23:40 (quiet) -> 21:00
 assert.equal(new Date(D.personalStartMs(bkk(2026, 10, 26, 1, 0)) + 7 * H).toISOString().slice(11, 16), '21:00');
-// a quiz that goes live with 2 h left gets the personal bubble only
-assert.equal(plan(dl - 2 * H, dl), 'personal');
+// a quiz that goes live with 1 h left gets the personal bubble only
+assert.equal(plan(dl - 1 * H, dl), 'personal');
 // sweep every hour of 48 h before a 14:00 deadline: never a push in quiet hours, group never after personal opens
 {
     const dd = bkk(2026, 10, 25, 14, 0);
@@ -190,11 +197,11 @@ const fresh = (quizzes, extraUsers) => {
 const quizAt = (ms, extra) => Object.assign({ isActive: true, title: 'Asthma 1', shortTitle: 'Asthma', deadline: { toMillis: () => ms } }, extra || {});
 
 (async () => {
-    // as shipped: nothing to the group at T-24 h, the personal bubble at T-3 h still goes
+    // as shipped: nothing to the group at T-24 h, the last-hour personal bubble still goes
     fresh({ qa: quizAt(NOW + 20 * H) });
     await offContext.runQuizDeadlines(NOW);
     assert.equal(pushes.length, 0, 'no group bubble with the switch off');
-    fresh({ qa: quizAt(NOW + 2 * H) });
+    fresh({ qa: quizAt(NOW + 1 * H) });
     await offContext.runQuizDeadlines(NOW);
     assert.ok(pushes.length > 0 && pushes.every(p => p.tag === 'quizDeadlineDM'), 'personal bubbles still go');
 
@@ -218,31 +225,39 @@ const quizAt = (ms, extra) => Object.assign({ isActive: true, title: 'Asthma 1',
     DB.users = { U1: user('Ann') }; DB.quiz_attempts = { 'qe_U1': { status: 'approved' } };
     await run(NOW); assert.equal(pushes.length, 0, 'opt-out / poll / no deadline / >24 h / all done: silent');
 
-    // C. T-3 h: personal bubbles only to interns who have NOT submitted; opted-out and out-of-cohort never
-    fresh({ qa: quizAt(NOW + 2 * H) });
+    // C. Last hour: personal bubbles only to interns who have NOT submitted; opted-out and out-of-cohort never
+    fresh({ qa: quizAt(NOW + 1 * H) });
     r = await run(NOW);
     const to = pushes.map(p => p.to).sort();
     assert.deepEqual(to, ['U2', 'U3'], 'U1 submitted; U4 opted out; U5 stale; U6 ignored; U7 staff -> got ' + to);
     assert.ok(pushes.every(p => p.tag === 'quizDeadlineDM'), 'personal tag');
-    assert.ok(JSON.stringify(pushes.find(p => p.to === 'U2').flex).includes('2 h left'), 'U2 reads English');
-    assert.ok(JSON.stringify(pushes.find(p => p.to === 'U3').flex).includes('เหลือ 2 ชม.'), 'U3 reads Thai');
-    assert.ok(!/Beri/.test(JSON.stringify(pushes.map(p => p.flex))), 'no Beri promise at T-2 h');
-    assert.deepEqual(DB.quiz_deadline_alerts[D.markerId('qa', NOW + 2 * H)].personalSent.sort(), ['U2', 'U3']);
+    assert.ok(JSON.stringify(pushes.find(p => p.to === 'U2').flex).includes('1 h left'), 'U2 reads English');
+    assert.ok(JSON.stringify(pushes.find(p => p.to === 'U3').flex).includes('เหลือ 1 ชม.'), 'U3 reads Thai');
+    assert.ok(!/Beri/.test(JSON.stringify(pushes.map(p => p.flex))), 'no Beri promise at T-1 h');
+    assert.deepEqual(DB.quiz_deadline_alerts[D.markerId('qa', NOW + 1 * H)].personalSent.sort(), ['U2', 'U3']);
     assert.equal(DB.quiz_deadline_alerts['_cap_2026-10-25'].personal, 2, 'daily counter');
     pushes = []; await run(NOW + 1000); assert.equal(pushes.length, 0, 'second run: nobody is nagged twice');
+    // one bubble: a quiz closing within 6 h rides along, is marked sent, and is not pushed on its own at its last hour; a quiz nobody is pushed for waits
+    fresh({ qa: quizAt(NOW + 1 * H), qb: quizAt(NOW + 5 * H, { title: 'Rhinitis 2', shortTitle: 'Rhinitis' }) });
+    await offContext.runQuizDeadlines(NOW);
+    assert.deepEqual(pushes.map(p => p.to).sort(), ['U2', 'U3'], 'one push each');
+    assert.ok(JSON.stringify(pushes[0].flex).includes('Rhinitis'), 'both quizzes in the bubble');
+    assert.deepEqual(DB.quiz_deadline_alerts[D.markerId('qb', NOW + 5 * H)].personalSent.sort(), ['U2', 'U3']);
+    pushes = []; await offContext.runQuizDeadlines(NOW + 4 * H); assert.deepEqual(pushes.map(p => p.to), ['U1'], 'U2 and U3 are not pushed again at its last hour; U1, who rode with nothing, is');
+    fresh({ qb: quizAt(NOW + 5 * H) }); await offContext.runQuizDeadlines(NOW); assert.equal(pushes.length, 0, 'alone, 5 h out: nothing yet');
     // a late submitter drops out before the next window
     // D. one bubble per user across several quizzes
-    fresh({ qa: quizAt(NOW + 2 * H), qb: quizAt(NOW + 1 * H, { title: 'Second', shortTitle: 'Second' }) });
+    fresh({ qa: quizAt(NOW + 1 * H), qb: quizAt(NOW + 1 * H, { title: 'Second', shortTitle: 'Second' }) });
     DB.quiz_attempts = {};
     await run(NOW);
     assert.equal(pushes.filter(p => p.to === 'U3').length, 1, 'U3 gets ONE bubble for both quizzes');
     assert.ok(/Second/.test(JSON.stringify(pushes.find(p => p.to === 'U3').flex)) && /Asthma/.test(JSON.stringify(pushes.find(p => p.to === 'U3').flex)));
 
     // E. transient failure retries next hour; permanent failure does not
-    fresh({ qa: quizAt(NOW + 2 * H) });
+    fresh({ qa: quizAt(NOW + 1 * H) });
     failFor = (tag, t) => (t.to === 'U2' ? 'transient' : (t.to === 'U3' ? 'no-friend' : null));
     await run(NOW);
-    let mk = DB.quiz_deadline_alerts[D.markerId('qa', NOW + 2 * H)];
+    let mk = DB.quiz_deadline_alerts[D.markerId('qa', NOW + 1 * H)];
     assert.deepEqual(mk.personalSent, ['U3'], 'U3 (not a friend) is final; U2 (transient) is not marked');
     pushes = []; failFor = null; await run(NOW + H);
     assert.deepEqual(pushes.map(p => p.to), ['U2'], 'only the transient failure is retried');
@@ -252,13 +267,13 @@ const quizAt = (ms, extra) => Object.assign({ isActive: true, title: 'Asthma 1',
 
     // F. daily cap + critical quota
     const crowd = {}; for (let i = 0; i < 20; i++) crowd['U1' + String(i).padStart(2, '0')] = user('N' + i);
-    fresh({ qa: quizAt(NOW + 2 * H) }, crowd);
+    fresh({ qa: quizAt(NOW + 1 * H) }, crowd);
     await run(NOW);
     assert.equal(pushes.length, 15, 'hard cap of 15 personal pushes per day, got ' + pushes.length);
     pushes = []; await run(NOW + H); assert.equal(pushes.length, 0, 'cap is per day: nothing more today');
     pushes = []; DB.quizzes.qz = quizAt(NOW + 23 * H); await run(NOW + 21 * H);   // 09:00 next Bangkok day, a quiz closing 11:00
     assert.ok(pushes.length > 0 && pushes.length <= 15, 'a new day opens a new allowance');
-    fresh({ qa: quizAt(NOW + 2 * H) }); DB.line_usage['2026-10'] = { total: 270 };
+    fresh({ qa: quizAt(NOW + 1 * H) }); DB.line_usage['2026-10'] = { total: 270 };
     await run(NOW); assert.equal(pushes.length, 0, 'quota 270/300: personal pushes skipped');
     fresh({ qa: quizAt(NOW + 20 * H) }); DB.line_usage['2026-10'] = { total: 270 };
     await run(NOW); assert.equal(pushes.length, 1, 'quota critical still lets the single group bubble through');
@@ -275,7 +290,7 @@ const quizAt = (ms, extra) => Object.assign({ isActive: true, title: 'Asthma 1',
 
     // H. the digest still sees the same pending list through the shared helper
     context.process.env = { LINE_CHANNEL_ACCESS_TOKEN: 't' };
-    fresh({ qa: quizAt(NOW + 2 * H) });
+    fresh({ qa: quizAt(NOW + 1 * H) });
     const act = [{ id: 'U1', group: 'Public' }, { id: 'U2', group: 'Public' }, { id: 'U3', group: 'Public' }];
     const sc = await context.scanQuizPending(fakeDb, 'qa', DB.quizzes.qa, act);
     assert.deepEqual([Array.from(sc.doneIds), sc.missing.map(u => u.id)], [['U1'], ['U2', 'U3']], 'in_progress and practice attempts do not count as done');
