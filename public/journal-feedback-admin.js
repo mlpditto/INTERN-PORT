@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
         snapDocs.filter(MATCH[filter]).sort((a, b) => (b.data().timestamp?.toMillis?.() || 0) - (a.data().timestamp?.toMillis?.() || 0)).forEach(doc => {
             const data = doc.data(), row = document.createElement('details');
             row.className = 'lr-request'; row.dataset.id = doc.id; row.open = open.has(doc.id);
-            row.addEventListener('toggle', () => { if (row.open) list.querySelectorAll('details.lr-request[open]').forEach(o => { if (o !== row) o.open = false; }); });   // one open at a time
+            row.addEventListener('toggle', () => { if (row.open && row.isConnected) list.querySelectorAll('details.lr-request[open]').forEach(o => { if (o !== row) o.open = false; }); });   // one open at a time
             const copy = copies[doc.id], replied = isReplied(doc.id);
             const summary = document.createElement('summary');
             rowHead(summary, data, doc.id);
