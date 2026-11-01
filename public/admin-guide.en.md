@@ -155,6 +155,7 @@ The **Admin Portal** page has 3 ways in — use any one:
 | 📦 **Assignments** → tick 2+ quizzes → **🔍 Compare** | Puts a **chip** next to each “≈ %” match: **✓ 92%** = same fact · **✗** = different · **?** = not sure | Read both questions and decide which to keep or edit |
 | 📦 **Assignments** → 🔗 **Gourmet World** → **Categories (n)** | Suggests a category for every shop that has none | Tick the ones you agree with → **Save** |
 | 📝 **Quiz editor** → **📖 All** → **Jev repeats** | Compares the term lines of the Read first notes and lists the same content under different terms | Open the listed questions and edit yourself |
+| 🏜️ **Alabasta** → **✨ Check systems** | Reads the notes of waiting cases, names removed, and suggests a system | Press ✓ to use it or ✕ to dismiss it |
 | 📝 **Quiz editor** → **Review** → **Jev check** | Reads the questions on screen: does each explanation support the marked answer, and does each translation say the same thing? | Open the listed questions, check the source, edit yourself |
 | **Quiz editor → PDF** (import questions) and **Reflective Review → AI suggestion** | A silent **guardrail**: checks the text for “ignore your instructions…” tricks before it goes to another AI | Only if it warns you: choose **Cancel** (stop) or **OK** (continue) |
 

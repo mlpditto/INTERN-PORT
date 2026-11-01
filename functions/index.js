@@ -5488,6 +5488,8 @@ exports.jevCheckQuiz = onCall({ secrets: ["OPENROUTER_API_KEY", "JEV_AI_API_KEY"
 
 // V102.563: Jev looks for the same content under different terms across a quiz's Read first notes. Quiz content only; admin only, on a button; answers share the Compare cache.
 exports.jevPrimerRepeats = onCall({ secrets: ["OPENROUTER_API_KEY", "JEV_AI_API_KEY"], timeoutSeconds: 300, memory: "256MiB" }, async (request) => {
+// V102.562: Jev suggests the system of waiting cases. Admin only, on a button; the server reads the cases and scrubs each note, so nothing but the scrubbed note leaves. Nothing is cached.
+exports.jevSuggestCaseSystems = onCall({ secrets: ["JEV_AI_API_KEY"], timeoutSeconds: 120, memory: "256MiB" }, async (request) => {
     requireAdminCallable(request);
     const db = admin.firestore();
     const cfg = await db.collection("quiz_dup_scores").doc("_config").get();
@@ -5515,6 +5517,16 @@ exports.jevPrimerRepeats = onCall({ secrets: ["OPENROUTER_API_KEY", "JEV_AI_API_
     }));
     if (out.calls) recordAiUsage(provider, jev.JEV_MODEL, out.inputTokens, true, "jev_primer_repeats", { inputTokens: out.inputTokens, outputTokens: 0 });
     return { enabled: true, repeats: out.repeats, compared: out.compared, left: out.left, errors: out.errors };
+    const apiKey = process.env.JEV_AI_API_KEY;
+    if (!apiKey) throw new HttpsError("failed-precondition", "No API key configured for Jev");
+    const sys = require("./case-system-suggest");
+    const data = request.data || {}, ids = [...new Set(Array.isArray(data.caseIds) ? data.caseIds.map(String).filter(Boolean) : [])];
+    if (!ids.length || ids.length > sys.MAX_CASES) throw new HttpsError("invalid-argument", "1-" + sys.MAX_CASES + " cases");
+    const snaps = await db.getAll(...ids.map(id => db.collection("cases").doc(id)));
+    const cases = snaps.filter(s => s.exists && !s.data().isArchived && (s.data().status || "pending") === "pending").map(s => ({ id: s.id, ...s.data() }));
+    const out = await sys.suggestSystems(cases, data.systems, { apiKey, fetch: (url, opts) => fetch(url, opts) });
+    if (out.inputTokens) recordAiUsage("jev", jev.JEV_MODEL, out.inputTokens, true, "jev_case_system", { inputTokens: out.inputTokens, outputTokens: 0 });
+    return { enabled: true, suggestions: out.suggestions, checked: out.checked, skipped: out.skipped, errors: out.errors };
 });
 
 // ---- Jev: "same fact?" verdicts for the Compare modal (Phase 0 + use #1 of the Jev plan) ----
