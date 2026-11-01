@@ -2321,6 +2321,17 @@ const CASE_LINE_PUSH = false;
 // V102.547: Gemini reads the PDF on a Case right after Send (a callable from the page: Firestore triggers cannot deploy in this region).
 // The intern's call reads once; the admin's retry reads again. A failure leaves the case as it is and says so on it.
 // V102.550: the admin's retry may name another reader; the intern's call cannot.
+// V102.560: Import PDF in Alabasta. Covered JPEGs in, text out; nothing is stored here (case-import.js).
+exports.importCaseRead = onCall({ secrets: ['GEMINI_API_KEY'], timeoutSeconds: 150, memory: '512MiB' }, async (request) => {
+    if (!request.auth || !isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Admin only');
+    const reader = require('./case-import');
+    const images = (request.data || {}).images;
+    if (!reader.validImages(images)) throw new HttpsError('invalid-argument', 'JPEG pages only');
+    const out = await reader.readImages(images, process.env.GEMINI_API_KEY);
+    recordAiUsage('gemini-aistudio', reader.MODEL, out.tokens, true, 'case_import_read', { inputTokens: out.inputTokens, outputTokens: out.outputTokens });
+    return { read: out.read };
+});
+
 exports.readCaseFile = onCall({ secrets: ['GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY'], timeoutSeconds: 300, memory: '512MiB' }, async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
     const { caseDocId, retry } = request.data || {};
