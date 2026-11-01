@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.554)</title>
+    <title>Nika Admin (V102.555)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -5677,6 +5677,13 @@
         #rv-writeup .rv-lang { width:34px; height:34px; min-height:0; padding:0; margin:0; border-radius:8px; border:1px solid #e2e8f0; background:#fff; font-size:15px; line-height:1; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
         #rv-writeup .rv-lang { border-color:#f59e0b; background:#fef3c7; }   /* V102.525: one chip, always the chosen language */
         #rv-writeup .rv-lang img.emoji { width:18px; height:18px; }
+        /* V102.555: the next control to press wears a flashing neon edge; what is done keeps a thin green one */
+        #rv-writeup .rv-g-on { outline:2px solid #fff7ed; outline-offset:1px; box-shadow:0 0 4px 1px #fbbf24,0 0 12px 3px #f97316,0 0 24px 6px rgba(249,115,22,.55); animation:rvNeon 1.25s linear infinite; }
+        #rv-writeup .rv-g-done { outline:1.5px solid #86efac; outline-offset:1px; }
+        #rv-writeup.rv-guiding .text-ai-chips { flex:0 1 auto; border-radius:10px; }
+        #rv-writeup.rv-guiding #rv-writeup-note { font-weight:800; color:#92400e !important; }
+        @keyframes rvNeon { 0%,8%,24%,32%,48%,100% { box-shadow:0 0 4px 1px #fbbf24,0 0 12px 3px #f97316,0 0 24px 6px rgba(249,115,22,.55); outline-color:#fff7ed; } 12%,20%,36%,44% { box-shadow:0 0 1px 0 rgba(251,191,36,.35); outline-color:rgba(245,158,11,.35); } }
+        @media (prefers-reduced-motion:reduce) { #rv-writeup .rv-g-on { animation:none; } }
         /* V102.527: Review header — status pills on the name line (D: the fruit is the status), the approve pair, phone width may wrap */
         #reviewQuizOverlay .rv-st { display:inline-flex; align-items:center; gap:4px; padding:0 7px; border-radius:999px; font-size:10.5px; font-weight:800; white-space:nowrap; line-height:18px; }
         #reviewQuizOverlay .rv-st-ok { background:#16a34a; color:#fff; }
@@ -32014,9 +32021,23 @@ ${JSON.stringify(sourceObj)}`;
             const open = p.hasAttribute('hidden');
             if (open) p.removeAttribute('hidden'); else p.setAttribute('hidden', '');
             if (b) b.setAttribute('aria-expanded', String(open));
-            // V102.511 (owner): opening the panel runs nothing — pick the language and model first, then ✨ drafts
+            // V102.511 (owner): opening the panel runs nothing — pick the language and model first, then ✨ drafts. V102.555: the neon guide shows the order
             const ta = document.getElementById('rv-writeup-text'), note = document.getElementById('rv-writeup-note');
-            if (open && ta && !ta.value.trim() && note && !note.textContent) note.textContent = 'Pick the language and model, then ✨';
+            if (open && ta && !ta.value.trim() && note && !note.textContent) rvWriteupGuide(0);
+        }
+        // V102.555: Language → Model → ✨ → Send, one neon edge at a time. It only points: any control still works, a later one skips ahead, and 4 ends it.
+        const RV_GUIDE = [['#rv-writeup-lang', 'Language'], ['#rv-writeup .text-ai-chips', 'Model'], ['#rv-writeup-draft', 'Draft'], ['#rv-writeup-send', 'Send']];
+        function rvWriteupGuide(step) {
+            const s = window._rvWriteup, p = document.getElementById('rv-writeup'), note = document.getElementById('rv-writeup-note');
+            if (!s || !p || !note) return;
+            if (step === 0 && s.guide == null) s.guide = 0;
+            if (s.guide == null) return;
+            s.guide = Math.max(s.guide, step);
+            RV_GUIDE.forEach(([sel], i) => { const el = p.parentElement.querySelector(sel); if (el) { el.classList.toggle('rv-g-on', i === s.guide); el.classList.toggle('rv-g-done', i < s.guide && s.guide < 4); } });
+            p.classList.toggle('rv-guiding', s.guide < 4);
+            const word = s.guide < 3 ? (s.guide + 1) + '/4 ' + RV_GUIDE[s.guide][1] : '';
+            if (note.textContent === s.guideWord || !note.textContent) note.textContent = word;   // a draft's own note stays
+            s.guideWord = word;
         }
         // V102.551: the draft stays in this browser until Send, so an intern can never read it from their own attempt
         function rvWriteupLoadDraft(id) {
@@ -32041,6 +32062,7 @@ ${JSON.stringify(sourceObj)}`;
                 else localStorage.removeItem('rv_draft_' + s.id);
             } catch (e) { s.savedAt = 0; }
             rvWriteupStatus();
+            if (text) rvWriteupGuide(3);
         }
         function rvWriteupPreview(on) {
             const ta = document.getElementById('rv-writeup-text'), view = document.getElementById('rv-writeup-view'), as = document.getElementById('rv-writeup-as'), b = document.getElementById('rv-writeup-preview');
@@ -32067,6 +32089,7 @@ ${JSON.stringify(sourceObj)}`;
             const chip = document.getElementById('rv-writeup-lang');
             if (window.twemoji) twemoji.parse(chip, { folder: 'svg', ext: '.svg' });
             chip.focus();
+            rvWriteupGuide(1);
         }
         async function rvWriteupDraft() {
             const src = window._reviewWrongForWriteup, ta = document.getElementById('rv-writeup-text');
@@ -32117,6 +32140,7 @@ ${qs}`;
                 if (note) note.textContent = '';   // V102.554: the pill and the dimmed Send already say it
                 const s = window._rvWriteup;
                 if (s) { s.sent = text; s.sentAt = Date.now(); try { localStorage.removeItem('rv_draft_' + s.id); } catch (e) { /* the draft only stays */ } }
+                rvWriteupGuide(4);
                 showToast('📰 Personal review sent');
             } catch (e) {
                 alert('Send failed: ' + ((e && e.message) || e));
@@ -32719,6 +32743,7 @@ ${qs}`;
                 if (window.rvApplyUi) window.rvApplyUi(attemptId);
                 rvWriteupStatus();
                 { const fl = document.getElementById('rv-writeup-lang'); if (fl && window.twemoji) twemoji.parse(fl, { folder: 'svg', ext: '.svg' }); }   // V100.79: flag emoji render as letters on Windows
+                document.getElementById('rv-writeup')?.addEventListener('click', e => { if (e.target.closest('.text-ai-chips > button.glass-toggle-item')) rvWriteupGuide(2); });
                 if (rvWrongItems.length && window.bindRegistryModelInput) window.bindRegistryModelInput(rvWriteupModelId, 'ai_review_writeup_model');   // V102.508: vendor icons first, then that vendor's chips (ai-model-ui.js V102.487 rail)
 
             } catch (e) {

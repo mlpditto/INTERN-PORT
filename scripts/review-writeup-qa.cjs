@@ -113,7 +113,17 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
       assert.equal(await btn.getAttribute('aria-expanded'), 'true');
       assert.equal(await panel.evaluate(p => p.getBoundingClientRect().top >= document.querySelector('#reviewQuizOverlay > div > div').getBoundingClientRect().bottom - 1), true, 'under the header row');
       assert.equal(await page.evaluate(() => window.__prompts.length), 0, 'V102.511: opening the panel runs no AI');
-      assert.equal(await page.locator('#rv-writeup-note').innerText(), 'Pick the language and model, then ✨', 'the empty panel says what to do');
+      // V102.555: the neon guide walks Language → Model → ✨ → Send, and never blocks
+      const guide = () => page.evaluate(() => ({ on: [...document.querySelectorAll('#rv-writeup .rv-g-on')].map(e => e.id || 'rail'), done: document.querySelectorAll('#rv-writeup .rv-g-done').length, note: document.getElementById('rv-writeup-note').textContent }));
+      assert.deepEqual(await guide(), { on: ['rv-writeup-lang'], done: 0, note: '1/4 Language' }, 'step 1 is the flag');
+      assert.equal(await page.$eval('.rv-g-on', e => getComputedStyle(e).animationName), 'rvNeon', 'the edge flashes');
+      await page.locator('#rv-writeup-lang').click();
+      assert.deepEqual(await guide(), { on: ['rail'], done: 1, note: '2/4 Model' }, 'the flag moves it to the model rail');
+      await page.locator('#rv-writeup .text-ai-chips > button.glass-toggle-item:not([hidden])').first().click();
+      assert.deepEqual(await guide(), { on: ['rv-writeup-draft'], done: 2, note: '3/4 Draft' }, 'a model moves it to ✨');
+      await page.locator('#rv-writeup-lang').click(); await page.locator('#rv-writeup-lang').click();
+      assert.equal(await page.locator('#rv-writeup-lang').getAttribute('data-lang'), 'th', 'three taps come back to the first language');
+      assert.deepEqual((await guide()).on, ['rv-writeup-draft'], 'going back to a done control does not move the guide back');
       await page.locator('#rv-writeup-draft').click();
       assert.equal(await page.locator('#rv-writeup-draft').isDisabled(), true, 'busy while the AI drafts');
       await waitIdle(page);
@@ -177,7 +187,7 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
       await page.locator('#rv-writeup-text').fill(DRAFT + '\nแก้โดยแอดมิน');
       await page.locator('#rv-writeup-send').click(); await page.waitForTimeout(150);
       assert.deepEqual(await page.evaluate(() => window.__writes), [['update', 'quiz_attempts', 'a1', ['adminComment', 'adminCommentAt', 'adminCommentBy'], DRAFT + '\nแก้โดยแอดมิน', 'medlifeplus@gmail.com']], 'Send = one update of adminComment on the attempt, nothing else');
-      assert.equal(await page.locator('#rv-writeup-note').innerText(), '', 'V102.554: no note, the pill says it'); assert.match(await page.locator('#rv-writeup-state').innerText(), /^✓ Sent/); assert.deepEqual(await page.evaluate(() => window.__toasts), ['📰 Personal review sent']);
+      assert.equal(await page.locator('#rv-writeup-note').innerText(), '', 'V102.554: no note, the pill says it'); assert.equal(await page.locator('#rv-writeup .rv-g-on, #rv-writeup .rv-g-done, #rv-writeup.rv-guiding').count(), 0, 'V102.555: Send ends the guide'); assert.match(await page.locator('#rv-writeup-state').innerText(), /^✓ Sent/); assert.deepEqual(await page.evaluate(() => window.__toasts), ['📰 Personal review sent']);
       await btn.click(); assert.equal(await panel.isHidden(), true, 'the button folds the panel again'); assert.equal(await btn.getAttribute('aria-expanded'), 'false');
       assert.deepEqual(errs.filter(e => !noise(e)), [], 'no page errors: ' + errs);
       await ctx.close();
