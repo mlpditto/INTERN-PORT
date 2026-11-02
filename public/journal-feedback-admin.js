@@ -3,7 +3,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!host) return;
     const section = document.createElement('details');
     section.id = 'jf-panel'; section.className = 'lr-admin lang-no-toggle';
-    section.innerHTML = '<summary>💬 Journal feedback <b class="jf-count" hidden></b></summary><div class="jf-tabs" role="group" aria-label="Filter"></div><div class="jf-list"></div><p role="status"></p>';
+    // V102.576 (Warm inbox, owner's pick A): the filter sits on the title line; a tap there filters and opens, never folds
+    section.innerHTML = '<summary><span class="jf-title">💬 Journal feedback</span> <b class="jf-count" hidden></b><span class="jf-tabs" role="group" aria-label="Filter"></span></summary><div class="jf-list"></div><p role="status"></p>';
     host.prepend(section);
     const list = section.querySelector('.jf-list'), status = section.querySelector('p'), count = section.querySelector('.jf-count'), tabs = section.querySelector('.jf-tabs');
     let unsubscribe, unsubCopies, snapDocs = [], copies = {}, copiesLoaded = false, seen = null, filter = 'all';
@@ -17,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const isReplied = id => { const c = copies[id]; return !!(c && c.status === 'answered' && c.reply); };
     const MATCH = { all: () => true, unread: d => !d.data().read, needs: d => !isReplied(d.id), replied: d => isReplied(d.id) };
-    const LABEL = { all: 'All', unread: 'Unread', needs: 'Needs reply', replied: 'Replied' };
+    const LABEL = { all: 'All', unread: 'New', needs: 'To reply', replied: 'Done' };
     const initials = name => [...String(name || '?').trim()].slice(0, 2).join('').toUpperCase();
     const hue = s => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
     function rowHead(summary, data, id) {
@@ -25,9 +26,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const av = document.createElement('span'); av.className = 'jf-av'; av.textContent = initials(name); av.style.background = `hsl(${hue(name)} 55% 92%)`; av.style.color = `hsl(${hue(name)} 45% 32%)`;
         const main = document.createElement('span'); main.className = 'jf-main';
         const top = document.createElement('span'); top.className = 'jf-top';
-        const who = document.createElement('b'); who.textContent = name;
-        const pill = document.createElement('span'); pill.className = 'jf-st ' + (replied ? 'replied' : data.read ? 'read' : 'new'); pill.textContent = replied ? '↩ Replied' : data.read ? '✓ Read' : 'New';
-        top.append(who, pill);
+        const who = document.createElement('b'); who.textContent = name; who.title = replied ? 'Replied' : data.read ? 'Read · waiting for a reply' : 'New';
+        top.append(who);
         if (drafts[id]) { const d = document.createElement('span'); d.className = 'jf-st draft'; d.textContent = 'Draft'; top.append(d); }
         const line = document.createElement('span'); line.className = 'jf-pv'; line.textContent = String(data.message || '').replace(/\s+/g, ' ');
         main.append(top, line);
@@ -49,9 +49,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function paintTabs() {
         tabs.replaceChildren(...Object.keys(LABEL).map(k => {
+            const n = snapDocs.filter(MATCH[k]).length;
             const b = document.createElement('button'); b.type = 'button'; b.className = 'jf-tab'; b.setAttribute('aria-pressed', String(filter === k));
-            b.textContent = LABEL[k] + ' ' + snapDocs.filter(MATCH[k]).length;
-            b.onclick = () => { filter = k; paint(); };
+            b.hidden = !n && k !== 'all' && filter !== k;   // a 0 hides, unless it is the one in use
+            b.textContent = LABEL[k] + ' ' + n;
+            b.onclick = e => { e.preventDefault(); filter = k; section.open = true; paint(); };
             return b;
         }));
     }
@@ -64,9 +66,13 @@ document.addEventListener('DOMContentLoaded', () => {
         list.replaceChildren();
         snapDocs.filter(MATCH[filter]).sort((a, b) => (b.data().timestamp?.toMillis?.() || 0) - (a.data().timestamp?.toMillis?.() || 0)).forEach(doc => {
             const data = doc.data(), row = document.createElement('details');
-            row.className = 'lr-request'; row.dataset.id = doc.id; row.open = open.has(doc.id);
-            row.addEventListener('toggle', () => { if (row.open && row.isConnected) list.querySelectorAll('details.lr-request[open]').forEach(o => { if (o !== row) o.open = false; }); });   // one open at a time
             const copy = copies[doc.id], replied = isReplied(doc.id);
+            row.className = 'lr-request ' + (replied ? 'done' : data.read ? 'wait' : 'wait new'); row.dataset.id = doc.id; row.open = open.has(doc.id);
+            row.addEventListener('toggle', () => {
+                if (!row.open || !row.isConnected) return;
+                list.querySelectorAll('details.lr-request[open]').forEach(o => { if (o !== row) o.open = false; });   // one open at a time
+                if (!data.read) doc.ref.update({ read: true }).catch(e => console.warn('Journal feedback read:', e && e.message));   // V102.576: opening = read
+            });
             const summary = document.createElement('summary');
             rowHead(summary, data, doc.id);
             row.append(summary);
@@ -77,33 +83,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 const content = document.createElement('p'); content.style.whiteSpace = 'pre-wrap'; content.textContent = data.attachment.content;
                 attachment.append(label, content); row.append(attachment);
             }
-            const date = document.createElement('small'); date.textContent = when(data.timestamp); row.append(date);
             // V102.526: ↩ Reply — written to the intern's own copy (intern_messages/{same id}); the intern reads it in History under the message.
             // A copy that does not exist yet (a message sent before V101.247) is backfilled from this doc in the same set (merge).
-            const box = document.createElement('div'); box.className = 'jf-reply'; box.style.cssText = 'margin-top:8px; display:grid; gap:6px;';
+            const box = document.createElement('div'); box.className = 'jf-reply';
             if (replied) {
                 const have = document.createElement('p'); have.className = 'jf-have'; have.style.cssText = 'margin:0; padding:8px 10px; border-left:3px solid #86efac; background:#f0fdf4; border-radius:0 8px 8px 0; white-space:pre-wrap;';
                 have.textContent = '↩ ' + copy.reply;
                 const at = document.createElement('small'); at.style.cssText = 'display:block; color:#64748b; margin-top:4px;'; at.textContent = when(copy.repliedAt) + (copy.repliedBy ? ' · ' + copy.repliedBy : ''); have.append(at);
                 box.append(have);
             }
-            const ta = document.createElement('textarea'); ta.rows = 2; ta.maxLength = 2000; ta.style.minHeight = '56px';
-            ta.placeholder = replied ? 'Edit the reply — the intern sees the new text' : 'Reply to the intern — shows in their History under this message (**bold** = highlighted)';
+            const ta = document.createElement('textarea'); ta.rows = 1; ta.maxLength = 2000;
+            ta.placeholder = replied ? 'Edit reply · they see the new text' : 'Reply · shows in their History';
+            ta.title = '**bold** = highlighted · Ctrl+Enter sends';
             ta.setAttribute('aria-label', 'Reply to ' + (data.userName || 'the intern'));
             ta.value = drafts[doc.id] || '';
-            const left = document.createElement('small'); left.className = 'jf-len'; left.textContent = ta.value.length + '/2000';
+            const left = document.createElement('small'); left.className = 'jf-len';
+            const count = () => { left.textContent = ta.value.length > 1800 ? ta.value.length + '/2000' : ''; };   // only near the cap
+            count();
             ta.oninput = () => {
                 const had = !!drafts[doc.id];
                 if (ta.value) drafts[doc.id] = ta.value; else delete drafts[doc.id];
-                left.textContent = ta.value.length + '/2000';
+                count();
                 if (had !== !!drafts[doc.id]) { const top = summary.querySelector('.jf-top'), d = top.querySelector('.draft'); if (d) d.remove(); else { const c = document.createElement('span'); c.className = 'jf-st draft'; c.textContent = 'Draft'; top.append(c); } }
             };
             ta.onkeydown = e => {
                 if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); go.click(); }
                 if (e.key === 'Escape') { e.stopPropagation(); row.open = false; summary.focus(); }
             };
-            const acts = document.createElement('div'); acts.style.cssText = 'display:flex; gap:8px; flex-wrap:wrap; align-items:center;';
-            const go = document.createElement('button'); go.type = 'button'; go.className = 'jf-send'; go.textContent = replied ? '↩ Update reply' : '↩ Reply';
+            const acts = document.createElement('div'); acts.className = 'jf-bar';
+            const go = document.createElement('button'); go.type = 'button'; go.className = 'jf-send'; go.textContent = '➤';
+            go.title = (replied ? 'Update reply' : 'Send reply') + ' (Ctrl+Enter)'; go.setAttribute('aria-label', replied ? 'Update reply' : 'Send reply');
             go.onclick = async () => {
                 const text = ta.value.trim();
                 if (!text) { status.textContent = 'Write a reply first.'; ta.focus(); return; }
@@ -117,18 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     delete drafts[doc.id]; status.textContent = 'Reply sent — the intern sees it in History.';
                 } catch (e) { console.error('Journal feedback reply', e); status.textContent = 'Could not send the reply. Your text is kept — please retry.'; go.disabled = false; }
             };
-            acts.append(go);
-            if (!data.read) {
-                const button = document.createElement('button'); button.type = 'button'; button.textContent = '✓ Mark read';
-                button.onclick = async () => {
-                    button.disabled = true;
-                    try { await doc.ref.update({ read: true }); status.textContent = 'Marked read'; }
-                    catch (e) { status.textContent = 'Could not update. Please retry.'; button.disabled = false; }
-                };
-                acts.append(button);
-            }
-            acts.append(left);
-            box.append(ta, acts); row.append(box);
+            acts.append(ta, go);
+            box.append(acts, left); row.append(box);
             list.append(row);
         });
         if (!list.firstChild) { const none = document.createElement('p'); none.className = 'jf-none'; none.textContent = snapDocs.length ? 'Nothing here. Well done.' : 'No journal feedback yet.'; list.append(none); }

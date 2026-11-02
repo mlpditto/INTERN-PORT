@@ -2,7 +2,9 @@
 // A reply is written to the intern's own copy intern_messages/{same id} with set(merge) — status answered, reply, repliedAt, repliedBy —
 // backfilling the copy's six fields from the notification (a message sent before V101.247 has no copy yet) and marking the notification
 // read; the existing reply shows under the message (↩ Replied in the summary) and can be updated; an empty reply is refused; a failed
-// write keeps the text and re-enables the button; a draft survives the re-render a snapshot causes; ✓ Mark read still works.
+// write keeps the text and re-enables the button; a draft survives the re-render a snapshot causes.
+// V102.576 Warm inbox: the filter sits on the title line (New / To reply / Done, a 0 hides), the row class says the state
+// (new glows, wait, done), opening a row marks it read (no ✓ Mark read), ➤ sends, the counter shows only near the cap.
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -51,13 +53,16 @@ const db = { app: { auth: () => ({ currentUser: { email: 'admin@test' }, onAuthS
         const scan = await page.$eval('.lr-request[data-id="a"] > summary', e => ({ av: e.querySelector('.jf-av').textContent, pv: e.querySelector('.jf-pv').textContent, t: e.querySelector('time').textContent, att: !!e.querySelector('.jf-att') }));
         assert.equal(scan.pv, 'อยากได้โจทย์คำนวณยาเด็กเพิ่มครับ'); assert.ok(scan.t && scan.att && scan.av === 'MI', JSON.stringify(scan));
         assert.equal(await page.$eval('.jf-count', e => e.textContent), '1', 'the unread count');
-        assert.deepEqual(await page.$$eval('.jf-tab', e => e.map(x => x.textContent)), ['All 2', 'Unread 1', 'Needs reply 1', 'Replied 1']);
+        assert.deepEqual(await page.$$eval('.jf-tab', e => e.map(x => x.textContent)), ['All 2', 'New 1', 'To reply 1', 'Done 1']);
+        assert.equal(await page.$eval('.jf-tabs', e => e.parentElement.tagName), 'SUMMARY', 'the filter is on the title line');
         const tab = async i => { await page.locator('.jf-tab').nth(i).click(); return page.$$eval('.lr-request', e => e.map(x => x.dataset.id)); };
         assert.deepEqual(await tab(1), ['a']); assert.deepEqual(await tab(3), ['b']); assert.deepEqual(await tab(0), ['a', 'b']);
 
         // one open at a time; Esc closes; Ctrl+Enter sends; typing shows Draft
         await page.evaluate(() => { document.querySelector('.lr-request[data-id="a"]').open = true; });
         await page.waitForTimeout(50);
+        assert.deepEqual(await page.evaluate(() => window.__upd), [['a', { read: true }]], 'opening an unread row marks it read');
+        await page.evaluate(() => { window.__upd.length = 0; });
         await page.evaluate(() => { document.querySelector('.lr-request[data-id="b"]').open = true; });
         await page.waitForTimeout(50);
         assert.deepEqual(await page.$$eval('.lr-request[open]', e => e.map(x => x.dataset.id)), ['b'], 'one open at a time');
@@ -66,7 +71,9 @@ const db = { app: { auth: () => ({ currentUser: { email: 'admin@test' }, onAuthS
         await page.evaluate(() => { document.querySelector('.lr-request[data-id="a"]').open = true; });
         await page.fill('.lr-request[data-id="a"] textarea', 'x');
         assert.equal(await page.locator('.lr-request[data-id="a"] .jf-st.draft').count(), 1, 'Draft shows on the row');
-        assert.equal(await page.$eval('.lr-request[data-id="a"] .jf-len', e => e.textContent), '1/2000');
+        assert.equal(await page.$eval('.lr-request[data-id="a"] .jf-len', e => e.textContent), '', 'no counter far from the cap');
+        await page.fill('.lr-request[data-id="a"] textarea', 'y'.repeat(1850));
+        assert.equal(await page.$eval('.lr-request[data-id="a"] .jf-len', e => e.textContent), '1850/2000', 'the counter near the cap');
         await page.fill('.lr-request[data-id="a"] textarea', '');
         assert.equal(await page.locator('.lr-request[data-id="a"] .jf-st.draft').count(), 0);
         await page.evaluate(() => { document.querySelector('.lr-request[data-id="a"]').open = false; });
@@ -76,13 +83,13 @@ const db = { app: { auth: () => ({ currentUser: { email: 'admin@test' }, onAuthS
         await page.evaluate(() => { const n = { id: 'c', data: () => ({ type: 'journal_feedback', userName: 'Nam', message: 'hi', read: false, timestamp: T(4000) }), ref: { update: () => Promise.resolve() } }; window.__ok({ docs: [n].concat(docs), size: 3 }); window.__ok({ docs: docs, size: 2 }); });
         assert.deepEqual(await page.evaluate(() => window.__toast), ['💬 New Journal feedback from Nam']);
 
-        const rows = await page.$$eval('.lr-request > summary', els => els.map(e => e.querySelector('b').textContent + ':' + e.querySelector('.jf-st').textContent));
-        assert.deepEqual(rows, ['Mint:New', 'Ploy:↩ Replied'], 'newest first; a replied one says so in the summary');
-        const b = await page.$eval('.lr-request[data-id="b"]', r => ({ have: r.querySelector('.jf-have').textContent, ph: r.querySelector('textarea').placeholder, btn: r.querySelector('.jf-send').textContent, read: !!r.querySelector('button:not(.jf-send)') }));
+        const rows = await page.$$eval('.lr-request', els => els.map(e => e.querySelector('summary b').textContent + ':' + e.className));
+        assert.deepEqual(rows, ['Mint:lr-request wait new', 'Ploy:lr-request done'], 'newest first; the row class says the state (new glows)');
+        const b = await page.$eval('.lr-request[data-id="b"]', r => ({ have: r.querySelector('.jf-have').textContent, ph: r.querySelector('textarea').placeholder, btn: r.querySelector('.jf-send').getAttribute('aria-label'), read: !!r.querySelector('button:not(.jf-send)') }));
         assert.match(b.have, /^↩ Under \*\*Settings ▸ Quiz\*\*\./, 'the existing reply shows under the message'); assert.match(b.have, /admin@test/);
-        assert.deepEqual([b.ph.startsWith('Edit the reply'), b.btn, b.read], [true, '↩ Update reply', false], 'a replied row offers to update; already read → no Mark read');
-        const a = await page.$eval('.lr-request[data-id="a"]', r => ({ have: !!r.querySelector('.jf-have'), btn: r.querySelector('.jf-send').textContent, read: r.querySelector('button:not(.jf-send)').textContent }));
-        assert.deepEqual(a, { have: false, btn: '↩ Reply', read: '✓ Mark read' }, 'an unanswered row: ↩ Reply + ✓ Mark read');
+        assert.deepEqual([b.ph.startsWith('Edit reply'), b.btn, b.read], [true, 'Update reply', false], 'a replied row offers to update');
+        const a = await page.$eval('.lr-request[data-id="a"]', r => ({ have: !!r.querySelector('.jf-have'), btn: r.querySelector('.jf-send').textContent + ' ' + r.querySelector('.jf-send').getAttribute('aria-label'), read: !!r.querySelector('button:not(.jf-send)') }));
+        assert.deepEqual(a, { have: false, btn: '➤ Send reply', read: false }, 'an unanswered row: ➤ only, no Mark read button');
         // empty reply refused
         await page.evaluate(() => { document.querySelector('.lr-request[data-id="a"]').open = true; });
         await page.click('.lr-request[data-id="a"] .jf-send');
@@ -94,7 +101,7 @@ const db = { app: { auth: () => ({ currentUser: { email: 'admin@test' }, onAuthS
         await page.evaluate(() => { document.querySelector('.lr-request[data-id="a"]').open = true; });
         assert.equal(await page.$eval('.lr-request[data-id="a"] textarea', e => e.value), 'เพิ่มให้แล้ว **10 ข้อ**', 'the typed reply is still there after the list repainted');
         // a failed write keeps the text, re-enables the button
-        await page.evaluate(() => { window.__failSet = true; });
+        await page.evaluate(() => { window.__failSet = true; window.__upd.length = 0; });   // the opens above were reads (the stub stays unread)
         await page.click('.lr-request[data-id="a"] .jf-send');
         await page.waitForFunction(() => /Could not send/.test(document.querySelector('.lr-admin > p[role=status]').textContent));
         assert.deepEqual(await page.$eval('.lr-request[data-id="a"]', r => [r.querySelector('textarea').value, r.querySelector('.jf-send').disabled]), ['เพิ่มให้แล้ว **10 ข้อ**', false], 'failure keeps the text, button usable again');
@@ -110,18 +117,14 @@ const db = { app: { auth: () => ({ currentUser: { email: 'admin@test' }, onAuthS
         // the copies snapshot brings the reply back → shown, summary flips, button says update, draft cleared
         await page.evaluate(() => window.__okCopies({ docs: copies.concat([{ id: 'a', data: () => ({ status: 'answered', reply: 'เพิ่มให้แล้ว **10 ข้อ**', repliedAt: T(3000), repliedBy: 'admin@test' }) }]), size: 2 }));
         await page.evaluate(() => { document.querySelector('.lr-request[data-id="a"]').open = true; });
-        const after = await page.$eval('.lr-request[data-id="a"]', r => [r.querySelector('.jf-st').textContent, r.querySelector('.jf-have').textContent.startsWith('↩ เพิ่มให้แล้ว **10 ข้อ**'), r.querySelector('.jf-send').textContent, r.querySelector('textarea').value]);
-        assert.deepEqual(after, ['↩ Replied', true, '↩ Update reply', ''], 'after the reply lands: ↩ Replied, the text under the message, Update reply, empty box');
-        // ✓ Mark read still works on its own
-        await page.evaluate(() => window.__okCopies({ docs: copies, size: 1 }));
-        await page.evaluate(() => { document.querySelector('.lr-request[data-id="a"]').open = true; });
-        await page.click('.lr-request[data-id="a"] button:not(.jf-send)');
-        await page.waitForFunction(() => window.__upd.length === 2);
-        assert.deepEqual(await page.evaluate(() => window.__upd[1]), ['a', { read: true }], '✓ Mark read updates the doc');
-        // hides itself when nothing is unread
+        const after = await page.$eval('.lr-request[data-id="a"]', r => [r.classList.contains('done'), r.querySelector('.jf-have').textContent.startsWith('↩ เพิ่มให้แล้ว **10 ข้อ**'), r.querySelector('.jf-send').getAttribute('aria-label'), r.querySelector('textarea').value]);
+        assert.deepEqual(after, [true, true, 'Update reply', ''], 'after the reply lands: green (done), the text under the message, Update reply, empty box');
+        // a 0 hides its filter, unless it is the one in use
         await page.evaluate(() => window.__ok({ docs: [docs[1]], size: 1 }));
+        assert.deepEqual(await page.$$eval('.jf-tab', e => e.map(x => x.hidden)), [false, true, true, false], 'New 0 and To reply 0 hide');
+        // hides itself when nothing is unread
         assert.equal(await page.locator('details.lr-admin.queue-empty').count(), 1, 'hides itself when nothing is unread');
         assert.deepEqual(errs, [], 'no page errors: ' + errs.join(' | '));
-        console.log('PASS: admin Journal feedback ↩ Reply (V102.526) — reads the copies alongside, existing reply shown + ↩ Replied, Update reply, empty refused, draft survives a repaint, failure keeps text, reply = set(merge) on intern_messages/{same id} with backfilled fields + who/when and the notification read, ✓ Mark read kept, hides when nothing is unread');
+        console.log('PASS: admin Journal feedback ↩ Reply (V102.526) — reads the copies alongside, existing reply shown + ↩ Replied, Update reply, empty refused, draft survives a repaint, failure keeps text, reply = set(merge) on intern_messages/{same id} with backfilled fields + who/when and the notification read, hides when nothing is unread; V102.576 Warm inbox: filter on the title line, a 0 hides, open = read, ➤ send, counter near the cap');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
