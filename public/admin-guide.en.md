@@ -148,7 +148,7 @@ In 🏜️ **Alabasta**, tick the cases and press **🖼 Cards**. Check each sum
 
 ### Merge two cases
 
-Tick two cases from the same intern and press **⛓ Merge**, or tap **follow-up?** on a card. Check the preview, then merge. Both notes and systems stay, the other case is kept folded with 0 points, and Undo puts both back.
+Tick two cases from the same intern and press **⛓ Merge**, or tap **follow-up?** on a card. Check the preview, then merge. Both notes and systems stay, with repeats of 3+ words struck out except drug names and doses; tap one to bring it back, or press **Same meaning?** for Jev to mark more, then ✓ or ✕ each. The other case is kept folded with 0 points, and Undo puts both back.
 
 ## 6. 🧠 Jev — the AI helper
 

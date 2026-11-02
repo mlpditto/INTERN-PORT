@@ -5535,6 +5535,24 @@ exports.jevSuggestCaseSystems = onCall({ secrets: ["JEV_AI_API_KEY"], timeoutSec
     return { enabled: true, suggestions: out.suggestions, checked: out.checked, skipped: out.skipped, errors: out.errors };
 });
 
+// V102.569: Jev marks the words of a merged note that only repeat the other note. Admin only, on a button; the server reads both cases and only scrubbed phrases leave. Nothing is cached.
+exports.jevMergeRepeats = onCall({ secrets: ["JEV_AI_API_KEY"], timeoutSeconds: 60, memory: "256MiB" }, async (request) => {
+    requireAdminCallable(request);
+    const db = admin.firestore();
+    const cfg = await db.collection("quiz_dup_scores").doc("_config").get();
+    if (cfg.exists && cfg.data().enabled === false) return { enabled: false };
+    const apiKey = process.env.JEV_AI_API_KEY;
+    if (!apiKey) throw new HttpsError("failed-precondition", "No API key configured for Jev");
+    const { baseId, otherId, at } = request.data || {};
+    if (!baseId || !otherId || baseId === otherId || !Array.isArray(at)) throw new HttpsError("invalid-argument", "Two cases and the words to check");
+    const [baseSnap, otherSnap] = await db.getAll(db.collection("cases").doc(String(baseId)), db.collection("cases").doc(String(otherId)));
+    const pending = s => s.exists && !s.data().isArchived && (s.data().status || "pending") === "pending";
+    if (!pending(baseSnap) || !pending(otherSnap) || baseSnap.data().userId !== otherSnap.data().userId) throw new HttpsError("failed-precondition", "Both cases must be waiting and from one intern");
+    const out = await require("./case-merge-repeats").matchRepeats(baseSnap.data(), otherSnap.data(), at, { apiKey, fetch: (url, opts) => fetch(url, opts) });
+    if (out.inputTokens) recordAiUsage("jev", jev.JEV_MODEL, out.inputTokens, true, "jev_merge_repeats", { inputTokens: out.inputTokens, outputTokens: 0 });
+    return { enabled: true, ranges: out.ranges };
+});
+
 // ---- Jev: "same fact?" verdicts for the Compare modal (Phase 0 + use #1 of the Jev plan) ----
 // Admin-only, suggest-only (the page shows a chip next to the n-gram %, nothing is written because of it).
 // Answers are cached by content hash in quiz_dup_scores (client-closed: no rule = no access), so re-opening a
