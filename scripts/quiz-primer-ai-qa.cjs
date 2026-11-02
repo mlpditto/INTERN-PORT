@@ -21,6 +21,7 @@ assert.ok(/aria-label="Draft Read first with AI">✨</.test(box) && /The correct
             const out = { prompts: [], models: [], toasts: [], feats: [] };
             window.showToast = m => out.toasts.push(m); window.escapeHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
             window.safeJsonParse = JSON.parse; window._qImproveModel = () => 'claude-sonnet-5-5';
+            window._qPrimerStrip = () => {}; window._qPrimerTodo = () => [...document.querySelectorAll('#quizManageModal .quiz-q-item')].filter(i => !i.querySelector('.q-primer').value.trim() && i.querySelector('.q-text').value.trim());
             window.TEXT_AI_MODELS = [{ id: 'gpt-6-luna', short: 'Luna 6' }, { id: 'claude-sonnet-5-5', short: 'Sonnet 5.5' }, { id: 'gpt-6.1-sol', short: 'Sol 6' }];
             window.normalizeTextAIModel = v => window.TEXT_AI_MODELS.some(m => m.id === v) ? v : 'gpt-6-luna';
             localStorage.clear();
@@ -61,13 +62,12 @@ assert.ok(/aria-label="Draft Read first with AI">✨</.test(box) && /The correct
             // 6) V102.359 ✨ All: three more questions — two empty, one already filled, plus the one above with no text → only the two empty ones are sent, the filled one is untouched, one toast
             const mk = (q, primer) => { const d = document.createElement('div'); d.innerHTML = item.outerHTML; const it = d.firstElementChild; it.querySelector('.q-text').value = q; it.querySelector('.q-primer').value = primer; it.querySelector('.q-primer-model').value = 'claude-sonnet-5-5'; it.querySelectorAll('.q-improve-panel').forEach(p => p.remove()); return it; };   // outerHTML keeps the markup's first pick, not the live one
             const modal = document.createElement('div'); modal.id = 'quizManageModal'; modal.append(item, mk('What is a LAMA?', ''), mk('What is an ICS?', 'Already written'), mk('What is SABA?', '')); document.body.append(modal);
-            reply = { primer: 'Background text' }; window.confirm = () => true;
+            reply = { primer: 'Background text' }; out.confirms = 0; window.confirm = () => { out.confirms++; return false; };
             // V102.524: ✨ All is a button in the 📖 All popup (no Read first row around it) — the model comes from the first question's row
             const allBtn = document.createElement('button'); allBtn.className = 'pra-all'; allBtn.innerHTML = '✨ All'; document.body.append(allBtn); const n6 = out.prompts.length, t6 = out.toasts.length;
             await window._qPrimerDraftAll(allBtn);
             out.allSent = out.prompts.slice(n6).map(p => (p.match(/โจทย์: "([^"]+)"/) || [])[1]); out.allToasts = out.toasts.slice(t6);
             out.allValues = [...modal.querySelectorAll('.quiz-q-item')].map(it => it.querySelector('.q-primer').value); out.allBtnBack = allBtn.innerHTML === '✨ All';
-            window.confirm = () => false; const n7 = out.prompts.length; modal.querySelectorAll('.quiz-q-item')[1].querySelector('.q-primer').value = ''; await window._qPrimerDraftAll(allBtn); out.allDeclined = out.prompts.length - n7;
             return out;
         }, [fns, box]);
         const [pFull, pTerms] = r.prompts;
@@ -92,7 +92,7 @@ assert.ok(/aria-label="Draft Read first with AI">✨</.test(box) && /The correct
         assert.deepEqual(r.allSent, ['What is a LAMA?', 'What is SABA?'], '✨ All sends only the questions with text and no Read first: ' + JSON.stringify(r.allSent));
         assert.deepEqual(r.allValues, ['New draft text', 'Background text', 'Already written', 'Background text'], 'the two empty ones are filled, the written ones untouched (the first still holds step 3), the one with no text skipped');
         assert.equal(r.allToasts.length, 1, 'one toast for the whole run: ' + JSON.stringify(r.allToasts)); assert.match(r.allToasts[0], /^✨ Read first drafted for 2\/2 · \d+ s · save the quiz to keep them$/, 'V102.514: the toast carries the total time: ' + r.allToasts[0]); assert.equal(r.allBtnBack, true, 'the ✨ All button comes back');
-        assert.equal(r.allDeclined, 0, 'Cancel on the confirm sends nothing');
+        assert.equal(r.confirms, 0, 'V102.571: no browser confirm');
         assert.deepEqual(errors, [], 'no page errors: ' + errors.join(' | '));
         console.log('PASS: Read first ✨ — drafts from stem + unmarked options only (no answer key), V102.524 two-button row with ☰ Terms only instead after a draft and ✨ All from the popup, leak flag, fills an empty box / asks before replacing, failure restores the button');
     } finally { await browser.close(); }
