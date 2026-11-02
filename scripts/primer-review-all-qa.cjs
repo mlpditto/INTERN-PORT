@@ -118,7 +118,7 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
         { const g = await page.locator('#praOverlay .pra-card[data-q="0"]').evaluate(c => { const r = c.getBoundingClientRect(), go = c.querySelector('.pra-go').getBoundingClientRect(), pill = c.querySelector('.pra-pill').getBoundingClientRect(), stem = c.querySelector('.pra-stem'); return { fits: go.right <= r.right + 0.5 && pill.width > 10 && go.width > 10, clipped: stem.scrollWidth > stem.clientWidth }; });
           assert.equal(g.fits, true, 'pill + ✎ stay inside the card at 390 px'); assert.equal(g.clipped, true, 'the long stem is the one that gives way'); }
         await page.evaluate(() => _praClose()); await page.setViewportSize({ width: 1200, height: 900 });
-        // V102.572 (owner's pick A): nothing written yet → the strip above the questions, no popup and no browser confirm
+        // V102.573 (owner's pick A): nothing written yet → the strip above the questions, no popup and no browser confirm
         await page.evaluate(() => { document.querySelectorAll('.quiz-q-item .q-primer').forEach(t => { t.value = ''; }); window.__confirms = 0; window.confirm = () => { window.__confirms++; return false; }; _qPrimerStrip(); _qPrimerReviewAll(); });
         assert.equal(await page.locator('#praOverlay').count(), 0, 'no popup while nothing is written');
         const strip = page.locator('#q-primer-strip');
