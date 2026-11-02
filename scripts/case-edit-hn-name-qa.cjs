@@ -25,7 +25,7 @@ const ctx = {
     renderAlabastaCases() {}, closeEditCaseNoteModal() { calls.closed++; }, showToast() {}, console, Date, Array, String
 };
 vm.createContext(ctx);
-vm.runInContext(cut('        const ECN_FIELDS', '        function editCaseNote(') + '\n' + cut('        async function saveEditedCaseNote()', '        // V102.273: a case can carry a userId')
+vm.runInContext(cut('        const ECN_FIELDS', '        function editCaseNote(') + '\n' + cut('        async function saveEditedCaseNote(', '        // V102.273: a case can carry a userId')
     + '\nthis.save = saveEditedCaseNote; this.hist = renderEditCaseHistory;', ctx);
 
 (async () => {

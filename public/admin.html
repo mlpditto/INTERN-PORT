@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.571)</title>
+    <title>Nika Admin (V102.572)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -3730,7 +3730,19 @@
         .crf-del { border: 0; background: #dc2626; color: #fff; } .crf-keep { border: 1px solid #fca5a5; background: #fff; color: #7f1d1d; }
         @media (max-width: 640px) { .crf-two { grid-template-columns: minmax(0, 1fr); } }
         .crf-mark { margin-left: 5px; font-size: .9em; }
-        .ecn-decide { display: inline-flex; align-items: center; gap: 6px; margin-right: auto; } .ecn-decide[hidden] { display: none; }
+        /* V102.572 (owner): the score is given in its own card: colour says it is saved, no Review button */
+        .ecn-score { background:#fff; border:1px solid #fde68a; border-radius:14px; padding:10px 12px; min-width:0; }
+        .ecn-score.ok { border:2px solid #22c55e; padding:9px 11px; }
+        .ecn-score-txt { margin-top:4px; color:#166534; font-weight:900; word-break:break-word; }
+        .ecn-score-rail { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; align-items:center; } .ecn-score-rail[hidden] { display:none; }
+        .ecn-score-rail button { width:auto; min-height:30px; margin:0; padding:0 9px; border:1px solid #fcd34d; border-radius:999px; background:#fffbeb; color:#92400e; font:inherit; font-size:.8rem; font-weight:800; cursor:pointer; }
+        .ecn-score-rail button.on { background:#16a34a; border-color:#16a34a; color:#fff; }
+        .ecn-score-rail button.ai::after { content:" ✨"; }
+        .ecn-score-rail button.is-reject { border-color:#fecaca; background:#fff; color:#be123c; }
+        .ecn-score-rail button.is-reply { border-color:#e2e8f0; background:#fff; }
+        .ecn-score-rail input { width:54px; min-height:30px; margin:0; padding:0 8px; border:1px dashed #fcd34d; border-radius:999px; font:inherit; font-size:.8rem; background:#fff; }
+        .ecn-score-rail input.on { border:1px solid #16a34a; color:#166534; font-weight:800; }
+        #ecn-review-slot #case-review-reply, #ecn-review-slot #case-review-ai { margin-top:8px; }
         .crf-ghead { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; font-size: .84em; color: #475569; }
         .crf-open + .crf-open { margin-left: 4px; } .crf-open:disabled { opacity: .35; cursor: default; }
         .crf-pages { height: 58vh; overflow: auto; background: #fff; }
@@ -8508,7 +8520,7 @@
 <script src="case-article.js?v=V102.395"></script>
 <script src="dca-ai-trail.js?v=V102.390"></script>
 <script src="dxa-ai-trail.js?v=V102.389"></script>
-<script src="case-review-ai.js?v=V102.423"></script>
+<script src="case-review-ai.js?v=V102.572"></script>
 <script src="case-file-review.js?v=V102.550"></script>
 <link rel="stylesheet" href="case-import.css?v=V102.560">
 <link rel="stylesheet" href="case-jev-system.css?v=V102.565">
@@ -16315,9 +16327,10 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
                     <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;"><span data-ecn="en">Customer</span><span data-ecn="sep"> · </span><span data-ecn="ko">환자</span><span data-ecn="sep2"> · </span><span data-ecn="th">ผู้ป่วย</span></div>
                     <input type="text" id="edit-case-note-customer" class="ecn-in" maxlength="80" autocomplete="off" aria-label="Patient" title="Click to edit · คลิกเพื่อแก้ไข" placeholder="-">
                 </div>
-                <div style="background:#fff; border:1px solid #fde68a; border-radius:14px; padding:10px 12px;">
+                <div id="ecn-score" class="ecn-score">
                     <div style="font-size:0.72em; color:#a16207; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;"><span data-ecn="en">Score</span><span data-ecn="sep"> · </span><span data-ecn="ko">점수</span><span data-ecn="sep2"> · </span><span data-ecn="th">คะแนน</span></div>
-                    <div id="edit-case-note-score" style="margin-top:4px; color:#166534; font-weight:900; word-break:break-word;">0.00 pts</div>
+                    <div id="edit-case-note-score" class="ecn-score-txt">0.00 pts</div>
+                    <div id="ecn-score-rail" class="ecn-score-rail" hidden></div>
                 </div>
             </div>
 
@@ -16413,12 +16426,12 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
                 <span class="ecn-note-lbl"><span data-ecn="en">Translate with</span><span data-ecn="sep"> · </span><span data-ecn="ko">번역 모델</span><span data-ecn="sep2"> · </span><span data-ecn="th">แปลด้วย</span></span>
             </div>
             <textarea id="edit-case-note-text" placeholder="Edit case note..." style="width:100%; min-height:180px; resize:vertical; padding:14px 16px; border-radius:16px; border:1.5px solid #fcd34d; background:#fffef8; color:#111827; font-size:0.98em; line-height:1.55; box-shadow:inset 0 2px 6px rgba(245,158,11,0.06);"></textarea>
+            <div id="ecn-review-slot" class="lang-no-toggle"></div>
             <div id="edit-case-note-translation-preview" style="display:none; margin-top:8px; padding:10px 14px; border-radius:14px; border:1.5px dashed #fcd34d; background:#fffbeb; font-size:0.92em; line-height:1.5;"></div>
 
             <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:14px; flex-wrap:wrap;">
                 <div><div id="edit-case-note-meta" style="font-size:0.8em; color:#6b7280;"></div><div id="edit-case-note-history" class="ecn-hist" hidden></div></div>
                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                    <span id="edit-case-decide" class="ecn-decide" hidden><button type="button" class="alabasta-go-btn" onclick="caseOpenDecide('review')">✅ Review</button><button type="button" class="btn-sm alabasta-action-btn is-reject" onclick="caseOpenDecide('reject')" title="Reject" aria-label="Reject case"><span class="alabasta-emoji">❌</span></button></span>
                     <button type="button" id="edit-case-note-save-btn" class="btn-sm" onclick="saveEditedCaseNote()" style="min-width:170px; background:linear-gradient(135deg,#f59e0b,#ea580c); color:white; border:none; border-radius:12px; padding:10px 18px; font-weight:900; box-shadow:0 8px 20px rgba(234,88,12,0.22);"><i class="fa-solid fa-save"></i> <span data-ecn="en">Save Changes</span><span data-ecn="sep"> · </span><span data-ecn="ko">변경 저장</span><span data-ecn="sep2"> · </span><span data-ecn="th">บันทึกการเปลี่ยนแปลง</span></button>
                 </div>
             </div>
@@ -44510,6 +44523,113 @@ They can connect again from LINE.
             renderEditCaseTaxonomyCard();
         }
 
+        // ---- V102.572 (owner): a tap on a score in the Score card is the review. Same write as the old dialog (updateCaseStatus), once per tap: a new score
+        // reverts the old one first, so points never stack. Colour alone says it is saved. Scores used most in this browser become the chips.
+        const ECN_SCORES = [0.1, 0.2, 0.5, 1], ECN_COUNTS = 'case_score_counts';
+        let ecnScoreBusy = false, ecnScoreChips = ECN_SCORES;
+        function ecnCounts() { try { return JSON.parse(localStorage.getItem(ECN_COUNTS)) || {}; } catch (e) { return {}; } }
+        function ecnCount(score, by) { const m = ecnCounts(), k = String(score); m[k] = Math.max(0, (m[k] || 0) + by); try { localStorage.setItem(ECN_COUNTS, JSON.stringify(m)); } catch (e) { /* the defaults stay */ } }
+        function ecnTopScores() {
+            const m = ecnCounts(), used = Object.keys(m).filter(k => m[k] > 0 && Number.isFinite(Number(k))).sort((a, b) => m[b] - m[a] || a - b).map(Number);
+            return [...new Set(used.concat(ECN_SCORES))].slice(0, 4).sort((a, b) => a - b);
+        }
+        function ecnPanelsTo(sheet) {
+            const home = document.querySelector('#caseReviewScoreModal .modal-content'), slot = document.getElementById('ecn-review-slot');
+            if (!home || !slot) return;
+            ['case-review-ai-head', 'case-review-ai', 'case-review-reply'].forEach(id => { const el = document.getElementById(id); if (el) (sheet ? slot : home).appendChild(el); });
+        }
+        const ecnCase = () => casesData.find(c => c.id === (document.getElementById('edit-case-note-id') || {}).value);
+        function ecnScorePaint() {
+            const c = ecnCase(), rail = document.getElementById('ecn-score-rail'), txt = document.getElementById('edit-case-note-score'), card = document.getElementById('ecn-score');
+            if (!c || !rail) return;
+            const st = c.status || 'pending', done = st === 'reviewed', cur = Number(c.adminBonus) || 0, folded = c.duplicateOf || c.mergedInto;
+            const open = (st === 'pending' || done) && !folded;
+            if (txt) { txt.textContent = `${cur.toFixed(2)} pts`; txt.hidden = open; }
+            card.classList.toggle('ok', done);
+            rail.hidden = !open;
+            if (!open) { rail.innerHTML = ''; return; }
+            const typed = done && !ecnScoreChips.includes(cur);
+            rail.innerHTML = ecnScoreChips.map(n => `<button type="button" class="case-score-chip${done && n === cur ? ' on' : ''}" data-score="${n}" onclick="ecnScoreSet(${n})">${n}</button>`).join('')
+                + `<input id="ecn-score-input" class="${typed ? 'on' : ''}" type="text" inputmode="decimal" aria-label="Other score" placeholder="0.0" value="${typed ? cur : ''}" onchange="ecnScoreSet(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">`
+                + `<button type="button" class="is-reply" onclick="toggleCaseReviewReply()" aria-label="Reply to the intern" title="Reply to the intern">💬</button>`
+                + (st === 'pending' ? `<button type="button" class="is-reject" onclick="caseOpenDecide('reject')" aria-label="Reject" title="Reject">✕</button>` : '');
+        }
+        function ecnScoreOpen(c) {
+            ecnPanelsTo(true);
+            ecnScoreChips = ecnTopScores();
+            const reply = document.getElementById('case-review-reply-text');
+            if (reply) { reply.value = String(c.adminComment || ''); reply.onchange = ecnReplySave; }
+            toggleCaseReviewReply(!!c.adminComment);
+            syncCaseReviewReply();
+            ecnScorePaint();
+            if ((c.status || 'pending') === 'pending' && window.caseReviewAi) window.caseReviewAi.start(c);
+        }
+        function ecnScoreClose() {
+            const c = ecnCase();
+            if (window.caseReviewAi) window.caseReviewAi.hide();
+            if (c && c.status === 'reviewed' && window.caseFileReview) window.caseFileReview.purge(c);   // V102.547: the file does not outlive the review
+            const reply = document.getElementById('case-review-reply-text');
+            if (reply) { reply.onchange = null; reply.value = ''; }
+        }
+        // a reply typed after the score: saved when the box is left
+        async function ecnReplySave() {
+            const c = ecnCase(), text = this.value.trim().slice(0, 500);
+            if (!c || c.status !== 'reviewed' || text === String(c.adminComment || '')) return;
+            try {
+                const ts = firebase.firestore.FieldValue.serverTimestamp(), batch = db.batch();
+                batch.update(db.collection('cases').doc(c.id), { adminComment: text, adminCommentAt: ts, adminCommentBy: ALLOWED_EMAIL || 'admin', adminUpdatedAt: ts });
+                await stageSubmissionMirror(batch, c.id, { adminComment: text });
+                await batch.commit();
+                c.adminComment = text;
+            } catch (e) { showToast('Could not save the reply: ' + e.message); }
+        }
+        function ecnDirty(c) {
+            const val = id => String((document.getElementById(id) || {}).value || '').trim();
+            return val('edit-case-note-text') !== String(c.note || '').trim() || val('edit-case-note-ref') !== String(c.caseId || '').trim() || val('edit-case-note-customer') !== String(c.customer || '').trim()
+                || val('edit-case-taxonomy-system') !== inferAlabastaTaxonomyKey(c) || JSON.stringify(getEditCaseSelectedTags()) !== JSON.stringify(Array.isArray(c.symptomTags) ? c.symptomTags : []);
+        }
+        // pending → reviewed at `next`, or a reviewed case moved to `next` (reverted first); null = back to waiting
+        async function ecnScoreApply(id, next, reply) {
+            let c = casesData.find(x => x.id === id);
+            if (c.status === 'reviewed' && !(await updateCaseStatus(id, 'pending', { silent: true }))) return false;
+            c = casesData.find(x => x.id === id);
+            Object.assign(c, { status: 'pending', isArchived: false, adminBonus: 0 }); delete c.reviewLogId;
+            if (next === null) return true;
+            const r = await updateCaseStatus(id, 'reviewed', { score: next, reply });
+            if (!r) return false;
+            c = casesData.find(x => x.id === id);
+            Object.assign(c, { status: 'reviewed', isArchived: true, adminBonus: next }, r.logId ? { reviewLogId: r.logId } : {}, reply ? { adminComment: reply } : {});
+            return true;
+        }
+        async function ecnScoreSet(raw) {
+            let c = ecnCase();
+            if (!c || ecnScoreBusy) return;
+            const score = parseFloat(String(raw).trim()), was = c.status === 'reviewed' ? (Number(c.adminBonus) || 0) : null;
+            if (!Number.isFinite(score) || score < 0) { showToast('Score must be 0 or higher'); ecnScorePaint(); return; }
+            if (was === score) return;
+            ecnScoreBusy = true;
+            try {
+                if (ecnDirty(c) && !(await saveEditedCaseNote({ stay: true }))) return;
+                const id = c.id, reply = String((document.getElementById('case-review-reply-text') || {}).value || '').trim().slice(0, 500);
+                if (!(await ecnScoreApply(id, score, reply))) return;
+                ecnCount(score, 1);
+                ecnScorePaint();
+                renderAlabastaCases();
+                ecnUndoToast(`+${score.toFixed(2)} pts`, async () => {
+                    if (await ecnScoreApply(id, was, reply)) { ecnCount(score, -1); renderAlabastaCases(); if ((ecnCase() || {}).id === id) ecnScorePaint(); }
+                });
+            } finally { ecnScoreBusy = false; }
+        }
+        function ecnUndoToast(msg, undo) {
+            showToast(msg, 'success');
+            const x = document.getElementById('toast'); if (!x) return;
+            x.querySelectorAll('.toast-undo').forEach(e => e.remove());   // only the latest score can be undone
+            const b = document.createElement('button'); b.type = 'button'; b.className = 'toast-undo'; b.textContent = '↩ Undo';
+            b.onclick = () => { x.classList.remove('show'); undo(); };
+            x.insertBefore(b, x.querySelector('.toast-close'));
+            clearTimeout(ecnUndoToast._t); ecnUndoToast._t = setTimeout(() => x.classList.remove('show'), 10000);
+        }
+
         window.caseOpenDecide = function (kind) {
             const id = document.getElementById('edit-case-note-id').value, c = casesData.find(x => x.id === id);
             const note = document.getElementById('edit-case-note-text');
@@ -44520,6 +44640,7 @@ They can connect again from LINE.
         };
 
         function closeEditCaseNoteModal() {
+            ecnScoreClose();
             if (window.caseFileReview) window.caseFileReview.stop();
             forceHideModal('editCaseNoteModal');
             // V92.67 Phase 3-E: drop the ?case= param from the URL when the modal closes so the
@@ -44750,7 +44871,7 @@ They can connect again from LINE.
             // V94.30: restore the admin's last toggle choice for this modal.
             ecnSetLang(ecnGetLang());
 
-            document.getElementById('edit-case-decide').hidden = (caseItem.status || 'pending') !== 'pending';   // V102.548: Review + Reject live here, not on the waiting card
+            ecnScoreOpen(caseItem);
             if (window.caseFileReview) window.caseFileReview.start(casesData.find(x => x.id === caseDocId), 'edit-case-file-box');   // V102.548: the intern's PDF here too
             forceShowModal('editCaseNoteModal');
             // V92.67 Phase 3-E: stamp ?case={id} into the URL so refresh / back-forward / share keep the modal context.
@@ -46190,7 +46311,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
         }
 
-        async function saveEditedCaseNote() {
+        async function saveEditedCaseNote(opts = {}) {   // V102.572: opts.stay = saved on the way to a score: the sheet stays open
             const idEl = document.getElementById('edit-case-note-id');
             const noteEl = document.getElementById('edit-case-note-text');
             const saveBtn = document.getElementById('edit-case-note-save-btn');
@@ -46266,6 +46387,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 }
 
                 renderAlabastaCases();
+                if (opts.stay) { saveBtn.disabled = false; saveBtn.innerHTML = originalHtml; return true; }
                 closeEditCaseNoteModal();
                 if (typeof showToast === 'function') showToast('Case note updated', 'success');
             } catch (e) {
@@ -46274,6 +46396,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 saveBtn.disabled = false;
                 saveBtn.innerHTML = originalHtml;
             }
+            return false;
         }
 
         // V102.273: a case can carry a userId whose users/{id} document no longer exists (deleted, or a legacy-linked id). batch.update() on a missing document fails the WHOLE
@@ -55240,6 +55363,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function openCaseReviewScoreModal(caseItem) {
             return new Promise(resolve => {
                 window.caseReviewScoreModalState = { resolver: resolve };
+                ecnPanelsTo(false);
                 const caseIdEl = document.getElementById('case-review-score-caseid');
                 const inputEl = document.getElementById('case-review-score-input');
                 const caseLabel = caseItem?.caseId || caseItem?.id || '';
@@ -55264,13 +55388,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             });
         }
 
-        async function updateCaseStatus(caseDocId, status) {
+        async function updateCaseStatus(caseDocId, status, opts = {}) {   // V102.572: opts.score = the inline Score (no dialog), opts.silent = no confirm or toast
             try {
                 const caseItem = casesData.find(c => c.id === caseDocId) || {};
                 const caseRef = db.collection('cases').doc(caseDocId);
 
                 if (status === 'reviewed') {
-                    const input = await openCaseReviewScoreModal({ ...caseItem, id: caseDocId });
+                    const input = opts.score != null ? String(opts.score) : await openCaseReviewScoreModal({ ...caseItem, id: caseDocId });
                     if (input === null) return;
 
                     const bonus = parseFloat(String(input).trim());
@@ -55279,7 +55403,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         return;
                     }
 
-                    const replyText = String(window.caseReviewLastReply || '').trim();   // V102.423: the admin's reply to the intern (empty = none; an old reply is kept)
+                    const replyText = String((opts.score != null ? opts.reply : window.caseReviewLastReply) || '').trim();   // V102.423: the admin's reply to the intern (empty = none; an old reply is kept)
+                    let logId = '';
                     const batch = db.batch();
                     batch.update(caseRef, {
                         status: 'reviewed',
@@ -55299,6 +55424,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             score: firebase.firestore.FieldValue.increment(bonus)
                         });
                         const reviewLogRef = db.collection('checkin_logs').doc();
+                        logId = reviewLogRef.id;
                         batch.set(reviewLogRef, {
                             userId: caseItem.userId,
                             type: 'case_review_bonus',
@@ -55320,6 +55446,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     await stageSubmissionMirror(batch, caseDocId, submissionReviewedFields(bonus, replyText));
 
                     await batch.commit();
+                    if (opts.score != null) return { logId };   // the sheet stays open: Undo still needs the file, it goes when the sheet closes
                     if (window.caseFileReview) window.caseFileReview.purge({ ...caseItem, id: caseDocId });   // V102.547: the file does not outlive the review
                     if (typeof showToast === 'function') showToast(`Archived +${bonus.toFixed(2)} pts` + (replyText ? ' · reply sent' : ''), 'success');
                     return;
@@ -55336,7 +55463,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const previousReviewLogId = caseItem.reviewLogId || null;
                 const reopenUserId = caseItem.userId;
 
-                if (previousBonus > 0 && reopenUserId) {
+                if (previousBonus > 0 && reopenUserId && !opts.silent) {
                     const ok = confirm(`Reopen this case?\n\nThis will revert ${previousBonus.toFixed(2)} pts from the user.`);
                     if (!ok) return;
                 }
@@ -55388,6 +55515,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const revertSuffix = previousBonus > 0 && reopenUserId
                     ? ` · −${previousBonus.toFixed(2)} pts reverted`
                     : '';
+                if (opts.silent) return true;
                 if (typeof showToast === 'function') showToast(`Case marked as ${status}${revertSuffix}`, 'success');
             } catch (e) {
                 console.error('Failed to update case status:', e);
