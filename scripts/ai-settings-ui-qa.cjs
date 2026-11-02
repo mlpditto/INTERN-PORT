@@ -59,15 +59,16 @@ for (const h of ['saveAIKeys()', 'parseAndFillKeys()', 'exportAIKeys()', 'import
             await page.waitForTimeout(300);
 
             // V102.571: tabs: one group at a time, the Save bar stays, nothing scrolls on the Keys or Models tab
-            const tab = n => page.locator(`.ais-tabs [data-tab="${n}"]`).click();
+            const tab = n => page.locator(`.ais-tabs [data-tab="${n}"]`).evaluate(b => b.click());   // V102.573: Models has no tab of its own when wide
             const fits = () => page.locator('.ais-scroll').evaluate(s => s.scrollHeight - s.clientHeight);
-            assert.deepEqual(await page.locator('.ais-tabs button').allInnerTexts().then(a => a.map(t => t.replace(/[^A-Za-z0-9/ ]/g, '').trim())), ['Keys 0/6', 'Models', 'Local', 'Vertex', 'Usage'], 'the five tabs @' + vw);
-            assert.ok(await page.locator('#local-gemini-key').isVisible() && !(await page.locator('.ais-mrow').first().isVisible()), 'Keys opens first');
+            assert.deepEqual(await page.locator('.ais-tabs button').allInnerTexts().then(a => a.map(t => t.replace(/[^A-Za-z0-9/ ]/g, '').trim())), ['Keys 0/6', 'Models', 'Local', 'Vertex', 'Usage'], 'the five tabs @' + vw); assert.equal(await page.locator('.ais-tabs [data-tab="models"]').isVisible(), vw === 390, 'V102.573: no Models tab when wide');
+            assert.equal(await page.locator('.ais-mrow').first().isVisible(), vw !== 390, 'V102.573: Keys and Models side by side when wide, Keys alone on a phone'); assert.ok(await page.locator('#local-gemini-key').isVisible(), 'Keys opens first');
+            if (vw !== 390) assert.ok(await page.evaluate(() => { const k = document.getElementById('local-gemini-key').getBoundingClientRect(), m = document.querySelector('.ais-mrow').getBoundingClientRect(); return m.left >= k.right && Math.abs(m.top - k.top) < 120; }), 'Models sits to the right of Keys');
             await page.setViewportSize({ width: vw, height: vw === 390 ? 844 : 720 });
             assert.ok((await fits()) <= 0, 'Keys fits without scrolling @' + vw + ': ' + (await fits()));
             await tab('models');
             assert.ok((await fits()) <= 0, 'Models fits without scrolling @' + vw);
-            assert.ok(!(await page.locator('#local-gemini-key').isVisible()), 'Keys is hidden on Models');
+            assert.equal(await page.locator('#local-gemini-key').isVisible(), vw !== 390, 'Keys is hidden on the Models tab of a phone');
             await page.setViewportSize({ width: vw, height: 900 });
 
             // Rows are collapsed to the chosen chip

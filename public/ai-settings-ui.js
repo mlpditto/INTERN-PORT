@@ -14,6 +14,15 @@
             var acc = el.classList.contains('ais-acc') && el.querySelector('div[id^="acc-"]');
             el.dataset.aisTab = acc ? acc.id.slice(4) : cur;
         });
+        // V102.573 (owner's pick C): Keys and Models side by side on a wide screen; a phone keeps them as tabs (the columns are display:contents there)
+        var cols = document.createElement('div'), left = document.createElement('div'), right = document.createElement('div');
+        cols.className = 'ais-cols'; left.className = right.className = 'ais-col';
+        cols.append(left, right);
+        var wide = window.matchMedia('(min-width:900px)'), first = scroll.querySelector('[data-ais-tab="keys"]'), tabNow = 'keys';
+        first.before(cols);
+        Array.prototype.slice.call(scroll.children).forEach(function (el) {
+            if (el.dataset.aisTab === 'keys') left.append(el); else if (el.dataset.aisTab === 'models') right.append(el);
+        });
         var bar = document.createElement('div');
         bar.className = 'ais-tabs'; bar.setAttribute('role', 'tablist');
         bar.innerHTML = TABS.map(function (t) { return '<button type="button" role="tab" data-tab="' + t[0] + '">' + t[1] + ' ' + t[2] + (t[0] === 'keys' ? ' <b></b>' : '') + '</button>'; }).join('');
@@ -24,13 +33,17 @@
             bar.querySelector('b').textContent = n + '/' + KEY_IDS.length;
         }
         function show(tab) {
-            Array.prototype.forEach.call(scroll.children, function (el) { if (el.dataset.aisTab) el.classList.toggle('ais-off', el.dataset.aisTab !== tab); });
+            if (tab === 'models' && wide.matches) tab = 'keys';
+            tabNow = tab;
+            var both = tab === 'keys' && wide.matches;
+            scroll.querySelectorAll('[data-ais-tab]').forEach(function (el) { el.classList.toggle('ais-off', el.dataset.aisTab !== tab && !(both && el.dataset.aisTab === 'models')); });
             Array.prototype.forEach.call(bar.children, function (b) { var on = b.dataset.tab === tab; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
             var body = document.getElementById('acc-' + tab);
             if (body && body.style.display === 'none' && typeof window.toggleAiAccordion === 'function') window.toggleAiAccordion('acc-' + tab);
             scroll.scrollTop = 0; count();
         }
         bar.addEventListener('click', function (e) { var b = e.target.closest('[data-tab]'); if (b) show(b.dataset.tab); });
+        wide.addEventListener('change', function () { show(tabNow); });
         modal.addEventListener('input', count);
         modal.querySelector('.ais-go').addEventListener('click', function () { setTimeout(count, 0); });   // Quick Paste fills the fields without an input event
         // every open starts on Keys, with the saved keys counted
