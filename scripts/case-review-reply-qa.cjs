@@ -6,11 +6,11 @@ const admin = fs.readFileSync(path.join(__dirname, '..', 'public', 'admin.html')
 const cut = (a, b) => { const i = admin.indexOf(a); assert.ok(i > 0, a); return admin.slice(i, admin.indexOf(b, i)); };
 const modal = admin.match(/<div id="caseReviewScoreModal"[\s\S]*?\n    <\/div>\r?\n/)[0];
 const css = [...admin.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].slice(0, 2).map(m => m[1]).join('\n');
-const fns = cut('        window.toggleCaseReviewReply = function', '        async function updateCaseStatus(');
+const fns = cut('        window.toggleCaseReviewReply = function', '        async function updateCaseStatus(') + '; function ecnPanelsTo() {}';
 
 // ---- the save path (static): the reply goes on the case AND the intern's mirror; none → nothing is overwritten
 const upd = cut('        async function updateCaseStatus(', 'const previousBonus = parseFloat(caseItem.adminBonus)');
-assert.ok(/const replyText = String\(window\.caseReviewLastReply \|\| ''\)\.trim\(\);/.test(upd), 'reads the reply right after the modal resolves');
+assert.ok(/const replyText = String\(\(opts\.score != null \? opts\.reply : window\.caseReviewLastReply\) \|\| ''\)\.trim\(\);/.test(upd), 'reads the reply right after the modal resolves');
 assert.ok(/\.\.\.\(replyText \? \{ adminComment: replyText, adminCommentAt: [^}]*adminCommentBy: ALLOWED_EMAIL \|\| 'admin' \} : \{\}\)/.test(upd), 'on the case: only when there is a reply');
 assert.ok(upd.includes('submissionReviewedFields(bonus, replyText)'), 'and on the intern mirror (its History shows adminComment)');
 assert.ok(upd.includes("(replyText ? ' · reply sent' : '')"), 'the toast says so');
