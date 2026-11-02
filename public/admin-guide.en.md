@@ -108,7 +108,7 @@ The **Admin Portal** page has 3 ways in — use any one:
 - 📰 **Personal review** (the newspaper icon, shown when there are wrong answers): tap the flag for the language, pick a model, press **✨** — nothing runs before that, and the intern's name is not sent. Edit, then **📨 Send**: it appears on their quiz result and in History. `**bold**` shows as a highlight
 
 ### 📰 Articles
-- ➕ **Create ▸ Article**. **✨ Draft** turns pasted notes into a short story of up to 2,000 characters; **✨ Episode 2** carries on where it stopped
+- ➕ **Create ▸ Article**. **✨ Draft** turns pasted notes or a link into a short story of up to 2,000 characters, and a link becomes the intern's **Source** line. If a site blocks the reader, paste the page text in the box; **✨ Episode 2** carries on where it stopped
 - Interns ask through 💬 **Any Q?** — the Dashboard chip counts open ones, ⚠️ "wrong / out of date" first. **↩ Reply** shows in their History; their name stays hidden
 
 ---
