@@ -58,6 +58,18 @@ for (const h of ['saveAIKeys()', 'parseAndFillKeys()', 'exportAIKeys()', 'import
             await page.evaluate(() => { document.getElementById('aiKeysModal').style.display = 'block'; });
             await page.waitForTimeout(300);
 
+            // V102.571: tabs: one group at a time, the Save bar stays, nothing scrolls on the Keys or Models tab
+            const tab = n => page.locator(`.ais-tabs [data-tab="${n}"]`).click();
+            const fits = () => page.locator('.ais-scroll').evaluate(s => s.scrollHeight - s.clientHeight);
+            assert.deepEqual(await page.locator('.ais-tabs button').allInnerTexts().then(a => a.map(t => t.replace(/[^A-Za-z0-9/ ]/g, '').trim())), ['Keys 0/6', 'Models', 'Local', 'Vertex', 'Usage'], 'the five tabs @' + vw);
+            assert.ok(await page.locator('#local-gemini-key').isVisible() && !(await page.locator('.ais-mrow').first().isVisible()), 'Keys opens first');
+            await page.setViewportSize({ width: vw, height: vw === 390 ? 844 : 720 });
+            assert.ok((await fits()) <= 0, 'Keys fits without scrolling @' + vw + ': ' + (await fits()));
+            await tab('models');
+            assert.ok((await fits()) <= 0, 'Models fits without scrolling @' + vw);
+            assert.ok(!(await page.locator('#local-gemini-key').isVisible()), 'Keys is hidden on Models');
+            await page.setViewportSize({ width: vw, height: 900 });
+
             // Rows are collapsed to the chosen chip
             const rows = ['default-translate-model', 'default-analyzer-model', 'default-review-model', 'default-qfp-model'];
             for (const id of rows) {
@@ -90,6 +102,7 @@ for (const h of ['saveAIKeys()', 'parseAndFillKeys()', 'exportAIKeys()', 'import
             assert.ok(!(await tr.evaluate(r => r.classList.contains('open'))), 'tapping the chosen chip while open folds it');
             assert.equal(await page.locator('#default-translate-model').inputValue(), 'claude-haiku-5-5', 'folding keeps the pick');
 
+            await tab('keys');
             // Saved key = green ring (set programmatically, like Quick Paste / open do); empty = not green
             const ring = id => page.locator(`.ais-row:has(#${id}) .ais-logo`).evaluate(e => getComputedStyle(e).borderTopColor);
             await page.evaluate(() => { document.getElementById('local-gemini-key').value = 'AIza-test'; document.getElementById('local-llama-key').value = ''; });
@@ -101,11 +114,17 @@ for (const h of ['saveAIKeys()', 'parseAndFillKeys()', 'exportAIKeys()', 'import
             assert.equal(await page.locator('#local-gemini-key').getAttribute('type'), 'text', 'eye shows the key');
             await page.locator('.ais-row:has(#local-gemini-key) .ais-eye').click();
             assert.equal(await page.locator('#local-gemini-key').getAttribute('type'), 'password', 'eye hides it again');
-            assert.ok(!(await page.locator('#local-qwen-url').isVisible()), 'Local endpoint starts folded');
-            await page.locator('.ais-drow[aria-controls="acc-local"]').click();
-            assert.ok(await page.locator('#local-qwen-url').isVisible(), 'Local endpoint opens');
+            assert.ok(!(await page.locator('#local-qwen-url').isVisible()), 'Local stays out of the Keys tab');
+            await page.evaluate(() => { document.getElementById('local-gemini-key').dispatchEvent(new Event('input', { bubbles: true })); });
+            assert.match(await page.locator('.ais-tabs [data-tab="keys"]').innerText(), /1\/6/, 'the Keys tab counts saved keys');
+            await tab('local');
+            assert.ok(await page.locator('#local-qwen-url').isVisible(), 'the Local tab opens its fields');
             assert.ok(await page.locator('.ais-acc:has(#acc-local)').evaluate(e => e.classList.contains('open')), 'and the chevron row is marked open');
             assert.ok(await page.locator('.ais-drow[aria-controls="acc-local"] .ais-chev i').count() === 1, 'chevron icon survives (data-ico)');
+            await page.evaluate(() => { window.__usage = 0; window.loadAiUsage7d = () => window.__usage++; });
+            await tab('usage'); await tab('keys'); await tab('usage');
+            assert.equal(await page.evaluate(() => window.__usage), 1, 'Usage loads once, when its tab first opens');
+            await tab('vertex');
             await page.evaluate(() => { document.getElementById('local-gcp-mode').value = 'manual'; toggleVertexManualFields(); });
             assert.equal(await page.locator('#ais-vertex-pill').textContent(), 'Manual', 'Vertex pill follows the auth mode');
             await page.evaluate(() => { document.getElementById('local-gcp-mode').value = 'auto'; toggleVertexManualFields(); });
@@ -119,12 +138,15 @@ for (const h of ['saveAIKeys()', 'parseAndFillKeys()', 'exportAIKeys()', 'import
             assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true, 'no horizontal page scroll @' + vw);
 
             if (process.env.AIS_SHOTS) {
-                await page.locator('.ais-drow[aria-controls="acc-local"]').click();
+                await tab('models');
                 await page.locator('.ais-mrow:has(#default-analyzer-model) .ais-more').click();
                 await page.waitForTimeout(150);
                 await page.evaluate(() => { document.querySelector('.ais-scroll').scrollTop = 0; });
                 await page.locator('#aiKeysModal .ais-set').screenshot({ path: path.join(process.env.AIS_SHOTS, `ais_${vw}.png`) });
             }
+            await page.evaluate(() => { const m = document.getElementById('aiKeysModal'); m.style.display = 'none'; m.style.display = 'block'; });
+            await page.waitForTimeout(50);
+            assert.ok(await page.locator('#local-gemini-key').isVisible(), 'every open starts on Keys');
             assert.deepEqual(errs, [], 'no page errors @' + vw);
             await page.close();
         }
