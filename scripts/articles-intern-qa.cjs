@@ -79,7 +79,7 @@ const D = 864e5, BKK = 7 * 3600e3;
     const r = await page.evaluate(async ({ D }) => {
       const out = {}, writes = [], txs = [], wait = ms => new Promise(res => setTimeout(res, ms)), now = Date.now();
       const docs = {
-        a1: { status: 'scheduled', dx: { draftId: 'd1', publishedId: 'dx1', name: 'Inhaler technique' }, dc: { draftId: 'c1', publishedId: 'dc1', name: 'Salbutamol MDI' }, title: { en: '3 inhaler mistakes we see every week', th: '“อดทนคืออวดตัว”' }, body: { en: '**Most patients** who say their inhaler doesn’t work are not breathing in with it.\n\nBefore you hand over a salbutamol MDI, check three things: shake it, breathe out fully first, then press as a slow deep breath starts. Hold for 10 seconds.\n\nAsk them to show you — don’t just tell them. A spacer fixes most timing problems.', th: 'ปัจจุบันคำว่า “อดทน (がまん)” ใช้ทั่วไปในความหมายว่า ทน อดกลั้น' },
+        a1: { status: 'scheduled', source: { url: 'https://www.mims.com/thailand/x', site: 'MIMS' }, dx: { draftId: 'd1', publishedId: 'dx1', name: 'Inhaler technique' }, dc: { draftId: 'c1', publishedId: 'dc1', name: 'Salbutamol MDI' }, title: { en: '3 inhaler mistakes we see every week', th: '“อดทนคืออวดตัว”' }, body: { en: '**Most patients** who say their inhaler doesn’t work are not breathing in with it.\n\nBefore you hand over a salbutamol MDI, check three things: shake it, breathe out fully first, then press as a slow deep breath starts. Hold for 10 seconds.\n\nAsk them to show you — don’t just tell them. A spacer fixes most timing problems.', th: 'ปัจจุบันคำว่า “อดทน (がまん)” ใช้ทั่วไปในความหมายว่า ทน อดกลั้น' },
           cover: { emoji: '🫁' }, startAt: { toMillis: () => now - D }, endAt: { toMillis: () => now + D }, audience: { divisions: [], groups: [] }, links: [{ kind: 'quiz', id: 'q1', label: 'Bronchodilators' }, { kind: 'codex', id: 'd1', label: 'Salbutamol' }], rerun: 'any', readMin: 1 }
       };
       const ledger = {};
@@ -107,6 +107,9 @@ const D = 864e5, BKK = 7 * 3600e3;
       const sh = document.getElementById('art-sheet');
       out.shown = !!sh;
       if (!sh) return out;
+      const opened = []; const openWas = window.open; window.open = (...a) => { opened.push(a); return null; };
+      out.src = [sh.querySelector('.art-src').textContent, Math.round(sh.querySelector('.art-src button').getBoundingClientRect().width) < 120];
+      sh.querySelector('.art-src button').click(); out.srcOpen = opened[0]; window.open = openWas;
       const rect = sh.getBoundingClientRect();
       out.sheet = { bottom: Math.round(window.innerHeight - rect.bottom), w: Math.round(rect.width), title: sh.querySelector('h3').textContent, kicker: sh.querySelector('.cov').getAttribute('title'), cover: sh.querySelector('.cov').textContent, foot: [...sh.querySelectorAll('.foot > button')].map(b => b.textContent.trim()), okBg: getComputedStyle(sh.querySelector('.ok')).backgroundColor, okW: Math.round(sh.querySelector('.ok').getBoundingClientRect().width), noOld: !sh.querySelector('.g, .tile, .kick, .mute:not(.bm)'),
         clamp: sh.querySelector('.art-md').classList.contains('clamp'), moreHidden: document.getElementById('art-more').hidden, lng: [...sh.querySelectorAll('.lng')].map(b => b.textContent + '|' + b.getAttribute('aria-label')),
@@ -174,6 +177,8 @@ const D = 864e5, BKK = 7 * 3600e3;
     }, { D });
     assert.deepEqual(r.waited, [false, ['articles', 'status', '==', 'scheduled']], 'loads only status == scheduled (the rule), and waits while another popup is open');
     assert.equal(r.shown, true, 'the sheet opens once the other popup has closed');
+    assert.deepEqual(r.src, ['Source: MIMS ↗', true], 'V101.264: a short Source line, not a full-width button');
+    assert.deepEqual(r.srcOpen, ['https://www.mims.com/thailand/x', '_blank', 'noopener'], 'opens the page outside');
     assert.ok(r.sheet.bottom === 0 && r.sheet.w === 390, 'a bottom sheet across the phone: ' + JSON.stringify(r.sheet));
     assert.equal(r.sheet.title, '3 inhaler mistakes we see every week'); assert.equal(r.sheet.kicker, 'Article · 1 min', 'V101.177: "Article · n min" is the cover tooltip'); assert.equal(r.sheet.cover, '🫁', 'the header is the cover emoji');
     assert.deepEqual(r.sheet.foot, ['🔖', '🔕', 'Read more ▾', '👍 Got it'], 'one footer row: 🔖 🔕 left, Read more + Got it right'); assert.equal(r.sheet.okBg, 'rgb(22, 163, 74)', 'Got it is the green pill (G4)'); assert.ok(r.sheet.okW < 160, 'Got it is small, not full width: ' + r.sheet.okW); assert.ok(r.sheet.noOld, 'no grab handle, tile, kicker line or text mute line');
