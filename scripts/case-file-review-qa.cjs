@@ -67,9 +67,9 @@ assert.ok(!/onclick="closeEditCaseNoteModal\(\)" style="min-width:120px/.test(ad
 assert.ok(admin.includes('<div id="edit-case-file-box" class="lang-no-toggle" hidden></div>') && /caseFileReview\.start\(casesData\.find\(x => x\.id === caseDocId\), 'edit-case-file-box'\)/.test(admin), 'Edit Case Note shows the file too');
 const waiting = admin.slice(admin.indexOf('<div class="ib-sub-row">'), admin.indexOf('caseDup.html(c)', admin.indexOf('<div class="ib-sub-row">')));
 assert.ok(!/updateCaseStatus|openAlabastaRejectModal/.test(waiting) && /editCaseNote/.test(waiting) && /caseArticle\.btns/.test(waiting), 'the waiting card keeps Open case, Case card, Article');
-assert.ok(/id="edit-case-decide"[^\n]*caseOpenDecide\('review'\)[^\n]*caseOpenDecide\('reject'\)/.test(admin) && /Leave without saving the note/.test(admin), 'Review + Reject are in Open case, and unsaved text asks first');
+assert.ok(/caseOpenDecide\('reject'\)/.test(admin) && /id="ecn-score-rail"/.test(admin) && /Leave without saving the note/.test(admin), 'Review + Reject are in Open case, and unsaved text asks first');
 assert.equal((admin.match(/class="crf-mark"/g) || []).length, 2, 'the row and the queue card mark a case with a file');
-assert.equal((admin.match(/caseFileReview\.purge\(/g) || []).length, 4, 'review, bulk review, delete, bulk delete drop the file');
+assert.equal((admin.match(/caseFileReview\.purge\(/g) || []).length, 5, 'review, the Score card, bulk review, delete, bulk delete drop the file');
 assert.ok(!/score|bonus/i.test(js.replace(/^\/\/.*$/gm, '').replace(/its score stay|keep their score|Score it as one|case-score-modal-shell|caseReviewScoreModal|closeCaseReviewScoreModal/g, '')), 'never touches the score');
 
 // V102.550: each reader gets the PDF itself and comes back through the same parser; only the admin's retry can name one

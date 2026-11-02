@@ -58,7 +58,7 @@
         const s = Number(d.score);
         if (!SCORES.includes(s)) return;
         const input = document.getElementById('case-review-score-input');
-        const chip = document.querySelector('#caseReviewScoreModal .case-score-chip[data-score="' + s + '"]');
+        const chip = document.querySelector('#ecn-score-rail .case-score-chip[data-score="' + s + '"], #caseReviewScoreModal .case-score-chip[data-score="' + s + '"]');
         if (chip) { chip.classList.add('ai'); chip.title = 'AI: ' + String(d.scoreWhy || '').slice(0, 80); }
         // only an untouched field (still the saved 0.0 / empty) is pre-filled — never overwrite what the admin typed
         if (input && !input.dataset.crTouched && (!input.value || Number(input.value) === 0) && typeof setCaseReviewScoreValue === 'function') setCaseReviewScoreValue(s);
@@ -116,7 +116,7 @@
         const h = headEl(); if (h) h.innerHTML = '';
         const input = document.getElementById('case-review-score-input');
         if (input) delete input.dataset.crTouched;
-        document.querySelectorAll('#caseReviewScoreModal .case-score-chip.ai').forEach(c => { c.classList.remove('ai'); c.removeAttribute('title'); });
+        document.querySelectorAll('#ecn-score-rail .case-score-chip.ai, #caseReviewScoreModal .case-score-chip.ai').forEach(c => { c.classList.remove('ai'); c.removeAttribute('title'); });
         replyDraft(null);
     }
 
