@@ -133,6 +133,24 @@
         const e = (window.alabastaTaxonomyCatalog || []).find(s => s.key === key);
         return e ? e.label + ' / ' + (e.thaiLabel || e.label) : (c.diseaseSystemKey === key ? c.diseaseSystemLabel : key);
     };
+    // V102.569: the words of the other note that only repeat the base. Runs of 3+ same words go; a run stops at a drug or dose word, so "mg 1×3" of another drug never leaves.
+    const DOSE_WORD = /[A-Za-z×]|มก|มล|เม็ด|ช้อน|ครั้ง/;
+    function repeatWords(baseNote, otherNote) {
+        const parts = String(otherNote || '').trim().split(/(\s+)/), words = [], b = String(baseNote || '').trim().split(/\s+/);
+        parts.forEach((t, i) => { if (i % 2 === 0 && t) words.push({ t, sp: parts[i + 1] || '', s: 'keep', g: 0 }); });
+        for (let g = 1; ; g++) {
+            let best = 0, at = -1;
+            for (let i = 0; i < words.length; i++) for (let j = 0; j < b.length; j++) {
+                let n = 0; while (i + n < words.length && j + n < b.length && words[i + n].s === 'keep' && words[i + n].t === b[j + n] && !DOSE_WORD.test(b[j + n])) n++;
+                if (n > best) { best = n; at = i; }
+            }
+            if (best < 3) break;
+            for (let k = 0; k < best; k++) { words[at + k].s = 'cut'; words[at + k].g = g; }
+        }
+        return words;
+    }
+    const noteFrom = (words) => words.filter(w => w.s !== 'cut').map(w => w.t + w.sp).join('').trim();
+
     function joinPlan(a, b) {
         if (!a || !b || a.id === b.id || !a.userId || a.userId !== b.userId || reviewed(a) || reviewed(b)) return null;
         const side = hasCard(a) !== hasCard(b) ? (hasCard(a) ? 'a' : 'b') : 'b';   // the one with a Case Card stays the base, else the newer
@@ -199,21 +217,73 @@
         return `<div class="cdup-win" role="dialog" aria-label="Merge cases"><div class="cdup-hd"><b>⛓ Merge</b> <span class="cdup-hn">${hn}</span><span class="cdup-sp"></span><button type="button" class="cdup-x" onclick="caseDup.close()" aria-label="Close">✕</button></div>`
             + (pl.warn.length ? `<div class="cmg-warn">⚠️ ${pl.warn.map(esc).join(' · ')}</div>` : '')
             + `<div class="cmg-2">${side(a, 1)}${side(b, 2)}</div>`
-            + `<div class="cmg-res"><small>After merge</small><b>${sys(pl.keys)}</b><p>${esc(pl.base.note || '')}</p><hr><p>${esc(pl.other.note || '')}</p><small class="cmg-pts">One case stays. The other is kept folded with 0 points. Undo is available.</small></div>`
-            + `<div class="cdup-pick"><button type="button" class="cdup-keep rec" onclick="caseDup.merge('${esc(a.id)}', '${esc(b.id)}', true)"><span>⛓ Merge</span><small>Keep both notes</small></button>${keepBtn(a, b, 1)}${keepBtn(b, a, 2)}</div>`
+            + `<div class="cmg-res"><div class="cmg-head"><small>After merge</small><span id="cmg-jev">${mgJevBtn()}</span></div><b>${sys(pl.keys)}</b><p>${esc(pl.base.note || '')}</p><hr><p id="cmg-other">${mgWords()}</p><small id="cmg-count" class="cmg-count">${mgCount()}</small><small class="cmg-pts">One case stays. The other is kept folded with 0 points. Undo is available.</small></div>`
+            + `<div class="cdup-pick"><button type="button" class="cdup-keep rec" onclick="caseDup.merge('${esc(a.id)}', '${esc(b.id)}', true)"><span>⛓ Merge</span><small id="cmg-sub">${mgSub()}</small></button>${keepBtn(a, b, 1)}${keepBtn(b, a, 2)}</div>`
             + `<div class="cdup-ft"><button type="button" class="cdup-no" onclick="caseDup.dismiss('${esc(a.id)}', '${esc(b.id)}')">Not the same case</button></div></div>`;
     }
+    // ---- V102.569: the repeats shown in the sheet. A cut word is struck and comes back on a tap; Jev only marks words, the admin presses ✓ or ✕
+    let mg = null;
+    const mgRemoved = () => (mg ? new Set(mg.words.filter(w => w.s === 'cut').map(w => w.g)).size : 0);
+    const mgSub = () => { const n = mgRemoved(); return n ? `${n} repeat${n > 1 ? 's' : ''} removed` : 'Keep both notes'; };
+    function mgCount() {
+        if (!mg) return '';
+        const n = mgRemoved(), ask = new Set(mg.words.filter(w => w.s === 'ask').map(w => w.g)).size;
+        const bits = [n ? mgSub() + ' · tap to bring back' : '', ask ? `Jev found ${ask} more · ✓ remove, ✕ keep` : '', mg.jev === 'none' ? 'Jev found no more' : '', mg.jev === 'fail' ? 'Jev could not check. Nothing changed.' : ''];
+        return bits.filter(Boolean).join(' · ');
+    }
+    function mgWords() {
+        if (!mg) return '';
+        let out = '';
+        mg.words.forEach((w, i) => {
+            const same = (x) => x && x.s === w.s && x.g === w.g, starts = !same(mg.words[i - 1]), ends = !same(mg.words[i + 1]), space = w.sp && !/\n/.test(w.sp) ? ' ' : (w.sp ? '\n' : '');
+            if (w.s === 'keep') { out += esc(w.t) + space; return; }
+            if (starts) out += w.s === 'ask' ? '<span class="cmg-ask">' : `<button type="button" class="cmg-cut${w.s === 'back' ? ' back' : ''}" onclick="caseDup.mgTap(${w.g})" title="${w.s === 'back' ? 'Tap to remove' : 'Tap to bring back'}">`;
+            out += esc(w.t) + (ends ? '' : ' ');
+            if (ends) out += (w.s === 'ask' ? `<button type="button" class="cjs-y" onclick="caseDup.mgMark(${w.g}, true)" aria-label="Remove">✓</button><button type="button" class="cjs-n" onclick="caseDup.mgMark(${w.g}, false)" aria-label="Keep">✕</button></span>` : '</button>') + space;
+        });
+        return out;
+    }
+    function mgJevBtn() {
+        if (!mg || mg.jev === 'none' || mg.jev === 'done' || !mg.words.some(w => w.s === 'keep')) return '';
+        const logo = window.jevMarkHtml ? window.jevMarkHtml(16) : '';
+        return `<button type="button" class="cmg-jev" onclick="caseDup.mgAsk()"${mg.jev === 'run' ? ' disabled' : ''}>${logo}${mg.jev === 'run' ? 'Asking…' : 'Same meaning?'}</button>`;
+    }
+    function mgPaint() {
+        const put = (id, h) => { const el = document.getElementById(id); if (el) el.innerHTML = h; };
+        put('cmg-other', mgWords()); put('cmg-count', mgCount()); put('cmg-jev', mgJevBtn()); put('cmg-sub', mgSub());
+    }
+    function mgTap(g) { if (!mg) return; mg.words.forEach(w => { if (w.g === g) w.s = w.s === 'cut' ? 'back' : 'cut'; }); mgPaint(); }
+    function mgMark(g, yes) { if (!mg) return; mg.words.forEach(w => { if (w.g === g) { w.s = yes ? 'cut' : 'keep'; if (!yes) w.g = 0; } }); mgPaint(); }
+    async function mgAsk() {
+        const m = mg; if (!m || m.jev === 'run') return;
+        m.jev = 'run'; mgPaint();
+        try {
+            const at = m.words.map((w, i) => (w.s === 'keep' ? i : -1)).filter(i => i >= 0);
+            const r = (await adminApp.functions().httpsCallable('jevMergeRepeats')({ baseId: m.baseId, otherId: m.otherId, at })).data || {};
+            if (!r.enabled) throw new Error('off');
+            let found = 0, g = m.words.reduce((x, w) => Math.max(x, w.g), 0);
+            (r.ranges || []).forEach(p => {
+                const part = m.words.slice(p.at, p.at + p.len);   // only what still reads the same, word for word
+                if (part.length !== p.len || part.map(w => w.t).join(' ') !== p.text || part.some(w => w.s !== 'keep')) return;
+                g++; found++; part.forEach(w => { w.s = 'ask'; w.g = g; });
+            });
+            m.jev = found ? 'done' : 'none';
+        } catch (e) { console.error('[case-dup] Jev repeats failed', e); m.jev = 'fail'; }
+        if (mg === m) mgPaint();
+    }
+
     function open(aId, bId) {
         const all = cases(), a = all.find(c => c.id === aId), b = all.find(c => c.id === bId);
         if (!a || !b) return;
         close();
         const back = document.createElement('div'); back.id = 'cdup-back'; back.className = 'cdup-back lang-no-toggle';
         const sim = similarity(a.note, b.note), pl = sim < SAME ? joinPlan(a, b) : null;
+        mg = pl ? { baseId: pl.base.id, otherId: pl.other.id, otherNote: pl.other.note, words: repeatWords(pl.base.note, pl.other.note), jev: '' } : null;
         back.innerHTML = pl ? joinHtml(a, b, pl) : modalHtml(a, b, sim);
         back.addEventListener('click', (e) => { if (e.target === back) close(); });
         document.body.appendChild(back);
     }
-    function close() { const el = document.getElementById('cdup-back'); if (el) el.remove(); }
+    function close() { mg = null; const el = document.getElementById('cdup-back'); if (el) el.remove(); }
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
 
     function repaint() { if (typeof renderAlabastaInbox === 'function') renderAlabastaInbox(); }
@@ -255,6 +325,11 @@
     async function merge(aId, bId, join) {
         const all = cases(), a = all.find(c => c.id === aId), b = all.find(c => c.id === bId), pl = a && b && (join ? joinPlan(a, b) : plan(a, b));
         if (!pl) { if (typeof showToast === 'function') showToast('Nothing to merge here.'); return; }
+        if (join && mg && mg.otherId === pl.other.id && mg.otherNote === pl.other.note && mgRemoved()) {   // the note changed since the sheet opened = both notes stay whole
+            const baseNote = String(pl.base.note || '').trim(), note = [baseNote, noteFrom(mg.words)].filter(Boolean).join('\n\n');
+            if (note === baseNote) { delete pl.set.note; delete pl.prev.note; } else pl.set.note = note;
+            pl.parts = [mgSub()];
+        }
         close();
         try {
             const F = firebase.firestore.FieldValue, ts = F.serverTimestamp(), batch = db.batch();
@@ -296,5 +371,5 @@
     function openPicked() { const p = picked(); if (p) open(p.a.id, p.b.id); }
     function dismiss(aId, bId) { try { localStorage.setItem(dismissKey(aId), '1'); localStorage.setItem(dismissKey(bId), '1'); } catch (_) { /* private mode */ } close(); repaint(); }
 
-    window.caseDup = { find, pair, compare, plan, joinPlan, picked, openPicked, similarity, html, cls, open, close, keep, fold, merge, stageRestore, undo, undoMerge, dismiss };
+    window.caseDup = { find, pair, compare, plan, joinPlan, repeatWords, noteFrom, mgTap, mgMark, mgAsk, picked, openPicked, similarity, html, cls, open, close, keep, fold, merge, stageRestore, undo, undoMerge, dismiss };
 })();
