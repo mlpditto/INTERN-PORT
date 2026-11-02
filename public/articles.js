@@ -14,13 +14,13 @@
     var BKK = 7 * 3600e3, DONE = ['ok', 'quiz', 'codex', 'hist'];
     var S = { list: null, loading: false, armed: false, tries: 0, cur: null, lang: 'en', more: false, sig: '', qs: [], qsUnsub: null };
     var T = {
-        en: { kicker: 'Article', min: 'min', more: 'Read more', less: 'Show less', got: 'Got it', save: 'Save', saved: 'Saved', mute: 'Don’t pop up articles', rerun: 'For new interns', close: 'Close',
+        en: { source: 'Source', kicker: 'Article', min: 'min', more: 'Read more', less: 'Show less', got: 'Got it', save: 'Save', saved: 'Saved', mute: 'Don’t pop up articles', rerun: 'For new interns', close: 'Close',
             read: 'Read', anyq: 'Any Q?', askSub: 'Goes to the article’s author · your name is not shown', ask: 'A question', wrong: 'Wrong / out of date', add: 'Please add',
             phAsk: 'What would you like to ask?', phWrong: 'Which part looks wrong or out of date?', phAdd: 'What should the article add?', hint: 'Replies show up in History', send: 'Send', sending: 'Sending…', fail: 'Could not send — your text is kept. Try again.' },
-        th: { kicker: 'บทความ', min: 'นาที', more: 'อ่านต่อ', less: 'ย่อ', got: 'รับทราบ', save: 'เก็บไว้', saved: 'เก็บแล้ว', mute: 'ไม่ต้องเด้งบทความ', rerun: 'สำหรับน้องใหม่', close: 'ปิด',
+        th: { source: 'ที่มา', kicker: 'บทความ', min: 'นาที', more: 'อ่านต่อ', less: 'ย่อ', got: 'รับทราบ', save: 'เก็บไว้', saved: 'เก็บแล้ว', mute: 'ไม่ต้องเด้งบทความ', rerun: 'สำหรับน้องใหม่', close: 'ปิด',
             read: 'อ่านแล้ว', anyq: 'Any Q?', askSub: 'ส่งถึงผู้เขียนบทความ · ไม่แสดงชื่อคุณ', ask: 'สงสัย', wrong: 'ข้อมูลผิด/ล้าสมัย', add: 'อยากให้เพิ่ม',
             phAsk: 'อยากถามอะไร?', phWrong: 'ส่วนไหนดูผิดหรือล้าสมัย?', phAdd: 'อยากให้บทความเพิ่มเรื่องอะไร?', hint: 'ตอบกลับดูได้ใน History', send: 'ส่ง', sending: 'กำลังส่ง…', fail: 'ส่งไม่สำเร็จ ข้อความยังอยู่ ลองอีกครั้ง' },
-        ko: { kicker: '아티클', min: '분', more: '더 보기', less: '접기', got: '확인', save: '저장', saved: '저장됨', mute: '아티클 팝업 끄기', rerun: '신규 인턴용', close: '닫기',
+        ko: { source: '출처', kicker: '아티클', min: '분', more: '더 보기', less: '접기', got: '확인', save: '저장', saved: '저장됨', mute: '아티클 팝업 끄기', rerun: '신규 인턴용', close: '닫기',
             read: '읽음', anyq: 'Any Q?', askSub: '글쓴이에게 전달 · 이름은 표시되지 않아요', ask: '질문', wrong: '틀림/오래됨', add: '추가 요청',
             phAsk: '무엇이 궁금한가요?', phWrong: '어느 부분이 틀리거나 오래되었나요?', phAdd: '어떤 내용을 더하면 좋을까요?', hint: '답변은 History에서 볼 수 있어요', send: '보내기', sending: '보내는 중…', fail: '보내지 못했어요. 글은 남아 있어요. 다시 시도하세요.' }
     };
@@ -178,6 +178,7 @@
             '.art-md{font:400 14.5px/1.6 Kanit,sans-serif;color:#334155;word-break:keep-all;overflow-wrap:anywhere}.art-md p,.art-md ul,.art-md ol{margin:0 0 8px}.art-md ul,.art-md ol{padding-left:20px}.art-md a{color:#4361ee}' +
             '#art-sheet .art-md.clamp{max-height:6.4em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 65%,transparent);mask-image:linear-gradient(#000 65%,transparent)}' +   // 4 lines × 1.6; line-clamp left half a line showing when the body has several paragraphs
             '#art-sheet .more{min-height:0;margin:0 0 0 auto;width:auto;border:0;background:none;font:700 13px/1 Kanit,sans-serif;color:#4361ee;padding:12px 4px;cursor:pointer;white-space:nowrap}' +
+            '.art-src{margin:0 0 10px;font:400 12.5px/1.4 Kanit,sans-serif;color:#64748b}.art-src button{width:auto;min-height:0;margin:0;padding:4px 2px;border:0;background:none;box-shadow:none;color:#4361ee;font:600 12.5px/1.4 Kanit,sans-serif;text-decoration:underline;cursor:pointer}' +
             '.art-links{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 12px}.art-link{min-height:0;margin:0;width:auto;display:inline-flex;align-items:center;gap:6px;font:600 12.5px/1 Kanit,sans-serif;padding:8px 11px;border-radius:999px;border:1px solid #c7d2fe;background:#eef2ff;color:#3730a3;cursor:pointer}' +
             '.art-link.codex{border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8}.art-link b{font-weight:800;color:#b45309}' +
             '#art-sheet .foot{display:flex;align-items:center;gap:8px;margin-top:6px}#art-sheet .bm{width:44px;height:44px;min-height:0;margin:0;padding:0;border-radius:12px;border:0;background:#f1f5f9;font-size:17px;cursor:pointer;flex:none}#art-sheet .bm[aria-pressed="true"]{background:#fef3c7}#art-sheet .bm.mute{opacity:.8}' +
@@ -208,6 +209,12 @@
         var g = document.getElementById('internGuideOverlay'); if (g && g.classList.contains('open')) return true;
         return Array.prototype.some.call(document.querySelectorAll('.modal'), function (m) { var d = m.style.display; return d === 'flex' || d === 'block' || m.classList.contains('open') || m.classList.contains('show'); });
     }
+    // V101.264: the page the article came from (articles/{id}.source), opened outside the app
+    function srcHtml(a, lang) {
+        var u = a.source && a.source.url;
+        if (!/^https?:\/\//i.test(u || '')) return '';
+        return '<div class="art-src">' + (T[lang] || T.en).source + ': <button type="button" onclick="internArticles.openSrc(' + esc(JSON.stringify(u)) + ')">' + esc(a.source.site || u) + ' ↗</button></div>';
+    }
     function linksHtml(a) {
         // V101.196: the Disease Codex entry drafted from this article (articles/{id}.dx.publishedId, set when the admin approves it)
         var dx = a.dx && a.dx.publishedId ? '<button type="button" class="art-link codex" onclick="internArticles.openDx(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(a.dx.publishedId)) + ')">🩺 ' + esc(a.dx.name || 'Disease Codex') + '</button>' : '';
@@ -229,7 +236,7 @@
             (have.length > 1 ? langBtn(have, tx.lang, 'internArticles.lang()') : '') +
             '<button type="button" class="x" onclick="internArticles.close(\'x\')" aria-label="' + t.close + '">✕</button></div>' +
             '<h3 id="art-title">' + esc(tx.title) + '</h3><div class="art-md' + (S.more ? '' : ' clamp') + '" id="art-text">' + md(tx.body) + '</div>' +
-            linksHtml(a) +
+            srcHtml(a, S.lang) + linksHtml(a) +
             '<div class="foot"><button type="button" class="bm" onclick="internArticles.save()" aria-pressed="' + saved + '" title="' + (saved ? t.saved : t.save) + '" aria-label="' + (saved ? t.saved : t.save) + '">🔖</button>' +
             '<button type="button" class="bm mute" onclick="internArticles.mute()" title="' + t.mute + '" aria-label="' + t.mute + '">🔕</button>' +
             '<button type="button" class="more" id="art-more" onclick="internArticles.toggleMore()">' + (S.more ? t.less + ' ▴' : t.more + ' ▾') + '</button>' +
@@ -446,7 +453,7 @@
         var tx = textOf(a, uiLang()), have = langs(a);
         // V101.251: on the title line (positioned against the History row) · V101.193: the sheet's language pill here too when the article has more than one language — a tap swaps the body in place (V101.202: one pill, cycles)
         var lng = have.length > 1 ? '<div class="art-top">' + langBtn(have, tx.lang, 'internArticles.histLang(this)') + '</div>' : '';
-        return '<div class="art-hist lang-no-toggle" data-art="' + esc(a.id) + '">' + lng + '<div class="art-md">' + md(tx.body) + '</div>' + linksHtml(a) + qaHtml(s) + '</div>';
+        return '<div class="art-hist lang-no-toggle" data-art="' + esc(a.id) + '">' + lng + '<div class="art-md">' + md(tx.body) + '</div>' + srcHtml(a, uiLang()) + linksHtml(a) + qaHtml(s) + '</div>';
     }
     function histLang(btn, l) {
         var box = btn.closest('.art-hist'), a = box && find(box.dataset.art); if (!a) return;
@@ -486,6 +493,10 @@
         },
         mute: function () { if (window.myUserDoc) window.myUserDoc.articlesMuted = true; write({ articlesMuted: true }); close('x'); if (typeof showToast === 'function') showToast('🔕 Articles stay in History'); },
         // from the popup (closes it, = read) or from a History row (= read)
+        openSrc: function (url) {
+            if (window.liff && liff.isInClient && liff.isInClient()) liff.openWindow({ url: url, external: true });
+            else window.open(url, '_blank', 'noopener');
+        },
         openQuiz: function (articleId, quizId) {
             if (S.cur) close('quiz'); else markRead(articleId, 'quiz');
             awardQuizBeri(articleId);

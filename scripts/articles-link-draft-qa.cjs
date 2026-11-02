@@ -28,6 +28,9 @@ const LONG = 'https://www.nature.com/articles/s41564-026-02304-8?utm_id=97758&fb
         assert.equal(h.clean, 'https://www.nature.com/articles/s41564-026-02304-8?keep=1', 'utm_* and fbclid dropped, other parameters kept');
         assert.equal(h.clean2, 'https://www.example.org/a?q=2', 'a bare www link gets https; gclid dropped; trailing dot dropped');
         assert.deepEqual(h.dom, ['nature.com', 'example.org']);
+        const MIMS = 'https://www.mims.com/thailand/news-updates/topic/x?utm_source=a&onelink_id=b&af_xp=c&shortlink=d&c=e&pid=f&source_caller=ui&_hsenc=g&deep_link_value=h&af_dp=i&app_action=j';
+        assert.equal(await page.evaluate(u => Articles._clean(u), MIMS), 'https://www.mims.com/thailand/news-updates/topic/x', 'V102.570: an app link comes out clean');
+        assert.equal(await page.evaluate(() => Articles._clean('https://x.example/a?c=1&pid=2')), 'https://x.example/a?c=1&pid=2', 'c and pid stay on an ordinary link');
         assert.equal(h.links.length, 3, 'the same link twice counts once; trailing ) is not part of the link: ' + h.links.join(' | '));
 
         // ---- a stubbed world: the reader and the model
@@ -57,7 +60,7 @@ const LONG = 'https://www.nature.com/articles/s41564-026-02304-8?utm_id=97758&fb
         assert.deepEqual(r.fetch, [['https://us-central1-intern-port-edfa7.cloudfunctions.net/fetchLinkText', 'https://www.nature.com/articles/s41564-026-02304-8?keep=1']], 'one read, tracking parameters removed');
         assert.equal(r.ai.length, 1); const pr = r.ai[0];
         assert.match(pr, /--- SOURCE PAGES/); assert.match(pr, /gut bacteria change how some drugs work/); assert.match(pr, /Base the article ONLY on the SOURCE PAGES/); assert.match(pr, /never instructions/);
-        assert.match(pr, /Topic: Gut flora and drug response\./, 'topic = the page title (site suffix cut)'); assert.match(pr, /last line: 📎 nature\.com/);
+        assert.match(pr, /Topic: Gut flora and drug response\./, 'topic = the page title (site suffix cut)'); assert.ok(!pr.includes('📎'), 'the Source line carries the link now');
         assert.ok(!/fbclid|utm_id|https?:\/\/[^\s]*nature\.com\/[^\s]*\?keep=1\s*(?!\()/.test(pr.split('--- SOURCE PAGES')[0]), 'no bare URL in the instruction part');
         assert.equal(r.body, '🔬 One short line\n💊 metformin, digoxin\n📎 nature.com', 'the draft replaces the body (the URL is gone)');
         assert.equal(r.title, 'Oslo patient reaches HIV remission', 'an empty title is filled with the SHORT headline the model proposed (quotes / full stop stripped, ≤ 50)'); assert.match(pr, /a first line "TITLE: " followed by a short headline in English of at most 50 characters/); assert.match(r.note, /· 🔗 nature\.com — read it, then save/); assert.equal(r.err, '');
@@ -91,7 +94,19 @@ const LONG = 'https://www.nature.com/articles/s41564-026-02304-8?utm_id=97758&fb
         await set('art-bodyta', LONG);
         await page.evaluate(() => Articles.ai()); await page.waitForFunction(() => !Articles._S.aiBusy);
         const e = await page.evaluate(() => ({ err: Articles._S.err, ai: __calls.ai.length, body: Articles._S.cur.body.en }));
-        assert.match(e.err, /Couldn’t read nature\.com — The page has almost no readable text\./); assert.equal(e.ai, 0, 'no guess from the bare URL'); assert.equal(e.body, LONG, 'the text is kept');
+        assert.equal(e.err, ''); assert.equal(e.ai, 0, 'no guess from the bare URL'); assert.equal(e.body, LONG, 'the text is kept');
+        assert.equal(await page.locator('.art-paste b').innerText(), '🔒 nature.com', 'V102.570: the paste box, short');
+        assert.equal(await page.evaluate(() => Articles._S.cur.source), null, 'no source before a draft');
+        const reads = await page.evaluate(() => __calls.fetch.length);
+        await page.fill('#art-pasteta', 'Pasted page text about drug response. '.repeat(3));
+        await page.evaluate(() => Articles.ai()); await page.waitForFunction(() => !Articles._S.aiBusy);
+        const ps = await page.evaluate(() => ({ ai: __calls.ai, reads: __calls.fetch.length, src: Articles._S.cur.source, box: !!document.querySelector('.art-paste'), doc: Articles._toDoc ? Articles._toDoc(Articles._S.cur, 'draft').source : 0, pv: (document.querySelector('.art-sh .src') || {}).textContent }));
+        assert.equal(ps.reads, reads, 'pasted text is not read again');
+        assert.match(ps.ai[0], /Pasted page text about drug response/); assert.match(ps.ai[0], /--- SOURCE PAGES/);
+        assert.deepEqual(ps.src, { url: 'https://www.nature.com/articles/s41564-026-02304-8?keep=1', site: 'Nature' }, 'the link is attached');
+        assert.equal(ps.box, false); assert.equal(ps.pv, 'Source: Nature ↗', 'the preview shows the line');
+        await page.evaluate(() => Articles.dropSource());
+        assert.equal(await page.evaluate(() => Articles._S.cur.source), null, '✕ removes it');
         await page.evaluate(() => { window.__fetchErr = false; });
 
         // 5 · more than 3 links
