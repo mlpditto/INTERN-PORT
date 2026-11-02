@@ -2,9 +2,45 @@
    ai-model-ui.js owns the chips and their click handlers; this only opens / closes the row. */
 (function () {
     'use strict';
+    // V102.571: one tab at a time, so nothing scrolls. Every id stays where it was: this only sorts the existing rows into tabs. Local, Vertex and
+    // Usage are the old disclosure rows, opened once through toggleAiAccordion (it lazy-loads Usage); their head row stays for the pill and today's total.
+    var TABS = [['keys', '🔑', 'Keys'], ['models', '🎚️', 'Models'], ['local', '🖥️', 'Local'], ['vertex', '☁️', 'Vertex'], ['usage', '📈', 'Usage']];
+    var KEY_IDS = ['gemini', 'openai', 'anthropic', 'typhoon', 'llama', 'openrouter'];
+    function initTabs(modal) {
+        var scroll = modal.querySelector('.ais-scroll'), head = scroll.querySelector('.ais-head'), cur = 'keys';
+        Array.prototype.forEach.call(scroll.children, function (el) {
+            if (el === head) return;
+            if (el.classList.contains('ais-sec') && el.querySelector('.fa-sliders')) cur = 'models';
+            var acc = el.classList.contains('ais-acc') && el.querySelector('div[id^="acc-"]');
+            el.dataset.aisTab = acc ? acc.id.slice(4) : cur;
+        });
+        var bar = document.createElement('div');
+        bar.className = 'ais-tabs'; bar.setAttribute('role', 'tablist');
+        bar.innerHTML = TABS.map(function (t) { return '<button type="button" role="tab" data-tab="' + t[0] + '">' + t[1] + ' ' + t[2] + (t[0] === 'keys' ? ' <b></b>' : '') + '</button>'; }).join('');
+        head.after(bar);
+        scroll.classList.add('ais-tabbed');
+        function count() {
+            var n = KEY_IDS.filter(function (k) { var i = document.getElementById('local-' + k + '-key'); return i && i.value.trim(); }).length;
+            bar.querySelector('b').textContent = n + '/' + KEY_IDS.length;
+        }
+        function show(tab) {
+            Array.prototype.forEach.call(scroll.children, function (el) { if (el.dataset.aisTab) el.classList.toggle('ais-off', el.dataset.aisTab !== tab); });
+            Array.prototype.forEach.call(bar.children, function (b) { var on = b.dataset.tab === tab; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
+            var body = document.getElementById('acc-' + tab);
+            if (body && body.style.display === 'none' && typeof window.toggleAiAccordion === 'function') window.toggleAiAccordion('acc-' + tab);
+            scroll.scrollTop = 0; count();
+        }
+        bar.addEventListener('click', function (e) { var b = e.target.closest('[data-tab]'); if (b) show(b.dataset.tab); });
+        modal.addEventListener('input', count);
+        modal.querySelector('.ais-go').addEventListener('click', function () { setTimeout(count, 0); });   // Quick Paste fills the fields without an input event
+        // every open starts on Keys, with the saved keys counted
+        new MutationObserver(function () { if (modal.style.display !== 'none') show('keys'); }).observe(modal, { attributes: true, attributeFilter: ['style'] });
+        show('keys');
+    }
     function init() {
         var modal = document.getElementById('aiKeysModal');
         if (!modal) return;
+        initTabs(modal);
         modal.querySelectorAll('.ais-mrow').forEach(function (row) {
             var wasActive = false;
             // capture runs before the chip's own onclick, which flips .active — so remember the state it had
