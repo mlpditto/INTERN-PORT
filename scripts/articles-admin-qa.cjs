@@ -343,7 +343,7 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
     // V102.362
     assert.deepEqual(r3.trHead, [true, '🌐 Translate all 3', false], '🌐 sits before ＋ New and counts the missing versions (a1 th+ko, a2 ko): ' + JSON.stringify(r3.trHead));
     assert.deepEqual(r3.trCancel, [0, 0], 'Cancel on the confirm sends nothing');
-    assert.equal(r3.trModel, 'gemini-3.8-flash', 'V102.573: Translate all uses the Translate default in AI API Settings'); assert.match(r3.trConfirm, /with Flash 3\.8 and save/, 'and the popup names it');
+    assert.equal(r3.trModel, 'gemini-3.8-flash', 'V102.574: Translate all uses the Translate default in AI API Settings'); assert.match(r3.trConfirm, /with Flash 3\.8 and save/, 'and the popup names it');
     assert.match(r3.trConfirm, /Translate 3 missing version\(s\) of 2 article\(s\)/, 'the confirm counts versions and articles: ' + r3.trConfirm + ' | ' + JSON.stringify(r3.trHead2));
     assert.deepEqual(r3.trJobs, ['Thai:Acromegaly: Spotting the Subtle Signs 🔍', 'Korean:Acromegaly: Spotting the Subtle Signs 🔍', 'Korean:Two'], 'one prompt per missing version, from the EN title: ' + JSON.stringify(r3.trJobs));
     assert.deepEqual(r3.trWrites, [['update', 'a1', 'body.th,title.th,updatedAt,updatedBy', 'เนื้อหา', 'หัวข้อ'], ['update', 'a1', 'body.ko,title.ko,updatedAt,updatedBy', '본문', '제목'], ['update', 'a2', 'body.ko,title.ko,updatedAt,updatedBy', '본문', '제목']], 'each version is saved on its own, only that language: ' + JSON.stringify(r3.trWrites));

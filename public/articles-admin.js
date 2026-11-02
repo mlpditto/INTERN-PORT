@@ -511,7 +511,7 @@
         if (!m && sel) m = sel.value;
         return (m && window.textAIModelInfo && window.textAIModelInfo(m)) ? m : 'gpt-6-luna';
     }
-    // V102.573: 🌐 Translate all follows the Translate default in AI API Settings; it has no chip of its own (was: the ✨ Draft model, else Luna)
+    // V102.574: 🌐 Translate all follows the Translate default in AI API Settings; it has no chip of its own (was: the ✨ Draft model, else Luna)
     function translateModel() {
         var m = ''; try { m = localStorage.getItem('ai_default_translate_model') || ''; } catch (e) { /* none */ }
         if (m && window.normalizeTextAIModel) m = window.normalizeTextAIModel(m);

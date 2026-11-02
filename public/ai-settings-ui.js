@@ -14,7 +14,7 @@
             var acc = el.classList.contains('ais-acc') && el.querySelector('div[id^="acc-"]');
             el.dataset.aisTab = acc ? acc.id.slice(4) : cur;
         });
-        // V102.573 (owner's pick C): Keys and Models side by side on a wide screen; a phone keeps them as tabs (the columns are display:contents there)
+        // V102.574 (owner's pick C): Keys and Models side by side on a wide screen; a phone keeps them as tabs (the columns are display:contents there)
         var cols = document.createElement('div'), left = document.createElement('div'), right = document.createElement('div');
         cols.className = 'ais-cols'; left.className = right.className = 'ais-col';
         cols.append(left, right);
