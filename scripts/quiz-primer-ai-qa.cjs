@@ -92,7 +92,7 @@ assert.ok(/aria-label="Draft Read first with AI">✨</.test(box) && /The correct
         assert.deepEqual(r.allSent, ['What is a LAMA?', 'What is SABA?'], '✨ All sends only the questions with text and no Read first: ' + JSON.stringify(r.allSent));
         assert.deepEqual(r.allValues, ['New draft text', 'Background text', 'Already written', 'Background text'], 'the two empty ones are filled, the written ones untouched (the first still holds step 3), the one with no text skipped');
         assert.equal(r.allToasts.length, 1, 'one toast for the whole run: ' + JSON.stringify(r.allToasts)); assert.match(r.allToasts[0], /^✨ Read first drafted for 2\/2 · \d+ s · save the quiz to keep them$/, 'V102.514: the toast carries the total time: ' + r.allToasts[0]); assert.equal(r.allBtnBack, true, 'the ✨ All button comes back');
-        assert.equal(r.confirms, 0, 'V102.571: no browser confirm');
+        assert.equal(r.confirms, 0, 'V102.572: no browser confirm');
         assert.deepEqual(errors, [], 'no page errors: ' + errors.join(' | '));
         console.log('PASS: Read first ✨ — drafts from stem + unmarked options only (no answer key), V102.524 two-button row with ☰ Terms only instead after a draft and ✨ All from the popup, leak flag, fills an empty box / asks before replacing, failure restores the button');
     } finally { await browser.close(); }
