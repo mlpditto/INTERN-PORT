@@ -118,25 +118,35 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
         { const g = await page.locator('#praOverlay .pra-card[data-q="0"]').evaluate(c => { const r = c.getBoundingClientRect(), go = c.querySelector('.pra-go').getBoundingClientRect(), pill = c.querySelector('.pra-pill').getBoundingClientRect(), stem = c.querySelector('.pra-stem'); return { fits: go.right <= r.right + 0.5 && pill.width > 10 && go.width > 10, clipped: stem.scrollWidth > stem.clientWidth }; });
           assert.equal(g.fits, true, 'pill + ✎ stay inside the card at 390 px'); assert.equal(g.clipped, true, 'the long stem is the one that gives way'); }
         await page.evaluate(() => _praClose()); await page.setViewportSize({ width: 1200, height: 900 });
-        // V102.517: no Read first anywhere → one message + ✨ All (which runs the first row's ✨ All) instead of empty cards
-        await page.evaluate(() => { document.querySelectorAll('.quiz-q-item .q-primer').forEach(t => { t.value = ''; }); window.__all = null; window._qPrimerDraftAll = b => { window.__all = b.className; }; _qPrimerReviewAll(); });
-        assert.equal(await page.locator('#praOverlay .pra-card').count(), 0, 'no cards');
-        // V102.539: ✨ All's model can be picked in the popup, and that is the pick on every question's row
+        // V102.573 (owner's pick A): nothing written yet → the strip above the questions, no popup and no browser confirm
+        await page.evaluate(() => { document.querySelectorAll('.quiz-q-item .q-primer').forEach(t => { t.value = ''; }); window.__confirms = 0; window.confirm = () => { window.__confirms++; return false; }; _qPrimerStrip(); _qPrimerReviewAll(); });
+        assert.equal(await page.locator('#praOverlay').count(), 0, 'no popup while nothing is written');
+        const strip = page.locator('#q-primer-strip');
+        assert.equal((await strip.locator('.qps-go').innerText()).trim(), '4'); assert.equal(await strip.locator('.qps-go').getAttribute('aria-label'), 'Draft Read first for 4 questions');
         {
-            const rail = page.locator('#praOverlay .pra-none .pra-model');
-            assert.equal(await rail.count(), 1, 'the model rail is in the empty state');
-            assert.ok(await page.locator('#praOverlay .pra-model .text-ai-chips button').count() > 0, 'with model chips');
-            const next = await page.evaluate(() => { const cur = document.querySelector('.q-primer-model').value; const b = [...document.querySelectorAll('#praOverlay .pra-model .text-ai-chips button')].find(x => x.dataset.value !== cur); window._praPickModel(b.dataset.value); return b.dataset.value; });
-            const after = await page.evaluate(() => ({ rows: [...new Set([...document.querySelectorAll('#quizManageModal .q-primer-model')].map(i => i.value))], stored: localStorage.getItem('ai_primer_model'), rail: document.getElementById('pra-model-pick').value }));
-            assert.deepEqual(after, { rows: [next], stored: next, rail: next }, 'one pick everywhere: ' + JSON.stringify(after));
+            await strip.locator('.qps-model').evaluate(b => b.click());
+            assert.ok(await strip.locator('.pra-model .text-ai-chips button').count() > 0, 'the model rail opens in the strip');
+            const next = await page.evaluate(() => { const cur = document.querySelector('.q-primer-model').value; const b = [...document.querySelectorAll('#q-primer-strip .text-ai-chips button')].find(x => x.dataset.value !== cur); window._praPickModel(b.dataset.value); return b.dataset.value; });
+            const after = await page.evaluate(() => ({ rows: [...new Set([...document.querySelectorAll('#quizManageModal .q-primer-model')].map(i => i.value))], stored: localStorage.getItem('ai_primer_model') }));
+            assert.deepEqual(after, { rows: [next], stored: next }, 'one pick everywhere: ' + JSON.stringify(after));
+            assert.equal(await strip.locator('.pra-model').count(), 0, 'the rail closes on a pick');
         }
-        assert.equal((await page.locator('#praOverlay .pra-sum').innerText()).trim(), '4 Q', 'V102.555: one row, the count alone');
-        assert.equal(await page.locator('#praOverlay .pra-chip[data-f]').count(), 0, 'no filters with nothing to filter');
-        assert.equal(await page.locator('#praOverlay .pra-hd').count(), 1, 'one row: no second header and no box'); assert.equal(await page.locator('#praOverlay .pra-body').isVisible(), false, 'the empty body takes no room');
-        assert.equal((await page.locator('#praOverlay .pra-none .pra-all').innerText()).trim(), '4'); assert.equal(await page.locator('#praOverlay .pra-none .pra-all').getAttribute('aria-label'), 'Draft all 4 questions');
-        await page.locator('#praOverlay .pra-none .pra-all').evaluate(b => b.click());
-        assert.equal(await page.locator('#praOverlay').count(), 1, 'V102.524: the popup stays open'); assert.equal(await page.evaluate(() => window.__all), 'pra-all', 'and ✨ All runs on the popup\'s own button');
-        await page.evaluate(() => { _qPrimerReviewAll(); }); await page.locator('#praOverlay .pra-none .pra-chip').evaluate(b => b.click()); assert.equal(await page.locator('#praOverlay').count(), 0, '✎ Write by hand closes');
+        // a run: dots and ■ i/n, a press stops, the rest stays to do; a full run ends green with Review
+        await page.evaluate(() => { window.__gate = []; window._qPrimerDraft = btn => new Promise(res => window.__gate.push(() => { btn.closest('.quiz-q-item').querySelector('.q-primer').value = '**T** x'; res('ok'); })); });
+        await strip.locator('.qps-go').evaluate(b => b.click());
+        await page.waitForFunction(() => window.__gate.length === 1);
+        assert.equal(await strip.locator('.qps-slot i').count(), 4); assert.equal(await strip.locator('.qps-model').count(), 0, 'dots replace the model');
+        assert.match((await strip.locator('.qps-go').innerText()).trim(), /^■ 1\/4 · \d+ s$/);
+        await strip.locator('.qps-go').evaluate(b => b.click());
+        await page.evaluate(() => window.__gate.shift()());
+        await page.waitForFunction(() => document.querySelector('#q-primer-strip .qps-model'));
+        assert.equal((await strip.locator('.qps-go').innerText()).trim(), '3', 'stopped: three left');
+        await strip.locator('.qps-go').evaluate(b => b.click());
+        for (let n = 0; n < 3; n++) { await page.waitForFunction(() => window.__gate.length > 0); await page.evaluate(() => window.__gate.shift()()); }
+        await page.waitForFunction(() => document.querySelector('#q-primer-strip.ok'));
+        assert.equal((await strip.locator('b').innerText()).trim(), '📖 4/4 ✓'); assert.equal(await page.evaluate(() => __confirms), 0, 'no browser confirm');
+        await strip.locator('.qps-rev').evaluate(b => b.click());
+        assert.equal(await page.locator('#praOverlay .pra-card').count(), 4, 'Review opens the cards'); await page.evaluate(() => _praClose());
         // V102.517 compact: ✎ is icon-only with the question in its label; two columns at ≥ 900 px, one below
         await page.evaluate(() => { document.querySelectorAll('.quiz-q-item .q-primer')[0].value = '**A** x'; _qPrimerReviewAll(); });
         assert.deepEqual(await page.locator('#praOverlay .pra-card[data-q="0"] .pra-go').evaluate(b => [b.textContent.trim(), b.getAttribute('aria-label')]), ['✎', 'Edit Q1'], 'icon-only ✎ with an accessible name');
