@@ -97,7 +97,7 @@ The **Admin Portal** page has 3 ways in — use any one:
 - Editing / deleting an intern's note requires a **reason** so an audit log is kept (deletes are soft — recoverable from Trash)
 
 ### 📝 Quiz editor
-- **Read first**: **✨** drafts this question (the correct answer is not sent to the AI); **☰ Terms only** is offered right after a draft. **📖 All** opens the whole quiz: repeated terms are flagged, you edit in the popup, and **✨ All** fills the empty ones with the model picked there
+- **Read first**: **✨** drafts this question (the correct answer is not sent to the AI); **☰ Terms only** is offered right after a draft. **📖 All** opens the whole quiz: repeated terms are flagged, and you edit in the popup. The **📖 Read first** strip above the questions fills the empty ones: press **⚡ n** to start, press again to stop
 - **✨ Scene** (🖼 image panel): a picture of the stem's situation — an AI picture with a check that it does not give the answer away, or a chart from the numbers. **Insert** puts it in the stem
 - **🎓 Practice** (Logic): the intern gets **✓ Check** after each question. It shows the key, so leave it off for exam sets
 - **Rank** question: the intern types an answer once, then ranks the options or sorts them into Best / OK / Avoid. **✨ Draft with AI** fills it; check the levels and ⚠ flags

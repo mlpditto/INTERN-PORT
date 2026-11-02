@@ -5799,6 +5799,21 @@
         .pra-none .pra-all:hover { box-shadow:0 0 0 1px #b45309,0 0 20px 3px rgba(250,204,21,.9); }
         .pra-none .pra-chip, .pra-none .pra-x { width:36px; height:36px; padding:0; border-radius:10px; border-color:#ddd6fe; color:#312e81; font-size:15px; }
         .pra-body:empty { display:none; }
+        /* V102.573 (owner's pick A): Read first for the whole quiz runs from a strip in the editor: no popup, no confirm */
+        .q-ps { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:8px; padding:6px 10px; border:1px solid #ddd6fe; border-radius:12px; background:#f5f3ff; font-size:0.85em; color:#312e81; }
+        .q-ps[hidden] { display:none; }
+        .q-ps.ok { border-color:#22c55e; background:#f0fdf4; color:#166534; }
+        .q-ps.flash { box-shadow:0 0 0 3px #facc15; }
+        .q-ps b { white-space:nowrap; }
+        .q-ps .pra-model { flex:1 1 100%; justify-content:flex-start; margin:0; }
+        .qps-slot { display:inline-flex; align-items:center; gap:3px; min-width:0; flex-wrap:wrap; }
+        .qps-slot i { width:9px; height:9px; border-radius:50%; background:#ddd6fe; }
+        .qps-slot i.run { background:#f59e0b; } .qps-slot i.good { background:#22c55e; } .qps-slot i.bad { background:#ef4444; }
+        .qps-model { min-height:0; width:auto; margin:0; padding:4px 9px; border:1px solid #1e293b; border-radius:8px; background:#1e293b; color:#fff; font:inherit; font-size:0.9em; font-weight:800; white-space:nowrap; cursor:pointer; }
+        .qps-go, .qps-rev { display:inline-flex; align-items:center; gap:5px; min-height:0; width:auto; height:34px; margin:0 0 0 auto; padding:0 12px; border-radius:10px; font:inherit; font-weight:800; white-space:nowrap; font-variant-numeric:tabular-nums; cursor:pointer; }
+        .qps-go { border:0; background:linear-gradient(135deg,#facc15,#f59e0b); color:#1e1b4b; box-shadow:0 0 0 1px #b45309; }
+        .q-ps.is-run .qps-go { border:1px solid #cbd5e1; background:#fff; color:#334155; box-shadow:none; }
+        .qps-rev { border:1px solid #16a34a; background:#fff; color:#166534; }
         .pra-model { display:flex; justify-content:center; margin-bottom:10px; min-width:0; }   /* V102.539: the model ✨ All uses, in the popup */
         .pra-strip .pra-model { flex:1 1 100%; justify-content:flex-start; margin:6px 0 0; }
         .pra-model .audit-model-row { margin-top:0; padding-top:0; border-top:0; gap:5px; }
@@ -15418,6 +15433,7 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
                     </div>
                 </div>
 
+                <div id="q-primer-strip" class="q-ps lang-no-toggle" hidden></div>
                 <div id="quiz-questions-container" style="min-height: 350px; text-align: left; padding: 12px; border: 1px solid #334155; border-radius: 12px; margin-bottom: 8px; background:#0f172a;">
                 </div>
                 
@@ -26217,6 +26233,11 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         window._qPrimerReviewAll = function () {
             const items = [...document.querySelectorAll('#quiz-questions-container .quiz-q-item')];
             if (!items.length) { showToast('No questions yet'); return; }
+            // V102.573: nothing written yet = nothing to review; the strip above the questions does the drafting
+            const strip = document.getElementById('q-primer-strip');
+            if (strip && !strip.hidden && items.every(it => !(it.querySelector('.q-primer').value || '').trim())) {
+                strip.scrollIntoView({ block: 'center' }); strip.classList.add('flash'); setTimeout(() => strip.classList.remove('flash'), 900); return;
+            }
             const qs = window._praRead(), A = window._praAnalyse(qs.map(x => x.primer));
             const parts = window._praParts(qs, A);
             // V102.520 (owner): the popup still scrolled with 10 questions, and a fix meant a trip back to the pager. Now a card is ONE line — its bold
@@ -26355,7 +26376,39 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             try { localStorage.setItem('ai_primer_model', id); } catch (_) { /* storage blocked */ }
             const box = document.querySelector('#praOverlay .pra-model');
             if (box) box.innerHTML = window._praModelRail();
+            _qpsModelOpen = false; window._qPrimerStrip();
         };
+        // V102.573: one strip above the questions: the model, ⚡ n, then dots and ■ i/n while it runs, then green n/n ✓ with Review. Hidden when no question is missing one.
+        let _qpsModelOpen = false, _qpsDoneAt = null;
+        const _qpsBolt = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 2 4 14h6.5L9 22l11-13h-7z"/></svg>';
+        window._qPrimerTodo = function() {
+            return Array.from(document.querySelectorAll('#quizManageModal .quiz-q-item')).filter(item => {
+                const ta = item.querySelector('.q-primer');
+                return ta && !(ta.value || '').trim() && window._qImproveCtx(item).question;
+            });
+        };
+        window._qPrimerStrip = function() {
+            const el = document.getElementById('q-primer-strip');
+            if (!el || _qPrimerAllRunning) return;
+            const todo = window._qPrimerTodo(), total = document.querySelectorAll('#quizManageModal .quiz-q-item').length;
+            if (todo.length) _qpsDoneAt = null;
+            const done = !todo.length && _qpsDoneAt && _qpsDoneAt.isConnected;   // the quiz this run filled, not the next one opened
+            el.hidden = !todo.length && !done;
+            el.classList.toggle('ok', !!done); el.classList.remove('is-run');
+            if (el.hidden) { el.innerHTML = ''; return; }
+            if (done) { el.innerHTML = '<b>📖 ' + total + '/' + total + ' ✓</b><button type="button" class="qps-rev" onclick="_qPrimerReviewAll()">Review</button>'; return; }
+            const cur = (document.querySelector('#quizManageModal .q-primer-model') || {}).value || window._qImproveModel(todo[0]);
+            const info = window.textAIModelInfo ? window.textAIModelInfo(cur) : null, name = (info && (info.short || info.label)) || cur;
+            el.innerHTML = '<b>📖 Read first</b><span class="qps-slot"><button type="button" class="qps-model" aria-expanded="' + _qpsModelOpen + '" onclick="_qpsModel()" title="AI model · tap to change" data-th-title="โมเดล AI กดเพื่อเปลี่ยน">' + escapeHtml(name) + ' ▾</button></span>' +
+                '<button type="button" class="qps-go" data-strip="1" onclick="_qPrimerDraftAll(this)" aria-label="Draft Read first for ' + todo.length + ' questions" title="AI drafts every empty Read first, one by one. The correct answers are NOT sent. Press again to stop. Nothing is saved until you save the quiz." data-th-title="AI ร่าง Read first ทุกข้อที่ว่าง ไม่ส่งเฉลย กดอีกครั้งเพื่อหยุด ยังไม่บันทึกจนกว่าจะบันทึก Quiz">' + _qpsBolt + ' ' + todo.length + '</button>' +
+                (_qpsModelOpen ? '<div class="pra-model q-primer-row">' + window.providerModelRailHtml('qps-model-pick', cur, 'window._praPickModel(this.dataset.value)') + '</div>' : '');
+        };
+        window._qpsModel = function() { _qpsModelOpen = !_qpsModelOpen; window._qPrimerStrip(); };
+        let _qpsInputT = 0;
+        document.addEventListener('input', e => {
+            if (!e.target.closest || !e.target.closest('#quiz-questions-container')) return;
+            clearTimeout(_qpsInputT); _qpsInputT = setTimeout(window._qPrimerStrip, 300);
+        });
         window._qPrimerModelSeq = window._qPrimerModelSeq || 0;
         window._qPrimerModelSelect = function() {
             let picked = '';
@@ -26420,7 +26473,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             } catch (err) {
                 console.error('[primer-ai]', err);
                 if (!silent) showToast('Read first draft failed: ' + (err && err.message ? err.message : 'unknown error'));
-            } finally { btn.disabled = false; btn.innerHTML = html0; }
+            } finally { btn.disabled = false; btn.innerHTML = html0; window._qPrimerStrip(); }
         };
 
         // V102.524 (owner, option 1): ☰ Terms only is no longer a row button — it is offered after a ✨ draft. A box that ✨ just filled is emptied
@@ -26441,31 +26494,33 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             if (_qPrimerAllRunning) { _qPrimerAllStop = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> stopping'; return; }
             const here = btn.closest('.quiz-q-item'), first = document.querySelector('#quizManageModal .quiz-q-item');   // V102.524: the button lives in the 📖 All popup — no row around it
             const model = ((btn.closest('.q-primer-row') || here || first || document).querySelector('.q-primer-model') || {}).value || window._qImproveModel(here || first);
-            const todo = Array.from(document.querySelectorAll('#quizManageModal .quiz-q-item')).filter(item => {
-                const ta = item.querySelector('.q-primer');
-                return ta && !(ta.value || '').trim() && window._qImproveCtx(item).question;
-            });
+            const todo = window._qPrimerTodo();
             if (!todo.length) { showToast('Every question already has a Read first (or has no question text yet)'); return; }
-            if (!confirm(`Draft a Read first for ${todo.length} question(s) that have none?\nModel: ${model}\n\nOne at a time — keep this window open. Press the button again to stop.`)) return;
+            // V102.573 (owner's pick A): no confirm. A second press stops, and nothing is saved until the quiz is
             _qPrimerAllRunning = true; _qPrimerAllStop = false;
+            const strip = btn.dataset.strip ? btn.closest('.q-ps') : null, dots = strip && strip.querySelector('.qps-slot');
+            if (strip) { _qpsModelOpen = false; const open = strip.querySelector('.pra-model'); if (open) open.remove(); strip.classList.add('is-run'); dots.innerHTML = todo.map(() => '<i></i>').join(''); }
             const html0 = btn.innerHTML, t0 = Date.now();
             // V102.514 (owner): the button counts the time the AI has used — "⏳ 4/10 · 0:47" — and the toast gives the total
             const fmt = ms => { const sec = Math.round(ms / 1000); return sec < 60 ? sec + ' s' : Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); };
             let done = 0, failed = 0, leaks = 0, i = 0, pos = '';
-            const paint = () => { if (_qPrimerAllRunning && !_qPrimerAllStop) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${pos} · ${fmt(Date.now() - t0)}`; };
+            const paint = () => { if (_qPrimerAllRunning && !_qPrimerAllStop) btn.innerHTML = `${strip ? '■' : '<i class="fa-solid fa-spinner fa-spin"></i>'} ${pos} · ${fmt(Date.now() - t0)}`; };
             const tick = setInterval(paint, 1000);
             try {
                 for (; i < todo.length; i++) {
                     if (_qPrimerAllStop) break;
                     pos = `${i + 1}/${todo.length}`; paint();
+                    if (dots) dots.children[i].className = 'run';
                     const item = todo[i], rowBtn = item.querySelector('.q-primer-ai') || btn;
                     const r = await window._qPrimerDraft(rowBtn, 'full', model, true);
                     if (r === 'ok' || r === 'leak') { done++; if (r === 'leak') leaks++; } else failed++;
+                    if (dots) dots.children[i].className = r === 'ok' || r === 'leak' ? 'good' : 'bad';
                     if (document.getElementById('praOverlay') && typeof window._praRecheck === 'function') window._praRecheck();   // V102.524: the popup's strips fill in one by one
                 }
             } finally {
                 clearInterval(tick);
                 _qPrimerAllRunning = false; _qPrimerAllStop = false; btn.innerHTML = html0;
+                _qpsDoneAt = done ? todo[0] : null; window._qPrimerStrip();
                 if (document.getElementById('praOverlay') && typeof window._qPrimerReviewAll === 'function') window._qPrimerReviewAll();   // V102.524: the popup re-renders (an all-empty quiz becomes cards)
                 showToast(`✨ Read first drafted for ${done}/${todo.length}${failed ? ` (${failed} failed)` : ''}${i < todo.length ? ' — stopped' : ''} · ${fmt(Date.now() - t0)}${leaks ? ` · ⚠️ ${leaks} repeat a correct option, check them` : ''} · save the quiz to keep them`);
             }
@@ -28092,6 +28147,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
 
         function updateQuizPagination() {
             updatePollUI();
+            if (window._qPrimerStrip) window._qPrimerStrip();
             const items = document.querySelectorAll('.quiz-q-item');
             const total = items.length;
             if (quizQPageIndex >= total && total > 0) quizQPageIndex = total - 1;
