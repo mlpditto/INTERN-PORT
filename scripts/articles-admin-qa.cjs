@@ -293,7 +293,9 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
       window.confirm = () => false; await Articles.translateAll(); out.trCancel = [trCalls.length, writes.length];
       out.trHead2 = [q('.art-tr-all').textContent.replace(/\s+/g, ' ').trim(), S.list.map(a => a.id + ':' + Object.keys(a.body).sort().join('')).join(' ')];
       window.confirm = msg => { if (!out.trConfirm) out.trConfirm = msg; return true; };   // the stop test below confirms again
+      const trInfoWas = window.textAIModelInfo; window.textAIModelInfo = id => ({ 'gemini-3.8-flash': { short: 'Flash 3.8' } })[id] || (trInfoWas ? trInfoWas(id) : null); localStorage.setItem('ai_default_translate_model', 'gemini-3.8-flash');
       const w0 = writes.length; await Articles.translateAll();
+      out.trModel = trCalls[0][0]; localStorage.removeItem('ai_default_translate_model'); window.textAIModelInfo = trInfoWas;
       out.trJobs = trCalls.map(a => (a[1].match(/into (\w+)\./) || [])[1] + ':' + (a[1].split('\n\n')[1] || '').split('\n')[0]);
       out.trWrites = writes.slice(w0).map(w => [w[0], w[1], Object.keys(w[2]).sort().join(','), w[2]['body.th'] || w[2]['body.ko'], w[2]['title.th'] || w[2]['title.ko']]);
       out.trList = S.list.map(a => a.id + ':' + Object.keys(a.body).sort().join(''));
@@ -341,6 +343,7 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
     // V102.362
     assert.deepEqual(r3.trHead, [true, '🌐 Translate all 3', false], '🌐 sits before ＋ New and counts the missing versions (a1 th+ko, a2 ko): ' + JSON.stringify(r3.trHead));
     assert.deepEqual(r3.trCancel, [0, 0], 'Cancel on the confirm sends nothing');
+    assert.equal(r3.trModel, 'gemini-3.8-flash', 'V102.574: Translate all uses the Translate default in AI API Settings'); assert.match(r3.trConfirm, /with Flash 3\.8 and save/, 'and the popup names it');
     assert.match(r3.trConfirm, /Translate 3 missing version\(s\) of 2 article\(s\)/, 'the confirm counts versions and articles: ' + r3.trConfirm + ' | ' + JSON.stringify(r3.trHead2));
     assert.deepEqual(r3.trJobs, ['Thai:Acromegaly: Spotting the Subtle Signs 🔍', 'Korean:Acromegaly: Spotting the Subtle Signs 🔍', 'Korean:Two'], 'one prompt per missing version, from the EN title: ' + JSON.stringify(r3.trJobs));
     assert.deepEqual(r3.trWrites, [['update', 'a1', 'body.th,title.th,updatedAt,updatedBy', 'เนื้อหา', 'หัวข้อ'], ['update', 'a1', 'body.ko,title.ko,updatedAt,updatedBy', '본문', '제목'], ['update', 'a2', 'body.ko,title.ko,updatedAt,updatedBy', '본문', '제목']], 'each version is saved on its own, only that language: ' + JSON.stringify(r3.trWrites));

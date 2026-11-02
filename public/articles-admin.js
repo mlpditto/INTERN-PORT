@@ -511,6 +511,12 @@
         if (!m && sel) m = sel.value;
         return (m && window.textAIModelInfo && window.textAIModelInfo(m)) ? m : 'gpt-6-luna';
     }
+    // V102.574: 🌐 Translate all follows the Translate default in AI API Settings; it has no chip of its own (was: the ✨ Draft model, else Luna)
+    function translateModel() {
+        var m = ''; try { m = localStorage.getItem('ai_default_translate_model') || ''; } catch (e) { /* none */ }
+        if (m && window.normalizeTextAIModel) m = window.normalizeTextAIModel(m);
+        return (m && window.textAIModelInfo && window.textAIModelInfo(m)) ? m : modelId();
+    }
     function modelName(id) { var i = window.textAIModelInfo ? window.textAIModelInfo(id) : null; return (i && (i.short || i.label)) || id; }
     function modelRail() { try { return window.providerModelRailHtml('art-model-pick', modelId(), 'Articles.model(this.dataset.value)'); } catch (e) { return ''; } }
     // V102.433 (owner pick A): ✨ Draft reads the links in the title / body first (admin-only fetchLinkText, the same reader as AI Curate's Custom box) and writes from the page text.
@@ -1084,7 +1090,7 @@
             if (TR.busy) { TR.stop = true; render(); return Promise.resolve(); }
             var jobs = trJobs(); if (!jobs.length) return Promise.resolve();
             var arts = {}; jobs.forEach(function (j) { arts[j.a.id] = 1; });
-            var model = modelId();
+            var model = translateModel();
             if (!confirm('Translate ' + jobs.length + ' missing version(s) of ' + Object.keys(arts).length + ' article(s) into TH / KO with ' + modelName(model) + ' and save them?\n\nOne at a time — keep this window open. Press the button again to stop.')) return Promise.resolve();
             if (typeof window.callUniversalAI !== 'function') { S.err = '🌐 AI is not available on this page.'; render(); return Promise.resolve(); }
             TR.busy = true; TR.stop = false; var done = 0, failed = 0, i = 0;
