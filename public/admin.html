@@ -5657,9 +5657,13 @@
         html.hw #createMenuModal .create-menu-row > span:last-child { color:#8b7bb0 !important; }
         @keyframes hwFly { 0%,100% { transform:translate(0,0) rotate(-6deg); } 50% { transform:translate(-10px,4px) rotate(6deg); } }
         @media (prefers-reduced-motion: reduce) { html.hw #createMenuModal h2::after { animation:none; } }
-        /* V102.581: the 🎨 theme chip beside "Create" */
-        #createMenuModal .admin-theme-chip { width:auto; min-height:0; margin:0 0 0 10px; padding:4px 10px; border:1.5px solid #e2e8f0; border-radius:999px; background:#fff; color:#475569; font-size:13px; font-weight:700; vertical-align:middle; cursor:pointer; text-shadow:none; }
-        html.hw #createMenuModal .admin-theme-chip { background:rgba(249,115,22,.16); border-color:#ea580c; color:#fdba74; }
+        /* V102.581: the two theme chips beside "Create" — icon only; dashed ring = Auto, solid theme colour = forced, faded = Off */
+        #createMenuModal .theme-chip { width:34px; height:30px; min-height:0; margin:0 0 0 6px; padding:0; border:2px solid var(--tc,#94a3b8); border-radius:999px; background:#fff; color:var(--tc,#94a3b8); font-size:13px; line-height:1; vertical-align:middle; cursor:pointer; text-shadow:none; }
+        #createMenuModal #admin-theme-chip { margin-left:12px; }
+        #createMenuModal .theme-chip[data-pick="auto"] { border-style:dashed; }
+        #createMenuModal .theme-chip[data-pick="off"] { opacity:.45; }
+        #createMenuModal .theme-chip[data-on="1"]:not([data-pick="auto"]) { background:color-mix(in srgb, var(--tc) 14%, #fff); }
+        html.hw #createMenuModal .theme-chip { background:rgba(255,255,255,.06); }
         #createMenuModal .create-menu-row:hover {
             background: #f8fafc !important;
         }
@@ -8671,23 +8675,44 @@
                         <span id="admin-version-badge" style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.69</span>
                         <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('admin-version-badge');if(m&&b)b.textContent=m[0];})();</script>
                         <script>/* V102.491 Halloween header: 20 Oct – 2 Nov (Bangkok) the Create / Logout buttons wear the season, then go back on their own.
-   V102.581 (owner): the 🎨 chip in the Create menu picks Auto (by date) · 🎃 Halloween · ⚪ Off for this admin browser only (localStorage admin_theme); the intern app is not touched */
-var ADMIN_THEMES = [['auto', '🗓', 'Auto'], ['hw', '🎃', 'Halloween'], ['off', '⚪', 'Off']];
-function adminThemePick() { var p = 'auto'; try { p = localStorage.getItem('admin_theme') || 'auto'; } catch (e) { /* none */ } return ADMIN_THEMES.some(function (t) { return t[0] === p; }) ? p : 'auto'; }
-function adminThemeHwByDate() { var d = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).slice(5); return d >= '10-20' && d <= '11-02'; }
+   V102.581 (owner): two icon chips beside "Create" — 🧑‍💼 this admin browser (localStorage admin_theme) and 👥 every intern (app_settings/theme.intern);
+   each steps Auto (by date) → each theme → Off. No words and no pumpkin on the chips: the ring says it (dashed = Auto, solid theme colour = forced, faded = Off) */
+var SEASON_THEMES = { hw: { from: '10-20', to: '11-02', name: 'Halloween', color: '#ea580c' } };   // the dates are Bangkok month-day; a new theme (Christmas) is one more entry + its CSS
+function themePicks() { return ['auto'].concat(Object.keys(SEASON_THEMES), ['off']); }
+function themeByDate() { var d = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).slice(5); return Object.keys(SEASON_THEMES).filter(function (k) { return d >= SEASON_THEMES[k].from && d <= SEASON_THEMES[k].to; })[0] || ''; }
+function themeOf(pick) { return pick === 'auto' ? themeByDate() : SEASON_THEMES[pick] ? pick : ''; }
+function themePickName(pick) { var t = SEASON_THEMES[themeOf(pick)]; return pick === 'auto' ? 'Auto (by date' + (t ? ': ' + t.name + ' now' : ': none now') + ')' : pick === 'off' ? 'Off' : t.name; }
+function adminThemePick() { var p = 'auto'; try { p = localStorage.getItem('admin_theme') || 'auto'; } catch (e) { /* none */ } return themePicks().indexOf(p) >= 0 ? p : 'auto'; }
+function paintThemeChip(el, pick, who) {
+    if (!el) return;
+    var picks = themePicks(), nx = picks[(picks.indexOf(pick) + 1) % picks.length], t = SEASON_THEMES[themeOf(pick)];
+    el.dataset.pick = pick; el.dataset.on = t ? '1' : '';
+    el.style.setProperty('--tc', t ? t.color : '#94a3b8');
+    el.title = (who === 'interns' ? 'Every intern: ' : 'This browser: ') + themePickName(pick) + '. Tap for ' + themePickName(nx);
+    el.setAttribute('aria-label', el.title);
+}
 function applyAdminTheme() {
-    var p = adminThemePick(), on = p === 'hw' || (p === 'auto' && adminThemeHwByDate());
-    document.documentElement.classList.toggle('hw', on);
-    document.querySelectorAll('.hw-ico').forEach(function (e) { if (!e.hasAttribute('data-plain')) e.setAttribute('data-plain', e.textContent); e.textContent = e.getAttribute(on ? 'data-hw' : 'data-plain'); });
-    var c = document.getElementById('admin-theme-chip'); if (!c) return;
-    var i = ADMIN_THEMES.findIndex(function (t) { return t[0] === p; }), cur = ADMIN_THEMES[i], nx = ADMIN_THEMES[(i + 1) % ADMIN_THEMES.length];
-    c.textContent = cur[1] + ' ' + cur[2] + (p === 'auto' ? ' · ' + (on ? '🎃' : 'plain') : '');
-    c.title = 'Theme for this browser: ' + (p === 'auto' ? 'Auto — Halloween 20 Oct – 2 Nov' : cur[2]) + '. Tap for ' + nx[2];
+    var p = adminThemePick(), th = themeOf(p);
+    Object.keys(SEASON_THEMES).forEach(function (k) { document.documentElement.classList.toggle(k, k === th); });
+    document.querySelectorAll('.hw-ico').forEach(function (e) { if (!e.hasAttribute('data-plain')) e.setAttribute('data-plain', e.textContent); e.textContent = e.getAttribute(th === 'hw' ? 'data-hw' : 'data-plain'); });
+    paintThemeChip(document.getElementById('admin-theme-chip'), p, 'me');
 }
 function cycleAdminTheme() {
-    var i = ADMIN_THEMES.findIndex(function (t) { return t[0] === adminThemePick(); });
-    try { localStorage.setItem('admin_theme', ADMIN_THEMES[(i + 1) % ADMIN_THEMES.length][0]); } catch (e) { /* none */ }
+    var picks = themePicks();
+    try { localStorage.setItem('admin_theme', picks[(picks.indexOf(adminThemePick()) + 1) % picks.length]); } catch (e) { /* none */ }
     applyAdminTheme();
+}
+var internThemePick = 'auto';
+function loadInternTheme() {
+    if (typeof db === 'undefined') return;
+    db.collection('app_settings').doc('theme').get().then(function (d) { var p = (d.exists && d.data().intern) || 'auto'; internThemePick = themePicks().indexOf(p) >= 0 ? p : 'auto'; paintThemeChip(document.getElementById('intern-theme-chip'), internThemePick, 'interns'); }).catch(function (e) { console.warn('[theme] read', e); });
+}
+function cycleInternTheme() {
+    var picks = themePicks(), was = internThemePick, nx = picks[(picks.indexOf(was) + 1) % picks.length], chip = document.getElementById('intern-theme-chip');
+    internThemePick = nx; paintThemeChip(chip, nx, 'interns');
+    db.collection('app_settings').doc('theme').set({ intern: nx, updatedAt: firebase.firestore.FieldValue.serverTimestamp(), updatedBy: (firebase.auth().currentUser || {}).email || '' }, { merge: true })
+        .then(function () { if (typeof showToast === 'function') showToast('Interns: ' + themePickName(nx)); })
+        .catch(function (e) { internThemePick = was; paintThemeChip(chip, was, 'interns'); alert('Theme not saved: ' + e.message); });
 }
 document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                     </h1>
@@ -14145,7 +14170,7 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
         <div id="createMenuModal" class="modal">
             <div class="modal-content" style="max-width:480px;"><span class="close-modal"
                     onclick="document.getElementById('createMenuModal').style.display='none'">&times;</span>
-                <h2><span class="hw-ico" data-hw="🎃">➕</span> Create <button type="button" id="admin-theme-chip" class="admin-theme-chip" onclick="cycleAdminTheme()">🗓 Auto</button></h2>
+                <h2><span class="hw-ico" data-hw="🎃">➕</span> Create <button type="button" id="admin-theme-chip" class="theme-chip" onclick="cycleAdminTheme()"><i class="fa-solid fa-user-tie"></i></button><button type="button" id="intern-theme-chip" class="theme-chip" onclick="cycleInternTheme()" data-pick="auto"><i class="fa-solid fa-users"></i></button></h2>
                 <div style="display:flex; flex-direction:column;">
                     <button type="button" onclick="createMenuPick(() => openTaskModal())" class="create-menu-row"
                         style="min-height:0; width:100%; display:flex; align-items:center; gap:14px; text-align:left; padding:14px 6px; border:none; border-bottom:1px solid #eee; border-radius:0; background:transparent; cursor:pointer;">
@@ -62472,6 +62497,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // existing tabs while Quiz opens its own builder directly.
         function openCreateMenu() {
             document.getElementById('createMenuModal').style.display = 'block';
+            loadInternTheme();   // V102.581: the 👥 chip shows what every intern gets
         }
         function createMenuPick(action) {
             document.getElementById('createMenuModal').style.display = 'none';

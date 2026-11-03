@@ -9,15 +9,16 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
 (async () => {
     const browser = await chromium.launch({ headless: true });
     try {
-        const run = async iso => {
+        const run = async (iso, theme) => {   // V101.265: theme = what an admin set in app_settings/theme.intern
             const ctx = await browser.newContext({ viewport: { width: 390, height: 900 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, timezoneId: 'Asia/Bangkok' });
             const page = await ctx.newPage();
             await page.clock.setFixedTime(new Date(iso));
             const errors = [], dialogs = []; page.on('pageerror', e => errors.push(e.message));
             page.on('dialog', d => { dialogs.push(d.message()); d.dismiss(); });
-            await page.addInitScript(() => {
-                window.firebase = { auth: () => ({ currentUser: null, onAuthStateChanged: () => () => {}, signInAnonymously: () => Promise.resolve() }), functions: () => ({ httpsCallable: () => () => Promise.resolve({ data: {} }) }), firestore: Object.assign(() => ({ collection: () => ({ doc: () => ({ get: () => Promise.resolve({ exists: false, data: () => ({}) }), onSnapshot: () => () => {} }), where: () => ({ get: () => Promise.resolve({ docs: [] }), onSnapshot: () => () => {} }), get: () => Promise.resolve({ docs: [] }), orderBy: () => ({ get: () => Promise.resolve({ docs: [] }) }) }) }), { FieldValue: { serverTimestamp: () => 0, delete: () => 0, increment: n => n } }) };
-            });
+            await page.addInitScript(t => {
+                window.__theme = t;
+                window.firebase = { auth: () => ({ currentUser: null, onAuthStateChanged: () => () => {}, signInAnonymously: () => Promise.resolve() }), functions: () => ({ httpsCallable: () => () => Promise.resolve({ data: {} }) }), firestore: Object.assign(() => ({ collection: () => ({ doc: () => ({ get: () => Promise.resolve({ exists: !!window.__theme, data: () => ({ intern: window.__theme }) }), onSnapshot: () => () => {} }), where: () => ({ get: () => Promise.resolve({ docs: [] }), onSnapshot: () => () => {} }), get: () => Promise.resolve({ docs: [] }), orderBy: () => ({ get: () => Promise.resolve({ docs: [] }) }) }) }), { FieldValue: { serverTimestamp: () => 0, delete: () => 0, increment: n => n } }) };
+            }, theme || '');
             await page.route('**/*', r => (r.request().url().startsWith('file:') ? r.continue() : r.abort()));
             await page.goto(INDEX, { waitUntil: 'load' });
             await page.evaluate(() => {
@@ -88,6 +89,10 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
             assert.ok(r.below, 'Writing progress is below the writing part all year');
             assert.equal(r.flags[0], '🇰🇷|Language: KR (tap to switch)', 'the top-bar toggle is there all year');
         }
+        // V101.265: an admin's pick for every intern wins over the date
+        assert.equal((await run('2026-12-25T10:00:00+07:00', 'hw')).hw, true, 'admin set 🎃 for everyone: on in December');
+        assert.equal((await run('2026-10-29T10:00:00+07:00', 'off')).hw, false, 'admin set Off: plain in season');
+        assert.equal((await run('2026-10-29T10:00:00+07:00', 'auto')).hw, true, 'Auto follows the date');
         console.log('journal-halloween-qa: PASS');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
