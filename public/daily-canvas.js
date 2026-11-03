@@ -156,7 +156,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         const badge = byId('rl-streak-badge'), n = ((badge || {}).textContent || '').match(/\d+/), fire = hero.querySelector('.dc-fire');
         fire.hidden = !(n && badge.style.display !== 'none');
-        fire.textContent = n ? (document.documentElement.classList.contains('hw') ? '🎃 ' : '🔥 ') + n[0] : '';   // V101.235: Halloween season
+        const cl = document.documentElement.classList;
+        fire.textContent = n ? (cl.contains('hw') ? '🎃 ' : cl.contains('xm') ? '🎁 ' : '🔥 ') + n[0] : '';   // V101.235: Halloween season · V101.265: Christmas
         refresh();
     }
 

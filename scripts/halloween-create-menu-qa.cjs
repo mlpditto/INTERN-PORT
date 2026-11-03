@@ -1,4 +1,5 @@
 // V102.493: Halloween Create menu — midnight card + dashed orange border + hazard tape, only 20 Oct – 2 Nov (Bangkok).
+// V102.581: the theme chip beside Create — Auto (by date) · 🎃 Halloween · ⚪ Off, kept in this browser (localStorage admin_theme).
 const assert = require('assert');
 const fs = require('fs');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -10,7 +11,7 @@ const modal = admin.slice(ms, admin.indexOf('\n        <div id="', ms + 10));
 const ss = admin.indexOf('<script>/* V102.491 Halloween header');
 const script = admin.slice(ss, admin.indexOf('</script>', ss)).replace(/^<script>/, '');
 const cs = admin.indexOf('/* V102.493: Halloween Create menu');
-const endMark = 'h2::after { animation:none; } }';
+const endMark = 'html.xm #createMenuModal .create-menu-row > span:last-child { color:#86b89a !important; }';   // V102.581: through the theme-chip + Christmas rules
 const css = admin.slice(cs, admin.indexOf(endMark, cs) + endMark.length);
 assert(cs > 0 && css.includes('@keyframes hwFly') && css.includes('prefers-reduced-motion'), 'css block');
 const rowCount = (modal.match(/class="create-menu-row"/g) || []).length;
@@ -19,19 +20,27 @@ assert(rowCount >= 6, 'rows found: ' + rowCount);
 (async () => {
     const browser = await chromium.launch();
     try {
-        const run = async iso => {
+        const run = async (iso, pick, taps) => {
             const page = await browser.newPage();
             const errs = []; page.on('pageerror', e => errs.push(e.message));
             await page.clock.install({ time: new Date(iso) });
-            await page.setContent('<!doctype html><meta charset="utf-8"><style>.modal-content{background:#fff;padding:20px;width:480px}#createMenuModal .create-menu-row:hover{background:#f8fafc !important}' + css + '</style><body>' + modal.replace('class="modal"', 'class="modal" style="display:block"') + '<script>' + script + '<\/script>');
+            // a real origin so localStorage works (about:blank denies it)
+            await page.route('http://qa.local/**', r => r.fulfill({ contentType: 'text/html', body: '<!doctype html><meta charset="utf-8"><script>' + (pick ? 'localStorage.setItem("admin_theme", "' + pick + '");' : 'localStorage.clear();') + '<\/script><style>.modal-content{background:#fff;padding:20px;width:480px}#createMenuModal .create-menu-row:hover{background:#f8fafc !important}' + css + '</style><body>' + modal.replace('class="modal"', 'class="modal" style="display:block"') + '<script>' + script + '<\/script>' }));
+            await page.goto('http://qa.local/');
             await page.waitForFunction(() => document.readyState === 'complete');
+            // a recording Firestore for the 👥 chip (app_settings/theme)
+            await page.evaluate(() => { window.__set = []; window.firebase = { firestore: { FieldValue: { serverTimestamp: () => 'TS' } }, auth: () => ({ currentUser: { email: 'a@x' } }) }; window.db = { collection: c => ({ doc: d => ({ get: () => Promise.resolve({ exists: true, data: () => ({ intern: 'off' }) }), set: (v, o) => { window.__set.push([c, d, v, o]); return Promise.resolve(); } }) }) }; });
+            for (let k = 0; k < (taps || 0); k++) await page.click('#admin-theme-chip');
+            await page.evaluate(async () => { loadInternTheme(); await new Promise(r => setTimeout(r, 50)); window.__loaded = [document.getElementById('intern-theme-chip').dataset.pick]; document.getElementById('intern-theme-chip').click(); await new Promise(r => setTimeout(r, 50)); window.__loaded.push(document.getElementById('intern-theme-chip').dataset.pick, document.getElementById('intern-theme-chip').dataset.tip); });
             const r = await page.evaluate(() => {
                 const cs = (el, p, pseudo) => getComputedStyle(el, pseudo)[p];
                 const mc = document.querySelector('#createMenuModal .modal-content');
                 const rows = [...document.querySelectorAll('#createMenuModal .create-menu-row')];
                 return {
-                    hw: document.documentElement.classList.contains('hw'),
-                    h2: document.querySelector('#createMenuModal h2').textContent.trim(),
+                    hw: document.documentElement.classList.contains('hw'), xm: document.documentElement.classList.contains('xm'),
+                    h2: document.querySelector('#createMenuModal h2 .hw-ico').textContent + ' Create',
+                    interns: [window.__loaded, window.__set],
+                    chip: [document.getElementById('admin-theme-chip').dataset.pick, document.getElementById('admin-theme-chip').dataset.tip, localStorage.getItem('admin_theme'), [...document.querySelectorAll('#admin-theme-chip i')].map(i => i.className).join(' | '), getComputedStyle(document.getElementById('admin-theme-chip')).borderTopStyle],
                     borderStyle: cs(mc, 'borderTopStyle'), tape: cs(mc, 'content', '::before'), web: cs(mc, 'content', '::after'),
                     bat: cs(document.querySelector('#createMenuModal h2'), 'content', '::after'),
                     ic: [0, 1].map(i => cs(rows[i].children[0], 'backgroundColor')),
@@ -51,11 +60,24 @@ assert(rowCount >= 6, 'rows found: ' + rowCount);
         assert.notEqual(on.ic[0], on.ic[1], 'icon rings alternate orange / purple');
         assert.equal(on.title, 'rgb(245, 236, 255)', 'row title light on the dark card');
         assert.equal(on.sub, 'rgb(185, 166, 217)');
-        const off = await run('2026-12-25T05:00:00Z');
+        const off = await run('2026-11-25T05:00:00Z');   // V102.581: 25 Dec is Christmas now
         assert.equal(off.hw, false);
         assert.equal(off.h2, '➕ Create', 'normal icon out of season');
         assert.notEqual(off.borderStyle, 'dashed');
         assert(off.web === 'none' || off.web === 'normal', 'no web out of season: ' + off.web);
+        assert.deepEqual(on.chip, ['auto', 'This browser · Auto (by date: Halloween now) — tap: Halloween', null, 'fa-solid fa-ghost | fa-solid fa-user who', 'dashed'], 'Auto in season — the theme mark (👻, not the title pumpkin) + whose badge, dashed ring, tip on hover: ' + JSON.stringify(on.chip));
+        assert.deepEqual([off.chip[1], off.chip[3]], ['This browser · Auto (by date: none now) — tap: Halloween', 'fa-solid fa-calendar-days | fa-solid fa-user who']);
+        const forced = await run('2026-12-25T05:00:00Z', 'hw');
+        assert.equal(forced.hw, true, '🎃 Halloween picked: on in December'); assert.equal(forced.h2, '🎃 Create'); assert.deepEqual([forced.chip[0], forced.chip[4]], ['hw', 'solid']);
+        const quiet = await run('2026-10-29T05:00:00Z', 'off');
+        assert.equal(quiet.hw, false, '⚪ Off picked: plain in season'); assert.equal(quiet.h2, '➕ Create', 'the icon goes back too'); assert.equal(quiet.chip[0], 'off');
+        const tap1 = await run('2026-12-25T05:00:00Z', '', 1);
+        assert.deepEqual([tap1.hw, tap1.h2, tap1.chip[0], tap1.chip[2]], [true, '🎃 Create', 'hw', 'hw'], 'a tap: Auto → Halloween, saved');
+        const tap3 = await run('2026-12-25T05:00:00Z', '', 4);
+        assert.deepEqual([tap3.hw, tap3.h2, tap3.chip[0], tap3.chip[2]], [false, '🎄 Create', 'auto', 'auto'], 'four taps (Halloween → Christmas → Off) come back to Auto — 25 Dec is Christmas');
+        assert.deepEqual(on.interns, [['off', 'auto', 'Every intern · Auto (by date: Halloween now) — tap: Halloween'], [['app_settings', 'theme', { intern: 'auto', updatedAt: 'TS', updatedBy: 'a@x' }, { merge: true }]]], '👥 reads app_settings/theme, a tap steps Off → Auto and saves it: ' + JSON.stringify(on.interns));
+        const xm = await run('2026-12-10T05:00:00Z', 'xm');
+        assert.deepEqual([xm.hw, xm.h2, xm.chip[0], xm.chip[3], xm.chip[4], xm.xm], [false, '🎄 Create', 'xm', 'fa-solid fa-snowflake | fa-solid fa-user who', 'solid', true], 'Christmas picked: 🎄 title, ❄ chip mark: ' + JSON.stringify(xm.chip));
         console.log('halloween-create-menu-qa: PASS');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
