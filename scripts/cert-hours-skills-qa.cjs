@@ -140,7 +140,11 @@ assert.ok(/dateText: _hrs \? _extra\.hours : drawArgs\[1\]/.test(admin), 'the re
             setCertPeriodMode('hours'); document.getElementById('cert-hours').value = '200'; document.getElementById('cert-hours-at').value = '2026-11-27';
             certLang = 'en'; certDateCal = 'ce'; certPaintPrints(); out.hours = txt('cert-xprint-period');
             out.noToggle = [...document.querySelectorAll('#certModal [data-certopt]')].every(r => r.closest('.lang-no-toggle'));
-            out.koLabel = document.querySelector('#certModal [data-certopt="lang"] [data-v="ko"]').textContent;
+            // V102.580: Template · Language · Year share one row; Language is one flag chip stepping TH → EN → TH+EN → KO+EN
+            const chip = document.getElementById('cert-lang-chip');
+            out.oneRow = chip.closest('.cert-xrow') === document.getElementById('cert-template-rail').closest('.cert-xrow') && chip.closest('.cert-xrow') === document.querySelector('#certModal [data-certopt="cal"]').closest('.cert-xrow') && !document.querySelector('#certModal [data-certopt="lang"]');
+            certLang = 'th'; paintCertLangChip(); out.cycle = [[certLang, chip.textContent, chip.title]];
+            for (let k = 0; k < 4; k++) { chip.click(); out.cycle.push([certLang, chip.textContent, chip.title]); }
             return out;
         });
         assert.equal(lean.datesHidden, true, 'Hours hides Start → End');
@@ -151,11 +155,12 @@ assert.ok(/dateText: _hrs \? _extra\.hours : drawArgs\[1\]/.test(admin), 'the re
         assert.deepEqual(lean.ko, [['en', 'ko'], true, '4 picked · badges shrink after 3', 'KO prints CE']);
         assert.equal(lean.hours, 'Prints200 hours · 27 November 2026');
         assert.equal(lean.noToggle, true, 'the Language / Year rails sit in lang-no-toggle rows');
-        assert.equal(lean.koLabel, 'KO+EN');
+        assert.equal(lean.oneRow, true, 'Template, the language chip and Year share one row; no 4-chip language rail');
+        assert.deepEqual(lean.cycle, [['th', '🇹🇭', 'Thai — tap for English'], ['en', '🇬🇧', 'English — tap for Thai + English'], ['both', '🇹🇭🇬🇧', 'Thai + English — tap for Korean + English'], ['ko', '🇰🇷🇬🇧', 'Korean + English — tap for Thai'], ['th', '🇹🇭', 'Thai — tap for English']], 'each tap steps to the next language: ' + JSON.stringify(lean.cycle));
         assert.ok(!admin.includes('v90.29r') && !admin.includes('🔄 Redraw</button>'), 'no stale version tag, no Redraw button');
         assert.ok(admin.includes('id="btn-gen-pdf" onclick="certPdfBusy(this)"') && /async function certPdfBusy\(btn\) \{[\s\S]{0,200}finally \{ btn\.disabled = false/.test(admin), 'the PDF button is busy while it runs');
         assert.ok(admin.includes("document.getElementById('cert-xdates-fields').hidden = false;\n            paintCertSkills();"), 'every open shows Start → End again');
         assert.deepEqual(errs, [], errs.join(' | '));
-        console.log('PASS: certificate hours mode + skills line (V102.577) + lean rows (V102.578) — hours text per language, time-clock prefill, the skills line clears the signature, no extras = identical pixels, chips remembered');
+        console.log('PASS: certificate hours mode + skills line (V102.577) + lean rows (V102.578) + one-line flag chip (V102.580) — hours text per language, time-clock prefill, the skills line clears the signature, no extras = identical pixels, chips remembered');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
