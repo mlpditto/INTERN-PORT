@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.581)</title>
+    <title>Nika Admin (V102.582)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -64737,28 +64737,33 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // awardList.length<=2 collision guard as before this redesign — that math
             // (badges stack upward from 0.66h and can reach this high with 3+ of them)
             // didn't depend on the seal's color, only its position and size.
+            // V102.582 (owner pick D): a gold foil seal — three thin gold rings, no fill (it sits quietly on the ivory),
+            // MEDLIFE PLUS along the top of the rim and CERTIFIED along the bottom (the old centred words ran past the
+            // navy disc), a gold star in the middle. Same spot, same size, same hide-at-3-awards rule.
             if (awardList.length <= 2) (() => {
                 const cx = w - 92, cy = 90, r = 38;
+                const ring = (rr, lw) => { ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.strokeStyle = GOLD; ctx.lineWidth = lw; ctx.stroke(); };
+                // letters along the circle at radius rr, centred on the top (dir 1) or the bottom (dir -1), upright either way
+                const arcText = (text, rr, font, dir, spacing) => {
+                    ctx.save();
+                    ctx.font = font; ctx.fillStyle = GOLD_DARK; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    const chars = [...text], widths = chars.map(ch => ctx.measureText(ch).width + spacing), total = widths.reduce((a, b) => a + b, 0);
+                    let ang = (dir === 1 ? -Math.PI / 2 : Math.PI / 2) - dir * (total / rr) / 2;
+                    chars.forEach((ch, i) => {
+                        const half = widths[i] / 2 / rr;
+                        ang += dir * half;
+                        ctx.save(); ctx.translate(cx + rr * Math.cos(ang), cy + rr * Math.sin(ang)); ctx.rotate(ang + dir * Math.PI / 2); ctx.fillText(ch, 0, 0); ctx.restore();
+                        ang += dir * half;
+                    });
+                    ctx.restore();
+                };
                 ctx.save();
+                ring(r, 2); ring(r - 3.5, 0.8); ring(r - 14, 0.8);
+                arcText('MEDLIFE PLUS', r - 9, "700 7.6px Montserrat", 1, 0.8);
+                arcText('CERTIFIED', r - 9, "600 7px Montserrat", -1, 1.4);
                 ctx.beginPath();
-                ctx.arc(cx, cy, r, 0, Math.PI * 2);
-                ctx.fillStyle = '#0a192f';
-                ctx.fill();
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = GOLD;
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.arc(cx, cy, r - 6, 0, Math.PI * 2);
-                ctx.strokeStyle = 'rgba(176,138,30,0.5)';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-                ctx.textAlign = 'center';
-                ctx.fillStyle = '#fff';
-                ctx.font = "700 10px Montserrat";
-                ctx.fillText('MEDLIFE PLUS', cx, cy - 2);
-                ctx.font = "500 7.5px Montserrat";
-                ctx.fillStyle = GOLD;
-                ctx.fillText('CERTIFIED', cx, cy + 10);
+                for (let i = 0; i < 10; i++) { const rr = i % 2 ? 11 * 0.45 : 11, a = -Math.PI / 2 + i * Math.PI / 5; ctx.lineTo(cx + rr * Math.cos(a), cy + rr * Math.sin(a)); }
+                ctx.closePath(); ctx.fillStyle = GOLD; ctx.fill();
                 ctx.restore();
             })();
 

@@ -67,6 +67,8 @@ assert.ok(/dateText: _hrs \? _extra\.hours : drawArgs\[1\]/.test(admin), 'the re
         const empty = await draw({ hours: '', skills: [] }, 'both');
         assert.equal(empty.png, plain.png, 'no hours + no skills draws exactly the same pixels');
         assert.equal(plain.t, 0, 'the transform is back to identity after the draw');
+        // V102.582 (owner pick D): the gold foil seal — its words run round the rim letter by letter (the old centred MEDLIFE PLUS ran past the disc)
+        assert.ok(!plain.calls.some(c => c.t === 'MEDLIFE PLUS') && [...'MEDLIFEPLUSCERTIFIED'].every(ch => plain.calls.some(c => c.t === ch && c.y < 140)), 'seal letters round the rim, top-right');
         assert.ok(plain.calls.some(c => c.t === 'วันที่ (DATE)') && plain.calls.some(c => c.t === '40 วัน / 40 days'), 'dates mode: label + day count');
 
         const skills = ['Dispensing', 'Patient Counseling', 'Inventory & Stock', 'OTC & Health Products'];
