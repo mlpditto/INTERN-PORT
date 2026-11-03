@@ -277,6 +277,15 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
       out.dr = [S.cur.body.en, /Write an article .* in English/.test(calls[1][1]) && /Topic: Inhaler mistakes/.test(calls[1][1]), /Tell it as a SHORT STORY/.test(calls[1][1]) && /at most 2000 characters including the markdown — a hard limit/.test(calls[1][1]) && /"➡️ Next: "/.test(calls[1][1]) && /one line starting with 💊 that lists 2 to 4 related drug names/.test(calls[1][1]) && !/under 700 characters/.test(calls[1][1]) && !/fits a phone line without wrapping/.test(calls[1][1])];   // V102.511: a story up to MAX_BODY with the episode hand-off (replaces the V102.363 emoji lines)   // V102.363: emoji-led lines + 💊 drugs line · V102.385: one short sentence per line
       window.callUniversalAI = async () => { throw new Error('quota'); };
       await Articles.ai(); out.err = q('.art-err') && q('.art-err').textContent;
+      // V102.579 (owner): a Thai original → ✨ From TH on an empty EN; the busy ✨ counts seconds instead of "…"
+      const keep = [S.cur.title, S.cur.body];
+      S.cur.title = { th: 'หัวข้อไทย' }; S.cur.body = { th: 'เนื้อไทย **สำคัญ**' }; Articles.lang('th'); Articles.lang('en');
+      out.thEnBtn = [q('.art-ai .go').textContent, q('.art-ai .go').title];
+      let busyLbl = null; const thCalls = [];
+      window.callUniversalAI = async (...a) => { thCalls.push(a); busyLbl = q('.art-ai .go').textContent; return { text: 'Thai title\n---\n**Key** body' }; };
+      await Articles.ai();
+      out.thEn = [S.cur.title.en, S.cur.body.en, /into English/.test(thCalls[0][1]) && /หัวข้อไทย\n---\nเนื้อไทย \*\*สำคัญ\*\*$/.test(thCalls[0][1]), busyLbl, q('.art-ai .go').textContent];
+      S.cur.title = keep[0]; S.cur.body = keep[1];
       out.writes = writes.length;
       // ---- V102.362: 🌐 Translate all — the header button before ＋ New; every missing TH / KO from EN, saved as title.<L> / body.<L>
       Articles.close();
@@ -340,6 +349,8 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
     assert.deepEqual(r3.bom, [239, 187, 191], 'with a UTF-8 BOM so Excel reads Thai names');
     assert.equal(r3.back, true, '✕ goes back to the editor');
     assert.equal(r3.trBtn, '✨ From EN', 'an empty TH next to a filled EN offers a translation');
+    assert.deepEqual(r3.thEnBtn, ['✨ From TH', 'Translate the TH version into EN (fills the editor — check, then save)'], 'V102.579: an empty EN next to a filled TH offers TH → EN');
+    assert.deepEqual(r3.thEn, ['Thai title', '**Key** body', true, '✨ 0 s', '✨ Draft'], 'TH → EN fills the EN title + body from the Thai text; busy shows seconds: ' + JSON.stringify(r3.thEn));
     // V102.362
     assert.deepEqual(r3.trHead, [true, '🌐 Translate all 3', false], '🌐 sits before ＋ New and counts the missing versions (a1 th+ko, a2 ko): ' + JSON.stringify(r3.trHead));
     assert.deepEqual(r3.trCancel, [0, 0], 'Cancel on the confirm sends nothing');

@@ -8627,7 +8627,7 @@
 <script src="quiz-cover.js?v=V102.528"></script>
 <script src="clip-captions.js?v=V102.366"></script>
 <script src="holidays-admin.js?v=V102.330"></script>
-<script src="articles-admin.js?v=V102.574"></script>
+<script src="articles-admin.js?v=V102.579"></script>
 <link rel="stylesheet" href="quiz-qimage.css?v=V102.523">
 <script src="quiz-qimage.js?v=V102.528"></script>
 <link rel="stylesheet" href="quiz-more-popover.css?v=V100.47">
@@ -14734,8 +14734,12 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                     #certModal #cert-hours-fields #cert-hours { width:80px; }
                     #certModal #cert-hours-hint { font-size:0.78em; color:#64748b; }
                     #certModal .cert-xcount { font-size:0.75em; color:#64748b; }
+                    #certModal .cert-xlbl2 { margin-left:10px; font-size:0.8em; font-weight:700; color:#666; }
+                    #certModal .cert-xflag { width:auto; min-height:32px; margin:0; padding:3px 10px; border:1.5px solid #4361ee; border-radius:999px; background:#eef2ff; font-size:18px; line-height:1; cursor:pointer; display:inline-flex; align-items:center; gap:3px; }
+                    #certModal .cert-xflag img.emoji { width:20px; height:20px; }
                     @media (max-width:600px) { #certModal .cert-xnames { grid-template-columns:1fr; } #certModal .cert-xprint { margin-left:0; } }
                 </style>
+                <!-- V102.580 (owner): Template · Language · Year on one line; Language is one flag chip — a tap steps TH → EN → TH+EN → KO+EN -->
                 <div class="cert-xrow lang-no-toggle">
                     <span class="cert-xlbl">Template</span>
                     <div id="cert-template-rail" style="display:flex; gap:6px; flex-wrap:wrap;">
@@ -14744,18 +14748,9 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                         <button type="button" class="cert-tpl-chip" data-tpl="bootcamp" onclick="setCertTemplate('bootcamp', this)" title="Short camp · ค่ายระยะสั้น"
                             style="width:auto; min-height:0; padding:5px 12px; border-radius:999px; border:1.5px solid #cbd5e1; background:#fff; color:#475569; font-size:0.78em; font-weight:800; cursor:pointer;">🧪 PharmCamp</button>
                     </div>
-                </div>
-                <div class="cert-xrow lang-no-toggle">
-                    <span class="cert-xlbl">Language</span>
-                    <div data-certopt="lang" style="display:flex; gap:6px; flex-wrap:wrap;">
-                        <button type="button" data-v="th" onclick="setCertLang('th')" style="width:auto; min-height:0; padding:5px 12px; border-radius:999px; border:1.5px solid #cbd5e1; background:#fff; color:#475569; font-size:0.78em; font-weight:800; cursor:pointer;">TH</button>
-                        <button type="button" data-v="en" onclick="setCertLang('en')" style="width:auto; min-height:0; padding:5px 12px; border-radius:999px; border:1.5px solid #cbd5e1; background:#fff; color:#475569; font-size:0.78em; font-weight:800; cursor:pointer;">EN</button>
-                        <button type="button" data-v="both" onclick="setCertLang('both')" style="width:auto; min-height:0; padding:5px 12px; border-radius:999px; border:1.5px solid #cbd5e1; background:#fff; color:#475569; font-size:0.78em; font-weight:800; cursor:pointer;">TH+EN</button>
-                        <button type="button" data-v="ko" onclick="setCertLang('ko')" style="width:auto; min-height:0; padding:5px 12px; border-radius:999px; border:1.5px solid #cbd5e1; background:#fff; color:#475569; font-size:0.78em; font-weight:800; cursor:pointer;" title="Korean + English">KO+EN</button>
-                    </div>
-                </div>
-                <div class="cert-xrow lang-no-toggle">
-                    <span class="cert-xlbl">Year</span>
+                    <span class="cert-xlbl2">Language</span>
+                    <button type="button" id="cert-lang-chip" class="cert-xflag" onclick="cycleCertLang()"></button>
+                    <span class="cert-xlbl2">Year</span>
                     <div data-certopt="cal" style="display:flex; gap:6px;">
                         <button type="button" data-v="be" onclick="setCertDateCal('be')" style="width:auto; min-height:0; padding:5px 12px; border-radius:999px; border:1.5px solid #cbd5e1; background:#fff; color:#475569; font-size:0.78em; font-weight:800; cursor:pointer;">BE พ.ศ.</button>
                         <button type="button" data-v="ce" onclick="setCertDateCal('ce')" style="width:auto; min-height:0; padding:5px 12px; border-radius:999px; border:1.5px solid #cbd5e1; background:#fff; color:#475569; font-size:0.78em; font-weight:800; cursor:pointer;">CE ค.ศ.</button>
@@ -65221,6 +65216,25 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const n = document.querySelectorAll('input[name="cert-award"]:checked').length;
             document.getElementById('cert-xaward-count').textContent = n > 3 ? n + ' picked · badges shrink after 3' : n ? n + ' picked' : '';
             document.getElementById('cert-xcal-note').textContent = certLang === 'ko' ? 'KO prints CE' : '';
+            paintCertLangChip();
+        }
+        // V102.580 (owner): one flag chip for the certificate language — each tap steps to the next
+        const CERT_LANG_CYCLE = [['th', '🇹🇭', 'Thai'], ['en', '🇬🇧', 'English'], ['both', '🇹🇭🇬🇧', 'Thai + English'], ['ko', '🇰🇷🇬🇧', 'Korean + English']];
+        function cycleCertLang() {
+            const i = CERT_LANG_CYCLE.findIndex(x => x[0] === certLang);
+            setCertLang(CERT_LANG_CYCLE[(i + 1) % CERT_LANG_CYCLE.length][0]);
+            paintCertLangChip();
+        }
+        function paintCertLangChip() {
+            const b = document.getElementById('cert-lang-chip');
+            if (!b) return;
+            const i = Math.max(0, CERT_LANG_CYCLE.findIndex(x => x[0] === certLang)), cur = CERT_LANG_CYCLE[i], nx = CERT_LANG_CYCLE[(i + 1) % CERT_LANG_CYCLE.length];
+            if (b.dataset.lang === cur[0]) return;
+            b.dataset.lang = cur[0];
+            b.textContent = cur[1];
+            b.title = cur[2] + ' — tap for ' + nx[2];
+            b.setAttribute('aria-label', 'Certificate language: ' + cur[2] + '. Tap for ' + nx[2]);
+            if (window.twemoji) twemoji.parse(b, { folder: 'svg', ext: '.svg' });   // flags render as letters on Windows
         }
         async function certPdfBusy(btn) {
             if (btn.disabled) return;
