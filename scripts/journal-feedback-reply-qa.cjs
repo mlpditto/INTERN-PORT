@@ -101,6 +101,7 @@ const db = { app: { auth: () => ({ currentUser: { email: 'admin@test' }, onAuthS
         await page.evaluate(() => { document.querySelector('.lr-request[data-id="a"]').open = true; });
         assert.equal(await page.$eval('.lr-request[data-id="a"] textarea', e => e.value), 'เพิ่มให้แล้ว **10 ข้อ**', 'the typed reply is still there after the list repainted');
         // a failed write keeps the text, re-enables the button
+        await page.waitForTimeout(400);   // let any late open-read land first (CI was slower than the reset)
         await page.evaluate(() => { window.__failSet = true; window.__upd.length = 0; });   // the opens above were reads (the stub stays unread)
         await page.click('.lr-request[data-id="a"] .jf-send');
         await page.waitForFunction(() => /Could not send/.test(document.querySelector('.lr-admin > p[role=status]').textContent));
