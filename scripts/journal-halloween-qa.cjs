@@ -62,7 +62,7 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
                 document.body.classList.remove('lang-kr-on', 'lang-th-on');
                 const flags = []; for (let i = 0; i < 4; i++) { window.cycleLang(); flags.push(chip.textContent + '|' + chip.getAttribute('aria-label')); }
                 const noTabChip = !document.getElementById('mission-lang-chip');
-                return { kt, noTabChip, hw: document.documentElement.classList.contains('hw'), below: wp.getBoundingClientRect().top >= area.getBoundingClientRect().bottom - 1, flex: cs(pane, 'display'),
+                return { kt, noTabChip, hw: document.documentElement.classList.contains('hw'), xm: document.documentElement.classList.contains('xm'), below: wp.getBoundingClientRect().top >= area.getBoundingClientRect().bottom - 1, flex: cs(pane, 'display'),
                     bar: cs(bar, 'backgroundImage').includes('repeating-linear-gradient'), barBorder: cs(bar, 'borderBottomStyle'), canvasBorder: cs(canvas, 'borderTopColor'), ghost: cs(hero, 'content', '::after'),
                     wpBg: cs(wp, 'backgroundImage'), wpBorder: cs(wp, 'borderTopStyle'), wpTape: cs(wp, 'content', '::before'), heat: cs(document.querySelector('#my-writing-profile .hm-c.l2'), 'backgroundColor'), heatN: cs(document.querySelector('#my-writing-profile .hm-n'), 'color'), flags };
             });
@@ -93,6 +93,11 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
         assert.equal((await run('2026-12-25T10:00:00+07:00', 'hw')).hw, true, 'admin set 🎃 for everyone: on in December');
         assert.equal((await run('2026-10-29T10:00:00+07:00', 'off')).hw, false, 'admin set Off: plain in season');
         assert.equal((await run('2026-10-29T10:00:00+07:00', 'auto')).hw, true, 'Auto follows the date');
+        // V101.265: Christmas 1–31 Dec (christmas.css) — snow on the hero, candy-cane tape on Writing progress; an admin's 🎃 in December wins
+        const xm = await run('2026-12-10T10:00:00+07:00');
+        assert.deepEqual([xm.hw, xm.xm, xm.ghost.includes('❄'), xm.wpTape.includes('"'), /240, 253, 244/.test(xm.wpBg), xm.barBorder], [false, true, true, true, true, 'solid'], 'Christmas look: ' + JSON.stringify(xm));
+        const forced = await run('2026-12-10T10:00:00+07:00', 'hw');
+        assert.deepEqual([forced.hw, forced.xm], [true, false], 'one theme at a time: the admin pick replaces the dated one');
         console.log('journal-halloween-qa: PASS');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
