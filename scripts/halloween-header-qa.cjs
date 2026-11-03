@@ -37,11 +37,14 @@ assert(cssStart > 0 && css.includes('@keyframes hwBob') && css.includes('prefers
             assert.deepEqual(r.icons, ['🎃', '🕸️'], iso);
             assert(r.createBg.includes('gradient') && r.logoutBg.includes('gradient'), iso + ': season gradients win over the inline background');
         }
-        for (const iso of ['2026-10-19T16:30:00Z', '2026-11-02T17:30:00Z', '2026-12-25T05:00:00Z']) {
+        for (const iso of ['2026-10-19T16:30:00Z', '2026-11-02T17:30:00Z', '2026-11-25T05:00:00Z']) {
             const r = await run(iso);
             assert.equal(r.hw, false, iso + ' is out of season');
             assert.deepEqual(r.icons, ['➕', '👋'], iso + ': the normal icons stay');
         }
+        // V102.581: Christmas 1–31 Dec swaps the icons too (its colours live with the Create-menu rules)
+        const xm = await run('2026-12-25T05:00:00Z');
+        assert.deepEqual([xm.hw, xm.icons], [false, ['🎄', '⛄']], 'Christmas icons on 25 Dec: ' + JSON.stringify(xm.icons));
         console.log('halloween-header-qa: PASS');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

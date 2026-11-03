@@ -3,11 +3,22 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.264)</title>
+    <title>Internship Portfolio (V101.265)</title>
     <link rel="stylesheet" href="nika-ask.css?v=V101.263">
     <link rel="stylesheet" href="daily-canvas.css?v=V101.234">
     <link rel="stylesheet" href="halloween.css?v=V101.249">
-    <script>/* V101.235: 20 Oct – 2 Nov (Bangkok) the Journal wears Halloween (halloween.css), then it goes back on its own */(function () { try { var d = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).slice(5); if (d >= '10-20' && d <= '11-02') document.documentElement.classList.add('hw'); } catch (e) { /* none */ } })();</script>
+    <link rel="stylesheet" href="christmas.css?v=V101.265">
+    <script>/* V101.235: 20 Oct – 2 Nov (Bangkok) the Journal wears Halloween (halloween.css), then it goes back on its own.
+       V101.265 (owner): an admin can set the theme for every intern (app_settings/theme.intern = auto | hw | off); the last value is kept here so the page opens in it, then refreshed */
+    var SEASON_THEMES = { hw: ['10-20', '11-02'], xm: ['12-01', '12-31'] };   // Bangkok month-day; a new theme is one more entry + its CSS (christmas.css)
+    function applySeasonTheme(pick) {
+        try {
+            var d = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).slice(5);
+            var on = pick === 'auto' || !pick ? Object.keys(SEASON_THEMES).filter(function (k) { return d >= SEASON_THEMES[k][0] && d <= SEASON_THEMES[k][1]; })[0] : SEASON_THEMES[pick] ? pick : '';
+            Object.keys(SEASON_THEMES).forEach(function (k) { document.documentElement.classList.toggle(k, k === on); });
+        } catch (e) { /* none */ }
+    }
+    (function () { var p = 'auto'; try { p = localStorage.getItem('intern_theme') || 'auto'; } catch (e) { /* none */ } applySeasonTheme(p); })();</script>
     <link rel="stylesheet" href="cafe-content.css?v=V101.147">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -6927,6 +6938,8 @@
             firebase.initializeApp(firebaseConfig);
         }
         const db = firebase.firestore();
+        // V101.265: the theme an admin set for every intern (read once; the head script already used the last known value)
+        try { db.collection('app_settings').doc('theme').get().then(function (d) { var p = (d && d.exists && d.data().intern) || 'auto'; try { localStorage.setItem('intern_theme', p); } catch (e) { /* none */ } applySeasonTheme(p); }).catch(function () { /* keep the cached / dated theme */ }); } catch (e) { /* none */ }
 
         // V96.88: local Firestore emulator, opt-in and double-gated. Requires BOTH a
         // loopback host AND ?emulator=1, so it cannot fire on GitHub Pages however the
@@ -27831,7 +27844,7 @@ async function archiveDoneCard(cardId) {
          Same reason admin.html shields its toast (V96.89). -->
     <div id="toast" class="lang-no-toggle"></div>
 <script src="history-review.js?v=V99.81"></script>
-<script src="daily-canvas.js?v=V101.247"></script>
+<script src="daily-canvas.js?v=V101.265"></script>
 <script src="knowthyself-nudge.js?v=V101.214"></script>
 <script src="nika-ask.js?v=V101.263"></script>
 <script src="intern-guide.js?v=V101.136" defer></script>
