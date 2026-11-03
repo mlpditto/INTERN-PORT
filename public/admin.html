@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.576)</title>
+    <title>Nika Admin (V102.577)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -14853,6 +14853,27 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
                     <div style="flex:1"><label>End:</label><input type="date" id="cert-end"
                             onchange="updateCertPreview()">
                     </div>
+                </div>
+                <!-- V102.577: hours mode (no start–end on the certificate) + skills trained -->
+                <style>
+                    #certModal .cert-xrow { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-bottom:10px; }
+                    #certModal .cert-xlbl { width:52px; font-size:0.8em; font-weight:700; color:#666; }
+                    #certModal .cert-xchip { width:auto; min-height:32px; margin:0; padding:4px 12px; border:1.5px solid #e2e8f0; border-radius:999px; background:#fff; color:#475569; font-size:0.85em; font-weight:700; }
+                    #certModal .cert-xchip[aria-pressed="true"] { background:#4361ee; border-color:#4361ee; color:#fff; }
+                    #certModal .cert-skill[aria-pressed="true"] { background:#fdf6e3; border-color:#b08a1e; color:#8f6b14; }
+                    #certModal #cert-hours-fields input { width:auto; margin:0; padding:5px 8px; }
+                    #certModal #cert-hours { width:80px; }
+                    #certModal #cert-hours-hint { font-size:0.78em; color:#64748b; }
+                </style>
+                <div class="cert-xrow" id="cert-period-row">
+                    <span class="cert-xlbl">Period</span>
+                    <button type="button" class="cert-xchip" data-period="dates" aria-pressed="true" onclick="setCertPeriodMode('dates')">📅 Dates</button>
+                    <button type="button" class="cert-xchip" data-period="hours" aria-pressed="false" onclick="setCertPeriodMode('hours')">⏱ Hours</button>
+                    <span id="cert-hours-fields" hidden><input type="number" id="cert-hours" min="1" step="1" placeholder="200" aria-label="Hours completed" oninput="updateCertPreview()"> h on <input type="date" id="cert-hours-at" aria-label="Date the hours were completed" onchange="updateCertPreview()"></span>
+                    <small id="cert-hours-hint" hidden></small>
+                </div>
+                <div class="cert-xrow" id="cert-skills-row">
+                    <span class="cert-xlbl">Skills</span>
                 </div>
                 <div id="cert-preview-container"
                     style="text-align:center; border:2px solid #ddd; padding:15px; margin-bottom:15px; background:#f9f9f9; border-radius:12px; overflow:hidden; display: flex; justify-content: center; align-items: center;">
@@ -56966,6 +56987,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
             document.getElementById('cert-start').value = u.startDate || "";
             document.getElementById('cert-end').value = u.endDate || "";
+            // V102.577: hours mode is prefilled from the time clock; every open starts in Dates
+            const _clock = certHoursFromClock(u);
+            document.getElementById('cert-hours').value = _clock.hours;
+            document.getElementById('cert-hours-at').value = _clock.at;
+            document.getElementById('cert-hours-hint').textContent = _clock.hint;
+            certPeriodMode = 'dates';
+            document.querySelectorAll('#cert-period-row [data-period]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.period === 'dates')));
+            document.getElementById('cert-hours-fields').hidden = true;
+            document.getElementById('cert-hours-hint').hidden = true;
+            paintCertSkills();
 
             // Handle multiple awards (u.awards) or legacy single award (u.awardType)
             const currentAwards = u.awards || (u.awardType ? [u.awardType] : []);
@@ -64483,6 +64514,42 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (certLang === 'en') return `${days} day${days === 1 ? '' : 's'}`;
             return `${days} วัน / ${days} day${days === 1 ? '' : 's'}`;
         }
+        // V102.577: what was trained — one gold line on the certificate (Thai labels on TH, English otherwise)
+        const CERT_SKILLS = [
+            { id: 'dispensing', chip: 'Dispensing', en: 'Dispensing', th: 'จ่ายยาตามใบสั่ง' },
+            { id: 'counseling', chip: 'Counseling', en: 'Patient Counseling', th: 'ให้คำปรึกษาผู้ป่วย' },
+            { id: 'inventory', chip: 'Inventory', en: 'Inventory & Stock', th: 'คลังยาและสต็อก' },
+            { id: 'otc', chip: 'OTC', en: 'OTC & Health Products', th: 'ยา OTC และผลิตภัณฑ์สุขภาพ' },
+            { id: 'law', chip: 'Drug law', en: 'Pharmacy Law & Records', th: 'กฎหมายยาและเอกสาร' },
+            { id: 'druginfo', chip: 'Drug info', en: 'Drug Information', th: 'ข้อมูลยา' }
+        ];
+        // V102.577: hours mode — "200 ชั่วโมง · 27 พฤศจิกายน 2569" instead of a start–end range
+        let certPeriodMode = 'dates';
+        function certHoursText(hours, atISO) {
+            const h = Math.round(hours * 10) / 10;
+            const d = certDateText(atISO, atISO);
+            if (!h || !d) return '';
+            if (certLang === 'th') return `${h} ชั่วโมง · ${d}`;
+            if (certLang === 'en') return `${h} hour${h === 1 ? '' : 's'} · ${d}`;
+            const cut = d.indexOf(' (');
+            const local = certLang === 'ko' ? `${h}시간` : `${h} ชั่วโมง`;
+            if (cut > 0 && d.endsWith(')')) return `${local} · ${d.slice(0, cut)} (${h} hours · ${d.slice(cut + 2, -1)})`;
+            return `${local} · ${d}`;
+        }
+        // the day the time clock's running total reached the goal (internHours.daily, newest first; c = credited)
+        function certHoursFromClock(u) {
+            const target = Number(u.internHoursTarget) || 0;
+            const ih = u.internHours || {};
+            const daily = Array.isArray(ih.daily) ? ih.daily.slice().sort((a, b) => (a.d < b.d ? -1 : 1)) : [];
+            let sum = 0;
+            for (const r of daily) {
+                sum += Number(r.c != null ? r.c : r.h) || 0;
+                if (target && sum >= target - 1e-6) return { hours: target, at: r.d, hint: `✓ time clock: ${target} h reached on ${r.d}` };
+            }
+            const total = Number(ih.total) || sum;
+            if (total > 0) return { hours: Math.floor(total), at: daily.length ? daily[daily.length - 1].d : '', hint: `time clock: ${Math.round(total * 10) / 10}${target ? ' / ' + target : ''} h so far` };
+            return { hours: '', at: '', hint: 'no time-clock hours: type them' };
+        }
 
         // ============ V96.83 Phase 3: Certificate Registry ============
         // Real running numbers live in Firestore `certificates/{no}` with the counter
@@ -64501,7 +64568,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function _certDedupeKey(name, template, ds, de) {
             return `${String(name || '').trim().toLowerCase()}|${template}|${ds || ''}|${de || ''}`;
         }
-        // items: [{name, nickname, nameTh, nameKo, template, dateStart, dateEnd, dateText, lang, cal, userId}]
+        // items: [{name, nickname, nameTh, nameKo, template, dateStart, dateEnd, dateText, hours?, skills?, lang, cal, userId}]
         // Returns array of numbers aligned with items. Throws on any Firestore failure
         // — callers must abort the export so no unregistered paper exists.
         async function issueCertNumbers(items) {
@@ -64539,6 +64606,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         dateStart: it.dateStart || '',
                         dateEnd: it.dateEnd || '',
                         dateText: it.dateText || '',
+                        ...(it.hours ? { hours: it.hours } : {}),
+                        ...(it.skills && it.skills.length ? { skills: it.skills } : {}),
                         lang: it.lang || 'both',
                         cal: it.cal || 'both',
                         userId: it.userId || null,
@@ -64606,10 +64675,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // V100.67: `names` = { th, ko } — the Thai name is the main name in TH and sits under
         // the English one in TH+EN; the Korean name sits under it in KO+EN (V100.68).
         // `name` stays the English name ("EN|nickname").
-        function drawCertificate(ctx, name, dates, awards, level, score, template, lang, certNo, names, duration) {
+        function drawCertificate(ctx, name, dates, awards, level, score, template, lang, certNo, names, duration, extra) {
             const tpl = CERT_TEMPLATES[template] || CERT_TEMPLATES.internship;
             lang = ['th', 'en', 'ko'].includes(lang) ? lang : 'both';
             names = names || {};
+            // V102.577: extra = { hours, skills } from the single Certificate modal — hours mode text
+            // replaces the date range, skills are one gold line under the description
+            extra = extra || {};
+            const skills = Array.isArray(extra.skills) ? extra.skills.filter(Boolean) : [];
             // V100.68: Montserrat has no Hangul — name Noto Sans KR explicitly for every
             // line that can be Korean, instead of whatever font the admin's OS falls to.
             const FF = "Montserrat, 'Noto Sans KR', sans-serif";
@@ -64786,6 +64859,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             ctx.beginPath(); ctx.moveTo(w / 2 - subW / 2 - 60, 178); ctx.lineTo(w / 2 - subW / 2 - 14, 178); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(w / 2 + subW / 2 + 14, 178); ctx.lineTo(w / 2 + subW / 2 + 60, 178); ctx.stroke();
 
+            // V102.577: with a skills line the middle block (intro → description) rises 30px so
+            // the line clears the signature; restored before section 11
+            ctx.save();
+            if (skills.length) ctx.translate(0, -30);
             // 7. Introduction (V96.82: per-language variants; V100.67: regular grey
             // instead of bold dark, so the recipient's name is the loudest line;
             // V100.75: centered under the now-centered header)
@@ -64904,11 +64981,28 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 fitLine(`(${tpl.en})`, descY + 22, 12, '400', 9);
             }
 
+            if (skills.length) {
+                const st = skills.join('   ·   ');
+                let px = 11.5;
+                ctx.font = `600 ${px}px ${FF}`;
+                while (ctx.measureText(st).width > w * 0.56 && px > 8) {
+                    px -= 0.5;
+                    ctx.font = `600 ${px}px ${FF}`;
+                }
+                ctx.textAlign = "center";
+                ctx.fillStyle = GOLD_DARK;
+                ctx.fillText(st, w * 0.5, descY + (lang === 'th' || lang === 'en' ? 26 : 46));
+            }
+            ctx.restore();
+
             // 11. Dates & Signature Area
             ctx.textAlign = "left";
             ctx.font = `bold 14px ${FF}`;
             ctx.fillStyle = "#0a192f";
-            const dateLabel = { th: "วันที่", en: "DATE", both: "วันที่ (DATE)", ko: CERT_KO.dateLabel }[lang];
+            const dateLabel = extra.hours
+                ? { th: "ฝึกงานครบ", en: "COMPLETED", both: "ฝึกงานครบ (COMPLETED)", ko: "COMPLETED" }[lang]
+                : { th: "วันที่", en: "DATE", both: "วันที่ (DATE)", ko: CERT_KO.dateLabel }[lang];
+            if (extra.hours) { dates = extra.hours; duration = ''; }   // V102.577: no start–end, no day count
             ctx.fillText(dateLabel, 80, 500);
             // V100.70: duration ("49 days"), same baseline as the label so the
             // delicate two-line date wrap (V100.63) is untouched. Skipped instead of
@@ -65176,6 +65270,47 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return certDurationText(certDurationDays(s, e || s));
         }
 
+        // V102.577: the Period chips (📅 Dates | ⏱ Hours) and the skill chips
+        function setCertPeriodMode(mode) {
+            certPeriodMode = mode === 'hours' ? 'hours' : 'dates';
+            document.querySelectorAll('#cert-period-row [data-period]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.period === certPeriodMode)));
+            document.getElementById('cert-hours-fields').hidden = certPeriodMode !== 'hours';
+            document.getElementById('cert-hours-hint').hidden = certPeriodMode !== 'hours';
+            updateCertPreview();
+        }
+        function paintCertSkills() {
+            let saved = [];
+            try { saved = JSON.parse(localStorage.getItem('cert_skills') || '[]'); } catch (e) { saved = []; }
+            const row = document.getElementById('cert-skills-row');
+            row.querySelectorAll('.cert-skill').forEach(b => b.remove());
+            CERT_SKILLS.forEach(k => {
+                const b = document.createElement('button');
+                b.type = 'button'; b.className = 'cert-xchip cert-skill'; b.dataset.skill = k.id; b.textContent = k.chip; b.title = k.en + ' · ' + k.th;
+                b.setAttribute('aria-pressed', String(saved.includes(k.id)));
+                b.onclick = () => { b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); saveCertSkills(); updateCertPreview(); };
+                row.append(b);
+            });
+        }
+        // the admin's last picks come back for the next certificate (this browser)
+        function saveCertSkills() {
+            const ids = [...document.querySelectorAll('#cert-skills-row .cert-skill[aria-pressed="true"]')].map(b => b.dataset.skill);
+            try { localStorage.setItem('cert_skills', JSON.stringify(ids)); } catch (e) { /* private mode: picks just are not remembered */ }
+        }
+        function getCurrentCertificateHours() {
+            if (certPeriodMode !== 'hours') return null;
+            const h = parseFloat(document.getElementById('cert-hours').value);
+            const at = document.getElementById('cert-hours-at').value;
+            return h > 0 && at ? { hours: h, at } : null;
+        }
+        // the 12th drawCertificate argument
+        function getCurrentCertificateExtra() {
+            const hrs = getCurrentCertificateHours();
+            const skills = [...document.querySelectorAll('#cert-skills-row .cert-skill[aria-pressed="true"]')]
+                .map(b => CERT_SKILLS.find(k => k.id === b.dataset.skill)).filter(Boolean)
+                .map(k => certLang === 'th' ? k.th : k.en);
+            return { hours: hrs ? certHoursText(hrs.hours, hrs.at) : '', skills };
+        }
+
         // V96.74: which wording the preview + PDF use. Chip rail, per house style.
         let currentCertTemplate = 'internship';
         function setCertTemplate(tpl, btn) {
@@ -65210,7 +65345,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (!c) return;
                 await certLogoReady(getCurrentCertificateNames().ko);
                 const drawArgs = getCurrentCertificateDrawArgs();
-                renderCertificateCanvas(c, [...drawArgs, null, getCurrentCertificateNames(), getCurrentCertificateDuration()], 1);
+                renderCertificateCanvas(c, [...drawArgs, null, getCurrentCertificateNames(), getCurrentCertificateDuration(), getCurrentCertificateExtra()], 1);
             } catch(err) {
                 console.error("Cert Preview Error:", err);
             }
@@ -65489,11 +65624,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const _nnEl = document.getElementById('cert-nickname');
             const _incNn = document.getElementById('cert-include-nickname');
             const _nn = (_nnEl && (!_incNn || _incNn.checked)) ? _nnEl.value : '';
+            // V102.577: hours mode registers the completion day + the hours text (so verify.html shows it, and
+            // it never reuses the number of a dates-mode certificate for the same person)
+            const _extra = getCurrentCertificateExtra(), _hrs = getCurrentCertificateHours();
+            if (certPeriodMode === 'hours' && !_hrs) return alert('Hours mode: type the hours and the date they were completed.');
             let certNo;
             try {
                 [certNo] = await issueCertNumbers([{
                     name: _fn, nickname: _nn, nameTh: getCurrentCertificateNames().th, nameKo: getCurrentCertificateNames().ko, template: currentCertTemplate,
-                    dateStart: _s, dateEnd: _e || _s, dateText: drawArgs[1],
+                    dateStart: _hrs ? _hrs.at : _s, dateEnd: _hrs ? _hrs.at : (_e || _s), dateText: _hrs ? _extra.hours : drawArgs[1],
+                    hours: _hrs ? _hrs.hours : null, skills: _extra.skills,
                     lang: certLang, cal: certLang === 'ko' ? 'ce' : certDateCal,
                     userId: certUser ? certUser.uid : null
                 }]);
@@ -65501,7 +65641,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 console.error('Cert registry error:', err);
                 return alert('Could not issue a certificate number, printing cancelled: ' + (err.message || err));
             }
-            renderCertificateCanvas(exportCanvas, [...drawArgs, certNo, getCurrentCertificateNames(), getCurrentCertificateDuration()], CERT_EXPORT_SCALE);
+            renderCertificateCanvas(exportCanvas, [...drawArgs, certNo, getCurrentCertificateNames(), getCurrentCertificateDuration(), _extra], CERT_EXPORT_SCALE);
             const imgData = exportCanvas.toDataURL('image/png');
             // V100.62: 'FAST' (lossless flate). Uncompressed, a 3200x2400 page is 29 MB — over
             // the 20 MB certificate-files Storage rule, so every archive (#1242) was denied.
