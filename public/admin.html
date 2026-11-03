@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.578)</title>
+    <title>Nika Admin (V102.581)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -5657,6 +5657,9 @@
         html.hw #createMenuModal .create-menu-row > span:last-child { color:#8b7bb0 !important; }
         @keyframes hwFly { 0%,100% { transform:translate(0,0) rotate(-6deg); } 50% { transform:translate(-10px,4px) rotate(6deg); } }
         @media (prefers-reduced-motion: reduce) { html.hw #createMenuModal h2::after { animation:none; } }
+        /* V102.581: the 🎨 theme chip beside "Create" */
+        #createMenuModal .admin-theme-chip { width:auto; min-height:0; margin:0 0 0 10px; padding:4px 10px; border:1.5px solid #e2e8f0; border-radius:999px; background:#fff; color:#475569; font-size:13px; font-weight:700; vertical-align:middle; cursor:pointer; text-shadow:none; }
+        html.hw #createMenuModal .admin-theme-chip { background:rgba(249,115,22,.16); border-color:#ea580c; color:#fdba74; }
         #createMenuModal .create-menu-row:hover {
             background: #f8fafc !important;
         }
@@ -8667,8 +8670,26 @@
                         ☀️ Nika
                         <span id="admin-version-badge" style="font-size:0.4em; background:linear-gradient(135deg, #f59e0b, #ef4444); color:white; -webkit-text-fill-color:white; padding:4px 14px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow:0 4px 12px rgba(245,158,11,0.3);">V91.69</span>
                         <script>(function(){var m=(document.title||'').match(/V\d+\.\d+/);var b=document.getElementById('admin-version-badge');if(m&&b)b.textContent=m[0];})();</script>
-                        <script>/* V102.491 Halloween header: 20 Oct – 2 Nov (Bangkok) the Create / Logout buttons wear the season, then go back on their own */
-document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Bangkok'}).slice(5);if(d<'10-20'||d>'11-02')return;document.documentElement.classList.add('hw');document.querySelectorAll('.hw-ico').forEach(function(e){e.textContent=e.getAttribute('data-hw');});});</script>
+                        <script>/* V102.491 Halloween header: 20 Oct – 2 Nov (Bangkok) the Create / Logout buttons wear the season, then go back on their own.
+   V102.581 (owner): the 🎨 chip in the Create menu picks Auto (by date) · 🎃 Halloween · ⚪ Off for this admin browser only (localStorage admin_theme); the intern app is not touched */
+var ADMIN_THEMES = [['auto', '🗓', 'Auto'], ['hw', '🎃', 'Halloween'], ['off', '⚪', 'Off']];
+function adminThemePick() { var p = 'auto'; try { p = localStorage.getItem('admin_theme') || 'auto'; } catch (e) { /* none */ } return ADMIN_THEMES.some(function (t) { return t[0] === p; }) ? p : 'auto'; }
+function adminThemeHwByDate() { var d = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).slice(5); return d >= '10-20' && d <= '11-02'; }
+function applyAdminTheme() {
+    var p = adminThemePick(), on = p === 'hw' || (p === 'auto' && adminThemeHwByDate());
+    document.documentElement.classList.toggle('hw', on);
+    document.querySelectorAll('.hw-ico').forEach(function (e) { if (!e.hasAttribute('data-plain')) e.setAttribute('data-plain', e.textContent); e.textContent = e.getAttribute(on ? 'data-hw' : 'data-plain'); });
+    var c = document.getElementById('admin-theme-chip'); if (!c) return;
+    var i = ADMIN_THEMES.findIndex(function (t) { return t[0] === p; }), cur = ADMIN_THEMES[i], nx = ADMIN_THEMES[(i + 1) % ADMIN_THEMES.length];
+    c.textContent = cur[1] + ' ' + cur[2] + (p === 'auto' ? ' · ' + (on ? '🎃' : 'plain') : '');
+    c.title = 'Theme for this browser: ' + (p === 'auto' ? 'Auto — Halloween 20 Oct – 2 Nov' : cur[2]) + '. Tap for ' + nx[2];
+}
+function cycleAdminTheme() {
+    var i = ADMIN_THEMES.findIndex(function (t) { return t[0] === adminThemePick(); });
+    try { localStorage.setItem('admin_theme', ADMIN_THEMES[(i + 1) % ADMIN_THEMES.length][0]); } catch (e) { /* none */ }
+    applyAdminTheme();
+}
+document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                     </h1>
                     <span id="admin-email" style="font-size:0.7em; font-weight:normal; margin-top:2px;">medlifeplus@gmail.com</span>
                 </div>
@@ -14124,7 +14145,7 @@ document.addEventListener('DOMContentLoaded',function(){var d=new Date().toLocal
         <div id="createMenuModal" class="modal">
             <div class="modal-content" style="max-width:480px;"><span class="close-modal"
                     onclick="document.getElementById('createMenuModal').style.display='none'">&times;</span>
-                <h2><span class="hw-ico" data-hw="🎃">➕</span> Create</h2>
+                <h2><span class="hw-ico" data-hw="🎃">➕</span> Create <button type="button" id="admin-theme-chip" class="admin-theme-chip" onclick="cycleAdminTheme()">🗓 Auto</button></h2>
                 <div style="display:flex; flex-direction:column;">
                     <button type="button" onclick="createMenuPick(() => openTaskModal())" class="create-menu-row"
                         style="min-height:0; width:100%; display:flex; align-items:center; gap:14px; text-align:left; padding:14px 6px; border:none; border-bottom:1px solid #eee; border-radius:0; background:transparent; cursor:pointer;">
