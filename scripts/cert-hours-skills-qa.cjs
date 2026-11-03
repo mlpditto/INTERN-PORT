@@ -8,7 +8,7 @@ const admin = fs.readFileSync(path.join(__dirname, '..', 'public', 'admin.html')
 const cut = (a, b) => { const i = admin.indexOf(a); assert.ok(i > 0, a); const j = admin.indexOf(b, i); assert.ok(j > i, b); return admin.slice(i, j); };
 const block = cut('        const CERT_TEMPLATES = {', '        const CERT_EXPORT_SCALE');
 const modalJs = cut('        function setCertPeriodMode(mode) {', '        // V96.74: which wording the preview + PDF use.');
-const rows = cut('                <!-- V102.577: hours mode', '                <div id="cert-preview-container"');
+const rows = cut('                <!-- V102.578: lean rows', '                <div id="cert-preview-container"');
 assert.ok(admin.includes('getCurrentCertificateDuration(), getCurrentCertificateExtra()], 1);'), 'the preview passes the extra');
 assert.ok(admin.includes('getCurrentCertificateDuration(), _extra], CERT_EXPORT_SCALE);'), 'the PDF passes the same extra');
 assert.ok(/dateText: _hrs \? _extra\.hours : drawArgs\[1\]/.test(admin), 'the registry keeps the hours text for verify.html');
@@ -115,7 +115,47 @@ assert.ok(/dateText: _hrs \? _extra\.hours : drawArgs\[1\]/.test(admin), 'the re
         assert.deepEqual(m.saved, ['dispensing', 'otc', 'law'], 'a tap is remembered');
         assert.deepEqual(m.thSkills, ['จ่ายยาตามใบสั่ง', 'ยา OTC และผลิตภัณฑ์สุขภาพ', 'กฎหมายยาและเอกสาร'], 'TH → Thai labels');
         assert.deepEqual(m.back, ['', true, 'true'], 'back to Dates');
+
+        // 5. V102.578 lean rows: Start → End hide in Hours, the name boxes per language, the Prints lines, the award count
+        const lean = await page.evaluate(() => {
+            window.escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            window.getCurrentCertificateDrawArgs = () => ['', '19 ตุลาคม 2569 – 27 พฤศจิกายน 2569'];
+            window.getCurrentCertificateDuration = () => '40 วัน';
+            const shown = () => [...document.querySelectorAll('#certModal .cert-xnames [data-for]')].filter(d => !d.hidden).map(d => d.dataset.for);
+            const txt = id => document.getElementById(id).textContent;
+            const out = {};
+            setCertPeriodMode('hours'); out.datesHidden = document.getElementById('cert-xdates-fields').hidden;
+            setCertPeriodMode('dates'); out.datesBack = document.getElementById('cert-xdates-fields').hidden;
+            document.getElementById('cert-fullname').value = 'ชื่อ ตัวอย่าง';
+            document.getElementById('cert-fullname-th').value = 'ชื่อ ตัวอย่าง';
+            document.querySelectorAll('input[name="cert-award"]').forEach((cb, i) => { cb.checked = i < 2; });
+            certLang = 'both'; certPaintPrints();
+            out.both = [shown(), document.getElementById('cert-xen-warn').hidden, txt('cert-xprint-period'), txt('cert-xprint-skills'), txt('cert-xaward-count'), txt('cert-xcal-note')];
+            certLang = 'th'; certPaintPrints(); out.th = shown();
+            document.getElementById('cert-fullname-th').value = ''; certPaintPrints(); out.thEmpty = shown();
+            document.getElementById('cert-fullname').value = 'Sample Intern';
+            document.querySelectorAll('input[name="cert-award"]').forEach((cb, i) => { cb.checked = i < 4; });
+            certLang = 'ko'; certPaintPrints();
+            out.ko = [shown(), document.getElementById('cert-xen-warn').hidden, txt('cert-xaward-count'), txt('cert-xcal-note')];
+            setCertPeriodMode('hours'); document.getElementById('cert-hours').value = '200'; document.getElementById('cert-hours-at').value = '2026-11-27';
+            certLang = 'en'; certDateCal = 'ce'; certPaintPrints(); out.hours = txt('cert-xprint-period');
+            out.noToggle = [...document.querySelectorAll('#certModal [data-certopt]')].every(r => r.closest('.lang-no-toggle'));
+            out.koLabel = document.querySelector('#certModal [data-certopt="lang"] [data-v="ko"]').textContent;
+            return out;
+        });
+        assert.equal(lean.datesHidden, true, 'Hours hides Start → End');
+        assert.equal(lean.datesBack, false, 'Dates shows them again');
+        assert.deepEqual(lean.both, [['th', 'en'], false, 'Prints19 ตุลาคม 2569 – 27 พฤศจิกายน 2569 · 40 วัน', 'PrintsDispensing · OTC & Health Products · Pharmacy Law & Records', '2 picked', '']);
+        assert.deepEqual(lean.th, ['th'], 'TH: the Thai box only');
+        assert.deepEqual(lean.thEmpty, ['th', 'en'], 'TH with no Thai name prints the EN one, so its box shows');
+        assert.deepEqual(lean.ko, [['en', 'ko'], true, '4 picked · badges shrink after 3', 'KO prints CE']);
+        assert.equal(lean.hours, 'Prints200 hours · 27 November 2026');
+        assert.equal(lean.noToggle, true, 'the Language / Year rails sit in lang-no-toggle rows');
+        assert.equal(lean.koLabel, 'KO+EN');
+        assert.ok(!admin.includes('v90.29r') && !admin.includes('🔄 Redraw</button>'), 'no stale version tag, no Redraw button');
+        assert.ok(admin.includes('id="btn-gen-pdf" onclick="certPdfBusy(this)"') && /async function certPdfBusy\(btn\) \{[\s\S]{0,200}finally \{ btn\.disabled = false/.test(admin), 'the PDF button is busy while it runs');
+        assert.ok(admin.includes("document.getElementById('cert-xdates-fields').hidden = false;\n            paintCertSkills();"), 'every open shows Start → End again');
         assert.deepEqual(errs, [], errs.join(' | '));
-        console.log('PASS: certificate hours mode + skills line (V102.577) — hours text per language, time-clock prefill, the skills line clears the signature, no extras = identical pixels, chips remembered');
+        console.log('PASS: certificate hours mode + skills line (V102.577) + lean rows (V102.578) — hours text per language, time-clock prefill, the skills line clears the signature, no extras = identical pixels, chips remembered');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
