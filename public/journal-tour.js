@@ -153,7 +153,12 @@
     }
     window.openJournalTour = open;
 
-    function guideOpen() { var g = document.getElementById('internGuideOverlay'); return !!(g && g.classList.contains('open')); }
+    // never stack on another popup: the intern guide, the 🧭 Know thyself sheet, the article popup — anything showing as a modal dialog
+    function guideOpen() {
+        var g = document.getElementById('internGuideOverlay'); if (g && g.classList.contains('open')) return true;
+        if (['art-back', 'fbr-back', 'cm-back', 'kt-back', 'ord-back'].some(function (id) { return document.getElementById(id); })) return true;   // the same popups knowthyself-nudge.js waits for
+        return [].some.call(document.querySelectorAll('[aria-modal="true"], #kt-sheet'), function (d) { return !d.closest('#journalTour') && shown(d); });
+    }
     function appShown() { var m = document.getElementById('main-app'); return !!m && getComputedStyle(m).display !== 'none'; }
     function init() {
         var pane = document.getElementById('rl-reflection-pane'), date = pane && pane.querySelector('#dc-hero .dc-date');

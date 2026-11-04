@@ -7,10 +7,12 @@ const { pathToFileURL } = require('node:url');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
 const idx = fs.readFileSync('public/index.html', 'utf8').replace(/\r\n/g, '\n'), js = fs.readFileSync('public/journal-tour.js', 'utf8');
-assert.ok(/<script src="daily-canvas\.js\?v=V\d+\.\d+"><\/script>\n<script src="journal-tour\.js\?v=V\d+\.\d+" defer><\/script>/.test(idx), 'journal-tour.js loads right after daily-canvas.js');
+assert.ok(/<script src="knowthyself-nudge\.js\?v=V\d+\.\d+"><\/script>\n<script src="journal-tour\.js\?v=V\d+\.\d+" defer><\/script>/.test(idx) && idx.indexOf('daily-canvas.js?v=') < idx.indexOf('journal-tour.js?v='),
+    'journal-tour.js loads after daily-canvas.js + knowthyself-nudge.js (that pair must stay adjacent)');
 assert.ok(!/db\.collection|firebase\.|fetch\(/.test(js), 'the tour reads and writes nothing in Firestore');
 assert.ok(/const LN_LIFETIME_CAP = 90;/.test(idx) && js.includes('<b>90 โน้ต</b>'), 'the 90-note number is the code’s');
 assert.ok(!/3 วัน|My Path/.test(js), 'no 3-day review promise (that queue is admin-only)');
+assert.ok(fs.readFileSync('public/knowthyself-nudge.js', 'utf8').includes("document.getElementById('journalTour')"), 'the 🧭 Know thyself sheet waits for the tour (and the tour waits for it)');
 
 async function open(browser, { width = 390, guideOpen = false, reducedMotion = 'no-preference', storage = {} } = {}) {
     const ctx = await browser.newContext({ viewport: { width, height: 780 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, timezoneId: 'Asia/Bangkok', reducedMotion });
@@ -23,7 +25,8 @@ async function open(browser, { width = 390, guideOpen = false, reducedMotion = '
     await page.route('**/*', r => (r.request().url().startsWith('file:') ? r.continue() : r.abort()));
     await page.goto(INDEX, { waitUntil: 'load' });
     await page.evaluate((guideOpen) => {
-        if (guideOpen) { const g = document.createElement('div'); g.id = 'internGuideOverlay'; g.className = 'open'; document.body.append(g); }
+        if (guideOpen === 'kt') { const k = document.createElement('div'); k.id = 'kt-sheet'; k.setAttribute('role', 'dialog'); k.setAttribute('aria-modal', 'true'); k.textContent = 'Know yourself'; k.style.cssText = 'position:fixed;left:0;right:0;bottom:0;height:120px;background:#fff'; document.body.append(k); }
+        else if (guideOpen) { const g = document.createElement('div'); g.id = 'internGuideOverlay'; g.className = 'open'; document.body.append(g); }
         window.__writes = [];
         db.collection = name => ({ add: d => { window.__writes.push(name); return Promise.resolve({ id: 'x' }); }, doc: () => ({ update: () => { window.__writes.push(name); return Promise.resolve(); }, set: () => { window.__writes.push(name); return Promise.resolve(); }, get: () => Promise.resolve({ exists: false, data: () => ({}) }) }), where: () => ({ get: () => Promise.resolve({ docs: [] }), onSnapshot: () => () => {} }) });
         ensureFirebaseAuthReady = async () => ({ uid: 'auth-u1' }); requireRegistered = () => true;
@@ -109,6 +112,16 @@ const state = page => page.evaluate(() => {
             await page.waitForTimeout(2200);
             assert.equal((await state(page)).open, false, 'waits while the guide is open');
             await page.evaluate(() => document.getElementById('internGuideOverlay').classList.remove('open'));
+            await page.mouse.click(5, 5);
+            await page.waitForSelector('#journalTour', { timeout: 4000 });
+            await ctx.close();
+        }
+        // ---- 4b. nor on top of another dialog (🧭 Know thyself sheet)
+        {
+            const { ctx, page } = await open(browser, { guideOpen: 'kt' });
+            await page.waitForTimeout(2200);
+            assert.equal((await state(page)).open, false, 'waits while the Know thyself sheet is open');
+            await page.evaluate(() => document.getElementById('kt-sheet').remove());
             await page.mouse.click(5, 5);
             await page.waitForSelector('#journalTour', { timeout: 4000 });
             await ctx.close();

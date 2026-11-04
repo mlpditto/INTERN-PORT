@@ -73,7 +73,7 @@
 
     // ---- B · the sheet
     function busy() {
-        if (document.getElementById('art-back') || document.getElementById('fbr-back') || document.getElementById('cm-back') || document.getElementById('kt-back') || document.getElementById('ord-back')) return true;
+        if (document.getElementById('art-back') || document.getElementById('fbr-back') || document.getElementById('cm-back') || document.getElementById('kt-back') || document.getElementById('ord-back') || document.getElementById('journalTour')) return true;   // V101.267: + the Journal tour
         var g = document.getElementById('internGuideOverlay'); if (g && g.classList.contains('open')) return true;
         return Array.prototype.some.call(document.querySelectorAll('.modal'), function (m) { var d = m.style.display; return d === 'flex' || d === 'block' || m.classList.contains('open') || m.classList.contains('show'); });
     }
