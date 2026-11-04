@@ -68,9 +68,16 @@ assert.ok(/async function generateAlabastaCaseCardImage[\s\S]{0,5000}await alaba
             assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no side scroll');
 
             await rows.nth(0).locator('textarea').fill('edited by admin');
-            await page.locator('.ccm-chip', { hasText: 'NB Pro' }).click();
-            await page.locator('.ccm-chip', { hasText: 'Minimal' }).click();
+            assert.equal(await page.locator('.ccm-tile, .ccm-thumb').evaluateAll(b => b.filter(x => /[A-Za-z0-9]/.test(x.innerText)).length), 0, 'no words inside the tiles');
+            const tip = page.locator('.ccm-tile[aria-label="NB Pro"]'), tipOn = () => tip.evaluate(e => +getComputedStyle(e, '::after').opacity);
+            assert.equal(await tipOn(), 0, 'no name bubble until hovered');
+            await tip.hover(); await page.waitForTimeout(250);
+            assert.deepEqual([await tip.evaluate(e => getComputedStyle(e, '::after').content), await tipOn()], ['"NB Pro"', 1], 'hover shows the name at once');
+            await tip.click();
+            await page.locator('.ccm-thumb[aria-label="Minimal, 4:3"]').click();
             assert.equal(await page.evaluate(() => window.__layout), 'minimal');
+            assert.equal(await page.locator('.ccm-cap').innerText(), 'NB Pro · Minimal 4:3', 'one caption line names both picks');
+            assert.equal(await page.locator('.ccm-tile[aria-pressed="true"]').count(), 1);
             await page.evaluate(() => { window.__failOnce.add('b'); });
             await page.click('.ccm-go');
             await page.waitForSelector('.ccm-res.bad');

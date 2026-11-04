@@ -1,8 +1,18 @@
 // V102.564 (owner, B): several Case Cards from one sheet. The admin checks every summary first; cards are made two at a time; one failure stops nothing and can be retried alone.
 (function () {
     const MAX = 20, MIN_NOTE = 20, WORKERS = 2;
-    const MODELS = [['as/gemini-nano-banana-2.1', 'Nano Banana 2.1'], ['as/gemini-3.1-flash-lite-image', 'NB 2 Lite'], ['as/gemini-3-pro-image', 'NB Pro'], ['gpt-image-2.5-flare', 'GPT 2.5 Flare'], ['gpt-image-2.5-sunburst', 'GPT 2.5 Sunburst'], ['or/x-ai/grok-imagine-image-quality', 'Grok Imagine']];
-    const LAYOUTS = [['infographic', 'Infographic'], ['lifestyle', 'Lifestyle'], ['symptoms', 'Symptoms'], ['selfcare', 'Self-care'], ['minimal', 'Minimal']];
+    // V102.583 (owner pick C): a tile per model — its own glyph and colours, the vendor logo in the corner; [value, name, glyph, colour 1, colour 2, vendor]
+    const MODELS = [['as/gemini-nano-banana-2.1', 'Nano Banana 2.1', '🍌', '#fef08a', '#facc15', 'gemini'], ['as/gemini-3.1-flash-lite-image', 'NB 2 Lite', '🪶', '#e0f2fe', '#7dd3fc', 'gemini'], ['as/gemini-3-pro-image', 'NB Pro', '💎', '#e0e7ff', '#818cf8', 'gemini'], ['gpt-image-2.5-flare', 'GPT 2.5 Flare', '🔥', '#ffe4e6', '#fb7185', 'openai'], ['gpt-image-2.5-sunburst', 'GPT 2.5 Sunburst', '☀️', '#ffedd5', '#fb923c', 'openai'], ['or/x-ai/grok-imagine-image-quality', 'Grok Imagine', '', '#475569', '#0f172a', 'grok']];
+    const VENDORS = { gemini: ['#1a73e8', 'assets/logos/gemini-spark-color.svg'], openai: ['#111827', 'assets/logos/openai-blossom-black.svg'], grok: ['#7c3aed', 'assets/logos/grok-white.svg'] };
+    // [value, name, ratio, what it shows]; the wide templates come out 16:9, so their drawing is wider
+    const LAYOUTS = [['infographic', 'Infographic', '4:3', 'Summary card: heading and info boxes'], ['lifestyle', 'Lifestyle', '16:9', 'Daily-life trigger tiles'], ['symptoms', 'Symptoms', '16:9', 'Body and symptoms'], ['selfcare', 'Self-care', '16:9', 'What-to-do tiles'], ['minimal', 'Minimal', '4:3', 'Picture only, little text']];
+    const DRAW = {
+        infographic: '<rect x="4" y="4" width="21" height="3" rx="1" fill="currentColor"/><rect x="4" y="9" width="9" height="9" rx="1.5" fill="currentColor" opacity=".35"/><rect x="15" y="9" width="10" height="2" rx="1" fill="currentColor" opacity=".6"/><rect x="15" y="13" width="10" height="2" rx="1" fill="currentColor" opacity=".6"/><rect x="15" y="16.5" width="7" height="1.6" rx=".8" fill="currentColor" opacity=".6"/>',
+        lifestyle: '<circle cx="9" cy="9" r="3" fill="currentColor" opacity=".45"/><circle cx="19.5" cy="9" r="3" fill="currentColor" opacity=".45"/><circle cx="30" cy="9" r="3" fill="currentColor" opacity=".45"/><rect x="5" y="15" width="8" height="2" rx="1" fill="currentColor"/><rect x="15.5" y="15" width="8" height="2" rx="1" fill="currentColor"/><rect x="26" y="15" width="8" height="2" rx="1" fill="currentColor"/>',
+        symptoms: '<circle cx="11" cy="6.5" r="2.6" fill="currentColor"/><rect x="7.5" y="10" width="7" height="9" rx="3" fill="currentColor" opacity=".55"/><circle cx="14" cy="13" r="1.4" fill="#ef4444"/><path d="M15.5 13 H23" stroke="currentColor" stroke-width="1"/><rect x="24" y="6" width="11" height="2" rx="1" fill="currentColor"/><rect x="24" y="12" width="11" height="2" rx="1" fill="currentColor" opacity=".6"/><rect x="24" y="16" width="8" height="2" rx="1" fill="currentColor" opacity=".6"/>',
+        selfcare: '<rect x="4" y="4" width="14.5" height="6" rx="1.5" fill="currentColor" opacity=".3"/><rect x="20.5" y="4" width="14.5" height="6" rx="1.5" fill="currentColor" opacity=".3"/><rect x="4" y="12" width="14.5" height="6" rx="1.5" fill="currentColor" opacity=".3"/><rect x="20.5" y="12" width="14.5" height="6" rx="1.5" fill="currentColor" opacity=".3"/><path d="M6 7l1.5 1.5L10 5.5M22.5 7l1.5 1.5 2.5-3M6 15l1.5 1.5L10 13.5M22.5 15l1.5 1.5 2.5-3" fill="none" stroke="#16a34a" stroke-width="1.3" stroke-linecap="round"/>',
+        minimal: '<circle cx="20" cy="7" r="2.4" fill="currentColor" opacity=".5"/><path d="M3 16 L10 9 L15 13.5 L18 11 L26 17 Z" fill="currentColor" opacity=".45"/><rect x="8" y="17.5" width="13" height="1.6" rx=".8" fill="currentColor"/>',
+    };
     const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const SCRUB_LEAD = 'Educational case summary: ';
     let rows = [], busy = false, stop = false, model = MODELS[0][0], ran = false;
@@ -39,7 +49,12 @@
         }));
     }
 
-    const chips = (list, on, fn) => list.map(([v, t]) => `<button type="button" class="ccm-chip" aria-pressed="${v === on}" onclick="caseCardMulti.${fn}('${esc(v)}')">${esc(t)}</button>`).join('');
+    const tiles = () => MODELS.map(([v, t, g, c1, c2, vd]) => `<button type="button" class="ccm-tile" aria-pressed="${v === model}" data-tip="${esc(t)}" aria-label="${esc(t)}" style="--c1:${c1};--c2:${c2};--vc:${VENDORS[vd][0]}" onclick="caseCardMulti.pickModel('${esc(v)}')"><span>${g || `<img src="${VENDORS.grok[1]}" alt="">`}</span><img class="ccm-tv${vd === 'grok' ? ' dk' : ''}" src="${VENDORS[vd][1]}" alt=""></button>`).join('');
+    const thumbs = on => LAYOUTS.map(([v, t, r, d]) => { const w = r === '16:9' ? 39 : 29; return `<button type="button" class="ccm-thumb" aria-pressed="${v === on}" data-tip="${esc(t + ' · ' + r)}&#10;${esc(d)}" aria-label="${esc(t + ', ' + r)}" onclick="caseCardMulti.pickLayout('${v}')"><svg viewBox="0 0 ${w} 22" width="${w * 24 / 22}" height="24" aria-hidden="true"><rect x="1" y="1" width="${w - 2}" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/>${DRAW[v]}</svg></button>`; }).join('');
+    function picks() {
+        const on = getCaseCardLayout(), m = MODELS.find(x => x[0] === model) || MODELS[0], l = LAYOUTS.find(x => x[0] === on) || LAYOUTS[0];
+        return `<div class="ccm-pick"><div class="ccm-rail" role="group" aria-label="Image model">${tiles()}</div><span class="ccm-div"></span><div class="ccm-rail" role="group" aria-label="Style">${thumbs(on)}</div></div><div class="ccm-cap"><b>${esc(m[1])}</b> · ${esc(l[1])} <i>${l[2]}</i></div>`;
+    }
     function head() {
         const done = rows.filter(r => r.state === 'done').length, failed = rows.filter(r => r.state === 'failed').length, picked = rows.filter(r => r.on).length, wait = rows.filter(r => r.on && r.state !== 'done').length, left = rows.filter(r => r.on && r.state === 'idle').length;
         const retryAll = !busy && failed >= 2 ? '<button type="button" class="ccm-ghost" onclick="caseCardMulti.retryFailed()">↻ Retry failed</button>' : '';
@@ -49,7 +64,7 @@
                     : '<span class="ccm-count">Select at least 1 case</span><button type="button" class="ccm-go" disabled>Generate</button>';
         return `<div class="ccm-hd"><b>Case cards</b><span class="ccm-acts">${action}<button type="button" class="ccm-x" onclick="caseCardMulti.close()" aria-label="Close"${busy ? ' disabled' : ''}>✕</button></span></div>` +
             (busy ? `<div class="ccm-bar"><span style="width:${picked ? Math.round((done + failed) / picked * 100) : 0}%"></span></div>` : done || failed ? ''
-                : `<div class="ccm-rail">${chips(MODELS, model, 'pickModel')}</div><div class="ccm-rail">${chips(LAYOUTS, getCaseCardLayout(), 'pickLayout')}</div><label class="ccm-all"><input type="checkbox" id="ccm-all" onchange="caseCardMulti.all(this.checked)" aria-label="Select all"> ${picked} of ${rows.length} selected</label>`);
+                : `${picks()}<label class="ccm-all"><input type="checkbox" id="ccm-all" onchange="caseCardMulti.all(this.checked)" aria-label="Select all"> ${picked} of ${rows.length} selected</label>`);
     }
     function rowHtml(r, i) {
         const c = r.c, hn = `<i>${esc(c.caseId || '—')}</i>`, sys = esc(alabastaEnglishOnly(c.diseaseSystemLabel || '') || 'Other');
