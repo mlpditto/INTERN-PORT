@@ -79,7 +79,7 @@ assert.ok(idx.includes('id="dx-detail-articles"') && idx.includes('function dxPa
       const docs = {
         a1: art('a1', { title: { en: 'Hordeolum: the 3-day rule', th: 'กุ้งยิง 3 วัน' }, links: [{ kind: 'disease', id: 'h1', label: 'Hordeolum · กุ้งยิง' }, { kind: 'quiz', id: 'q1', label: 'Eye quiz' }] }),
         a2: art('a2', { title: { en: 'Red eye: when to refer' }, dx: { draftId: 'd2', publishedId: 'h1', name: 'Hordeolum' }, startAt: { toMillis: () => now - 3 * D } }),
-        a3: art('a3', { title: { en: 'Old hordeolum tips' }, dx: { draftId: 'd3', publishedId: 'h1', name: 'Hordeolum' }, startAt: { toMillis: () => now - 40 * D }, endAt: { toMillis: () => now - 34 * D } }),   // ended before this intern joined; rerun any → still for them
+        a3: art('a3', { title: { en: 'Old hordeolum tips' }, dx: { draftId: 'd3', publishedId: 'h1', name: 'Hordeolum' }, startAt: { toMillis: () => now - 40 * D }, endAt: { toMillis: () => now - 34 * D } }),   // ended before this intern joined (startDate is now − 32 d, relative so the test keeps working past 2026-11-03); rerun any → still for them
         a4: art('a4', { title: { en: 'Not for me' }, dx: { draftId: 'd4', publishedId: 'h1', name: 'Hordeolum' }, audience: { divisions: ['CU'], groups: [] } }),
         a5: art('a5', { title: { en: 'Another disease' }, links: [{ kind: 'disease', id: 'n1', label: 'Neuropathic Pain' }] })
       };
@@ -88,7 +88,7 @@ assert.ok(idx.includes('id="dx-detail-articles"') && idx.includes('function dxPa
         runTransaction: async f => f({ get: async () => ({ exists: true }), set: () => {} })
       };
       userId = 'U1'; window.myRegistered = true;
-      window.myUserDoc = { id: 'U1', group: 'EXTERN', division: 'RSU', startDate: '2026-10-01', articleSeen: { a2: { act: 'ok', at: now - D } }, articlePopDay: internArticles._bkkDay(now) };   // already had today's popup → none opens by itself
+      window.myUserDoc = { id: 'U1', group: 'EXTERN', division: 'RSU', startDate: new Date(now - 32 * D).toISOString().slice(0, 10), articleSeen: { a2: { act: 'ok', at: now - D } }, articlePopDay: internArticles._bkkDay(now) };   // already had today's popup → none opens by itself
       const spy = []; window.dxOpenDetail_spy = spy;
       internArticles.onUserDoc(); await wait(2800);
       out.loaded = !!internArticles.forDisease;
