@@ -67,6 +67,9 @@ document.addEventListener('DOMContentLoaded', function () {
     note.append(row('dc-ic', '<span class="dc-i" aria-hidden="true">🎓</span><textarea id="dc-note-content" rows="1" aria-label="Note" placeholder="A lesson worth keeping…" title="Reviewed by admin · แอดมินตรวจ"></textarea>'));
     note.querySelector('.dc-row').append(byId('ln-counter'));
     byId('ln-counter').title = 'Notes saved · max 90';
+    // V101.266: say what a Note is where a phone can see it (the textarea's title only shows on hover). Hidden once the row is in use.
+    note.querySelector('.dc-row').insertAdjacentHTML('beforeend', '<p id="dc-note-hint" class="dc-hint lang-no-toggle"><b>จด 1 เรื่องที่อยากจำ</b> แอดมินจะอ่านและให้คะแนนเพิ่ม</p>');
+    byId('dc-note-content').setAttribute('aria-describedby', 'dc-note-hint');
     const noteMore = document.createElement('div'); noteMore.className = 'dc-more';
     noteMore.append(byId('rl-note-fields'));
     if (byId('ln-history')) noteMore.append(byId('ln-history'));

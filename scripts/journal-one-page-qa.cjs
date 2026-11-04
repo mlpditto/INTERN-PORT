@@ -77,8 +77,15 @@ assert.ok(!/role="tab"|dc-tabs|createElement\('details'\)/.test(js), 'no tabs, n
         assert.deepEqual(lean.ph, ['Learned · ได้เรียนรู้อะไร', 'Hard · ติดอะไร', 'Next · จะทำอะไรต่อ', 'Help or an idea?'], 'one text per row: the label rides in the placeholder (V101.215)');
         assert.equal(lean.labelVisible, false, 'no label column (the <label> stays for screen readers)');
         assert.equal(lean.feed, false, 'an empty 💬 section is not drawn'); assert.equal(lean.counter, false, '0/90 hidden while the Note row is idle');
+        // V101.266: one Thai line under the idle Note row says what a Note is (the title tooltip never shows on a phone)
+        const hint = await page.evaluate(() => { const h = document.getElementById('dc-note-hint'), b = h.getBoundingClientRect(), r = h.closest('.dc-row').getBoundingClientRect();
+            return { text: h.textContent, shown: getComputedStyle(h).display !== 'none', inRow: b.top >= r.top && b.bottom <= r.bottom + 1, lines: Math.round(b.height / parseFloat(getComputedStyle(h).lineHeight)),
+                described: document.getElementById('dc-note-content').getAttribute('aria-describedby') }; });
+        assert.deepEqual([hint.text, hint.shown, hint.inRow, hint.described], ['จด 1 เรื่องที่อยากจำ แอดมินจะอ่านและให้คะแนนเพิ่ม', true, true, 'dc-note-hint'], 'the idle Note row explains itself: ' + JSON.stringify(hint));
+        assert.ok(hint.lines <= 2, 'the hint stays short: ' + hint.lines + ' lines');
         await page.focus('#dc-note-content');
         assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('ln-counter')).display !== 'none'), true, '0/90 shows while the Note row is in use');
+        assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('dc-note-hint')).display), 'none', 'the hint gives way to title · tags once the Note row is in use');
         await page.evaluate(() => document.activeElement.blur());
         assert.ok(layout.pickerInHero, 'the mood circles sit in the hero');
         assert.equal(layout.date, 'Mon 26 Oct');
