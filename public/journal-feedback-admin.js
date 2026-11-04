@@ -128,6 +128,34 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             acts.append(ta, go);
             box.append(acts, left); row.append(box);
+            // V102.585: 🗑 Delete — asks inside the row (a native confirm() can be dropped), then removes the inbox doc AND the intern's
+            // copy (intern_messages/{same id}, their History row + any reply) in one batch: both go or neither does (owner's pick 2026-11-05).
+            const del = document.createElement('div'); del.className = 'jf-del-row';
+            const ask = () => {
+                const who = data.userName || 'the intern';
+                const q = document.createElement('span'); q.className = 'jf-del-q'; q.textContent = 'Delete this message? It also disappears from ' + who + '’s History.';
+                const no = document.createElement('button'); no.type = 'button'; no.className = 'jf-del-no'; no.textContent = 'Cancel';
+                const yes = document.createElement('button'); yes.type = 'button'; yes.className = 'jf-del-yes'; yes.textContent = '🗑 Delete';
+                no.onclick = () => { idle(); del.querySelector('.jf-del').focus(); };
+                yes.onclick = async () => {
+                    yes.disabled = no.disabled = true; status.textContent = 'Deleting…';
+                    try {
+                        const batch = db.batch();
+                        batch.delete(doc.ref);
+                        batch.delete(db.collection('intern_messages').doc(doc.id));
+                        await batch.commit();
+                        delete drafts[doc.id];
+                        status.textContent = 'Deleted — gone from the inbox and from ' + who + '’s History.';
+                    } catch (e) { console.error('Journal feedback delete', e); status.textContent = 'Could not delete. Nothing was removed — please retry.'; idle(); }
+                };
+                del.classList.add('asking'); del.replaceChildren(q, no, yes); no.focus();
+            };
+            const idle = () => {
+                const b = document.createElement('button'); b.type = 'button'; b.className = 'jf-del'; b.textContent = '🗑 Delete';
+                b.title = 'Delete this message (also from the intern’s History)'; b.onclick = ask;
+                del.classList.remove('asking'); del.replaceChildren(b);
+            };
+            idle(); row.append(del);
             list.append(row);
         });
         if (!list.firstChild) { const none = document.createElement('p'); none.className = 'jf-none'; none.textContent = snapDocs.length ? 'Nothing here. Well done.' : 'No journal feedback yet.'; list.append(none); }

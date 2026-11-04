@@ -54,7 +54,7 @@
 ### 📊 Dashboard
 - **แถบชิปด้านบน** (กดเพื่อเปิดรายการ): 👤 Access (คำขอเข้าใช้) · 📖 Review (Reflective Review) · 💰 Claimed (คะแนนที่ขอ) · ⏱️ Quiz (รอตรวจ/ส่งช้า) · 💼 Work · 💊 Drug Drafts · 🩺 Disease Drafts · 📥 New Cases
 - 🚀 **Up next** + 🎯 **Live quizzes**: Quiz ที่เปิดอยู่ทั้งหมดบนตารางความเร่งด่วน × จำนวนคนที่ทำแล้ว — 🔥 Do first · 📅 Plan · ⏳ Watch · ✅ On track ตั้งเกณฑ์ได้ที่ ⏱ 24 ชม. / 72 ชม. / 7 วัน และ 👥 30 / 50 / 70 %
-- 💬 **Journal feedback**: ข้อความที่ intern ส่งจากหน้า Journal กด **↩ Reply** แล้วคำตอบจะขึ้นใน History ของ intern ใต้ข้อความนั้น · **✓ Mark read**
+- 💬 **Journal feedback**: ข้อความที่ intern ส่งจากหน้า Journal กด **↩ Reply** แล้วคำตอบจะขึ้นใน History ของ intern ใต้ข้อความนั้น · **✓ Mark read** · **🗑 Delete** (ถามยืนยันก่อน) ลบข้อความออกจาก inbox และจาก History ของ intern
 - **จุดสีน้ำเงินบนชิปโมเดล** = ตัดจากเครดิต Google Cloud ก่อน
 - **Kanban**: Backlog → 🚧 Doing → 👀 Review → ✅ Done (ค้นหา Task ได้, Show archived ดูของเก่า)
 - **🚀 Escalated**: บันทึกการเรียนที่ intern กด Escalate เพื่อให้ดูเป็นพิเศษ · **🗑️ Note deletion requests**: คำขอลบบันทึก

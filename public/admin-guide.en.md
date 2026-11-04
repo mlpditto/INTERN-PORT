@@ -54,7 +54,7 @@ The **Admin Portal** page has 3 ways in — use any one:
 ### 📊 Dashboard
 - **Chip bar at the top** (tap to open the list): 👤 Access (access requests) · 📖 Review (Reflective Review) · 💰 Claimed (points requested) · ⏱️ Quiz (waiting / late) · 💼 Work · 💊 Drug Drafts · 🩺 Disease Drafts · 📥 New Cases
 - 🚀 **Up next** + 🎯 **Live quizzes**: every live quiz on a grid of how urgent × how many have done it — 🔥 Do first · 📅 Plan · ⏳ Watch · ✅ On track. Set the limits with ⏱ 24 h / 72 h / 7 d and 👥 30 / 50 / 70 %
-- 💬 **Journal feedback**: messages interns send from their Journal. **↩ Reply** lands in that intern's History under their message · **✓ Mark read**
+- 💬 **Journal feedback**: messages interns send from their Journal. **↩ Reply** lands in that intern's History under their message · **✓ Mark read** · **🗑 Delete** (asks first) removes the message from the inbox and from the intern's History
 - **Blue dot on a model chip** = paid by Google Cloud credits first
 - **Kanban**: Backlog → 🚧 Doing → 👀 Review → ✅ Done (search Tasks; Show archived for older ones)
 - **🚀 Escalated**: learning notes an intern escalated for special attention · **🗑️ Note deletion requests**: requests to delete notes

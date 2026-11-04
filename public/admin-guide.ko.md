@@ -54,7 +54,7 @@
 ### 📊 Dashboard
 - **맨 위 칩 바** (눌러서 목록 열기): 👤 Access (접근 요청) · 📖 Review (Reflective Review) · 💰 Claimed (요청된 포인트) · ⏱️ Quiz (대기 / 지연) · 💼 Work · 💊 Drug Drafts · 🩺 Disease Drafts · 📥 New Cases
 - 🚀 **Up next** + 🎯 **Live quizzes**: 진행 중인 모든 Quiz를 긴급도 × 완료 인원 표로 보여 줍니다 — 🔥 Do first · 📅 Plan · ⏳ Watch · ✅ On track. 기준은 ⏱ 24시간 / 72시간 / 7일, 👥 30 / 50 / 70 %로 정합니다
-- 💬 **Journal feedback**: 인턴이 Journal에서 보낸 메시지입니다. **↩ Reply**를 누르면 그 인턴의 History에서 메시지 아래에 답변이 표시됩니다 · **✓ Mark read**
+- 💬 **Journal feedback**: 인턴이 Journal에서 보낸 메시지입니다. **↩ Reply**를 누르면 그 인턴의 History에서 메시지 아래에 답변이 표시됩니다 · **✓ Mark read** · **🗑 Delete**(먼저 확인)는 받은편지함과 인턴의 History에서 메시지를 지웁니다
 - **모델 칩의 파란 점** = Google Cloud 크레딧에서 먼저 차감
 - **칸반**: Backlog → 🚧 Doing → 👀 Review → ✅ Done (Tasks 검색; 오래된 항목은 Show archived)
 - **🚀 Escalated**: 인턴이 특별 주의를 요청한 학습 노트 · **🗑️ Note deletion requests**: 노트 삭제 요청
