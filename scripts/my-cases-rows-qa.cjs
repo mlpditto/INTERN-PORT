@@ -62,10 +62,10 @@ async function open(browser, width) {
         assert.equal(desk.r.dot, '""', 'reviewed = a dot before the HN (::before with empty content)'); assert.equal(desk.r.preDisp, 'none', '"HN / Ref:" prefix hidden on desktop');
         assert.ok(desk.r.noteH <= 56, 'the note is clamped to two lines (13px × 1.55 × 2 + padding): ' + desk.r.noteH); assert.equal(desk.r.noteStrong, 'none', 'no "Note:" label on desktop');
         assert.equal(desk.r.pendingBadge, true, 'the pending badge stays');
-        // phone: the old cards
-        assert.deepEqual(phone.r.heads, ['flex', 'flex'], 'phone: emoji group heads stay');
+        // phone: the cards (V101.271: emoji inside, no head line, no HN prefix)
+        assert.deepEqual(phone.r.heads, ['none', 'none'], 'phone (V101.271): no group-head line, the system emoji sits inside the card');
         assert.notEqual(phone.r.display, 'grid', 'phone: a card, not a grid row'); assert.equal(phone.r.bg, 'rgb(240, 253, 244)', 'phone: reviewed = green card');
-        assert.equal(phone.r.before, 'none', 'no disc on a phone'); assert.equal(phone.r.preDisp, 'inline', '"HN / Ref:" shown on a phone');
+        assert.equal(phone.r.before, 'none', 'no disc on a phone'); assert.equal(phone.r.preDisp, 'none', 'phone (V101.271): "HN / Ref:" moved to the tooltip, as on desktop');
         assert.ok(phone.r.noteH > 80, 'the long note is not clamped on a phone: ' + phone.r.noteH); assert.equal(phone.r.noteStrong, 'inline', '"Note:" label on a phone');
         assert.deepEqual(desk.errors.concat(phone.errors), [], 'no page errors');
         console.log('PASS: My Cases — desktop rows (disc emoji + nth, green dot, no prefix / Note label, two-line note, no heads) · phone keeps the cards');
