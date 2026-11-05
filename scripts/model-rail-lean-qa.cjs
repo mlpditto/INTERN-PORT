@@ -44,7 +44,7 @@ const BODY = '<div id="a"><input type="hidden" id="research-model-select" value=
 
             // a rail whose row already has its own provider tabs keeps its layout (no second tab bar)
             assert.equal(await page.locator('[data-model-input="lp-ai-model"]').count(), 1, 'the tabbed row still gets its rail');
-            assert.equal(await page.locator('[data-model-input="lp-ai-model"] .mr-vendors').count(), 0, 'rails with their own tabs are untouched');
+            assert.equal(await page.locator('[data-model-input="lp-ai-model"] .mr-vendors').count(), 0, 'rails with their own tabs get no second icon bar (V102.589: their tabs are seated inline instead)');
             assert.equal(await page.locator('[data-model-input="lp-ai-model"] > button[hidden]').count(), 0, 'and keep every chip visible for their own tabs to filter');
 
             // no tray, no chip border, no bars

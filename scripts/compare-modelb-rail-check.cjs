@@ -73,7 +73,7 @@ const modelB = cut('        window._compareModelB = function', '        window.g
         assert.equal(await page.locator('#b button[aria-label="Qwen 3.8 Max"]').evaluate(b => getComputedStyle(b, '::after').backgroundColor), 'rgb(118, 36, 244)', 'picked chip keeps its dot');
         // the audit toolbar and Curate paint their own amber pick — the vendor colour must still win there
         await page.evaluate(() => { const w = document.createElement('div'); w.className = 'audit-toolbar'; w.id = 'at'; w.innerHTML = textAIChipsHtml('', 'claude-opus-5-5', ''); document.body.append(w); });
-        assert.deepEqual(await page.locator('#at button[aria-pressed="true"]').evaluate(b => [getComputedStyle(b).backgroundColor, getComputedStyle(b).color]), ['rgb(217, 119, 87)', 'rgb(255, 255, 255)'], 'audit toolbar pick uses the vendor colour');
+        assert.deepEqual(await page.locator('#at .text-ai-chips > button[aria-pressed="true"]').evaluate(b => [getComputedStyle(b).backgroundColor, getComputedStyle(b).color]), ['rgb(217, 119, 87)', 'rgb(255, 255, 255)'], 'audit toolbar pick uses the vendor colour');
         assert.equal(await page.locator('#at button[aria-label="Qwen 3.8 Flash"]').evaluate(b => getComputedStyle(b, '::after').backgroundColor), 'rgb(118, 36, 244)', 'V102.487: audit toolbar OpenRouter chip carries the violet dot');
         await page.evaluate(() => document.getElementById('at').remove());
 

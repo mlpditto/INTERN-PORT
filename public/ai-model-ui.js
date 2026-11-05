@@ -37,7 +37,7 @@
     // the owner, so Gemini's `short` drops the word like GPT / Claude.
     // V102.11: Qwen / DeepSeek / Grok marks (assets/logos, already on the provider tabs) on every chip too — their
     // `short` keeps the name, since aiModelShortName shows it where no logo is drawn.
-    const LOGO_OWNERS = { GPT: 'openai', Claude: 'claude', Gemini: 'gemini', Qwen: 'qwen', DeepSeek: 'deepseek', Grok: 'grok', Muse: 'meta', Kimi: 'kimi' };
+    const LOGO_OWNERS = { GPT: 'openai', Claude: 'claude', Gemini: 'gemini', Qwen: 'qwen', DeepSeek: 'deepseek', Grok: 'grok', Muse: 'meta', Kimi: 'kimi', Ollama: 'ollama' };   // V102.589: + Ollama, so its vendor icon is the logo, not the word
     // V101.52: opt-in trial models. Only the audit toolbar offers them; they are NOT in
     // TEXT_AI_MODELS, so no other rail, select, Settings default or normaliser sees them.
     // Grok 4.7 trial (GROK_OPENROUTER_INTEGRATION_PLAN.md step C, 2026-09-24): Audit + Analyze.
@@ -183,7 +183,7 @@
             };
         });
         if (input.tagName === 'SELECT') input.style.display = 'none';
-        if (!host.parentElement.querySelector('.audit-providers, .cmp-vendors') && !host.closest('#aiKeysModal')) vendorFirst(host);
+        if (!host.parentElement.querySelector('.audit-providers, .cmp-vendors')) vendorFirst(host);   // V102.589 (owner: "A everywhere"): the AI Settings modal too
         bindings.set(id, { rail: host, key });
         input.addEventListener('change', () => window.syncRegistryModelSelect(id));
         window.syncRegistryModelSelect(id);
@@ -219,4 +219,48 @@
     // V102.508: a rail built after load (the Review 📰 panel) gets the same bound, vendor-first rail as the page's own inputs.
     window.bindRegistryModelInput = (id, key) => bind(id, null, key);
     document.addEventListener('DOMContentLoaded', window.initRegistryModelSelectors);
+    // V102.589 (owner: "A everywhere") — ONE model-picker look on every screen, without touching the ~20 places that draw a picker:
+    // • a rail with its own vendor tabs (providerModelRailHtml's .audit-providers, Compare B's .cmp-vendors) keeps its markup, ids and
+    //   handlers; text-ai-chips.css puts tabs + chips on one flex line and seatTabRow() orders the picked vendor's chips right after its icon;
+    // • a plain rail of every model (textAIChipsHtml: short-answer grading, Quiz compare, …) becomes the vendor-first rail.
+    // A MutationObserver does both whenever a picker is drawn or a tab is pressed (browseAuditProvider / cmpBrowseVendor set aria-pressed).
+    const TAB = '.audit-provider, .cmp-vendor', TAB_ROW = '.audit-model-row, .cmp-b';
+    function seatTabRow(row) {
+        const items = [];
+        [...row.children].forEach(c => { if (c.matches('.audit-providers, .cmp-vendors, .text-ai-chips')) items.push(...c.children); else items.push(c); });
+        const icons = items.filter(e => e.matches(TAB));
+        if (!icons.length) return;
+        const k = Math.max(0, icons.findIndex(t => t.getAttribute('aria-pressed') === 'true'));
+        let seen = false;
+        items.forEach(e => {
+            if (e.matches(TAB)) { seen = true; e.style.order = icons.indexOf(e) * 2; }
+            else if (e.parentElement.matches('.text-ai-chips')) e.style.order = k * 2 + 1;
+            else e.style.order = seen ? 999 : -1;   // what sits before the icons stays first, what sits after stays last
+        });
+        row.dataset.oneStyle = '1';
+    }
+    function hasTabs(row) { return !!(row && row.querySelector(':scope > .audit-providers > .audit-provider, :scope > .cmp-vendors > .cmp-vendor')); }
+    function oneStyle(node) {
+        if (!node || node.nodeType !== 1 || !node.matches) return;
+        const rows = new Set(node.matches(TAB_ROW) ? [node] : []);
+        const up = node.closest(TAB_ROW); if (up) rows.add(up);
+        node.querySelectorAll(TAB_ROW).forEach(r => rows.add(r));
+        rows.forEach(r => { if (hasTabs(r)) seatTabRow(r); });
+        const rails = node.matches('.text-ai-chips') ? [node] : [...node.querySelectorAll('.text-ai-chips')];
+        rails.forEach(r => {
+            if (r.dataset.vendorFirst || r.parentElement?.querySelector(':scope > .audit-providers, :scope > .cmp-vendors') || hasTabs(r.closest(TAB_ROW)) || !r.querySelector(':scope > button[data-value]')) return;
+            vendorFirst(r);
+            const on = r.querySelector(':scope > button[aria-pressed="true"], :scope > button.active') || r.querySelector(':scope > button[data-value]');
+            showVendor(r, vendorOf(on));
+        });
+    }
+    window.oneStyleModelPickers = oneStyle;
+    const watch = () => {
+        oneStyle(document.body);
+        new MutationObserver(list => list.forEach(m => {
+            if (m.type === 'attributes') { if (m.target.matches(TAB)) { const r = m.target.closest(TAB_ROW); if (r) seatTabRow(r); } return; }
+            m.addedNodes.forEach(oneStyle);
+        })).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-pressed'] });
+    };
+    if (typeof MutationObserver === 'function') { if (document.body) watch(); else document.addEventListener('DOMContentLoaded', watch); }
 })();
