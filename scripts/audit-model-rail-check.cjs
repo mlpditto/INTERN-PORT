@@ -25,10 +25,10 @@ const checks = [];
 const check = (name, got, want) => checks.push([name, got, want]);
 const html = window.auditModelControlsHtml(false, 'audit');
 const tabs = [...html.matchAll(/class="audit-provider" data-provider="([^"]+)" aria-pressed="([^"]+)"/g)].map(m => [m[1], m[2] === 'true']);
-check('one tab per provider, in model-list order', tabs.map(t => t[0]).join('|'), 'Gemini|GPT|Claude|Qwen|DeepSeek|Muse|Grok|Kimi|Ollama'); // V102.432: + Kimi trial tab; V102.268: + Muse tab; V101.52: Grok trial tab; V102.76: + local Ollama
+check('one tab per provider, in model-list order', tabs.map(t => t[0]).join('|'), 'Gemini|GPT|Claude|Qwen|DeepSeek|Muse|Kimi|Grok|Ollama'); // V102.588: Kimi in the main list (last), so its tab comes before the trial Grok; V102.432: + Kimi trial tab; V102.268: + Muse tab; V101.52: Grok trial tab; V102.76: + local Ollama
 check('GPT tab pressed for the default gpt-6-luna', tabs.find(t => t[0] === 'GPT')[1] && tabs.filter(t => t[1]).length === 1, true);
 const chips = [...html.matchAll(/<button (hidden )?[^>]*data-value="([^"]+)"[^>]*aria-label="([^"]+)"/g)].map(m => ({ hidden: !!m[1], id: m[2], label: m[3] }));
-check('Qwen + DeepSeek chips are rendered', chips.filter(c => c.id.startsWith('or/')).map(c => c.label).join('|'), 'Gemini Gemma 4 26B A4B|Qwen 3.8 Flash|Qwen 3.8 Omni Flash|Qwen 3.8 Max|DeepSeek V4.1 Flash|DeepSeek V4 Pro|Muse Spark Open|Grok 4.7|Kimi K3.1 Pro');   // V102.518: + Qwen 3.8 Omni Flash; V102.432: + Kimi K3.1 Pro (trial); V102.268: + Muse Spark Open; V102.242: + Gemma 4 26B A4B (or/google/, under the Gemini tab)
+check('Qwen + DeepSeek chips are rendered', chips.filter(c => c.id.startsWith('or/')).map(c => c.label).join('|'), 'Gemini Gemma 4 26B A4B|Qwen 3.8 Flash|Qwen 3.8 Omni Flash|Qwen 3.8 Max|DeepSeek V4.1 Flash|DeepSeek V4 Pro|Muse Spark Open|Kimi K3.1 Pro|Grok 4.7');   // V102.518: + Qwen 3.8 Omni Flash; V102.432: + Kimi K3.1 Pro (trial); V102.268: + Muse Spark Open; V102.242: + Gemma 4 26B A4B (or/google/, under the Gemini tab)
 check('only the pressed provider\'s chips are visible initially', chips.filter(c => !c.hidden).map(c => c.label).every(l => l.startsWith('GPT ')) && chips.filter(c => !c.hidden).length === 4, true);
 check('no provider heading spans leak into the rail', /text-ai-provider/.test(html), false);
 check('rewrite mode uses the analyzer default', /id="rewrite-ai-model" value="gemini-3.8-flash"/.test(window.auditModelControlsHtml(false, 'rewrite')), true);
@@ -48,7 +48,7 @@ window.browseAuditProvider(grokTab);
 check('browse: Grok tab shows only the Grok trial chip', chipEls.filter(c => !c.hidden).map(c => c.label).join('|'), 'Grok 4.7');
 check('css: Grok tab colour', css.includes('.audit-provider[data-provider="Grok"]{color:#d4d4d8}'), true);
 check('css: Ollama tab is a logo (V102.82), not a name tab', css.includes('.text-ai-logo[data-owner="ollama"]{background-image:url(assets/logos/ollama-white.svg)}') && !css.includes('[data-provider="Ollama"]'), true);
-check('browse: Ollama is a trial-only text tab after Grok and Kimi', tabs.map(t => t[0]).slice(-3).join('|'), 'Grok|Kimi|Ollama');
+check('browse: Kimi (main list, last) sits beside the trial Grok and Ollama tabs', tabs.map(t => t[0]).slice(-3).join('|'), 'Kimi|Grok|Ollama');
 check('css: the toolbar no longer paints an OpenRouter grape border (V102.487 lean rail: a violet dot instead)', css.includes('.audit-toolbar .text-ai-chips>button[data-value^="or/"]:not([aria-pressed="true"]){border-color:var(--or-grape)}'), false);
 check('admin cache-busts audit-toolbar.css', /audit-toolbar\.css\?v=V\d+\.\d+/.test(admin) && !/audit-toolbar\.css\?v=V100\.12/.test(admin), true);
 

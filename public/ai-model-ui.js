@@ -26,7 +26,10 @@
         { id: 'or/deepseek/deepseek-v4.1-flash-1017', label: 'DeepSeek V4.1 Flash', short: 'DeepSeek Flash V4.1', hint: 'DeepSeek รุ่นประหยัด ผ่าน OpenRouter' },
         { id: 'or/deepseek/deepseek-v4-pro-0813', label: 'DeepSeek V4 Pro', short: 'DeepSeek Pro V4', hint: 'DeepSeek รุ่นใหญ่ เหมาะกับงานวิเคราะห์ ผ่าน OpenRouter' },
         // V102.268: Meta Muse Spark Open (open weights, 1M context; text / image / video / audio in, text out) via OpenRouter — its own Muse tab, drawn with the Meta mark.
-        { id: 'or/meta/muse-spark-open', label: 'Muse Spark Open', short: 'Muse Spark Open', hint: 'Muse Spark Open ของ Meta (open weights, บริบท 1M) ผ่าน OpenRouter รับภาพ วิดีโอ เสียง เหมาะกับงานโค้ดและงาน agent 메타 Muse Spark Open (오픈 웨이트, 컨텍스트 1M), OpenRouter 경유, 이미지·영상·음성 입력, 코드·에이전트 작업에 적합' }
+        { id: 'or/meta/muse-spark-open', label: 'Muse Spark Open', short: 'Muse Spark Open', hint: 'Muse Spark Open ของ Meta (open weights, บริบท 1M) ผ่าน OpenRouter รับภาพ วิดีโอ เสียง เหมาะกับงานโค้ดและงาน agent 메타 Muse Spark Open (오픈 웨이트, 컨텍스트 1M), OpenRouter 경유, 이미지·영상·음성 입력, 코드·에이전트 작업에 적합' },
+        // V102.432: Kimi K3.1 Pro (Moonshot AI, open-weight reasoning, 1M context, text / image / video in) via OpenRouter — $2/$10 per MTok.
+        // V102.588 (owner): out of the trial list into the main list — every rail + the AI Settings default; last, so its tab sits beside the trial Grok / Ollama tabs.
+        { id: 'or/moonshotai/kimi-k3.1-pro', label: 'Kimi K3.1 Pro', short: 'Kimi K3.1 Pro', hint: 'Kimi K3.1 Pro ของ Moonshot AI (reasoning, บริบท 1M, รับภาพ) ผ่าน OpenRouter Moonshot AI Kimi K3.1 Pro, 추론 모델, OpenRouter 경유' },
     ];
     // Official marks (assets/logos, from openai.com/brand and anthropic.com/press-kit). Owners
     // without a small official mark (Qwen, DeepSeek) carry their name in `short` instead.
@@ -40,8 +43,6 @@
     // Grok 4.7 trial (GROK_OPENROUTER_INTEGRATION_PLAN.md step C, 2026-09-24): Audit + Analyze.
     const trialModels = window.TEXT_AI_TRIAL_MODELS = [
         { id: 'or/x-ai/grok-4.7', label: 'Grok 4.7', short: 'Grok 4.7', hint: 'Grok 4.7 (SpaceXAI) รุ่นทดลอง สำหรับ Audit / Analyze ผ่าน OpenRouter' },
-        // V102.432: Kimi K3.1 Pro (Moonshot AI, open-weight reasoning, 1M context, text / image / video in) via OpenRouter — $2/$10 per MTok; trial like Grok, so only the audit toolbar offers it.
-        { id: 'or/moonshotai/kimi-k3.1-pro', label: 'Kimi K3.1 Pro', short: 'Kimi K3.1 Pro', hint: 'Kimi K3.1 Pro ของ Moonshot AI รุ่นทดลอง (reasoning, บริบท 1M, รับภาพ) ผ่าน OpenRouter Moonshot AI Kimi K3.1 Pro, 실험용 추론 모델, OpenRouter 경유' },
         // V102.76: Ollama on the admin's own computer (ollama-local.js; the browser calls localhost:11434 directly).
         { id: 'ol/local', label: 'Ollama local', short: 'Ollama', hint: 'Ollama บนเครื่องนี้ (localhost:11434) รุ่นทดลอง ใช้ได้เมื่อ Ollama เปิดอยู่และอนุญาตเว็บนี้ใน OLLAMA_ORIGINS — ไม่คิดค่าใช้จ่าย ช้ากว่าโมเดลออนไลน์' }
     ];

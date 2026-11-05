@@ -41,8 +41,8 @@ const { chromium } = require('playwright');
             assert.equal(await popup.locator('.text-ai-chips button').count(), 21); // V102.518: + Qwen 3.8 Omni Flash; V102.432: + Kimi K3.1 Pro trial chip; V102.365: + Gemini 4 Argon; V102.268: + Muse Spark Open; V102.242: + Gemma 4 26B A4B; V101.64: + Claude Opus 5.5; V102.76: + local Ollama trial chip
             assert.equal(await popup.locator('.text-ai-chips button:visible').count(), 4);
             // V101.65: provider tabs are logos named by aria-label; the chips next to them carry no logo.
-            assert.deepEqual(await popup.locator('.audit-provider').evaluateAll(ns => ns.map(n => n.getAttribute('aria-label'))), ['Gemini', 'GPT', 'Claude', 'Qwen', 'DeepSeek', 'Muse', 'Grok', 'Kimi', 'Ollama']);
-            assert.deepEqual(await popup.locator('.audit-provider .text-ai-logo').evaluateAll(ns => ns.map(n => n.dataset.owner)), ['gemini', 'openai', 'claude', 'qwen', 'deepseek', 'meta', 'grok', 'kimi', 'ollama']);
+            assert.deepEqual(await popup.locator('.audit-provider').evaluateAll(ns => ns.map(n => n.getAttribute('aria-label'))), ['Gemini', 'GPT', 'Claude', 'Qwen', 'DeepSeek', 'Muse', 'Kimi', 'Grok', 'Ollama']);
+            assert.deepEqual(await popup.locator('.audit-provider .text-ai-logo').evaluateAll(ns => ns.map(n => n.dataset.owner)), ['gemini', 'openai', 'claude', 'qwen', 'deepseek', 'meta', 'kimi', 'grok', 'ollama']);
             assert.equal(await popup.locator('.text-ai-chips .text-ai-logo').count(), 0);
             assert.deepEqual(await popup.locator('.audit-provider').evaluateAll(ns => ns.slice(0, 6).map(n => getComputedStyle(n).color)), ['rgb(168, 180, 255)', 'rgb(125, 211, 176)', 'rgb(232, 180, 154)', 'rgb(201, 160, 240)', 'rgb(127, 200, 245)', 'rgb(125, 184, 255)']);
             assert.equal(await popup.locator('[data-value="gpt-6-astra"]').textContent(), 'Astra 6');
