@@ -201,6 +201,9 @@
             '#art-sheet .aq-e{margin:8px 0 0;font:600 12.5px/1.4 Kanit,sans-serif;color:#b91c1c}#art-sheet .aq-e:empty{display:none}' +
             '@media (prefers-reduced-motion: reduce){#art-sheet .anyq{animation:none}}' +
 
+            '.art-hist .art-md{font-size:13.5px;line-height:1.55}.art-hist .art-md p{margin:0 0 6px}.art-hist .art-md.art-clamp{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:6;overflow:hidden}' +
+            '.art-hist .art-more-h{display:inline-block;width:auto;min-height:0;margin:2px 0 6px;padding:2px 0;border:0;background:none;box-shadow:none;color:#4361ee;font:700 13px/1 Kanit,sans-serif;cursor:pointer}.art-hist .art-more-h[hidden]{display:none}' +
+            '@media (min-width:1100px){.art-hist .art-md{columns:2;column-gap:36px}.art-hist .art-md.art-clamp{display:block;-webkit-line-clamp:unset;overflow:visible}.art-hist .art-more-h{display:none}}' +
             '.hl-pill.art-ok{background:#dcfce7;color:#166534}.hl-pill.art-new{background:#eef2ff;color:#4361ee}.art-hist{padding:0 0 6px}.art-hist .art-top{position:absolute;top:14px;right:0}.hl-row[aria-expanded="true"]:has(.art-top) .hl-tx{padding-right:44px}.art-hist .art-links{margin:8px 0 2px}' +
             // V101.213: the intern's 💬 questions under the article in History, the admin's reply as a green bubble
             '.art-qa{margin:10px 0 2px;padding-top:8px;border-top:1px dashed #e2e8f0;font:400 13px/1.45 Kanit,sans-serif;color:#334155}.art-qa>b{display:block;font-weight:800;font-size:12.5px;color:#4338ca;margin-bottom:4px}' +
@@ -389,7 +392,7 @@
     function discCss() {
         if (document.getElementById('art-disc-css')) return;
         var s = document.createElement('style'); s.id = 'art-disc-css';
-        s.textContent = '.history-compact .hl-disc.art-d{position:relative;padding:0;margin:0;font:inherit;cursor:pointer;background:#e0e7ff;border:1px solid #c7d2fe;overflow:visible}' +
+        s.textContent = '.history-compact .hl-disc.art-d{position:relative;padding:0;margin:0;min-height:0;font:inherit;cursor:pointer;background:#e0e7ff;border:1px solid #c7d2fe;overflow:visible}' +
             '.hl-disc.art-d.art-read{border:2.5px solid #22c55e;background:#f0fdf4}' +
             '.hl-disc.art-d.art-new::after{content:"";position:absolute;right:-2px;top:-2px;width:10px;height:10px;border-radius:50%;background:#6366f1;border:2px solid #fff}' +
             '.hl-disc.art-d .art-tm{position:absolute;right:-10px;bottom:-6px;font-style:normal;font-size:.58rem;font-weight:800;color:#64748b;background:#fff;border:1.5px solid #cbd5e1;border-radius:999px;padding:0 5px;line-height:1.5;white-space:nowrap}' +
@@ -462,18 +465,31 @@
         var tx = textOf(a, uiLang()), have = langs(a);
         // V101.251: on the title line (positioned against the History row) · V101.193: the sheet's language pill here too when the article has more than one language — a tap swaps the body in place (V101.202: one pill, cycles)
         var lng = have.length > 1 ? '<div class="art-top">' + langBtn(have, tx.lang, 'internArticles.histLang(this)') + '</div>' : '';
-        return '<div class="art-hist lang-no-toggle" data-art="' + esc(a.id) + '">' + lng + '<div class="art-md">' + md(tx.body) + '</div>' + srcHtml(a, uiLang()) + linksHtml(a) + qaHtml(s) + '</div>';
+        // V101.270: the first 6 lines + Read more (hidden when it all fits); ≥1100 px the whole body in two columns
+        var t = T[uiLang()] || T.en;
+        return '<div class="art-hist lang-no-toggle" data-art="' + esc(a.id) + '">' + lng + '<div class="art-md art-clamp">' + md(tx.body) + '</div><button type="button" class="art-more-h" onclick="internArticles.histMore(this)">' + t.more + ' ▾</button>' + srcHtml(a, uiLang()) + linksHtml(a) + qaHtml(s) + '</div>';
+    }
+    // V101.270: Read more only when the 6 lines hide something (the row's toggle has already shown the detail by now)
+    function fitMore(box) {
+        var m = box.querySelector('.art-hist .art-md'), b = box.querySelector('.art-hist .art-more-h');
+        if (m && b) b.hidden = m.classList.contains('art-clamp') && m.scrollHeight <= m.clientHeight + 2;
+    }
+    function histMore(btn) {
+        var box = btn.closest('.art-hist'), m = box && box.querySelector('.art-md'), t = T[uiLang()] || T.en; if (!m) return;
+        var open = m.classList.toggle('art-clamp') === false;
+        btn.textContent = open ? t.less + ' ▴' : t.more + ' ▾';
     }
     function histLang(btn, l) {
         var box = btn.closest('.art-hist'), a = box && find(box.dataset.art); if (!a) return;
         var have = langs(a), tx = textOf(a, l || nextLang(have, btn.dataset.lang));
-        box.querySelector('.art-md').innerHTML = md(tx.body);
+        box.querySelector('.art-md').innerHTML = md(tx.body); fitMore(box);
         btn.outerHTML = langBtn(have, tx.lang, 'internArticles.histLang(this)');
     }
     // tapping an article row open in History = read (the row stays open: the pill is patched in place, no re-render)
     document.addEventListener('click', function (e) {
         var row = e.target.closest && e.target.closest('[data-delete-type="article"]');
         if (!row || e.target.closest('a, button')) return;
+        fitMore(row);
         var id = String(row.dataset.deleteItem || '').replace(/^art_/, ''), s = (me().articleSeen || {})[id];
         if (!find(id) || isDone(s)) return;
         markRead(id, 'hist').then(function () { });
@@ -488,6 +504,7 @@
             else refreshHistory(false);
         },
         historyItems: function () { return historyItems(S.list, me(), Date.now(), S.qs); },
+        histMore: histMore,
         owed: function () { return owed(S.list, me(), Date.now()); },
         detailHtml: detailHtml, pillHtml: pillHtml, discHtml: discHtml, listen: listen, stopListen: stopListen, close: close, histLang: histLang,
         gotIt: gotIt, anyQ: anyQ, askSend: askSend,
