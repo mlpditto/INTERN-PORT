@@ -22,6 +22,7 @@ assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(fs.readFileSync('publi
       document.querySelector('#user-badges-pop button[aria-label="Export badge board"]').click();
       const st = badgeExportState; await st.countsPromise; st.avatar = 'photo'; st.photo64 = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>';
       st.counts = { quiz_master: 261, perfectionist: 11, explorer: 58, on_fire: 4 };
+      st.progress = false;   // V102.586: this test is about the name / score lines; "n / 16 badges" (on by default) is tested in badge-board-tier-qa
       const mk = extra => Object.assign({}, st, extra);
       const y0 = (l, extra) => badgeBoardGeom(mk(Object.assign({ layout: l }, extra)), l).y0;
       out.y0 = { story: [y0('story', {}), y0('story', { showName: false }), y0('story', { showScore: false }), y0('story', { showName: false, showScore: false })], card: [y0('card', {}), y0('card', { showName: false, showScore: false })] };
