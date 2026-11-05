@@ -50,24 +50,32 @@ const db = { app: { auth: () => ({ currentUser: { email: 'admin@test' }, onAuthS
         await page.waitForSelector('.lr-request[data-id="a"]');
         await page.evaluate(() => { document.querySelector('.lr-request[data-id="a"]').open = true; });
         const row = '.lr-request[data-id="a"]';
-        // idle: one quiet 🗑 Delete under the reply, inside the open row only
-        const idle = await page.$eval(row, r => { const b = r.querySelector('.jf-del'), cs = getComputedStyle(b); return { text: b.textContent, title: b.title, bg: cs.backgroundColor, after: !!r.querySelector('.jf-reply + .jf-del-row') }; });
-        assert.deepEqual([idle.text, idle.after, idle.bg], ['🗑 Delete', true, 'rgba(0, 0, 0, 0)'], 'a quiet 🗑 Delete under the reply box: ' + JSON.stringify(idle));
+        // V102.587 lean: the message wraps in the head (no second copy), and a quiet 🗑 icon sits in the reply bar: [reply][🗑][➤]
+        const lean = await page.$eval(row, r => ({ msg: r.querySelectorAll('.jf-msg').length, pv: getComputedStyle(r.querySelector('.jf-pv')).whiteSpace, vis: getComputedStyle(r.querySelector('.jf-pv')).visibility,
+            bar: [...r.querySelector('.jf-bar').children].map(c => c.tagName === 'TEXTAREA' ? 'reply' : c.className.split(' ')[0]),
+            line: (() => { const tops = ['textarea', '.jf-del', '.jf-send'].map(s => Math.round(r.querySelector(s).getBoundingClientRect().bottom)); return new Set(tops).size; })() }));
+        assert.deepEqual(lean, { msg: 0, pv: 'pre-wrap', vis: 'visible', bar: ['reply', 'jf-del-row', 'jf-send'], line: 1 }, 'lean open row: ' + JSON.stringify(lean));
+        const idle = await page.$eval(row, r => { const b = r.querySelector('.jf-del'), cs = getComputedStyle(b); return { text: b.textContent, aria: b.getAttribute('aria-label'), title: b.title, bg: cs.backgroundColor }; });
+        assert.deepEqual([idle.text, idle.aria, idle.bg], ['🗑', 'Delete message', 'rgba(0, 0, 0, 0)'], 'a quiet 🗑 icon: ' + JSON.stringify(idle));
         assert.match(idle.title, /History/, 'the tooltip says it also leaves the intern’s History');
         // ask: the question names the intern, Cancel is first and focused; nothing written yet
         await page.click(row + ' .jf-del');
-        const ask = await page.$eval(row + ' .jf-del-row', r => ({ asking: r.classList.contains('asking'), q: r.querySelector('.jf-del-q').textContent, btns: [...r.querySelectorAll('button')].map(b => b.textContent), focus: document.activeElement.className }));
-        assert.deepEqual(ask, { asking: true, q: 'Delete this message? It also disappears from Joeylive’s History.', btns: ['Cancel', '🗑 Delete'], focus: 'jf-del-no' }, 'asks in the row, Cancel first: ' + JSON.stringify(ask));
+        const ask = await page.$eval(row + ' .jf-del-row', r => ({ asking: r.classList.contains('asking'), q: r.querySelector('.jf-del-q').textContent, btns: [...r.querySelectorAll('button')].map(b => b.textContent), focus: document.activeElement.className,
+            hidden: ['textarea', '.jf-send'].map(s => getComputedStyle(r.closest('.jf-bar').querySelector(s)).display) }));
+        assert.deepEqual(ask, { asking: true, q: 'Delete this message? It also disappears from Joeylive’s History.', btns: ['Cancel', 'Delete'], focus: 'jf-del-no', hidden: ['none', 'none'] }, 'asks on the bar’s line, Cancel first: ' + JSON.stringify(ask));
         assert.deepEqual(await page.evaluate(() => window.__commits), [], 'asking writes nothing');
         // Cancel: back to the quiet link, focus on it
         await page.click(row + ' .jf-del-no');
-        assert.deepEqual(await page.$eval(row + ' .jf-del-row', r => [r.classList.contains('asking'), r.textContent, document.activeElement.className]), [false, '🗑 Delete', 'jf-del'], 'Cancel goes back');
+        assert.deepEqual(await page.$eval(row + ' .jf-del-row', r => [r.classList.contains('asking'), r.textContent, document.activeElement.className]), [false, '🗑', 'jf-del'], 'Cancel goes back');
+        assert.equal(await page.$eval(row + ' textarea', e => getComputedStyle(e).display), 'block', 'the reply box is back');
+        await page.click(row + ' .jf-del'); await page.keyboard.press('Escape');
+        assert.deepEqual(await page.$eval(row, r => [r.open, r.querySelector('.jf-del-row').classList.contains('asking')]), [true, false], 'Esc on the question = Cancel, the row stays open');
         assert.deepEqual(await page.evaluate(() => window.__commits), [], 'Cancel writes nothing');
         // a failed commit removes nothing and says so; the row stays
         await page.evaluate(() => { window.__failCommit = true; });
         await page.click(row + ' .jf-del'); await page.click(row + ' .jf-del-yes');
         await page.waitForFunction(() => /Could not delete/.test(document.querySelector('.lr-admin > p[role=status]').textContent));
-        assert.deepEqual(await page.$eval(row + ' .jf-del-row', r => [r.classList.contains('asking'), r.textContent]), [false, '🗑 Delete'], 'after a failure: back to idle, ready to retry');
+        assert.deepEqual(await page.$eval(row + ' .jf-del-row', r => [r.classList.contains('asking'), r.textContent]), [false, '🗑'], 'after a failure: back to idle, ready to retry');
         assert.deepEqual(await page.evaluate(() => window.__commits), [], 'nothing removed on a failure');
         // a reply draft for this row, then Delete: ONE batch with both docs, the status says where it went
         await page.fill(row + ' textarea', 'draft that must go');
@@ -88,6 +96,6 @@ const db = { app: { auth: () => ({ currentUser: { email: 'admin@test' }, onAuthS
         assert.deepEqual(errs, [], 'no page errors: ' + errs.join(' | '));
         await page.evaluate(() => { document.querySelector('.lr-request[data-id="a"] .jf-del').click(); });
         await page.locator('#jf-panel').screenshot({ path: process.env.JF_SHOT || require('node:os').tmpdir() + '/jf-delete.png' });
-        console.log('PASS: admin Journal feedback 🗑 Delete (V102.585) — asks in the row (Cancel first, no native dialog), one batch removes the inbox doc + the intern copy, a failure removes nothing, the row and its draft go');
+        console.log('PASS: admin Journal feedback 🗑 Delete (V102.585, lean bar V102.587) — asks in the row (Cancel first, no native dialog), one batch removes the inbox doc + the intern copy, a failure removes nothing, the row and its draft go');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

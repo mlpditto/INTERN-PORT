@@ -26,7 +26,7 @@ assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(fs.readFileSync('publi
       const st = badgeExportState; await st.countsPromise;
       st.avatar = 'none';
       st.counts = { early_bird: 8, quiz_master: 110, perfectionist: 1, speedrunner: 1, reflective_mind: 7, mentor_feedback: 7, explorer: 24, social_butterfly: 1, case_hunter: 12, case_systems: 4 };
-      out.defaults = [st.sortTier, st.progress];
+      out.defaults = [st.sortTier, st.progress]; st.progress = true;   // V102.587: off by default; the rest tests the line when shown
       const doc = (l, extra) => new DOMParser().parseFromString(badgeBoardSvg(Object.assign({}, st, { layout: l }, extra), l, 400), 'image/svg+xml');
       const texts = (l, extra) => [...doc(l, extra).querySelectorAll('text')].map(t => t.textContent);
       out.order = badgeBoardGeom(st, 'story').items.map(i => i.id);
@@ -51,7 +51,7 @@ assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(fs.readFileSync('publi
       click('🏆 By tier'); out.afterTier = badgeExportState.sortTier;
       return out;
     });
-    assert.deepEqual(r.defaults, [true, true], 'the dialog opens sorted by tier, with n / 16 badges');
+    assert.deepEqual(r.defaults, [true, false], 'the dialog opens sorted by tier, without n / 16 badges (V102.587)');
     // order: Gold, then Silver, then Bronze; ties keep the usual order
     assert.deepEqual(r.order, ['explorer', 'night_owl', 'quiz_master', 'case_hunter', 'reflective_mind', 'mentor_feedback', 'on_fire', 'early_bird', 'perfectionist', 'speedrunner', 'codex_contributor', 'team_player', 'social_butterfly'], 'by tier: ' + r.order);
     assert.deepEqual(r.orderOff.slice(0, 4), ['on_fire', 'early_bird', 'quiz_master', 'perfectionist'], 'Original keeps the usual order');
