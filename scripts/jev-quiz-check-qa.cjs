@@ -50,8 +50,38 @@ const ADMIN = pathToFileURL(path.resolve('public/admin.html')).href;
       await page.evaluate(() => { window.__reply = { enabled: true, questions: 5, checked: 2, errors: 0, noExplanation: 2, unchecked: [3, 4], compared: 9, flags: [], repeats: [{ q: 1, quizId: 'b', title: 'Eye 2', otherQ: 2, score: 0.91, stem: 'first stem', otherStem: 'other stem' }] }; });
       await btn(); await page.waitForTimeout(100);
       { const u = await box(); assert.match(u, /2 OK/); assert.match(u, /2 not checked/); assert.match(u, /1 repeat/); assert.match(u, /Q2[\s\S]*Same fact as Eye 2 Q3[\s\S]*0\.91/); assert.match(u, /Compared 9 likely pairs/); assert.ok(!/Nothing to look at/.test(u)); }
-      assert.equal(await page.locator('.jqc-pair').isVisible(), false); await page.click('.jqc-cmp'); assert.match(await page.locator('.jqc-pair').innerText(), /first stem[\s\S]*other stem/);
+      assert.equal(await page.locator('.jqc-pair').isVisible(), false);
+      // V102.590 (owner): Compare = both questions in full, side by side; the other quiz is read from Firestore; 🗑 only on this quiz's side
+      await page.evaluate(() => {
+        window.__formQs = [{ q: 'zero', options: ['a', 'b'], correct: [0], explanation: '' }, { q: 'first stem', options: ['keep me', 'right one'], correct: [1], explanation: 'mine because' }];
+        window.getQuizFormData = () => ({ questions: window.__formQs.map(x => Object.assign({ content: '', type: 'choice' }, x)) });
+        window.__dbReads = [];
+        window.db = { collection: c => ({ doc: id => ({ get: async () => { window.__dbReads.push(c + '/' + id); return { exists: true, data: () => ({ questions: [{}, {}, { q: 'other stem', options: ['x', 'y <b>'], correct: [1], explanation: 'why' }] }) }; } }) }) };
+      });
+      await page.click('.jqc-cmp'); await page.waitForTimeout(150);
+      const sbs = await page.evaluate(() => { const cols = [...document.querySelectorAll('.jqc-pair .jqc-col')]; return { n: cols.length, heads: cols.map(c => c.querySelector('h4').textContent), stems: cols.map(c => c.querySelector('.jqc-stem').textContent), ok: cols.map(c => [...c.querySelectorAll('.jqc-opts li.ok span')].map(x => x.textContent)), exp: cols.map(c => (c.querySelector('.jqc-exp') || {}).textContent || ''), del: cols.map(c => c.querySelectorAll('.jqc-del-b').length), wide: document.getElementById('jqc-box').classList.contains('jqc-wide'), reads: window.__dbReads, raw: cols[1].innerHTML.includes('<b>') && !cols[1].querySelector('.jqc-opts b + span b') }; });
+      assert.deepEqual(sbs, { n: 2, heads: ['This quiz · Q2', 'Eye 2 · Q3'], stems: ['first stem', 'other stem'], ok: [['right one'], ['y <b>']], exp: ['💡 mine because', '💡 why'], del: [1, 0], wide: true, reads: ['quizzes/b'], raw: true }, 'side by side in full, escaped, 🗑 on this side only: ' + JSON.stringify(sbs));
+      if (width < 500) assert.ok(await page.evaluate(() => { const c = document.querySelectorAll('.jqc-pair .jqc-col'); return c[1].getBoundingClientRect().top > c[0].getBoundingClientRect().bottom - 1; }), 'phone: the two stack');
+      else assert.ok(await page.evaluate(() => { const c = document.querySelectorAll('.jqc-pair .jqc-col'); return Math.abs(c[1].getBoundingClientRect().top - c[0].getBoundingClientRect().top) < 2; }), 'desktop: side by side');
+      // 🗑 asks in place (Cancel first, quotes the stem), Cancel writes nothing
+      await page.click('.jqc-del-b');
+      assert.match(await page.locator('.jqc-del.asking').innerText(), /Delete Q2 “first stem” from this quiz\? It is saved when you press Save Quiz\./);
+      assert.equal(await page.evaluate(() => document.activeElement.className), 'jqc-del-no', 'Cancel is focused');
+      await page.click('.jqc-del-no');
+      assert.equal(await page.locator('.jqc-del.asking').count(), 0, 'Cancel goes back');
       await page.locator('.jqc-qs .jqc-go').nth(1).click(); assert.equal(await page.evaluate(() => window.__page), 4, 'a chip opens that question');
+      // 🗑 Delete removes that question from the editor (not saved until Save Quiz), closes Jev + the Review, re-pages, autosaves
+      await page.evaluate(() => { document.querySelectorAll('.quiz-q-item').forEach(n => n.remove()); const host = document.createElement('div'); host.id = 'jqc-test-qs'; host.innerHTML = '<div class="quiz-q-item" data-k="0"></div><div class="quiz-q-item" data-k="1"></div>'; document.body.append(host); window.__auto = 0; window.triggerAutoSave = () => { window.__auto++; }; window.__closedBefore = window.__closed; });
+      await btn(); await page.waitForTimeout(100); await page.click('.jqc-cmp'); await page.waitForTimeout(150);
+      await page.click('.jqc-del-b'); await page.click('.jqc-del-yes'); await page.waitForTimeout(50);
+      const gone = await page.evaluate(() => ({ left: [...document.querySelectorAll('#jqc-test-qs .quiz-q-item')].map(n => n.dataset.k), open: document.getElementById('jqc-box').open, review: window.__closed - window.__closedBefore, auto: window.__auto }));
+      assert.deepEqual(gone, { left: ['0'], open: false, review: 1, auto: 1 }, 'Q2 removed from the form only: ' + JSON.stringify(gone));
+      await page.evaluate(() => document.getElementById('jqc-test-qs').remove());
+      // the other quiz cannot be read → its stem from Jev + a note, still 🗑 on this side
+      await page.evaluate(() => { window.db = { collection: () => ({ doc: () => ({ get: async () => { throw new Error('denied'); } }) }) }; });
+      await btn(); await page.waitForTimeout(100); await page.click('.jqc-cmp'); await page.waitForTimeout(150);
+      assert.match(await page.locator('.jqc-pair .jqc-col').nth(1).innerText(), /other stem[\s\S]*Could not load the full question/);
+      await page.click('.jqc-x');
 
       await page.evaluate(() => { window.__reply = { enabled: true, questions: 5, checked: 5, errors: 0, noExplanation: 0, flags: [] }; });
       await btn(); await page.waitForTimeout(100);
@@ -65,8 +95,23 @@ const ADMIN = pathToFileURL(path.resolve('public/admin.html')).href;
       await btn(); await page.waitForTimeout(100);
       assert.match(await box(), /Could not reach Jev/);
       assert.equal(await page.evaluate(() => window.__jevBtn.disabled), false, 'can try again');
+      await page.click('.jqc-x');
+      // V102.590 (owner): reading is INLINE — no dialog; the J tab pulses and counts (J 00:01); the result opens when Jev answers
+      await page.evaluate(() => {
+        document.body.insertAdjacentHTML('beforeend', '<div class="review-tabs"><button type="button" id="jev-quiz-check" class="review-tab" aria-label="Jev check">Jev check</button></div>');
+        window.__jevBtn = document.getElementById('jev-quiz-check');
+        window.__reply = { enabled: true, questions: 1, checked: 1, errors: 0, noExplanation: 0, flags: [] };
+        window.adminApp = { functions: () => ({ httpsCallable: () => () => new Promise(r => { window.__release = () => r({ data: window.__reply }); }) }) };
+      });
+      await btn(); await page.waitForTimeout(1250);
+      const run = await page.evaluate(() => { const b = document.getElementById('jev-quiz-check'); return { dlg: !!document.querySelector('#jqc-box[open]'), busy: b.classList.contains('jqc-busy'), t: b.dataset.t, after: getComputedStyle(b, '::after').content, label: b.getAttribute('aria-label'), wide: b.getBoundingClientRect().width > 40, off: b.disabled }; });
+      assert.deepEqual(run, { dlg: false, busy: true, t: '00:01', after: '"00:01"', label: 'Jev is reading this quiz · 00:01', wide: true, off: true }, 'inline while reading: ' + JSON.stringify(run));
+      await page.evaluate(() => window.__release()); await page.waitForTimeout(150);
+      const done = await page.evaluate(() => { const b = document.getElementById('jev-quiz-check'); return { busy: b.classList.contains('jqc-busy'), t: b.dataset.t || '', label: b.getAttribute('aria-label'), off: b.disabled }; });
+      assert.deepEqual(done, { busy: false, t: '', label: 'Jev check', off: false }, 'back to the J tab when Jev answers');
+      assert.match(await box(), /Nothing to look at/, 'then the result opens');
       await page.context().close();
     }
-    console.log('PASS: Jev check — whole-quiz button, unsaved quiz, flags in order, Open jumps, clean, off, error, 390 px');
+    console.log('PASS: Jev check — reading inline on the J tab with a timer + Compare side by side in full with 🗑 on this quiz’s side (V102.590), whole-quiz button, unsaved quiz, flags in order, Open jumps, clean, off, error, 390 px');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
