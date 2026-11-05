@@ -81,10 +81,10 @@
         const el = document.createElement(tag); if (text !== undefined) el.textContent = text;
         if (className) el.className = className; return el;
     }
+    // V102.591 (owner: leaner Curate): ONE line in the admin's UI language; the other language rides in the tooltip
     function bilingual(host, en, th) {
-        for (const [lang, text] of [['th', th], ['en', en]]) {
-            const line = node('div', (lang === 'th' ? 'TH · ' : 'EN · ') + text); line.lang = lang; host.append(line);
-        }
+        const thOn = document.body.classList.contains('lang-th-on') && th, line = node('div', thOn ? th : (en || th));
+        line.lang = thOn || !en ? 'th' : 'en'; if (thOn ? en : th) line.title = thOn ? en : th; host.append(line);
     }
     function disclosure(label, hint, host, open = false) {
         const details = node('details'); details.open = open;
@@ -194,9 +194,14 @@
         if (!s.compare) return;
         const [a, b] = s.compare, assessment = s.proposal.find(q => q.id === a), relation = assessment.related.find(r => r.id === b);
         const back = node('button', '← Back to review', 'curate-back'); back.type = 'button'; back.title = 'กลับรายการข้อสอบ'; back.onclick = backToReview;
-        panel.append(back, node('h3', 'Compare Q' + a + ' ↔ Q' + b));
-        panel.append(node('div', 'AI assessment · highlighted excerpts are verified against the source text', 'curate-note'));
-        if (s.source.form.caseContent) disclosure('Shared case context', 'บริบทกรณีศึกษาร่วมของข้อสอบ', panel).append(node('div', s.source.form.caseContent, 'curate-stem'));
+        // V102.591 (owner: lean + inline): one header line — ← · Q10 ↔ Q14 · ⓘ · Shared case context · Keep both
+        back.textContent = '←'; back.setAttribute('aria-label', 'Back to review');
+        const head = node('div', undefined, 'curate-cmp-head'); panel.append(head);
+        const info = node('span', 'ⓘ', 'curate-info'); info.tabIndex = 0;
+        info.title = 'AI assessment · highlighted excerpts are verified against the source text · Selection changes do not rewrite questions. Match the target before saving.';
+        info.setAttribute('aria-label', info.title);
+        head.append(back, node('h3', 'Q' + a + ' ↔ Q' + b), info);
+        if (s.source.form.caseContent) disclosure('Shared case context', 'บริบทกรณีศึกษาร่วมของข้อสอบ', head).append(node('div', s.source.form.caseContent, 'curate-stem'));
         const grid = node('div', undefined, 'curate-compare-grid'); panel.append(grid);
         for (const id of [a, b]) {
             const card = node('section', undefined, 'curate-compare-card');
@@ -204,17 +209,21 @@
             heading.append(copyButton(s.source.form.questions[id - 1], id, s.source.missingKeys.includes(id))); // V101.18: inline with the heading
             card.append(heading);
             sourceView(card, s.source.form.questions[id - 1], true, relation.evidence.filter(e => e.id === id), s.source.missingKeys.includes(id), id); grid.append(card);
+            card.querySelectorAll(':scope details').forEach(d => d.classList.add(/explanation/i.test(d.querySelector('summary')?.textContent || '') ? 'curate-cmp-exp' : 'curate-cmp-flat'));
         }
-        for (const [key, label] of [['shared', 'Shared objective'], ['difference', 'Key differences'], ['preference', 'Why prefer this question']]) {
-            const section = node('section', undefined, 'curate-reason'); section.append(node('strong', label)); bilingual(section, relation[key], relation[key + 'Th']); panel.append(section);
+        const why = node('section', undefined, 'curate-reason curate-cmp-why'); panel.append(why);
+        for (const [key, label, icon] of [['shared', 'Shared objective', '🎯'], ['difference', 'Key differences', '↔'], ['preference', 'Why prefer this question', '⭐']]) {
+            const line = node('div', undefined, 'curate-cmp-line'); const tag = node('strong', icon); tag.title = label; tag.setAttribute('aria-label', label);
+            line.append(tag); bilingual(line, relation[key], relation[key + 'Th']); why.append(line);
         }
         const actions = node('div', undefined, 'curate-compare-actions');
         // V101.04: the button matching the current selection shows as pressed, and a click
         // confirms the result in the feedback line — before, pressing an already-current
         // choice (e.g. "Keep Q1" while Q1 was kept) changed nothing visible and looked broken.
         const current = [a, b].filter(id => s.keep.has(id));
-        for (const ids of [[a], [b], [a, b]]) {
-            const button = node('button', ids.length === 2 ? 'Keep both' : 'Keep Q' + ids[0]); button.type = 'button';
+        for (const ids of [[b], [a], [a, b]]) {   // V102.591 (owner, like Jev check): 🗑 Remove Qa = keep Qb, on that question's card
+            const gone = ids.length === 2 ? null : [a, b].find(id => !ids.includes(id));
+            const button = node('button', gone ? '🗑 Remove Q' + gone : 'Keep both', gone ? 'curate-cmp-del' : undefined); button.type = 'button';
             const pressed = ids.length === current.length && ids.every(id => current.includes(id));
             button.setAttribute('aria-pressed', String(pressed));
             button.title = pressed ? 'ตัวเลือกปัจจุบัน' : 'ปรับข้อที่เก็บ โดยยังคงข้อที่ปักหมุดไว้';
@@ -225,11 +234,12 @@
                 const removed = [a, b].filter(id => !ids.includes(id));
                 s.message = 'Keeping ' + ids.map(id => 'Q' + id).join(' and ') + (removed.length ? ' · removing ' + removed.map(id => 'Q' + id).join(', ') : '') + ' · ' + s.keep.size + ' selected · target ' + target(s);
                 render();
-                [...panel.querySelectorAll('.curate-compare-actions button')].find(b => b.textContent === button.textContent)?.focus();
+                [...panel.querySelectorAll('.curate-compare-actions button, .curate-cmp-del')].find(b => b.textContent === button.textContent)?.focus();
                 byId('curate-feedback').scrollIntoView({ block: 'nearest' });
-            }; actions.append(button);
+            };
+            if (gone) panel.querySelectorAll('.curate-compare-card h4')[gone === a ? 0 : 1].append(button); else actions.append(button);
         }
-        panel.append(actions, node('div', 'Selection changes do not rewrite questions. Match the target before saving.', 'curate-note'));
+        head.append(actions);   // Keep both, on the header line (the old note is the ⓘ title)
     }
     function problem(s) {
         const n = target(s);
@@ -294,16 +304,18 @@
             const next = Math.min(Number(input.max) || Infinity, Math.max(1, Math.round(Number(input.value) || 0) + Number(button.dataset.step)));
             input.value = next; input.oninput();
         });
+        byId('curate-coverage').after(byId('curate-proposal-label'));   // V102.591: ⓘ on the coverage line
         const comparison = node('div'); comparison.id = 'curate-comparison'; comparison.hidden = true;
         dialog.querySelector('.curate-review').after(comparison);
         const backupOption = node('label'); backupOption.className = 'curate-backup-option';
-        backupOption.innerHTML = '<input type="checkbox" id="curate-create-backup" checked> Create backup quiz <span title="ใช้กับ Remove เท่านั้น หากปิดจะไม่เพิ่มสำเนาในรายการ Quiz แต่ยังเก็บเวอร์ชันที่จำเป็นต่อประวัติคำตอบเดิม">ⓘ</span>';
-        dialog.querySelector('.curate-footer').before(backupOption);
+        backupOption.innerHTML = '<input type="checkbox" id="curate-create-backup" checked> Backup <span title="ใช้กับ Remove เท่านั้น หากปิดจะไม่เพิ่มสำเนาในรายการ Quiz แต่ยังเก็บเวอร์ชันที่จำเป็นต่อประวัติคำตอบเดิม">ⓘ</span>';
+        byId('curate-save').before(backupOption);   // V102.591: inline with the buttons (was its own line)
         const apply = node('button', 'Apply to current quiz', 'curate-apply'); apply.type = 'button'; apply.id = 'curate-apply';
         apply.title = 'ตัดข้อออกจากชุดเดิมที่ปิดใช้งานและไม่มีประวัติ พร้อมสร้างสำเนาก่อนแก้ไข';
         byId('curate-save').after(apply);
         const split = node('button', 'Split into two quizzes', 'curate-primary'); split.type = 'button'; split.id = 'curate-split';
         split.title = 'ชุดเดิมเก็บ Keep ชุดใหม่รับ Remove พร้อมสำเนา Before Split'; apply.after(split);
+        const info = node('span', 'ⓘ', 'curate-info'); info.id = 'curate-actions-info'; info.tabIndex = 0; split.after(info);   // V102.591: the footer note, as a tooltip
         split.onclick = () => save(true, true);
         byId('curate-confirm-ok').onclick = () => settleConfirm(true);
         byId('curate-confirm-cancel').onclick = () => settleConfirm(false);
@@ -378,7 +390,6 @@
                 reason.append(note);
             }
             if (assessment) {
-                reason.append(node('span', assessment.keep ? 'AI suggests keeping' : 'AI suggests removal', 'curate-badge'));
                 bilingual(reason, assessment.reason, assessment.reasonTh);
                 const details = disclosure('Details', 'รายละเอียดเหตุผลและผลกระทบหากตัดข้อนี้', reason);
                 details.className = 'curate-reason-details';
@@ -406,8 +417,19 @@
             coverage = missing.length ? 'Coverage gap · ' + missing.join(', ') : covered.size + '/' + topics.size + ' topics covered · ' + s.pins.size + ' pinned';
         }
         byId('curate-coverage').textContent = coverage;
-        byId('curate-proposal-label').textContent = s.proposal ? 'AI proposal · review before saving · topics and difficulty are AI estimates' : 'Pin must-keep questions, then select Suggest.';
-        byId('curate-feedback').textContent = s.message || problem(s) || count + ' → ' + s.keep.size + ' questions · total points unchanged';
+        const label = byId('curate-proposal-label');   // V102.591: after a proposal the sentence is a ⓘ on the coverage line
+        label.textContent = s.proposal ? 'ⓘ' : 'Pin must-keep questions, then select Suggest.'; label.classList.toggle('curate-info', !!s.proposal);
+        label.title = s.proposal ? 'AI proposal · review before saving · topics and difficulty are AI estimates' : ''; label.tabIndex = s.proposal ? 0 : -1;
+        if (s.proposal) label.setAttribute('aria-label', label.title); else label.removeAttribute('aria-label');
+        const feedback = byId('curate-feedback');
+        if (s.unsaved && !s.message) {   // V102.591 (owner): 💾 Save editor right here, instead of "save the editor first, then reopen Curate"
+            const list = s.unsaved.map(d => 'Q' + d.id + ' (' + d.fields.join(', ') + ')').join(', ');
+            feedback.replaceChildren(node('span', '⚠ ' + s.unsaved.length + ' unsaved question' + (s.unsaved.length > 1 ? 's' : ''), 'curate-unsaved'));
+            feedback.firstChild.title = list + ' differ from the saved quiz.';
+            const save = node('button', s.savingEditor ? 'Saving…' : '💾 Save editor', 'curate-save-editor'); save.type = 'button'; save.id = 'curate-save-editor';
+            save.title = 'Save the quiz editor (same as Save Quiz), then press Remove or Split again';
+            save.onclick = () => saveEditor(s); feedback.append(save);
+        } else feedback.textContent = s.message || problem(s) || count + ' → ' + s.keep.size + ' questions · total points unchanged';
         byId('curate-confirm').hidden = !s.confirming;
         byId('curate-confirm-text').textContent = s.confirming?.text || '';
         byId('curate-confirm-ok').textContent = s.confirming?.label || '';
@@ -424,7 +446,8 @@
         byId('curate-split').disabled = byId('curate-apply').disabled;
         byId('curate-split').textContent = s.splitting && !s.confirming ? 'Splitting…' : 'Split into two quizzes';
         byId('curate-apply').textContent = s.applying && !s.confirming ? 'Applying…' : 'Remove ' + (count - s.keep.size) + ' from original';
-        dialog.querySelector('.curate-main > .curate-note').textContent = 'Remove updates the inactive original. Create backup quiz is optional; required history versions are preserved. Split creates a new quiz from removed questions.';
+        dialog.querySelector('.curate-main > .curate-note').hidden = true;   // V102.591: the sentence is the ⓘ title beside the buttons
+        byId('curate-actions-info').title = 'Remove updates the inactive original. Create backup quiz is optional; required history versions are preserved. Split creates a new quiz from removed questions.';
         byId('curate-suggest').textContent = s.busy ? 'Processing · ' + elapsed(s) : s.done ? 'Run again' : '✦ Suggest';
         byId('curate-suggest').classList.toggle('icon', !!s.done && !s.busy);   // V102.219: icon-only ↻ after a run
         byId('curate-suggest').hidden = !!s.stale; byId('curate-reload').hidden = !s.stale;
@@ -674,14 +697,14 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
         if (!before.exists) throw new Error('The original quiz no longer exists. Save as new quiz instead.');
         const original = before.data();
         if (operation.backupRef && original.curation?.applyOperationId === operation.backupRef.id) return;
-        const baseline = await s.serverBaseline;
+        const baseline = s.rebased ? { exists: true, data: original } : await s.serverBaseline;   // V102.591: saved from this same editor via 💾
         if (baseline?.error) throw new Error('Could not verify the original quiz. Close Curate and retry online.');
         if (!baseline?.exists || fingerprint(baseline.data) !== fingerprint(original)) throw new Error('The stored quiz changed since Curate opened. Close it and review the latest version.');
         const diff = editorDiff(Array.isArray(original.questions) ? original.questions : [], s.source.form.questions);   // V102.456: editor fields only, named
         if (diff.length) {
             console.warn('[curate] editor ≠ saved quiz:', diff.map(d => 'Q' + d.id + ' (' + d.fields.join(', ') + ')').join('; '));
-            throw new Error(diff.slice(0, 5).map(d => 'Q' + d.id + ' (' + d.fields.join(', ') + ')').join(', ') + (diff.length > 5 ? ' and ' + (diff.length - 5) + ' more' : '')
-                + ' differ from the saved quiz. Save the editor first, then reopen Curate before applying to this quiz.');
+            const error = new Error(diff.slice(0, 5).map(d => 'Q' + d.id + ' (' + d.fields.join(', ') + ')').join(', ') + (diff.length > 5 ? ' and ' + (diff.length - 5) + ' more' : '')
+                + ' differ from the saved quiz.'); error.unsaved = diff; throw error;
         }
         // V102.513 (owner): an active quiz is no longer refused — the confirm says it will be deactivated first, and the same transaction writes isActive:false
         const deactivate = original.isActive !== false;
@@ -767,7 +790,22 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
             await s.docRef.set(copy);
             s.saved = true; s.message = 'Saved as a new inactive quiz. Original ' + form.questions.length + ' questions preserved.';
             showToast('Curated quiz saved. Find it in the quiz list.');
-        } catch (error) { s.message = 'Could not save: ' + error.message; }
+        } catch (error) { if (error.unsaved) { s.unsaved = error.unsaved; s.message = ''; } else s.message = 'Could not save: ' + error.message; }
         finally { if (state === s) { s.saving = false; s.applying = false; s.splitting = false; render(); } }
+    }
+    // V102.591 (owner): 💾 Save editor — runs the editor's own Save Quiz, then checks the stored questions now equal what Curate reviewed;
+    // if so the proposal stays valid (no reopen, no new AI call) and Remove / Split compare against the freshly saved quiz.
+    async function saveEditor(s) {
+        if (s.savingEditor || typeof window.saveQuiz !== 'function') return;
+        s.savingEditor = true; render();
+        try {
+            await window.saveQuiz();
+            const doc = await db.collection('quizzes').doc(s.source.sourceId).get({ source: 'server' });
+            const diff = editorDiff(Array.isArray(doc.data()?.questions) ? doc.data().questions : [], s.source.form.questions);
+            if (!unchanged(s)) { s.stale = true; s.unsaved = null; s.message = 'The editor changed since Curate opened. Select ↻ Use latest questions.'; }
+            else if (diff.length) { s.unsaved = diff; s.message = ''; }
+            else { s.unsaved = null; s.rebased = true; s.message = '💾 Saved · press Remove or Split again'; }
+        } catch (error) { s.message = 'Could not save the editor: ' + error.message; }
+        finally { if (state === s) { s.savingEditor = false; render(); } }
     }
 })();

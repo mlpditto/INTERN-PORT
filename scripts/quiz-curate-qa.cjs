@@ -167,11 +167,13 @@ const { chromium } = require('playwright');
         assert.equal(await page.locator('.curate-question').count(), 4);
         assert.match(await page.locator('#curate-coverage').innerText(), /2\/2 topics/);
         assert.equal(await page.locator('#curate-rows img').count(), 0);
-        assert.match(await row(10).locator('[lang=th]').first().innerText(), /เหตุผลสำหรับข้อ 10/);
+        // V102.591 lean: one line in the UI language (EN here), the other language in its tooltip
         assert.match(await row(10).locator('[lang=en]').first().innerText(), /<img/);
+        assert.match(await row(10).locator('[lang=en]').first().getAttribute('title'), /เหตุผลสำหรับข้อ 10/);
+        assert.equal(await row(10).locator('.curate-reason > [lang=th]').count(), 0, 'no second-language line');
         assert.equal(await page.evaluate(() => window.injected), undefined);
         assert.equal(await row(10).locator('.curate-stem').count(), 1);
-        assert.equal(await row(11).locator('.curate-badge').innerText(), 'AI suggests removal');
+        assert.equal(await row(11).locator('.curate-badge').count(), 0, 'V102.591: no AI-suggests badge — the Keep / Remove tab says it');
         await page.waitForFunction(() => document.querySelector('[data-question-id="10"] .curate-expand').hidden);
         assert.equal(await row(11).locator('.curate-expand').isVisible(), false, 'short question does not need More');
         const choicesToggle = row(10).getByRole('button', { name: /^Choices · 2/ });
@@ -196,7 +198,8 @@ const { chromium } = require('playwright');
         assert.equal(await page.locator('.curate-compare-card').count(), 2);
         assert.equal(await page.locator('.curate-compare-card mark').count(), 2);
         assert.equal(await page.locator('.curate-compare-card .curate-key').count(), 2);
-        assert(await page.getByRole('button', { name: 'Keep Q10', exact: true }).isDisabled(), 'cannot remove pinned Q14');
+        assert(await page.getByRole('button', { name: '🗑 Remove Q14', exact: true }).isDisabled(), 'cannot remove pinned Q14');
+        assert.deepEqual(await page.locator('.curate-compare-card').evaluateAll(cs => cs.map(c => (c.querySelector('.curate-cmp-del') || {}).textContent)), ['🗑 Remove Q10', '🗑 Remove Q14'], 'V102.591: 🗑 on each side, like Jev check');
         for (const width of [320, 390, 736, 1024]) {
             await page.setViewportSize({ width, height: 900 });
             assert(await page.locator('#quiz-curate-dialog').evaluate(d => d.scrollWidth <= d.clientWidth + 1), 'comparison overflow at ' + width);
@@ -205,15 +208,15 @@ const { chromium } = require('playwright');
         }
         await page.getByRole('button', { name: 'Keep both', exact: true }).click(); assert(await saveDisabled());
         assert.match(await feedback(), /11 selected/);
-        await page.getByRole('button', { name: 'Keep Q14', exact: true }).click(); assert.equal(await saveDisabled(), false);
+        await page.getByRole('button', { name: '🗑 Remove Q10', exact: true }).click(); assert.equal(await saveDisabled(), false);
         await page.screenshot({path:'quiz-curate-compare-qa.png'});
         await page.keyboard.press('Escape');
         assert(await page.locator('#quiz-curate-dialog').isVisible());
         assert.equal(await page.locator('#curate-comparison').isVisible(), false);
         await row(10).locator('.curate-move').click(); assert(await saveDisabled());
         await page.locator('[data-view="keep"]').click();
-        assert.match(await row(14).locator('[lang=th]').first().innerText(), /เหตุผลสำหรับข้อ 14/);
         assert.match(await row(14).locator('[lang=en]').first().innerText(), /Reason for Q14/);
+        assert.match(await row(14).locator('[lang=en]').first().getAttribute('title'), /เหตุผลสำหรับข้อ 14/);
         await row(1).locator('.curate-move').click(); assert.equal(await saveDisabled(), false);
         for (const width of [320, 390, 736, 1024]) {
             await page.setViewportSize({ width, height: 850 });
@@ -370,8 +373,17 @@ const { chromium } = require('playwright');
         // …while a real unsaved edit still blocks, and the message names the question + field
         await page.evaluate(() => { records['source-quiz'] = structuredClone(stored); fixture.questions[3].q += ' (edited, not saved)'; });
         await open(); await suggest(result()); await apply();
-        assert.match(await feedback(), /Q4 \(q\) differ from the saved quiz\. Save the editor first/, 'a real edit names Q4: ' + await feedback());
-        assert.equal(await page.evaluate(() => atomicWrites), 0); await close();
+        // V102.591 (owner): a short line + 💾 Save editor instead of “save the editor first, then reopen Curate”; the tooltip names Q4 (q)
+        assert.match(await feedback(), /⚠ 1 unsaved question/, 'a real edit: ' + await feedback());
+        assert.match(await page.locator('.curate-unsaved').getAttribute('title'), /Q4 \(q\) differ from the saved quiz/);
+        assert.equal(await page.evaluate(() => atomicWrites), 0);
+        // 💾 runs the editor's Save Quiz; the stored questions now equal what Curate reviewed → the same proposal applies, no reopen, no AI call
+        await page.evaluate(() => { window.saveQuiz = async () => { window.editorSaves = (window.editorSaves || 0) + 1; records['source-quiz'] = Object.assign(structuredClone(records['source-quiz']), { questions: structuredClone(fixture.questions), updatedAt: 'later' }); }; window.callsBefore = calls.length; });
+        await page.locator('#curate-save-editor').click();
+        await page.waitForFunction(() => /Saved · press Remove or Split again/.test(document.getElementById('curate-feedback').textContent));
+        assert.deepEqual(await page.evaluate(() => [window.editorSaves, calls.length - window.callsBefore]), [1, 0], 'one editor save, no new AI call');
+        await apply(); assert.match(await confirmText(), /Q11, Q12, Q13, Q14/, 'after 💾 the stored quiz is the baseline: Remove reaches its confirm');
+        await confirmCancel(); assert.equal(await page.evaluate(() => atomicWrites), 0); await close();
         await page.evaluate(() => { fixture = structuredClone(original); });
         await page.evaluate(() => records['source-quiz'] = structuredClone(stored));
         await open(); await suggest(result());
