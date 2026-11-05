@@ -79,7 +79,7 @@ const snap = page => page.evaluate(() => {
         await ctx.close();
         // a mid-size window (~1150 px): there IS room, the card narrows to fit instead of waiting for 1240 px
         ({ ctx, page, errors } = await open(browser, 1150, 'high'));
-        s = await snap(page); assert.ok(s.shown && s.rightOfTimeline && s.width >= 120 && s.width < 236, 'at ~1150 px the card is drawn, narrower than 236: ' + JSON.stringify(s));
+        s = await snap(page); assert.ok(s.shown && s.rightOfTimeline && s.width >= 120 && s.width <= 236, 'at ~1150 px the card is drawn (V101.270: History is full width but keeps the rail its 252 px from 1100 px, so the card gets its full 236): ' + JSON.stringify(s));
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true, 'and it never causes sideways scroll');
         await ctx.close();
         console.log('PASS: History flood rail — at-risk places only, right of the timeline, no words, × = closed for today, tap = popup, hidden on narrow screens');
