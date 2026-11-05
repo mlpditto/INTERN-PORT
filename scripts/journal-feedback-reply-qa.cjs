@@ -85,10 +85,10 @@ const db = { app: { auth: () => ({ currentUser: { email: 'admin@test' }, onAuthS
 
         const rows = await page.$$eval('.lr-request', els => els.map(e => e.querySelector('summary b').textContent + ':' + e.className));
         assert.deepEqual(rows, ['Mint:lr-request wait new', 'Ploy:lr-request done'], 'newest first; the row class says the state (new glows)');
-        const b = await page.$eval('.lr-request[data-id="b"]', r => ({ have: r.querySelector('.jf-have').textContent, ph: r.querySelector('textarea').placeholder, btn: r.querySelector('.jf-send').getAttribute('aria-label'), read: !!r.querySelector('button:not(.jf-send)') }));
+        const b = await page.$eval('.lr-request[data-id="b"]', r => ({ have: r.querySelector('.jf-have').textContent, ph: r.querySelector('textarea').placeholder, btn: r.querySelector('.jf-send').getAttribute('aria-label'), read: !!r.querySelector('button:not(.jf-send):not(.jf-del)') }));
         assert.match(b.have, /^↩ Under \*\*Settings ▸ Quiz\*\*\./, 'the existing reply shows under the message'); assert.match(b.have, /admin@test/);
         assert.deepEqual([b.ph.startsWith('Edit reply'), b.btn, b.read], [true, 'Update reply', false], 'a replied row offers to update');
-        const a = await page.$eval('.lr-request[data-id="a"]', r => ({ have: !!r.querySelector('.jf-have'), btn: r.querySelector('.jf-send').textContent + ' ' + r.querySelector('.jf-send').getAttribute('aria-label'), read: !!r.querySelector('button:not(.jf-send)') }));
+        const a = await page.$eval('.lr-request[data-id="a"]', r => ({ have: !!r.querySelector('.jf-have'), btn: r.querySelector('.jf-send').textContent + ' ' + r.querySelector('.jf-send').getAttribute('aria-label'), read: !!r.querySelector('button:not(.jf-send):not(.jf-del)') }));
         assert.deepEqual(a, { have: false, btn: '➤ Send reply', read: false }, 'an unanswered row: ➤ only, no Mark read button');
         // empty reply refused
         await page.evaluate(() => { document.querySelector('.lr-request[data-id="a"]').open = true; });
