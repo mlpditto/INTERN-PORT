@@ -67,6 +67,7 @@ assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(fs.readFileSync('publi
     const ch = r.story.indexOf('Case Hunter'); assert.deepEqual(r.story.slice(ch, ch + 3), ['Case Hunter', '12 cases', '4 systems'], 'Case Hunter: cases + systems');
     assert.ok(r.story.includes('24 topics') && r.story.includes('110 questions'), 'exact counts still win over the tier name');
     assert.ok(!r.story.some(x => /\d\+/.test(x)), 'no "N+" guesses');
+    assert.ok(!r.story.includes('MY BADGES'), 'no MY BADGES title on the story (owner 2026-11-05)');
     assert.ok(r.rows[0] > r.rows[1], 'rows get room for the 3rd line only when Case Hunter has systems: ' + r.rows);
     // a short last row is centred: story 13 badges = 4+4+4+1 → the lone tile sits in the middle
     const [W, cell] = r.tiles[r.tiles.length - 1], t = r.tiles.slice(0, -1);
