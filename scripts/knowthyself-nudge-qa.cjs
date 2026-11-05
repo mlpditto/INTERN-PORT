@@ -32,7 +32,7 @@ assert.ok(!/score|beri|increment|collection\(/i.test(js.replace(/never affects a
             document.querySelectorAll('.modal').forEach(m => { m.style.display = 'none'; });
             document.getElementById('kanban-content').style.display = 'block';
             if (typeof switchMissionTab === 'function') switchMissionTab('reflection');
-            userId = 'U1'; window.myRegistered = true; localStorage.clear();
+            userId = 'U1'; window.myRegistered = true; localStorage.clear(); localStorage.setItem('journalTourSeen', '1');   // V101.267: the Journal tour is not what this test is about
             window.myUserDoc = { id: 'U1', group: 'EXTERN' };
         });
         const today = await page.evaluate(() => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }));
