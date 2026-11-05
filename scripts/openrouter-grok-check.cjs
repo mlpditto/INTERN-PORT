@@ -133,8 +133,8 @@ const ok = (content, finish = 'stop', usage = { prompt_tokens: 100, completion_t
     new Function('window', 'document', 'localStorage', fs.readFileSync(path.join(root, 'public', 'ai-model-ui.js'), 'utf8'))(win, doc, { getItem: () => null, setItem() {} });
     const grok = 'or/x-ai/grok-4.7';
     check('T8 Grok is NOT in TEXT_AI_MODELS (no other rail / select / QFP / Settings)', win.TEXT_AI_MODELS.some(m => m.id === grok), false);
-    check('T8 trial models are Grok, Kimi K3.1 Pro (V102.432), then local Ollama (V102.76)', JSON.stringify(win.TEXT_AI_TRIAL_MODELS.map(m => [m.id, m.short])), '[["or/x-ai/grok-4.7","Grok 4.7"],["or/moonshotai/kimi-k3.1-pro","Kimi K3.1 Pro"],["ol/local","Ollama"]]');
-    check('T8 Kimi is NOT in TEXT_AI_MODELS and never normalises into a default', win.TEXT_AI_MODELS.some(m => m.id === 'or/moonshotai/kimi-k3.1-pro') + '|' + win.normalizeTextAIModel('or/moonshotai/kimi-k3.1-pro'), 'false|gpt-6-luna');
+    check('T8 trial models are Grok, then local Ollama (V102.76) — V102.588: Kimi left the trial list', JSON.stringify(win.TEXT_AI_TRIAL_MODELS.map(m => [m.id, m.short])), '[["or/x-ai/grok-4.7","Grok 4.7"],["ol/local","Ollama"]]');
+    check('T8 V102.588: Kimi is in TEXT_AI_MODELS (last) and can be a saved default', win.TEXT_AI_MODELS[win.TEXT_AI_MODELS.length - 1].id + '|' + win.normalizeTextAIModel('or/moonshotai/kimi-k3.1-pro'), 'or/moonshotai/kimi-k3.1-pro|or/moonshotai/kimi-k3.1-pro');
     check('T8 Kimi stays itself where a trial model is picked', win.resolveTrialTextAIModel('or/moonshotai/kimi-k3.1-pro'), 'or/moonshotai/kimi-k3.1-pro');
     check('T8 normaliser still maps Grok to the default (a saved default can never become Grok)', win.normalizeTextAIModel(grok), 'gpt-6-luna');
     // V101.72: a proxy that ANSWERED with an error must surface that error, not "proxy is unreachable".
