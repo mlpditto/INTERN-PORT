@@ -14,13 +14,13 @@
     var BKK = 7 * 3600e3, DONE = ['ok', 'quiz', 'codex', 'hist'];
     var S = { list: null, loading: false, armed: false, tries: 0, cur: null, lang: 'en', more: false, sig: '', qs: [], qsUnsub: null };
     var T = {
-        en: { source: 'Source', kicker: 'Article', min: 'min', more: 'Read more', less: 'Show less', got: 'Got it', save: 'Save', saved: 'Saved', mute: 'Don’t pop up articles', rerun: 'For new interns', close: 'Close',
+        en: { source: 'Source', kicker: 'Article', min: 'min', more: 'Read more', less: 'Show less', got: 'Got it', save: 'Save', saved: 'Saved', mute: 'Don’t pop up articles', hist: 'All articles in History', rerun: 'For new interns', close: 'Close',
             read: 'Read', anyq: 'Any Q?', askSub: 'Goes to the article’s author · your name is not shown', ask: 'A question', wrong: 'Wrong / out of date', add: 'Please add',
             phAsk: 'What would you like to ask?', phWrong: 'Which part looks wrong or out of date?', phAdd: 'What should the article add?', hint: 'Replies show up in History', send: 'Send', sending: 'Sending…', fail: 'Could not send — your text is kept. Try again.' },
-        th: { source: 'ที่มา', kicker: 'บทความ', min: 'นาที', more: 'อ่านต่อ', less: 'ย่อ', got: 'รับทราบ', save: 'เก็บไว้', saved: 'เก็บแล้ว', mute: 'ไม่ต้องเด้งบทความ', rerun: 'สำหรับน้องใหม่', close: 'ปิด',
+        th: { source: 'ที่มา', kicker: 'บทความ', min: 'นาที', more: 'อ่านต่อ', less: 'ย่อ', got: 'รับทราบ', save: 'เก็บไว้', saved: 'เก็บแล้ว', mute: 'ไม่ต้องเด้งบทความ', hist: 'บทความทั้งหมด ใน History', rerun: 'สำหรับน้องใหม่', close: 'ปิด',
             read: 'อ่านแล้ว', anyq: 'Any Q?', askSub: 'ส่งถึงผู้เขียนบทความ · ไม่แสดงชื่อคุณ', ask: 'สงสัย', wrong: 'ข้อมูลผิด/ล้าสมัย', add: 'อยากให้เพิ่ม',
             phAsk: 'อยากถามอะไร?', phWrong: 'ส่วนไหนดูผิดหรือล้าสมัย?', phAdd: 'อยากให้บทความเพิ่มเรื่องอะไร?', hint: 'ตอบกลับดูได้ใน History', send: 'ส่ง', sending: 'กำลังส่ง…', fail: 'ส่งไม่สำเร็จ ข้อความยังอยู่ ลองอีกครั้ง' },
-        ko: { source: '출처', kicker: '아티클', min: '분', more: '더 보기', less: '접기', got: '확인', save: '저장', saved: '저장됨', mute: '아티클 팝업 끄기', rerun: '신규 인턴용', close: '닫기',
+        ko: { source: '출처', kicker: '아티클', min: '분', more: '더 보기', less: '접기', got: '확인', save: '저장', saved: '저장됨', mute: '아티클 팝업 끄기', hist: 'History의 모든 아티클', rerun: '신규 인턴용', close: '닫기',
             read: '읽음', anyq: 'Any Q?', askSub: '글쓴이에게 전달 · 이름은 표시되지 않아요', ask: '질문', wrong: '틀림/오래됨', add: '추가 요청',
             phAsk: '무엇이 궁금한가요?', phWrong: '어느 부분이 틀리거나 오래되었나요?', phAdd: '어떤 내용을 더하면 좋을까요?', hint: '답변은 History에서 볼 수 있어요', send: '보내기', sending: '보내는 중…', fail: '보내지 못했어요. 글은 남아 있어요. 다시 시도하세요.' }
     };
@@ -191,6 +191,7 @@
             '@keyframes artShrink{from{transform:scaleX(1)}to{transform:scaleX(0)}}@keyframes artPop{from{transform:scale(.9);opacity:.4}to{transform:none;opacity:1}}' +
             // the Any Q? form
             '#art-sheet .lng.fl,.art-hist .lng.fl{font-size:16px;padding:4px 8px}' +
+            '@media (max-width:400px){#art-sheet .foot{gap:6px}#art-sheet .bm{width:38px}#art-sheet .ok{padding:0 14px}}#art-sheet .bm.hist{position:relative}#art-sheet .bm.hist i{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;box-sizing:border-box;border-radius:999px;background:#4361ee;color:#fff;font:700 10.5px/18px Kanit,sans-serif;font-style:normal}' +
             '#art-sheet .aq-h{display:flex;align-items:center;gap:10px;margin:2px 0 2px}#art-sheet .aq-h .lng{font-size:16px;padding:5px 9px}#art-sheet .aq-h b{flex:1;font:800 19px/1.3 Kanit,sans-serif;color:#1e293b}#art-sheet .aq-sub{font:400 12.5px/1.4 Kanit,sans-serif;color:#94a3b8;margin:0 0 12px}' +
             '#art-sheet .aq-k{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}#art-sheet .aq-k button{min-height:0;margin:0;width:auto;border:1.5px solid #e2e8f0;background:#fff;color:#475569;font:700 13px/1 Kanit,sans-serif;padding:9px 12px;border-radius:999px;cursor:pointer}' +
             '#art-sheet .aq-k button[aria-pressed="true"]{border-color:#818cf8;background:#eef2ff;color:#3730a3}#art-sheet .aq-k button[data-k="wrong"][aria-pressed="true"]{border-color:#f59e0b;background:#fffbeb;color:#92400e}' +
@@ -228,6 +229,11 @@
                 : '<button type="button" class="art-link codex" onclick="internArticles.openCodex(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(l.id)) + ')">💊 ' + esc(l.label) + '</button>';
         }).join('') + '</div>' : '';
     }
+    // V101.269 (owner pick A, mockups/article-history-link-mockup.html): 📰 in the footer = every article in History; the badge = how many
+    function histBtn(t) {
+        var n = historyItems(S.list, me(), Date.now(), S.qs).length;
+        return '<button type="button" class="bm hist" onclick="internArticles.toHistory()" title="' + t.hist + '" aria-label="' + t.hist + ' (' + n + ')">📰' + (n > 1 ? '<i>' + n + '</i>' : '') + '</button>';
+    }
     function md(text) { return typeof window.renderMd === 'function' ? window.renderMd(text) : esc(text).replace(/\n/g, '<br>'); }
     function render() {
         var c = S.cur, a = c.a, tx = textOf(a, S.lang), t = T[S.lang] || T.en, have = langs(a), saved = !!((me().articleSeen || {})[a.id] || {}).saved;
@@ -241,6 +247,7 @@
             srcHtml(a, S.lang) + linksHtml(a) +
             '<div class="foot"><button type="button" class="bm" onclick="internArticles.save()" aria-pressed="' + saved + '" title="' + (saved ? t.saved : t.save) + '" aria-label="' + (saved ? t.saved : t.save) + '">🔖</button>' +
             '<button type="button" class="bm mute" onclick="internArticles.mute()" title="' + t.mute + '" aria-label="' + t.mute + '">🔕</button>' +
+            (S.got ? '' : histBtn(t)) +   // V101.269: not in the 7 s ✓ Read · 💬 moment (the sheet closes itself; that row is full)
             '<button type="button" class="more" id="art-more" onclick="internArticles.toggleMore()">' + (S.more ? t.less + ' ▴' : t.more + ' ▾') + '</button>' +
             (S.got ? '<span class="rd">✓ ' + t.read + '</span><button type="button" class="anyq" onclick="internArticles.anyQ()">💬 ' + t.anyq + '</button>'
                 : '<button type="button" class="ok" onclick="internArticles.gotIt()">👍 ' + t.got + '</button>') + '</div>';
@@ -488,6 +495,15 @@
         askKind: function (k) { if (!S.ask || S.ask.busy) return; S.ask.kind = k; render(); },
         lang: function (l) { var a = S.cur && S.cur.a, have = a ? langs(a) : []; S.lang = l || (have.length ? nextLang(have, textOf(a, S.lang).lang) : S.lang); render(); },
         toggleMore: function () { S.more = !S.more; render(); },
+        // V101.269: close the sheet (not read: it stays in History as closed) → Work ▸ History with the 📰 chip on, like the ?tab=history deep link
+        toHistory: function () {
+            close('x');
+            var w = document.getElementById('work-section-content');
+            if (w && w.style.display === 'none' && typeof toggleWorkSection === 'function') toggleWorkSection();
+            if (typeof switchWorkTab === 'function') switchWorkTab('history');
+            if (typeof filterUnifiedHistory === 'function') filterUnifiedHistory('article');
+            var sec = document.getElementById('section-general-work'); if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        },
         save: function () {
             var c = S.cur; if (!c) return;
             var s = (me().articleSeen || {})[c.a.id] || {};
