@@ -85,12 +85,14 @@ for (const h of ['saveAIKeys()', 'parseAndFillKeys()', 'exportAIKeys()', 'import
             const tr = page.locator('.ais-mrow:has(#default-translate-model)');
             await tr.locator('.text-ai-chips > button.active').click();
             assert.ok(await tr.evaluate(r => r.classList.contains('open')), 'tap opens the rail @' + vw);
-            assert.ok((await tr.locator('.text-ai-chips > button').evaluateAll(bs => bs.filter(b => b.offsetParent !== null).length)) > 8, 'open rail shows every chip');
+            assert.ok((await tr.locator('.text-ai-chips .mr-vendor').evaluateAll(bs => bs.filter(b => b.offsetParent !== null).length)) >= 7, 'V102.589 one style: the open rail shows every vendor icon @' + vw);
+            assert.ok((await tr.locator('.text-ai-chips > button').evaluateAll(bs => bs.filter(b => b.offsetParent !== null).length)) >= 1, '…and the picked vendor’s chips @' + vw);
             if (vw === 390) {
                 const g = await tr.evaluate(r => { const m = r.querySelector('.ais-mn').getBoundingClientRect(), c = r.querySelector('.text-ai-chips').getBoundingClientRect(); return { chipsTop: c.top, nameBottom: m.bottom, w: c.width }; });
                 assert.ok(g.chipsTop >= g.nameBottom, 'on a phone the open rail drops below the name');
                 assert.ok(g.w > 250, 'and uses the full width: ' + g.w);
             }
+            await tr.locator('.mr-vendor[data-provider="Claude"]').click();   // V102.589 one style: vendor icon first
             await tr.locator('.text-ai-chips > button[data-value="claude-haiku-5-5"]').click();
             assert.equal(await page.locator('#default-translate-model').inputValue(), 'claude-haiku-5-5', 'pick changes the select @' + vw);
             assert.equal(await page.evaluate(() => localStorage.getItem('ai_default_translate_model')), 'claude-haiku-5-5', 'and the stored default');
