@@ -42,6 +42,13 @@ for (const t of ['QUIZ_EARLYBIRD_BERI_DEFAULT = 10', 'QUIZ_DEADLINE_BERI_DEFAULT
     assert.ok(adminHtml.includes(t), 'admin.html still has: ' + t);
 for (const t of ['+0.01', '+0.05', '+0.1', '08:00–12:00', 'LV.2 at 10', 'LV.10 at 90', '10 · 6 · 4', '5 · 3 · 1', '500 Beri', 'automatic', 'Murthehelp']) assert.ok(mdEn.includes(t), 'EN guide says: ' + t);
 for (const t of ['+0.01', '+0.05', '+0.1', '08:00–12:00', 'LV.2 ที่ 10', 'LV.10 ที่ 90', '10 · 6 · 4', '5 · 3 · 1', 'เกิน 500', 'อัตโนมัติ', 'Murthehelp']) assert.ok(md.includes(t), 'TH guide says: ' + t);
+// V101.266: Learned vs Note — the 90-note cap is the code's, and the guide promises no review reminder interns cannot see (My Path is admin-only)
+assert.ok(admin.includes('const LN_LIFETIME_CAP = 90;'), 'index.html still caps notes at 90');
+assert.ok(mdEn.includes('📝 **Learned** vs 🎓 **Note**') && mdEn.includes('up to 90 notes') && mdEn.includes('🎓 My Notes'), 'EN guide explains Learned vs Note');
+assert.ok(md.includes('📝 **Learned** กับ 🎓 **Note**') && md.includes('สูงสุด 90 โน้ต') && md.includes('🎓 My Notes'), 'TH guide explains Learned vs Note');
+assert.ok(admin.includes('🎓 My Notes'), 'index.html has the My Notes list the guide points to');
+assert.ok(!/My Path|3 days|3 วัน/.test(awkSection(mdEn, '📓 Journal') + awkSection(md, '📓 Journal')), 'the Journal section promises no 3-day review on My Path (admin-only)');
+function awkSection(text, head) { const i = text.indexOf('## ', text.indexOf(head) - 8); const j = text.indexOf('\n## ', i + 3); return text.slice(i, j < 0 ? undefined : j); }
 assert.ok(!/Tap the \*\*Daily check-in\*\* card/.test(mdEn), 'guide no longer tells interns to tap the check-in card');
 const sections = md.split(/\r?\n/).filter(l => /^## /.test(l));
 assert.ok(sections.length >= 5, 'guide has sections: ' + sections.length);

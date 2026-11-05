@@ -60,6 +60,7 @@ After a scored quiz, tell us how it went — under a minute, and it makes the qu
 
 Open **Mission ▸ Journal**. Pick a **mood**, then fill **Learned · Hard · Next** — any part is fine, Thai or English. **🎓 Note** and **✉️ Message** sit on the same page. One **Send** appears once something is filled, and it sends only those parts.
 
+- 📝 **Learned** vs 🎓 **Note** — **Learned** is what you did today (once a day). A **Note** is **one lesson** you want to keep: give it a title and tags, an admin grades it and may add points for quality. Your notes stay in **🎓 My Notes** under the Note row, filterable by tag — up to 90 notes
 - **My Writing Profile** shows total words, active days, your streak, and your TH / EN balance
 - The small number on the Journal tab = logs that already received an **admin bonus**
 - Writing every day builds your 🔥 **streak** (shown on the History tab)
