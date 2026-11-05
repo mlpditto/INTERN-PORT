@@ -81,7 +81,8 @@
     }
     // V101.202 (owner): one language pill, like the app's EN / KR / TH button — it shows the language on screen; a tap moves to the next one the article has
     function nextLang(have, l) { return have[(have.indexOf(l) + 1) % have.length]; }
-    function langBtn(have, l, onclick) { return '<button type="button" class="lng" data-lang="' + l + '" aria-label="Language: ' + l.toUpperCase() + ' (tap for ' + nextLang(have, l).toUpperCase() + ')" onclick="' + onclick + '">' + l.toUpperCase() + '</button>'; }
+    // V101.268 (owner): the pill is the country flag (🇬🇧 / 🇹🇭 / 🇰🇷), like the 💬 Any Q? chip; the name is in title + aria-label
+    function langBtn(have, l, onclick) { return '<button type="button" class="lng fl" data-lang="' + l + '" title="' + LNAME[l] + '" aria-label="Language: ' + LNAME[l] + ' (tap for ' + LNAME[nextLang(have, l)] + ')" onclick="' + onclick + '">' + FLAGS[l] + '</button>'; }
     // V101.217 (owner): the 💬 Any Q? form carries one flag chip too (🇬🇧 → 🇹🇭 → 🇰🇷), like the Guide — its labels exist in all three languages whatever the article has
     var FLAGS = { en: '🇬🇧', th: '🇹🇭', ko: '🇰🇷' }, LNAME = { en: 'English', th: 'ไทย', ko: '한국어' }, LORDER = ['en', 'th', 'ko'];
     function flagBtn(l) { var n = LORDER[(LORDER.indexOf(l) + 1) % LORDER.length]; return '<button type="button" class="lng fl" data-lang="' + l + '" title="' + LNAME[l] + '" aria-label="Language: ' + LNAME[l] + ' (tap for ' + LNAME[n] + ')" onclick="internArticles.askLang()">' + FLAGS[l] + '</button>'; }
@@ -178,7 +179,7 @@
             '.art-md{font:400 14.5px/1.6 Kanit,sans-serif;color:#334155;word-break:keep-all;overflow-wrap:anywhere}.art-md p,.art-md ul,.art-md ol{margin:0 0 8px}.art-md ul,.art-md ol{padding-left:20px}.art-md a{color:#4361ee}' +
             '#art-sheet .art-md.clamp{max-height:6.4em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 65%,transparent);mask-image:linear-gradient(#000 65%,transparent)}' +   // 4 lines × 1.6; line-clamp left half a line showing when the body has several paragraphs
             '#art-sheet .more{min-height:0;margin:0 0 0 auto;width:auto;border:0;background:none;font:700 13px/1 Kanit,sans-serif;color:#4361ee;padding:12px 4px;cursor:pointer;white-space:nowrap}' +
-            '.art-src{margin:0 0 10px;font:400 12.5px/1.4 Kanit,sans-serif;color:#64748b}.art-src button{width:auto;min-height:0;margin:0;padding:4px 2px;border:0;background:none;box-shadow:none;color:#4361ee;font:600 12.5px/1.4 Kanit,sans-serif;text-decoration:underline;cursor:pointer}' +
+            '.art-src{margin:0 0 10px;font:400 12.5px/1.4 Kanit,sans-serif;color:#64748b}.art-src button{display:inline;width:auto;min-height:0;margin:0;padding:4px 2px;border:0;background:none;box-shadow:none;color:#4361ee;font:600 12.5px/1.4 Kanit,sans-serif;text-decoration:underline;cursor:pointer}' +
             '.art-links{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 12px}.art-link{min-height:0;margin:0;width:auto;display:inline-flex;align-items:center;gap:6px;font:600 12.5px/1 Kanit,sans-serif;padding:8px 11px;border-radius:999px;border:1px solid #c7d2fe;background:#eef2ff;color:#3730a3;cursor:pointer}' +
             '.art-link.codex{border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8}.art-link b{font-weight:800;color:#b45309}' +
             '#art-sheet .foot{display:flex;align-items:center;gap:8px;margin-top:6px}#art-sheet .bm{width:44px;height:44px;min-height:0;margin:0;padding:0;border-radius:12px;border:0;background:#f1f5f9;font-size:17px;cursor:pointer;flex:none}#art-sheet .bm[aria-pressed="true"]{background:#fef3c7}#art-sheet .bm.mute{opacity:.8}' +
@@ -189,6 +190,7 @@
             '#art-sheet .anyq::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.75);transform-origin:left;animation:artShrink ' + ANYQ_MS + 'ms linear forwards}' +
             '@keyframes artShrink{from{transform:scaleX(1)}to{transform:scaleX(0)}}@keyframes artPop{from{transform:scale(.9);opacity:.4}to{transform:none;opacity:1}}' +
             // the Any Q? form
+            '#art-sheet .lng.fl,.art-hist .lng.fl{font-size:16px;padding:4px 8px}' +
             '#art-sheet .aq-h{display:flex;align-items:center;gap:10px;margin:2px 0 2px}#art-sheet .aq-h .lng{font-size:16px;padding:5px 9px}#art-sheet .aq-h b{flex:1;font:800 19px/1.3 Kanit,sans-serif;color:#1e293b}#art-sheet .aq-sub{font:400 12.5px/1.4 Kanit,sans-serif;color:#94a3b8;margin:0 0 12px}' +
             '#art-sheet .aq-k{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}#art-sheet .aq-k button{min-height:0;margin:0;width:auto;border:1.5px solid #e2e8f0;background:#fff;color:#475569;font:700 13px/1 Kanit,sans-serif;padding:9px 12px;border-radius:999px;cursor:pointer}' +
             '#art-sheet .aq-k button[aria-pressed="true"]{border-color:#818cf8;background:#eef2ff;color:#3730a3}#art-sheet .aq-k button[data-k="wrong"][aria-pressed="true"]{border-color:#f59e0b;background:#fffbeb;color:#92400e}' +

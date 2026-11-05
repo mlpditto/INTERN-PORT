@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const who = document.createElement('b'); who.textContent = name; who.title = replied ? 'Replied' : data.read ? 'Read · waiting for a reply' : 'New';
         top.append(who);
         if (drafts[id]) { const d = document.createElement('span'); d.className = 'jf-st draft'; d.textContent = 'Draft'; top.append(d); }
-        const line = document.createElement('span'); line.className = 'jf-pv'; line.textContent = String(data.message || '').replace(/\s+/g, ' ');
+        const line = document.createElement('span'); line.className = 'jf-pv'; line.textContent = String(data.message || '').trim();   // V102.587: closed = one line (CSS nowrap), open = the whole message in place
         main.append(top, line);
         const side = document.createElement('span'); side.className = 'jf-side';
         const t = document.createElement('time'); t.textContent = ago(data.timestamp); t.title = when(data.timestamp); side.append(t);
@@ -76,7 +76,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const summary = document.createElement('summary');
             rowHead(summary, data, doc.id);
             row.append(summary);
-            const message = document.createElement('p'); message.className = 'jf-msg'; message.style.whiteSpace = 'pre-wrap'; message.textContent = data.message; row.append(message);
             if (data.attachment) {
                 const attachment = document.createElement('details');
                 const label = document.createElement('summary'); label.textContent = '📎 Daily Canvas · ' + (data.attachment.mood || '') + ' ' + (data.attachment.moodSecondary || '');
@@ -128,15 +127,16 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             acts.append(ta, go);
             box.append(acts, left); row.append(box);
-            // V102.585: 🗑 Delete — asks inside the row (a native confirm() can be dropped), then removes the inbox doc AND the intern's
+            // V102.585: 🗑 Delete — asks inside the row (V102.587: in the reply bar's line) (a native confirm() can be dropped), then removes the inbox doc AND the intern's
             // copy (intern_messages/{same id}, their History row + any reply) in one batch: both go or neither does (owner's pick 2026-11-05).
             const del = document.createElement('div'); del.className = 'jf-del-row';
             const ask = () => {
                 const who = data.userName || 'the intern';
                 const q = document.createElement('span'); q.className = 'jf-del-q'; q.textContent = 'Delete this message? It also disappears from ' + who + '’s History.';
                 const no = document.createElement('button'); no.type = 'button'; no.className = 'jf-del-no'; no.textContent = 'Cancel';
-                const yes = document.createElement('button'); yes.type = 'button'; yes.className = 'jf-del-yes'; yes.textContent = '🗑 Delete';
+                const yes = document.createElement('button'); yes.type = 'button'; yes.className = 'jf-del-yes'; yes.textContent = 'Delete';
                 no.onclick = () => { idle(); del.querySelector('.jf-del').focus(); };
+                no.onkeydown = e => { if (e.key === 'Escape') { e.stopPropagation(); no.click(); } };
                 yes.onclick = async () => {
                     yes.disabled = no.disabled = true; status.textContent = 'Deleting…';
                     try {
@@ -148,14 +148,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         status.textContent = 'Deleted — gone from the inbox and from ' + who + '’s History.';
                     } catch (e) { console.error('Journal feedback delete', e); status.textContent = 'Could not delete. Nothing was removed — please retry.'; idle(); }
                 };
-                del.classList.add('asking'); del.replaceChildren(q, no, yes); no.focus();
+                del.classList.add('asking'); acts.classList.add('asking'); del.replaceChildren(q, no, yes); no.focus();
             };
             const idle = () => {
-                const b = document.createElement('button'); b.type = 'button'; b.className = 'jf-del'; b.textContent = '🗑 Delete';
-                b.title = 'Delete this message (also from the intern’s History)'; b.onclick = ask;
-                del.classList.remove('asking'); del.replaceChildren(b);
+                const b = document.createElement('button'); b.type = 'button'; b.className = 'jf-del'; b.textContent = '🗑';
+                b.title = 'Delete this message (also from the intern’s History)'; b.setAttribute('aria-label', 'Delete message'); b.onclick = ask;
+                del.classList.remove('asking'); acts.classList.remove('asking'); del.replaceChildren(b);
             };
-            idle(); row.append(del);
+            idle(); acts.insertBefore(del, go);   // V102.587: [reply][🗑][➤] on one line
             list.append(row);
         });
         if (!list.firstChild) { const none = document.createElement('p'); none.className = 'jf-none'; none.textContent = snapDocs.length ? 'Nothing here. Well done.' : 'No journal feedback yet.'; list.append(none); }

@@ -63,7 +63,7 @@ assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(fs.readFileSync('publi
       assert.deepEqual(r.t[l].file, ['badges-nt-' + l + '.png', 'badges-' + l + '.png'], l + ': the file name drops the name too');
     }
     assert.ok(r.t.card.noName.includes('⭐ 3.31'), 'Person Hide leaves the score (a separate switch)');
-    assert.deepEqual(r.defaults2, [true, true], 'V102.586: opens sorted by tier, with n / 16 badges');
+    assert.deepEqual(r.defaults2, [true, false], 'opens sorted by tier; n / 16 badges off by default (V102.587)');
     for (const w of ['Person', 'Score', 'Labels', 'Name + count', 'Corners', 'Transparent', 'White']) assert.ok(r.dialog.includes(w), 'dialog offers ' + w);
     assert.equal(r.afterName, 'name', 'the Name chip sets labels');
     assert.equal(r.cornerClear[3], 0, 'Transparent: the corner pixel is see-through');
