@@ -34,7 +34,7 @@ let quizzesCache = [
   { id: 'q3', title: 'Practice', quizType: 'standard' }];
 let quizAttemptsCache = {
   q1: { quizId: 'q1', status: 'approved', score: 0.4, correctCount: 2, totalQuestions: 5, timestamp: ago(1) },
-  q2: { quizId: 'q2', status: 'approved', score: 1.2, timestamp: ago(5) },
+  q2: { quizId: 'q2', status: 'approved', score: 1.2, timestamp: ago(5), feedbackGiven: true },
   q3: { quizId: 'q3', status: 'pending', score: 0, timestamp: ago(40) } };
 let myLinkSuggestionsCache = [
   { id: 's1', title: 'Khao Don', status: 'approved', url: 'https://shop.example/khao', createdAt: ago(3) },
@@ -76,6 +76,9 @@ assert.match(q1, /class="hl-pt" title="Points">\+0\.40/); assert.match(q1, /clas
 assert.doesNotMatch(q2, /class="hl-br"/);
 assert.match(q1, /hl-more-t"> · \d\d:\d\d · 2\/5/);
 assert.match(q1, /viewQuizAnswers\('q1'\)/); assert.match(q1, /openFeedbackForPastAttempt\('q1'\)/);
+// V101.280: the 💬 says it — an amber "No feedback yet" pill (EN + ไทย), not an icon alone; gone once feedback was given
+assert.match(q1, /class="hl-ib hl-fb" onclick="openFeedbackForPastAttempt\('q1'\)"[^>]*aria-label="No feedback yet — give feedback">💬 <span>No feedback yet <i>ยังไม่ได้ให้ feedback<\/i><\/span><\/button>/, 'labelled feedback pill');
+assert.doesNotMatch(q2, /hl-fb|openFeedbackForPastAttempt/, 'feedback already given → no pill');
 assert.doesNotMatch(q3, /viewQuizAnswers/);                      // pending → no answers / feedback
 // one file → a direct, logged download link (the javascript: one is dropped); several → a counted list
 assert.equal((q1.match(/href="https:\/\/example\.com\/a\.pdf"/g) || []).length, 2);   // inline + expanded
