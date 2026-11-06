@@ -1,0 +1,147 @@
+// V102.600 (owner): certificate by progress + 🏅 badges row. The REAL certificate block + modal rows from public/admin.html:
+// Auto picks Early (<40%) / Mid (40–79%) / Near (80–99%) / Completed (100%) from the days done (or time-clock hours);
+// a stage chip overrides it; below 100% the title, wording and colour change, the corner seal and "scan to verify" go,
+// and "x / y วัน (days) · % · stage" + a bar print under DATE (the ✓ print box turns that line off); PharmCamp has no
+// stage; ✂️ First / Last shows only when the user has no EN first/last name yet; a progress PDF is never registered.
+const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const admin = fs.readFileSync(path.join(__dirname, '..', 'public', 'admin.html'), 'utf8').replace(/\r\n/g, '\n');
+const cut = (a, b) => { const i = admin.indexOf(a); assert.ok(i > 0, a); const j = admin.indexOf(b, i); assert.ok(j > i, b); return admin.slice(i, j); };
+const block = cut('        const CERT_TEMPLATES = {', '        const CERT_EXPORT_SCALE');
+const modalJs = cut('        function setCertPeriodMode(mode) {', '        // V96.74: which wording the preview + PDF use.');
+const rows = cut('                <!-- V102.578: lean rows', '                <div id="cert-preview-container"');
+const pdf = cut('        async function generateCertPDF() {', '        async function delQuizAttempt(');
+assert.ok(pdf.indexOf('if (_extra.stage) {') > 0 && pdf.indexOf('if (_extra.stage) {') < pdf.indexOf('issueCertNumbers('), 'a progress PDF returns before a number is issued');
+assert.ok(/if \(_extra\.stage\) \{[\s\S]*?return;\s*\}/.test(pdf) && !/if \(_extra\.stage\) \{[^}]*markCertApproved/.test(pdf), 'no archive / approval for a progress PDF');
+assert.ok(admin.includes("certStagePick = 'auto';"), 'every open starts on Auto');
+
+(async () => {
+    const browser = await chromium.launch();
+    try {
+        const page = await browser.newPage();
+        const errs = []; page.on('pageerror', e => errs.push(e.message));
+        await page.route('http://qa.local/**', r => r.fulfill({ contentType: 'text/html', body: `<!doctype html><meta charset="utf-8"><div id="certModal">${rows}</div>` }));
+        await page.goto('http://qa.local/');
+        await page.addScriptTag({ content: block + '\n' + modalJs + "\nvar currentCertTemplate = 'internship', certUser = { uid: 'U1', hoursDone: 0, hoursTarget: 0 };" +
+            "\nvar usersData = [{ id: 'U1' }];\nwindow.updateCertPreview = () => paintCertStage();" });
+        assert.deepEqual(errs, []);
+
+        // 1. Auto from the days done (40-day internship 2026-10-19 → 2026-11-27)
+        const auto = await page.evaluate(() => {
+            document.getElementById('cert-start').value = '2026-10-19'; document.getElementById('cert-end').value = '2026-11-27';
+            document.getElementById('cert-fullname').value = 'Natamon Laukanjanaratr';
+            certLang = 'both';
+            return ['2026-10-10', '2026-10-28', '2026-11-03', '2026-11-15', '2026-11-24', '2026-11-27', '2026-12-30'].map(d => {
+                const p = certProgress(d);
+                return [d, p.done + '/' + p.total, p.pct, certStageFromPct(p.pct)];
+            });
+        });
+        assert.deepEqual(auto, [
+            ['2026-10-10', '0/40', 0, 'early'], ['2026-10-28', '10/40', 25, 'early'], ['2026-11-03', '16/40', 40, 'mid'],
+            ['2026-11-15', '28/40', 70, 'mid'], ['2026-11-24', '37/40', 92, 'near'], ['2026-11-27', '40/40', 100, 'done'], ['2026-12-30', '40/40', 100, 'done']
+        ]);
+
+        // 2. the modal rows: Auto label, bar, badge, manual pick, print box, split chip, PharmCamp
+        const m = await page.evaluate(() => {
+            const fixed = new Date('2026-11-15T10:00:00').getTime(); Date.now = () => fixed;
+            certStagePick = 'auto'; paintCertStage();
+            const out = { auto: document.querySelector('[data-stage="auto"]').textContent, text: document.getElementById('cert-progress-text').textContent,
+                bar: document.getElementById('cert-pbar-fill').style.width, badge: document.getElementById('cert-stage-badge').textContent,
+                split: !document.getElementById('cert-split-en').hidden, extra: getCurrentCertificateExtra().stage };
+            setCertStage('near');
+            out.manual = [getCurrentCertificateExtra().stage.key, document.querySelector('[data-stage="near"]').getAttribute('aria-pressed'), document.querySelector('[data-stage="auto"]').textContent];
+            setCertStage('done'); out.done = getCurrentCertificateExtra().stage;
+            setCertStage('auto');
+            document.getElementById('cert-progress-print').checked = false; out.noPrint = getCurrentCertificateExtra().stage;
+            document.getElementById('cert-progress-print').checked = true;
+            usersData[0].firstNameEn = 'Natamon'; paintCertStage(); out.splitAfter = !document.getElementById('cert-split-en').hidden;
+            certPeriodMode = 'hours'; certUser.hoursDone = 112; certUser.hoursTarget = 160; out.hours = [certProgressText(certProgress(), 'th'), certStageNow()];
+            certPeriodMode = 'dates';
+            currentCertTemplate = 'bootcamp'; paintCertStage(); out.camp = [document.getElementById('cert-stage-row').hidden, getCurrentCertificateExtra().stage];
+            currentCertTemplate = 'internship';
+            return out;
+        });
+        assert.deepEqual(m, {
+            auto: 'Auto · 🟢 Mid', text: '28 / 40 วัน · 70%', bar: '70%', badge: '🟢 Mid', split: true,
+            extra: { key: 'mid', text: '28 / 40 วัน (days) · 70% · Progressing', pct: 70 },
+            manual: ['near', 'true', 'Auto'], done: null,
+            noPrint: { key: 'mid', text: '', pct: 70 }, splitAfter: false,
+            hours: ['112 / 160 ชม. · 70%', 'mid'], camp: [true, null]
+        });
+
+        // 3. the draw
+        const draw = (extra) => page.evaluate((extra) => {
+            const c = document.createElement('canvas'); c.width = CERT_BASE_WIDTH; c.height = CERT_BASE_HEIGHT;
+            const ctx = c.getContext('2d'), calls = [];
+            const orig = ctx.fillText.bind(ctx);
+            ctx.fillText = (t, x, y, ...r) => { calls.push({ t: String(t), y: Math.round(y + ctx.getTransform().f), c: ctx.fillStyle }); return orig(t, x, y, ...r); };
+            drawCertificate(ctx, 'Sample Intern', '19 ตุลาคม 2569 – 27 พฤศจิกายน 2569 (19 October 2026 – 27 November 2026)', [], 1, 0, 'internship', 'both', null, { th: 'ชื่อ ตัวอย่าง' }, '40 วัน / 40 days', extra);
+            return { calls, png: c.toDataURL() };
+        }, extra);
+        const plain = await draw({ hours: '', skills: [] });
+        const done = await draw({ hours: '', skills: [], stage: null });
+        assert.equal(done.png, plain.png, 'Completed (stage null) draws exactly today\'s certificate');
+        const has = (d, t) => d.calls.some(c => c.t === t);
+        // 〰 Name line: off by default (nothing remembered), on with the chip
+        const lineOff = await draw({ hours: '', skills: [], nameLine: false }), lineOn = await draw({ hours: '', skills: [], nameLine: true });
+        assert.equal(plain.png, lineOff.png, 'the gold line under the name is off by default');
+        assert.notEqual(lineOn.png, lineOff.png, 'the chip turns the line on');
+        // Brand row: every MEDLIFE PLUS spot can go; all on by default (today's certificate)
+        assert.ok(has(plain, 'MEDLIFE PLUS CO.,LTD.') && ['M', 'P', 'U', 'S'].every(ch => plain.calls.some(c => c.t === ch && c.y < 140)), 'default: company line + seal rim text');
+        await page.evaluate(() => ['logo', 'wm', 'seal', 'co'].forEach(k => toggleCertBrand(k)));
+        const noBrand = await draw({ hours: '', skills: [] });
+        assert.ok(!has(noBrand, 'MEDLIFE PLUS CO.,LTD.') && !['M', 'P', 'U', 'S'].some(ch => noBrand.calls.some(c => c.t === ch && c.y < 140)), 'all off: no company line, no MEDLIFE PLUS on the seal');
+        assert.ok(['C', 'E', 'R', 'T', 'I', 'F', 'D'].every(ch => noBrand.calls.some(c => c.t === ch && c.y > 100 && c.y < 140)), 'the seal keeps CERTIFIED');
+        assert.ok(await page.evaluate(() => ['logo', 'wm', 'seal', 'co'].every(k => !certBrandOn(k)) && document.querySelectorAll('#cert-brand-row [data-brand]').length === 4), '4 Brand chips, all off now');
+        await page.evaluate(() => ['logo', 'wm', 'seal', 'co'].forEach(k => toggleCertBrand(k)));
+        assert.equal((await draw({ hours: '', skills: [] })).png, plain.png, 'back on → today\'s certificate again');
+        assert.ok(await page.evaluate(() => { localStorage.removeItem('cert_name_line'); const a = certNameLineOn(); toggleCertNameLine(); const b = certNameLineOn(); toggleCertNameLine(); return !a && b && !certNameLineOn(); }), 'the chip toggles and is remembered');
+        const mid = await draw({ hours: '', skills: [], stage: { key: 'mid', text: '28 / 40 วัน (days) · 70% · Progressing', pct: 70 } });
+        assert.ok(has(mid, 'INTERNSHIP') && has(mid, 'PROGRESS CERTIFICATE') && !has(mid, 'CERTIFICATE'), 'Mid: INTERNSHIP · PROGRESS CERTIFICATE');
+        assert.ok(has(mid, 'ได้ปฏิบัติงานฝึกงานด้วยความมุ่งมั่น') && has(mid, '(Has been actively participating in the internship program)'), 'Mid wording');
+        assert.ok(has(mid, 'IN PROGRESS'), 'Mid: watermark');
+        assert.ok(!['M', 'E', 'D', 'C', 'R', 'T'].some(ch => mid.calls.some(c => c.t === ch && c.y < 140)), 'no corner seal below 100%');
+        assert.ok(has(mid, '28 / 40 วัน (days) · 70% · Progressing') && !has(mid, '40 วัน / 40 days'), 'progress line replaces the day count');
+        assert.ok(!has(mid, 'SCAN TO VERIFY') && has(mid, 'Progress · no number'), 'no scan-to-verify on a progress certificate');
+        assert.equal(mid.calls.find(c => c.t === 'PROGRESS CERTIFICATE').c, '#0f766e', 'Mid accent colour');
+        const near = await draw({ hours: '', skills: [], stage: { key: 'near', text: '37 / 40 วัน (days) · 92% · Near completion', pct: 92 } });
+        assert.ok(has(near, 'CERTIFICATE') && has(near, 'OF ACHIEVEMENT') && has(near, 'กำลังจะสำเร็จการฝึกงาน') && !has(near, 'IN PROGRESS'), 'Near: Certificate of Achievement, no watermark');
+        const early = await draw({ hours: '', skills: [], stage: { key: 'early', text: '10 / 40 วัน (days) · 25% · In progress · early stage', pct: 25 } });
+        assert.ok(has(early, 'OF PARTICIPATION · IN PROGRESS') && has(early, 'กำลังอยู่ระหว่างการฝึกงาน') && has(early, 'IN PROGRESS'), 'Early wording + watermark');
+        const off = await draw({ hours: '', skills: [], stage: { key: 'mid', text: '', pct: 70 } });
+        assert.ok(has(off, '40 วัน / 40 days') && !off.calls.some(c => /70%/.test(c.t)), 'print off: the usual day count, no progress line');
+        const hrsMid = await draw({ hours: '112 ชั่วโมง · 15 พฤศจิกายน 2569', skills: [], stage: { key: 'mid', text: '112 / 160 ชม. (hours) · 70% · Progressing', pct: 70 } });
+        assert.ok(has(hrsMid, 'วันที่ (DATE)') && !has(hrsMid, 'ฝึกงานครบ (COMPLETED)'), 'hours mode below 100% keeps the DATE label (not COMPLETED)');
+        // 4. 🏅 Badges (owner pick A): the real badge art + tier helpers, best tier first, one row under Skills, and the canvas still exports (PDF)
+        const badgeJs = cut('        const BADGE_STATS_DEFS = [', '        // V102.263') + cut('        const BADGE_TIERS = [', '        function badgeSvgHtml(') +
+            cut('        function badgeSvgHtml(', '\n        }\n') + '\n        }\n' + cut('        function userBadgeTier(u, id) {', '        // Sort key:');
+        await page.addScriptTag({ content: badgeJs });
+        const bd = await page.evaluate(async () => {
+            const L = n => ({ level: n });
+            usersData[0].badges = { on_fire: L(2), quiz_master: L(3), legend: L(1), explorer: L(1), speedrunner: L(0) };
+            localStorage.setItem('cert_badges', '0');
+            const off = (await certBadgeImgs()).length;
+            toggleCertBadges();
+            const imgs = await certBadgeImgs();
+            const order = certHeldBadges(usersData[0]).map(x => x.d.id + ':' + x.t).join(' ');
+            const c = document.createElement('canvas'); c.width = CERT_BASE_WIDTH; c.height = CERT_BASE_HEIGHT;
+            const ctx = c.getContext('2d'), at = [];
+            const di = ctx.drawImage.bind(ctx);
+            ctx.drawImage = (im, x, y, ...r) => { if (imgs.includes(im)) at.push(Math.round(y + ctx.getTransform().f)); return di(im, x, y, ...r); };
+            const sk = [];
+            const ft = ctx.fillText.bind(ctx);
+            ctx.fillText = (t, x, y, ...r) => { if (t === 'Dispensing') sk.push(Math.round(y + ctx.getTransform().f)); return ft(t, x, y, ...r); };
+            drawCertificate(ctx, 'Sample Intern', 'x', [], 1, 0, 'internship', 'en', null, {}, '', { hours: '', skills: ['Dispensing'], badgeImgs: imgs });
+            let exports = true; try { c.toDataURL(); } catch (e) { exports = false; }
+            return { off, n: imgs.filter(Boolean).length, order, at, sk, exports };
+        });
+        assert.equal(bd.off, 0, 'chip off → no badges');
+        assert.equal(bd.order, 'legend:4 quiz_master:3 on_fire:2 explorer:1', 'best tier first (Diamond → Gold → Silver → Bronze)');
+        assert.equal(bd.n, 4, 'every held badge becomes an image');
+        assert.equal(bd.at.length, 4, 'one row of 4');
+        assert.ok(bd.at.every(y => y === bd.at[0]) && bd.at[0] >= bd.sk[0] + 7 && bd.at[0] + 21 <= 472, 'the row sits under the skills line and above the signature: ' + JSON.stringify(bd));
+        assert.ok(bd.exports, 'the canvas with badges still exports (PDF)');
+        assert.deepEqual(errs, []);
+        console.log('PASS: certificate by progress (V102.600) — Auto stage from days/hours, manual pick, print box, stage wording/colour/watermark, no seal / scan below 100%, Completed = identical pixels, PharmCamp no stage, ✂️ First / Last, progress PDF unregistered, 〰 name line off by default + chip, Brand row (logo · watermark · seal · Co. name), 🏅 badges in one row under Skills (best tier first, PDF still exports)');
+    } finally { await browser.close(); }
+})().catch(e => { console.error(e); process.exit(1); });

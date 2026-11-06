@@ -9,7 +9,7 @@ const cut = (a, b) => { const i = admin.indexOf(a); assert.ok(i > 0, a); const j
 const block = cut('        const CERT_TEMPLATES = {', '        const CERT_EXPORT_SCALE');
 const modalJs = cut('        function setCertPeriodMode(mode) {', '        // V96.74: which wording the preview + PDF use.');
 const rows = cut('                <!-- V102.578: lean rows', '                <div id="cert-preview-container"');
-assert.ok(admin.includes('getCurrentCertificateDuration(), getCurrentCertificateExtra()], 1);'), 'the preview passes the extra');
+assert.ok(admin.includes('const ex = getCurrentCertificateExtra();') && admin.includes('getCurrentCertificateDuration(), ex], 1);'), 'the preview passes the extra (V102.600: + the badge images)');
 assert.ok(admin.includes('getCurrentCertificateDuration(), _extra], CERT_EXPORT_SCALE);'), 'the PDF passes the same extra');
 assert.ok(/dateText: _hrs \? _extra\.hours : drawArgs\[1\]/.test(admin), 'the registry keeps the hours text for verify.html');
 
@@ -21,7 +21,7 @@ assert.ok(/dateText: _hrs \? _extra\.hours : drawArgs\[1\]/.test(admin), 'the re
         // a real origin, so localStorage works (about:blank denies it)
         await page.route('http://qa.local/**', r => r.fulfill({ contentType: 'text/html', body: `<!doctype html><meta charset="utf-8"><div id="certModal">${rows}</div>` }));
         await page.goto('http://qa.local/');
-        await page.addScriptTag({ content: block + '\n' + modalJs + '\nwindow.updateCertPreview = () => { window.__repaint = (window.__repaint || 0) + 1; };' });
+        await page.addScriptTag({ content: block + '\n' + modalJs + "\nvar currentCertTemplate = 'internship', certUser = null;" + '\nwindow.updateCertPreview =() => { window.__repaint = (window.__repaint || 0) + 1; };' });
         assert.deepEqual(errs, []);
 
         // 1. the hours text per language / calendar
@@ -81,7 +81,7 @@ assert.ok(/dateText: _hrs \? _extra\.hours : drawArgs\[1\]/.test(admin), 'the re
         assert.ok(sk, 'the skills line');
         assert.ok(sk.y <= 464, 'the skills line clears the signature (top ≈ 472): y=' + sk.y);
         const name = find('Sample Intern'), namePlain = plain.calls.find(c => c.t === 'Sample Intern');
-        assert.equal(name.y, namePlain.y - 30, 'the middle block rose 30px');
+        assert.equal(name.y, namePlain.y - 36, 'name → skills rose 36px (V102.600: intro only 10px)');
         assert.equal(find('Managing Pharmacist').y, plain.calls.find(c => c.t === 'Managing Pharmacist').y, 'the signature block did not move');
         const th = await draw({ hours: '200 ชั่วโมง · 27 พฤศจิกายน 2569', skills: ['จ่ายยาตามใบสั่ง'] }, 'th');
         assert.ok(th.calls.some(c => c.t === 'ฝึกงานครบ') && th.calls.some(c => c.t === 'จ่ายยาตามใบสั่ง'), 'TH: Thai label + Thai skill');
@@ -110,7 +110,7 @@ assert.ok(/dateText: _hrs \? _extra\.hours : drawArgs\[1\]/.test(admin), 'the re
         });
         assert.deepEqual(m.chips, ['Dispensing', 'Counseling', 'Inventory', 'OTC', 'Drug law', 'Drug info']);
         assert.deepEqual(m.restored, ['dispensing', 'otc'], 'last picks come back');
-        assert.deepEqual(m.extraDates, { hours: '', skills: ['Dispensing', 'OTC & Health Products'] }, 'dates mode: skills only, in the chip order');
+        assert.deepEqual(m.extraDates, { hours: '', skills: ['Dispensing', 'OTC & Health Products'], stage: null }, 'dates mode (no dates → no stage): skills only, in the chip order');
         assert.equal(m.fieldsShown, true);
         assert.equal(m.incomplete, '', 'hours mode without hours / date → falls back to the dates');
         assert.equal(m.hours, '200 ชั่วโมง · 27 พฤศจิกายน 2569 (200 hours · 27 November 2026)');
