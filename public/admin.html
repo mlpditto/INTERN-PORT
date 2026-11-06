@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.599)</title>
+    <title>Nika Admin (V102.600)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -14784,6 +14784,17 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                     #certModal .cert-xlbl2 { margin-left:10px; font-size:0.8em; font-weight:700; color:#666; }
                     #certModal .cert-xflag { width:auto; min-height:32px; margin:0; padding:3px 10px; border:1.5px solid #4361ee; border-radius:999px; background:#eef2ff; font-size:18px; line-height:1; cursor:pointer; display:inline-flex; align-items:center; gap:3px; }
                     #certModal .cert-xflag img.emoji { width:20px; height:20px; }
+                    /* V102.600 (owner): progress stages — Auto picks Early / Mid / Near / Completed from the % */
+                    #certModal #cert-stage-row, #certModal #cert-progress-row { background:#eef2ff; border-radius:10px; padding:4px 6px; }
+                    #certModal .cert-pbar { flex:1; min-width:120px; max-width:320px; height:8px; border-radius:999px; background:#e2e8f0; overflow:hidden; }
+                    #certModal .cert-pbar i { display:block; height:100%; background:linear-gradient(90deg,#4361ee,#22c55e); }
+                    #certModal #cert-progress-text { font-size:0.8em; }
+                    #certModal .cert-stage-badge { padding:2px 9px; border-radius:999px; font-size:0.75em; font-weight:800; }
+                    #certModal .cert-stage-badge[data-k="early"] { background:#dbeafe; color:#1e40af; }
+                    #certModal .cert-stage-badge[data-k="mid"] { background:#ccfbf1; color:#115e59; }
+                    #certModal .cert-stage-badge[data-k="near"] { background:#ffedd5; color:#9a3412; }
+                    #certModal .cert-stage-badge[data-k="done"] { background:#fef3c7; color:#854d0e; }
+                    #certModal #cert-split-en { width:auto; margin:4px 0 0; padding:2px 10px; min-height:0; border:1.5px dashed #94a3b8; border-radius:999px; background:#fff; color:#475569; font-size:0.75em; font-weight:700; cursor:pointer; }
                     @media (max-width:600px) { #certModal .cert-xnames { grid-template-columns:1fr; } #certModal .cert-xprint { margin-left:0; } }
                 </style>
                 <!-- V102.580 (owner): Template · Language · Year on one line; Language is one flag chip — a tap steps TH → EN → TH+EN → KO+EN -->
@@ -14805,11 +14816,19 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                     </div>
                     <span class="cert-xcount" id="cert-xcal-note"></span>
                 </div>
+                <div class="cert-xrow lang-no-toggle" id="cert-stage-row">
+                    <span class="cert-xlbl">Stage</span>
+                    <button type="button" class="cert-xchip" data-stage="auto" aria-pressed="true" onclick="setCertStage('auto')">Auto</button>
+                    <button type="button" class="cert-xchip" data-stage="early" aria-pressed="false" onclick="setCertStage('early')">Early</button>
+                    <button type="button" class="cert-xchip" data-stage="mid" aria-pressed="false" onclick="setCertStage('mid')">Mid</button>
+                    <button type="button" class="cert-xchip" data-stage="near" aria-pressed="false" onclick="setCertStage('near')">Near</button>
+                    <button type="button" class="cert-xchip" data-stage="done" aria-pressed="false" onclick="setCertStage('done')">Completed</button>
+                </div>
                 <div class="cert-xrow lang-no-toggle" style="align-items:flex-start;">
                     <span class="cert-xlbl" style="padding-top:18px;">Name</span>
                     <div class="cert-xnames">
                         <div data-for="th"><label>Thai</label><input type="text" id="cert-fullname-th" placeholder="ชื่อ-นามสกุล" onkeyup="updateCertPreview()"></div>
-                        <div data-for="en"><label>English (as in passport)</label><input type="text" id="cert-fullname" placeholder="Full name in English" onkeyup="updateCertPreview()"><div class="cert-xwarn" id="cert-xen-warn" hidden>⚠ Thai letters here print on the EN line</div></div>
+                        <div data-for="en"><label>English (as in passport)</label><input type="text" id="cert-fullname" placeholder="Full name in English" onkeyup="updateCertPreview()"><div class="cert-xwarn" id="cert-xen-warn" hidden>⚠ Thai letters here print on the EN line</div><button type="button" id="cert-split-en" hidden onclick="certSplitEnName()" title="Save as First name (EN) + Last name (EN) on this user">✂️ First / Last</button></div>
                         <div data-for="ko"><label>Korean</label><input type="text" id="cert-fullname-ko" placeholder="한국어 이름 (optional)" onkeyup="updateCertPreview()"></div>
                         <div><label style="display:flex; justify-content:space-between;">AKA <span style="font-weight:600;"><input type="checkbox" id="cert-include-nickname" checked onchange="updateCertPreview()" style="margin:0; width:auto; vertical-align:middle;"> print</span></label><input type="text" id="cert-nickname" placeholder="Nickname" onkeyup="updateCertPreview()"></div>
                     </div>
@@ -14821,6 +14840,13 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                     <span class="cert-xdates" id="cert-xdates-fields"><input type="date" id="cert-start" aria-label="Start" onchange="updateCertPreview()"> → <input type="date" id="cert-end" aria-label="End" onchange="updateCertPreview()"></span>
                     <span id="cert-hours-fields" hidden><input type="number" id="cert-hours" min="1" step="1" placeholder="200" aria-label="Hours completed" oninput="updateCertPreview()"> h on <input type="date" id="cert-hours-at" aria-label="Date the hours were completed" onchange="updateCertPreview()"></span>
                     <small id="cert-hours-hint" hidden></small>
+                </div>
+                <div class="cert-xrow lang-no-toggle" id="cert-progress-row" hidden>
+                    <span class="cert-xlbl"></span>
+                    <div class="cert-pbar"><i id="cert-pbar-fill" style="width:0%"></i></div>
+                    <b id="cert-progress-text"></b>
+                    <span class="cert-stage-badge" id="cert-stage-badge"></span>
+                    <label class="cert-xcount" title="Print the x / y days · % line and bar under DATE"><input type="checkbox" id="cert-progress-print" checked onchange="updateCertPreview()" style="margin:0; width:auto; vertical-align:middle;"> print</label>
                 </div>
                 <span class="cert-xprint lang-no-toggle" id="cert-xprint-period"></span>
                 <div class="cert-xrow" id="cert-skills-row">
@@ -14838,8 +14864,17 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                     <label class="cert-xaward" title="Great teamwork and helping colleagues"><input type="checkbox" name="cert-award" value="team-player" onchange="updateCertPreview()">🤝 Team Player</label>
                     <label class="cert-xaward" title="Outstanding development and fastest growth"><input type="checkbox" name="cert-award" value="rising-star" onchange="updateCertPreview()">🌟 Rising Star</label>
                     <label class="cert-xaward" title="Best overall intern of the generation"><input type="checkbox" name="cert-award" value="mvp" onchange="updateCertPreview()">👑 MVP</label>
+                    <button type="button" class="cert-xchip" id="cert-badges-chip" aria-pressed="false" onclick="toggleCertBadges()" title="Print the intern's badges in one row under Skills, best tier first">🏅 Badges</button>
+                    <button type="button" class="cert-xchip" id="cert-nameline-chip" aria-pressed="false" onclick="toggleCertNameLine()" title="The gold line under the name">〰 Name line</button>
                     <span class="cert-xcount" id="cert-xaward-count"></span>
                     </div>
+                </div>
+                <div class="cert-xrow lang-no-toggle" id="cert-brand-row" title="MEDLIFE PLUS on the certificate: tap to hide / show">
+                    <span class="cert-xlbl">Brand</span>
+                    <button type="button" class="cert-xchip" data-brand="logo" aria-pressed="true" onclick="toggleCertBrand('logo')">Logo</button>
+                    <button type="button" class="cert-xchip" data-brand="wm" aria-pressed="true" onclick="toggleCertBrand('wm')">Watermark</button>
+                    <button type="button" class="cert-xchip" data-brand="seal" aria-pressed="true" onclick="toggleCertBrand('seal')">Seal</button>
+                    <button type="button" class="cert-xchip" data-brand="co" aria-pressed="true" onclick="toggleCertBrand('co')">Co. name</button>
                 </div>
                 <div id="cert-preview-container"
                     style="text-align:center; border:2px solid #ddd; padding:15px; margin-bottom:15px; background:#f9f9f9; border-radius:12px; overflow:hidden; display: flex; justify-content: center; align-items: center;">
@@ -56967,7 +57002,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function openCertModal(uid) {
             const u = usersData.find(x => x.id === uid);
             if (!u) return;
-            certUser = { uid: u.id, name: u.displayName, level: Math.floor((u.score || 0) / 10) + 1, score: parseFloat((u.score || 0).toFixed(2)) };
+            certUser = { uid: u.id, name: u.displayName, level: Math.floor((u.score || 0) / 10) + 1, score: parseFloat((u.score || 0).toFixed(2)),
+                hoursDone: Number((u.internHours || {}).total) || 0, hoursTarget: Number(u.internHoursTarget) || 0 };
+            certStagePick = 'auto';
             document.getElementById('cert-fullname').value = u.fullNameEn || u.fullName || u.displayName || "";
             // V100.67: users.fullName is the Thai name (fullNameEn is the English one).
             // Set on every open so one recipient's value never leaks into the next.
@@ -64547,6 +64584,134 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             return { hours: '', at: '', hint: 'no time-clock hours: type them' };
         }
 
+        // V102.600 (owner): progress-based certificates. Below 100% the wording, colour and title change, the corner seal
+        // goes (the progress prints under DATE instead), Early/Mid carry a faint IN PROGRESS watermark, and no registry
+        // number is issued. Completed = the normal Certificate of Achievement. Internship template only.
+        const CERT_STAGES = {
+            early: { name: 'In progress · early stage', header: 'CERTIFICATE', subtitle: 'OF PARTICIPATION · IN PROGRESS', gold: '#2563eb', goldDark: '#1d4ed8', watermark: true,
+                thai: 'กำลังอยู่ระหว่างการฝึกงาน', en: 'Currently undergoing internship training', ko: '현재 인턴십 과정을 수행 중임을 증명합니다' },
+            mid: { name: 'Progressing', header: 'INTERNSHIP', subtitle: 'PROGRESS CERTIFICATE', gold: '#0d9488', goldDark: '#0f766e', watermark: true,
+                thai: 'ได้ปฏิบัติงานฝึกงานด้วยความมุ่งมั่น', en: 'Has been actively participating in the internship program', ko: '인턴십 과정에 성실히 참여하고 있음을 증명합니다' },
+            near: { name: 'Near completion', header: 'CERTIFICATE', subtitle: 'OF ACHIEVEMENT', gold: '#d97706', goldDark: '#b45309',
+                thai: 'กำลังจะสำเร็จการฝึกงาน', en: 'Successfully progressing towards completion', ko: '인턴십 과정의 수료를 앞두고 있음을 증명합니다' }
+        };
+        const CERT_STAGE_LABEL = { early: '🔵 Early', mid: '🟢 Mid', near: '🟠 Near completion', done: '🏅 Completed' };
+        let certStagePick = 'auto';
+        function certStageFromPct(p) { return p >= 100 ? 'done' : p >= 80 ? 'near' : p >= 40 ? 'mid' : 'early'; }
+        // { done, total, pct, unit } — days from the start to today (Dates) or time-clock hours over the goal (Hours); null when unknown
+        function certProgress(todayISO) {
+            if (certPeriodMode === 'hours') {
+                const t = certUser && certUser.hoursTarget, d = certUser ? certUser.hoursDone : 0;
+                if (!t) return null;
+                const done = Math.round(Math.min(d, t) * 10) / 10;
+                return { done, total: t, pct: Math.min(100, Math.floor(d / t * 100)), unit: 'hours' };
+            }
+            const s = document.getElementById('cert-start').value, e = document.getElementById('cert-end').value;
+            const total = certDurationDays(s, e);
+            if (!s || !e || total < 1) return null;
+            const now = todayISO || new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+            const done = now < s ? 0 : Math.min(total, certDurationDays(s, now));
+            return { done, total, pct: Math.min(100, Math.floor(done / total * 100)), unit: 'days' };
+        }
+        function certStageNow() {
+            if (currentCertTemplate !== 'internship') return 'done';
+            if (certStagePick !== 'auto') return certStagePick;
+            const p = certProgress();
+            return p ? certStageFromPct(p.pct) : 'done';
+        }
+        function setCertStage(k) { certStagePick = k; updateCertPreview(); }
+        // V102.600 (owner pick A): 🏅 Badges — the intern's badges in one row under Skills, best tier first (Diamond → Bronze),
+        // no names / legend. On/off is remembered in this browser like the skill picks.
+        function certBadgesOn() { try { return localStorage.getItem('cert_badges') === '1'; } catch (e) { return false; } }
+        // V102.600 (owner): the Brand row — each MEDLIFE PLUS spot (logo, watermark, seal rim, company line) on unless turned off
+        function certBrandOff() { try { const v = JSON.parse(localStorage.getItem('cert_brand_off') || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+        function certBrandOn(k) { return !certBrandOff().includes(k); }
+        function toggleCertBrand(k) {
+            const off = certBrandOff(), next = off.includes(k) ? off.filter(x => x !== k) : off.concat(k);
+            try { localStorage.setItem('cert_brand_off', JSON.stringify(next)); } catch (e) { /* private mode: not remembered */ }
+            updateCertPreview();
+        }
+        // V102.600 (owner): the gold line under the name is off unless this chip turns it on
+        function certNameLineOn() { try { return localStorage.getItem('cert_name_line') === '1'; } catch (e) { return false; } }
+        function toggleCertNameLine() {
+            try { localStorage.setItem('cert_name_line', certNameLineOn() ? '0' : '1'); } catch (e) { /* private mode: not remembered */ }
+            updateCertPreview();
+        }
+        function toggleCertBadges() {
+            try { localStorage.setItem('cert_badges', certBadgesOn() ? '0' : '1'); } catch (e) { /* private mode: not remembered */ }
+            updateCertPreview();
+        }
+        const certBadgeImgCache = {};
+        function certHeldBadges(u) {
+            if (!u || typeof BADGE_STATS_DEFS === 'undefined') return [];
+            return BADGE_STATS_DEFS.map((d, i) => ({ d, i, t: userBadgeTier(u, d.id) || 0 })).filter(x => x.t).sort((a, b) => b.t - a.t || a.i - b.i);
+        }
+        async function certBadgeImgs() {
+            if (!certBadgesOn() || !certUser) return [];
+            const held = certHeldBadges((usersData || []).find(x => x.id === certUser.uid));
+            return Promise.all(held.map(x => {
+                const k = x.d.art + ':' + x.t;
+                return certBadgeImgCache[k] || (certBadgeImgCache[k] = new Promise(res => {
+                    const tmp = document.createElement('div');
+                    tmp.innerHTML = badgeSvgHtml(x.d.art, x.t, 40, false);
+                    const svg = tmp.querySelector('svg');
+                    if (!svg) return res(null);
+                    svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                    const im = new Image();
+                    im.onload = () => res(im); im.onerror = () => res(null);
+                    im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg.outerHTML);
+                }));
+            }));
+        }
+        function certProgressText(p, lang) {
+            const u = p.unit === 'hours' ? { th: 'ชม.', en: 'hours', ko: '시간' } : { th: 'วัน', en: 'days', ko: '일' };
+            const unit = lang === 'th' ? u.th : lang === 'en' ? u.en : lang === 'ko' ? u.ko + ' (' + u.en + ')' : u.th + ' (' + u.en + ')';
+            return `${p.done} / ${p.total} ${unit} · ${p.pct}%`;
+        }
+        function paintCertStage() {
+            const row = document.getElementById('cert-stage-row'), prow = document.getElementById('cert-progress-row');
+            if (!row) return;
+            const intern = currentCertTemplate === 'internship', p = certProgress(), k = certStageNow();
+            row.hidden = !intern;
+            const bc = document.getElementById('cert-badges-chip');
+            if (bc) {
+                const n = certUser ? certHeldBadges((usersData || []).find(x => x.id === certUser.uid)).length : 0;
+                bc.setAttribute('aria-pressed', String(certBadgesOn()));
+                document.querySelectorAll('#cert-brand-row [data-brand]').forEach(b => b.setAttribute('aria-pressed', String(certBrandOn(b.dataset.brand))));
+                const lc = document.getElementById('cert-nameline-chip');
+                if (lc) lc.setAttribute('aria-pressed', String(certNameLineOn()));
+                bc.textContent = '🏅 Badges' + (n ? ' · ' + n : '');
+                bc.disabled = !n; bc.title = n ? "Print the intern's badges in one row under Skills, best tier first" : 'No badges saved for this intern yet';
+            }
+            prow.hidden = !intern || !p;
+            row.querySelectorAll('[data-stage]').forEach(b => {
+                b.setAttribute('aria-pressed', String(b.dataset.stage === certStagePick));
+                if (b.dataset.stage === 'auto') b.textContent = certStagePick === 'auto' ? 'Auto · ' + CERT_STAGE_LABEL[k] : 'Auto';
+            });
+            if (p) {
+                document.getElementById('cert-pbar-fill').style.width = p.pct + '%';
+                document.getElementById('cert-progress-text').textContent = certProgressText(p, 'th');
+                const bd = document.getElementById('cert-stage-badge');
+                bd.dataset.k = k; bd.textContent = CERT_STAGE_LABEL[k];
+            }
+            const u = certUser && (usersData || []).find(x => x.id === certUser.uid), en = document.getElementById('cert-fullname').value.trim();
+            document.getElementById('cert-split-en').hidden = !(u && !u.firstNameEn && !u.lastNameEn && /^[A-Za-z.'\-]+(\s+[A-Za-z.'\-]+)+$/.test(en));
+        }
+        // ✂️ splits the English name at the last space and saves First / Last (EN) on the user, after a confirm
+        async function certSplitEnName() {
+            const en = document.getElementById('cert-fullname').value.trim().replace(/\s+/g, ' ');
+            const cut = en.lastIndexOf(' ');
+            if (!certUser || cut < 1) return;
+            const first = en.slice(0, cut), last = en.slice(cut + 1);
+            if (!confirm(`Save on this user?\nFirst name (EN): ${first}\nLast name (EN): ${last}`)) return;
+            try {
+                await db.collection('users').doc(certUser.uid).update({ firstNameEn: first, lastNameEn: last });
+                const u = (usersData || []).find(x => x.id === certUser.uid);
+                if (u) { u.firstNameEn = first; u.lastNameEn = last; }
+                showToast('Saved First / Last (EN)');
+                paintCertStage();
+            } catch (e) { alert('Save failed: ' + e.message); }
+        }
         // ============ V96.83 Phase 3: Certificate Registry ============
         // Real running numbers live in Firestore `certificates/{no}` with the counter
         // in `cert_meta/counter`. Numbers are minted ONLY at PDF-export time (never on
@@ -64672,13 +64837,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // the English one in TH+EN; the Korean name sits under it in KO+EN (V100.68).
         // `name` stays the English name ("EN|nickname").
         function drawCertificate(ctx, name, dates, awards, level, score, template, lang, certNo, names, duration, extra) {
-            const tpl = CERT_TEMPLATES[template] || CERT_TEMPLATES.internship;
+            // V102.600: a progress stage overrides the title, wording and accent colour
+            const stage = extra && extra.stage && CERT_STAGES[extra.stage.key] ? extra.stage : null;
+            const tpl = Object.assign({}, CERT_TEMPLATES[template] || CERT_TEMPLATES.internship, stage ? CERT_STAGES[stage.key] : {});
             lang = ['th', 'en', 'ko'].includes(lang) ? lang : 'both';
             names = names || {};
             // V102.577: extra = { hours, skills } from the single Certificate modal — hours mode text
             // replaces the date range, skills are one gold line under the description
             extra = extra || {};
             const skills = Array.isArray(extra.skills) ? extra.skills.filter(Boolean) : [];
+            const badgeImgs = Array.isArray(extra.badgeImgs) ? extra.badgeImgs.filter(im => im && im.naturalWidth) : [];
             // V100.68: Montserrat has no Hangul — name Noto Sans KR explicitly for every
             // line that can be Korean, instead of whatever font the admin's OS falls to.
             const FF = "Montserrat, 'Noto Sans KR', sans-serif";
@@ -64689,7 +64857,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const NAME_FF = "'Cormorant Garamond', " + FF;
             // V96.82: one gold pair for every accent — subtitle, underline, ornament,
             // borders and seal previously each used a slightly different gold.
-            const GOLD = '#b08a1e', GOLD_DARK = '#8f6b14';
+            const GOLD = tpl.gold || '#b08a1e', GOLD_DARK = tpl.goldDark || '#8f6b14';
             // Handle both array (multiple) and string (legacy)
             const awardList = Array.isArray(awards) ? awards : (awards && awards !== 'none' ? [awards] : []);
             // V100.65: A4 proportions (297:210 ≈ 848:600). At 800×600 the 4:3 image was
@@ -64709,8 +64877,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             ctx.lineWidth = 1;
             ctx.strokeRect(0, 0, w, h);
 
-            // 2. Watermark — unchanged from before this redesign.
-            if (CERT_LOGO.complete && CERT_LOGO.naturalWidth) {
+            // 2. Watermark — unchanged from before this redesign. (V102.600: the Brand row can turn it off)
+            if (!certBrandOn('wm')) {
+                // no watermark
+            } else if (CERT_LOGO.complete && CERT_LOGO.naturalWidth) {
                 ctx.save();
                 ctx.globalAlpha = 0.035;
                 const wmW = w * 0.46, wmH = wmW * CERT_LOGO.naturalHeight / CERT_LOGO.naturalWidth;
@@ -64724,6 +64894,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 ctx.fillStyle = "rgba(0, 0, 0, 0.03)";
                 ctx.font = "bold 120px Montserrat, sans-serif";
                 ctx.fillText("OFFICIAL", 0, 0);
+                ctx.restore();
+            }
+
+            if (tpl.watermark) {
+                ctx.save();
+                ctx.translate(w / 2, h / 2 + 20); ctx.rotate(-0.3);
+                ctx.textAlign = "center"; ctx.fillStyle = "rgba(37, 99, 235, 0.06)";
+                ctx.font = "900 92px Montserrat, sans-serif";
+                ctx.fillText("IN PROGRESS", 0, 0);
                 ctx.restore();
             }
 
@@ -64801,7 +64980,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             sideLine(w - 50, 90, 300);
 
             // V96.79: small company logo, top-left above the header.
-            if (CERT_LOGO.complete && CERT_LOGO.naturalWidth) {
+            if (certBrandOn('logo') && CERT_LOGO.complete && CERT_LOGO.naturalWidth) {
                 const logoH = 50, logoW = logoH * CERT_LOGO.naturalWidth / CERT_LOGO.naturalHeight;
                 ctx.drawImage(CERT_LOGO, 62, 46, logoW, logoH);
             }
@@ -64815,7 +64994,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // V102.582 (owner pick D): a gold foil seal — three thin gold rings, no fill (it sits quietly on the ivory),
             // MEDLIFE PLUS along the top of the rim and CERTIFIED along the bottom (the old centred words ran past the
             // navy disc), a gold star in the middle. Same spot, same size, same hide-at-3-awards rule.
-            if (awardList.length <= 2) (() => {
+            if (awardList.length <= 2 && !stage) (() => {
                 const cx = w - 92, cy = 90, r = 38;
                 const ring = (rr, lw) => { ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.strokeStyle = GOLD; ctx.lineWidth = lw; ctx.stroke(); };
                 // letters along the circle at radius rr, centred on the top (dir 1) or the bottom (dir -1), upright either way
@@ -64834,7 +65013,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 };
                 ctx.save();
                 ring(r, 2); ring(r - 3.5, 0.8); ring(r - 14, 0.8);
-                arcText('MEDLIFE PLUS', r - 9, "700 7.6px Montserrat", 1, 0.8);
+                if (certBrandOn('seal')) arcText('MEDLIFE PLUS', r - 9, "700 7.6px Montserrat", 1, 0.8);
                 arcText('CERTIFIED', r - 9, "600 7px Montserrat", -1, 1.4);
                 ctx.beginPath();
                 for (let i = 0; i < 10; i++) { const rr = i % 2 ? 11 * 0.45 : 11, a = -Math.PI / 2 + i * Math.PI / 5; ctx.lineTo(cx + rr * Math.cos(a), cy + rr * Math.sin(a)); }
@@ -64849,7 +65028,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             ctx.textAlign = "center";
             ctx.fillStyle = "#0a192f";
             ctx.font = "bold 52px 'Cormorant Garamond', Georgia, serif";
-            ctx.fillText("CERTIFICATE", w / 2, 148);
+            ctx.fillText(tpl.header || "CERTIFICATE", w / 2, 148);
 
             ctx.font = "italic 600 20px 'Cormorant Garamond', serif";
             ctx.fillStyle = GOLD_DARK; // V96.82: was #c5a021 — too pale on white
@@ -64863,7 +65042,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // V102.577: with a skills line the middle block (intro → description) rises 30px so
             // the line clears the signature; restored before section 11
             ctx.save();
-            if (skills.length) ctx.translate(0, -30);
+            // V102.600 (owner): less cramped — the intro rises only 10px (it no longer crowds the subtitle) and the
+            // gap between "This is to certify that" and the name closes instead, so name → skills → badges rise 36px
+            const extraRows = skills.length || badgeImgs.length;
+            if (extraRows) ctx.translate(0, -10);
             // 7. Introduction (V96.82: per-language variants; V100.67: regular grey
             // instead of bold dark, so the recipient's name is the loudest line;
             // V100.75: centered under the now-centered header)
@@ -64885,6 +65067,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 ctx.fillText("This is to certify that", w / 2, 260);
             }
 
+            if (extraRows) ctx.translate(0, -26 - (skills.length && badgeImgs.length ? 6 : 0));   // skills + badges: 6px more so the row clears the signature
             // 8. Recipient Name (Dynamic Fitting & Bold Italic)
             const recipientNameArray = name ? name.split('|') : ["Student Name"];
             const enName = recipientNameArray[0].trim();
@@ -64944,16 +65127,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
 
 
             // 9. Premium Underline
-            const grad = ctx.createLinearGradient(w * 0.22, 0, w * 0.78, 0); // V100.75: recentered, same 0.56w span
-            grad.addColorStop(0, "rgba(176, 138, 30, 0)");
-            grad.addColorStop(0.5, "rgba(176, 138, 30, 1)");
-            grad.addColorStop(1, "rgba(176, 138, 30, 0)");
-            ctx.strokeStyle = grad;
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.moveTo(w * 0.22, lineY);
-            ctx.lineTo(w * 0.78, lineY);
-            ctx.stroke();
+            // V102.600 (owner): off by default; the 〰 Name line chip brings it back (remembered in this browser, bulk too)
+            if (extra.nameLine != null ? extra.nameLine : certNameLineOn()) {
+                const grad = ctx.createLinearGradient(w * 0.22, 0, w * 0.78, 0); // V100.75: recentered, same 0.56w span
+                grad.addColorStop(0, "rgba(176, 138, 30, 0)");
+                grad.addColorStop(0.5, "rgba(176, 138, 30, 1)");
+                grad.addColorStop(1, "rgba(176, 138, 30, 0)");
+                ctx.strokeStyle = grad;
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(w * 0.22, lineY);
+                ctx.lineTo(w * 0.78, lineY);
+                ctx.stroke();
+            }
 
             // 10. Course Description (V96.82: language variants, heavier Thai weight,
             // more air after the name; shrink-to-fit so long titles never clip)
@@ -64994,12 +65180,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 ctx.fillStyle = GOLD_DARK;
                 ctx.fillText(st, w * 0.5, descY + (lang === 'th' || lang === 'en' ? 26 : 46));
             }
+            // V102.600 (owner pick A): the intern's badges, one row under the skills line (or in its place), best tier first, no legend
+            if (badgeImgs.length) {
+                const s = 21, gap = 5, n = badgeImgs.length, x0 = w / 2 - (n * s + (n - 1) * gap) / 2;
+                const top = descY + (lang === 'th' || lang === 'en' ? 26 : 46) + (skills.length ? 7 : -14);
+                badgeImgs.forEach((im, i) => ctx.drawImage(im, x0 + i * (s + gap), top, s, s));
+            }
             ctx.restore();
 
             // 11. Dates & Signature Area
             ctx.textAlign = "left";
             ctx.font = `bold 14px ${FF}`;
             ctx.fillStyle = "#0a192f";
+            if (stage) extra = Object.assign({}, extra, { hours: '' });   // V102.600: an unfinished stage keeps the date range
             const dateLabel = extra.hours
                 ? { th: "ฝึกงานครบ", en: "COMPLETED", both: "ฝึกงานครบ (COMPLETED)", ko: "COMPLETED" }[lang]
                 : { th: "วันที่", en: "DATE", both: "วันที่ (DATE)", ko: CERT_KO.dateLabel }[lang];
@@ -65008,6 +65201,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // V100.70: duration ("49 days"), same baseline as the label so the
             // delicate two-line date wrap (V100.63) is untouched. Skipped instead of
             // clipped if it would run into the signature line at x=390.
+            if (stage && stage.text) {
+                // V102.600: "28 / 40 วัน (days) · 70% · Progressing" + a thin bar instead of the day count
+                const labelW = ctx.measureText(dateLabel).width;
+                let px = 10;
+                ctx.font = `400 ${px}px ${FF}`;
+                while (80 + labelW + 10 + ctx.measureText(stage.text).width > 370 && px > 7) { px -= 0.5; ctx.font = `400 ${px}px ${FF}`; }
+                ctx.fillStyle = "#666";
+                ctx.fillText(stage.text, 80 + labelW + 10, 500);
+                ctx.fillStyle = "#e2e8f0"; ctx.fillRect(80, 504, 260, 3);
+                ctx.fillStyle = GOLD; ctx.fillRect(80, 504, 260 * Math.max(0, Math.min(100, stage.pct || 0)) / 100, 3);
+                ctx.font = `bold 14px ${FF}`;
+                duration = '';
+            }
             if (duration) {
                 const labelW = ctx.measureText(dateLabel).width;
                 ctx.font = `400 10px ${FF}`;
@@ -65069,7 +65275,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 ctx.font = "bold 12px Montserrat";
                 ctx.fillStyle = "#333";
                 ctx.fillText(CERT_SIGNER.name, 480, 541);
-                if (CERT_SIGNER.title) {
+                if (CERT_SIGNER.title && certBrandOn('co')) {
                     ctx.font = "10px Montserrat";
                     ctx.fillStyle = "#777";
                     ctx.fillText(CERT_SIGNER.title, 480, 555);
@@ -65077,7 +65283,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             } else {
                 ctx.font = "italic 11px Montserrat";
                 ctx.fillStyle = "#777";
-                ctx.fillText("Issued by: MEDLIFE PLUS CO.,LTD.", 390, 545);
+                if (certBrandOn('co')) ctx.fillText("Issued by: MEDLIFE PLUS CO.,LTD.", 390, 545);
             }
 
             // 12. Verify QR + Certificate No. (V96.83: replaces the old random serial
@@ -65117,7 +65323,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 ctx.textAlign = "center";
                 ctx.font = "7px Montserrat";
                 ctx.fillStyle = "#888";
-                ctx.fillText("QR on export", cardX + cardS / 2, cardY + 37);
+                ctx.fillText(stage ? "Progress · no number" : "QR on export", cardX + cardS / 2, cardY + 37);
             }
             // V100.67: say what the QR is for, in the certificate's language (also on the
             // preview, so the admin sees the real layout before exporting).
@@ -65125,11 +65331,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // ground, so it switches to the same dark grey "Certificate No." already uses.
             ctx.fillStyle = "#555";
             ctx.textAlign = "center";
-            if (lang !== 'th') {
+            if (lang !== 'th' && !stage) {
                 ctx.font = "bold 7px Montserrat";
                 ctx.fillText("SCAN TO VERIFY", cardX + cardS / 2, cardY + cardS + 9);
             }
-            if (lang !== 'en') {
+            if (lang !== 'en' && !stage) {
                 ctx.font = `400 6.5px ${FF}`;
                 ctx.fillText(lang === 'ko' ? CERT_KO.scan : "สแกนเพื่อตรวจสอบ", cardX + cardS / 2, cardY + cardS + (lang === 'th' ? 10 : 17));
             }
@@ -65352,7 +65558,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const skills = [...document.querySelectorAll('#cert-skills-row .cert-skill[aria-pressed="true"]')]
                 .map(b => CERT_SKILLS.find(k => k.id === b.dataset.skill)).filter(Boolean)
                 .map(k => certLang === 'th' ? k.th : k.en);
-            return { hours: hrs ? certHoursText(hrs.hours, hrs.at) : '', skills };
+            const k = certStageNow(), p = certProgress();
+            // the ✓ print box (Progress row): off = no progress line or bar, the usual day count stays
+            const pr = document.getElementById('cert-progress-print'), printIt = !pr || pr.checked;
+            const stage = k !== 'done' ? { key: k, text: printIt ? (p ? certProgressText(p, certLang) + ' · ' : '') + CERT_STAGES[k].name : '', pct: p ? p.pct : 0 } : null;
+            return { hours: hrs ? certHoursText(hrs.hours, hrs.at) : '', skills, stage };
         }
 
         // V96.74: which wording the preview + PDF use. Chip rail, per house style.
@@ -65389,8 +65599,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (!c) return;
                 await certLogoReady(getCurrentCertificateNames().ko);
                 const drawArgs = getCurrentCertificateDrawArgs();
-                renderCertificateCanvas(c, [...drawArgs, null, getCurrentCertificateNames(), getCurrentCertificateDuration(), getCurrentCertificateExtra()], 1);
+                const ex = getCurrentCertificateExtra();
+                ex.badgeImgs = await certBadgeImgs();
+                renderCertificateCanvas(c, [...drawArgs, null, getCurrentCertificateNames(), getCurrentCertificateDuration(), ex], 1);
                 certPaintPrints();
+                paintCertStage();
             } catch(err) {
                 console.error("Cert Preview Error:", err);
             }
@@ -65672,6 +65885,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // V102.577: hours mode registers the completion day + the hours text (so verify.html shows it, and
             // it never reuses the number of a dates-mode certificate for the same person)
             const _extra = getCurrentCertificateExtra(), _hrs = getCurrentCertificateHours();
+            _extra.badgeImgs = await certBadgeImgs();
+            // V102.600: a progress certificate (Early / Mid / Near) prints without a number, an archive copy or the approval
+            if (_extra.stage) {
+                renderCertificateCanvas(exportCanvas, [...drawArgs, null, getCurrentCertificateNames(), getCurrentCertificateDuration(), _extra], CERT_EXPORT_SCALE);
+                doc.addImage(exportCanvas.toDataURL('image/png'), 'PNG', 0, 0, 297, 210, undefined, 'FAST');
+                doc.save(`Certificate_Progress_${document.getElementById('cert-fullname').value || "User"}.pdf`);
+                return;
+            }
             if (certPeriodMode === 'hours' && !_hrs) return alert('Hours mode: type the hours and the date they were completed.');
             let certNo;
             try {
