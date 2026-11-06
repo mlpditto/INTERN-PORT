@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>User Hub — quiz feedback per user (before / after)</title>
+<style>
+  body { margin:0; padding:20px 24px 32px; background:#e2e8f0; font-family: Inter, "Segoe UI", system-ui, -apple-system, "Noto Sans Thai", sans-serif; color:#1e293b; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  .sub { color:#475569; font-size:13px; margin:0 0 18px; }
+  h2 { font-size:14px; margin:22px 0 6px; color:#334155; }
+  h2 small { font-weight:500; color:#64748b; }
+  .note { font-size:12.5px; color:#475569; margin:0 0 6px; }
+  /* ── the real popup frame (#groupSelectModal .modal-content 820px) ── */
+  .frame { width:820px; max-width:100%; background:#fff; border-radius:30px; padding:24px; box-sizing:border-box; box-shadow:0 8px 24px rgba(0,0,0,.12); margin-bottom:8px; }
+  .hdr { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin-bottom:10px; }
+  .pic { width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,#fbcfe8,#c7d2fe); flex:none; }
+  .name { font-weight:800; font-size:17px; letter-spacing:.2px; }
+  .chip { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:999px; font-size:11.5px; font-weight:800; white-space:nowrap; border:1px solid transparent; }
+  .chip.rsu { background:#eef2ff; color:#4338ca; border-color:#c7d2fe; }
+  .chip.ext { background:#fce7f3; color:#be185d; border-color:#fbcfe8; }
+  .ib { width:28px; height:28px; border-radius:8px; border:1px solid #dfe5ef; background:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:13px; }
+  .sp { flex:1; }
+  .lang { display:inline-grid; grid-template-columns:1fr 1fr; padding:3px; border-radius:999px; background:#eef2ff; border:1px solid #c7d2fe; font-size:11px; font-weight:800; }
+  .lang span { padding:2px 9px; border-radius:999px; color:#64748b; }
+  .lang span.on { background:#4f46e5; color:#fff; }
+  .flag { display:inline-flex; align-items:center; gap:5px; padding:3px 9px 3px 7px; border-radius:999px; background:#eef2ff; border:1px solid #c7d2fe; font-size:11px; font-weight:800; color:#4338ca; }
+  .flag b { font-size:14px; line-height:1; display:inline-flex; }
+  .flag img.emoji { width:15px; height:15px; vertical-align:-2px; }   /* twemoji — admin.html already loads it (V100.79): flags render as letters on Windows otherwise */
+  .bal { font-size:13px; font-weight:700; white-space:nowrap; }
+  .bal.pts { color:#4361ee; } .bal.beri { color:#d97706; }
+  .x { font-size:20px; color:#64748b; margin-left:4px; }
+  /* cards grid */
+  .cards { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+  .card { border:1px solid #dfe5ef; border-radius:14px; overflow:hidden; background:#fff; align-self:start; }
+  .card header { display:flex; align-items:center; gap:4px; padding:4px 8px 4px 12px; background:#eceefc; min-height:34px; box-sizing:border-box; }
+  .card header::before { content:"\25B8"; color:#6366f1; font-size:12px; margin-right:2px; }
+  .card.open header::before { content:"\25BE"; }
+  .card h3 { font-size:13.5px; margin:0; font-weight:800; white-space:nowrap; }
+  .prev { flex:1; min-width:0; font-size:11.5px; color:#64748b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .prev code { font-size:11px; background:#fff; border:1px solid #dfe5ef; border-radius:6px; padding:1px 5px; color:#334155; }
+  .hs { display:inline-flex; align-items:center; padding:2px 9px; border-radius:999px; font-size:11px; font-weight:800; white-space:nowrap; }
+  .hs.miss { background:#fffbeb; color:#b45309; border:1px solid #fde68a; }
+  .hs.ok { background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; }
+  .hs.fb { background:#fef3c7; color:#92400e; border:1px solid #fde68a; }
+  .hs.bug { background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; }
+  .hs.n { background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe; }
+  .mini { width:26px; height:26px; border-radius:7px; border:1px solid #dfe5ef; background:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:13px; flex:none; }
+  .card.c1 header { background:#fff7ed; } .card.c2 header { background:#ecfdf5; } .card.c3 header { background:#ecfeff; } .card.c4 header { background:#f5f3ff; } .card.c5 header { background:#fef2f2; } .card.c6 header { background:#f0f9ff; }
+  .card.fb header { background:#fefce8; }
+  /* feedback list */
+  .rail { display:flex; gap:6px; flex-wrap:wrap; padding:8px 10px 2px; align-items:center; }
+  .rail .hs { cursor:pointer; }
+  .rail .hs.on { background:#1e293b; color:#fff; border-color:#1e293b; }
+  .rail .srch { flex:1; min-width:120px; font-size:11.5px; color:#94a3b8; border:1px solid #e2e8f0; border-radius:999px; padding:3px 10px; }
+  .rows { padding:4px 6px 8px; }
+  .row { display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:center; padding:7px 8px; border-radius:10px; }
+  .row:nth-child(even) { background:#f8fafc; }
+  .star { font-size:12px; font-weight:800; color:#b45309; min-width:34px; }
+  .star.low { color:#b91c1c; } .star.none { color:#94a3b8; font-weight:600; }
+  .row .q { font-size:12.5px; font-weight:700; color:#1e293b; }
+  .row .c { font-size:12px; color:#475569; margin-top:1px; }
+  .row .c i { color:#64748b; }
+  .row .t { font-size:11px; color:#4338ca; background:#eef2ff; border-radius:999px; padding:1px 7px; margin-left:6px; font-style:normal; font-weight:700; }
+  .row .d { font-size:11px; color:#94a3b8; white-space:nowrap; text-align:right; }
+  .row .d span { display:block; font-size:13px; }
+  .row.urgent { box-shadow: inset 3px 0 0 #ef4444; }
+  .sum { display:flex; gap:14px; align-items:center; padding:8px 12px; font-size:12px; color:#475569; border-top:1px dashed #e2e8f0; }
+  .sum b { color:#1e293b; }
+  .bars { display:inline-flex; gap:2px; align-items:flex-end; height:14px; }
+  .bars i { width:4px; background:#fbbf24; border-radius:1px; display:block; }
+  /* option B: header chip + panel */
+  .fbchip { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:999px; font-size:12px; font-weight:800; background:#fefce8; color:#92400e; border:1px solid #fde68a; }
+  .fbchip .dot { width:7px; height:7px; border-radius:50%; background:#ef4444; }
+  .panel { border:1px solid #fde68a; border-radius:14px; background:#fff; overflow:hidden; }
+  .panel .ph { display:flex; align-items:center; gap:8px; padding:6px 10px 6px 12px; background:#fefce8; font-size:13.5px; font-weight:800; }
+  .panel .ph .back { font-size:12px; color:#64748b; font-weight:700; margin-left:auto; }
+  /* option C: strip */
+  .strip { display:flex; align-items:center; gap:10px; padding:6px 12px; border:1px solid #fde68a; background:#fffbeb; border-radius:12px; margin-bottom:10px; font-size:12.5px; color:#475569; }
+  .strip .q { font-weight:800; color:#1e293b; }
+  .strip .last { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-style:italic; }
+  .strip .go { font-size:11px; color:#92400e; font-weight:800; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:900px) { .two { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<h1>User Hub popup — ให้แอดมินเห็น quiz feedback ของคนนี้</h1>
+<p class="sub">ข้อมูลที่มีอยู่แล้วใน <code>quiz_feedback</code> ต่อ user: ⭐ rating 0–10 (หรือไม่ให้), comment, nextTopic, เวลาใช้, วันที่, triage จากระบบ (🐞 bug · ❌ content · 🧗 hard · 💡 request · 👍 praise). ตอนนี้แอดมินดูได้แค่ "ต่อควิซ" (Quiz Engine ▸ 💬) ไม่มีมุม "ต่อคน" · ทุกแบบ after เปลี่ยน EN|TH เป็นชิปธงเดียว 🇺🇸 (แตะ = สลับ 🇹🇭)</p>
+
+<!-- ─────────── BEFORE ─────────── -->
+<h2>BEFORE <small>— 6 การ์ดพับ ไม่มี feedback ที่ไหนเลย</small></h2>
+<div class="frame" id="f-before">
+  <div class="hdr"><span class="pic"></span><span class="name">NATT OFFICIAL</span><span class="chip rsu">🛡 RSU 2</span><span class="chip ext">👤 EXTERN 4 ▾</span><span class="ib">📱</span><span class="sp"></span><span class="ib">⧉</span><span class="lang"><span class="on">EN</span><span>TH</span></span><span class="bal pts">🏆 31.48</span><span class="bal beri">🪙 80</span><span class="x">×</span></div>
+  <div class="cards">
+    <div class="card c1"><header><h3>Personal details</h3><span class="prev">นักธม...</span><code style="font-size:11px;background:#fff;border:1px solid #dfe5ef;border-radius:6px;padding:1px 5px;">🔑 7JNAWX ⧉</code><span class="mini">📄</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+    <div class="card c2"><header><h3>Contact</h3><span class="prev">Not provided</span><span class="mini">✏️</span></header></div>
+    <div class="card c3"><header><h3>Education &amp; certificates</h3><span class="prev">RSU</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+    <div class="card c4"><header><h3>Social</h3><span class="prev">Not provided</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+    <div class="card c5"><header><h3>🩺 Health</h3><span class="hs miss">Not filled</span><span class="sp"></span><span class="mini">✏️</span></header></div>
+    <div class="card c6"><header><h3>🔗 Work link</h3><span class="prev">drive.google.com</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+  </div>
+</div>
+
+<!-- ─────────── A ─────────── -->
+<h2>A · การ์ดที่ 7 ในกริดเดิม <small>— "💬 Quiz feedback" พับเหมือนการ์ดอื่น สรุปอยู่บนหัว · กางออกเป็นรายการ</small></h2>
+<p class="note">แนะนำ: ไม่เพิ่มพื้นที่ตอนพับ (34px เท่าการ์ดอื่น) · เห็นตัวเลขสำคัญทันทีแม้ไม่กาง: จำนวน · ⭐เฉลี่ย · 🐞 ถ้ามีเรื่องด่วน</p>
+<div class="frame" id="f-a1">
+  <div class="hdr"><span class="pic"></span><span class="name">NATT OFFICIAL</span><span class="chip rsu">🛡 RSU 2</span><span class="chip ext">👤 EXTERN 4 ▾</span><span class="ib">📱</span><span class="sp"></span><span class="ib">⧉</span><span class="flag"><b>🇺🇸</b>EN</span><span class="bal pts">🏆 31.48</span><span class="bal beri">🪙 80</span><span class="x">×</span></div>
+  <div class="cards">
+    <div class="card c1"><header><h3>Personal details</h3><span class="prev">นักธม...</span><code style="font-size:11px;background:#fff;border:1px solid #dfe5ef;border-radius:6px;padding:1px 5px;">🔑 7JNAWX ⧉</code><span class="mini">📄</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+    <div class="card c2"><header><h3>Contact</h3><span class="prev">Not provided</span><span class="mini">✏️</span></header></div>
+    <div class="card c3"><header><h3>Education &amp; certificates</h3><span class="prev">RSU</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+    <div class="card c4"><header><h3>Social</h3><span class="prev">Not provided</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+    <div class="card c5"><header><h3>🩺 Health</h3><span class="hs miss">Not filled</span><span class="sp"></span><span class="mini">✏️</span></header></div>
+    <div class="card c6"><header><h3>🔗 Work link</h3><span class="prev">drive.google.com</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+    <div class="card fb"><header><h3>💬 Quiz feedback</h3><span class="hs n">12</span><span class="hs fb">⭐ 8.4</span><span class="hs bug">🐞 1</span><span class="prev">“โจทย์ข้อ 3 เฉลยผิด”</span><span class="mini">📋</span></header></div>
+  </div>
+</div>
+<p class="note">กางออก (คลิกหัวการ์ด) — แถวละบรรทัด: ⭐ · ควิซ · คอมเมนต์ · หัวข้อที่อยากเรียนต่อ · วันที่ · ชิปกรองด้านบน · แตะแถว = เปิด Feedback panel ของควิซนั้น</p>
+<div class="frame" id="f-a2">
+  <div class="hdr"><span class="pic"></span><span class="name">NATT OFFICIAL</span><span class="chip rsu">🛡 RSU 2</span><span class="chip ext">👤 EXTERN 4 ▾</span><span class="ib">📱</span><span class="sp"></span><span class="ib">⧉</span><span class="flag"><b>🇺🇸</b>EN</span><span class="bal pts">🏆 31.48</span><span class="bal beri">🪙 80</span><span class="x">×</span></div>
+  <div class="cards">
+    <div class="card c1"><header><h3>Personal details</h3><span class="prev">นักธม...</span><span class="mini">📄</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+    <div class="card c2"><header><h3>Contact</h3><span class="prev">Not provided</span><span class="mini">✏️</span></header></div>
+    <div class="card c3"><header><h3>Education &amp; certificates</h3><span class="prev">RSU</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+    <div class="card c4"><header><h3>Social</h3><span class="prev">Not provided</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+    <div class="card c5"><header><h3>🩺 Health</h3><span class="hs miss">Not filled</span><span class="sp"></span><span class="mini">✏️</span></header></div>
+    <div class="card c6"><header><h3>🔗 Work link</h3><span class="prev">drive.google.com</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+    <div class="card fb open" style="grid-column:1 / -1;">
+      <header><h3>💬 Quiz feedback</h3><span class="hs n">12</span><span class="hs fb">⭐ 8.4</span><span class="hs bug">🐞 1</span><span class="sp"></span><span class="mini">📋</span></header>
+      <div class="rail"><span class="hs on">All 12</span><span class="hs fb">⭐ ≤ 5 · 2</span><span class="hs n">💬 comment · 7</span><span class="hs bug">🐞 1</span><span class="hs n">💡 3</span><span class="srch">🔍 ควิซ / คำในคอมเมนต์</span></div>
+      <div class="rows">
+        <div class="row urgent"><span class="star low">⭐ 4</span><div><div class="q">🐞 Eye for all-2</div><div class="c"><i>“โจทย์ข้อ 3 เฉลยผิด น่าจะเป็นข้อ ข”</i></div></div><div class="d"><span>🐞</span>5 Nov</div></div>
+        <div class="row"><span class="star">⭐ 9</span><div><div class="q">Retail Pharmacy-2</div><div class="c"><i>“ชอบเคสร้านยา ใกล้ชีวิตจริง”</i><span class="t">💡 Pediatric dosing</span></div></div><div class="d"><span>👍</span>3 Nov</div></div>
+        <div class="row"><span class="star">⭐ 8</span><div><div class="q">Contraceptive Knowledge</div><div class="c"><span class="t">💡 Emergency contraception</span></div></div><div class="d"><span>·</span>29 Oct</div></div>
+        <div class="row"><span class="star low">⭐ 5</span><div><div class="q">🧗 BILASTINE Orodispersible Tab</div><div class="c"><i>“ศัพท์ยากไป อ่านโจทย์ไม่ทัน”</i></div></div><div class="d"><span>🧗</span>1 Nov</div></div>
+        <div class="row"><span class="star none">— </span><div><div class="q">Allergic Rhinitis-2</div><div class="c"><i>“ขอแบบฝึกเพิ่มครับ”</i><span class="t">💡 Nasal steroid</span></div></div><div class="d"><span>💡</span>1 Nov</div></div>
+        <div class="row"><span class="star">⭐ 10</span><div><div class="q">Common Illnesses-2</div><div class="c"><span style="color:#94a3b8;">👍 no comment</span></div></div><div class="d"><span>👍</span>5 Jun</div></div>
+      </div>
+      <div class="sum"><span>⭐ 30 วันล่าสุด <span class="bars"><i style="height:9px"></i><i style="height:12px"></i><i style="height:6px"></i><i style="height:14px"></i><i style="height:13px"></i><i style="height:5px"></i><i style="height:12px"></i></span></span><span>ใช้เวลาเฉลี่ย <b>4m 12s</b>/ควิซ</span><span>ให้ feedback <b>12/18</b> ควิซที่ทำ</span><span style="margin-left:auto;color:#94a3b8;">+ 6 more ▾</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────── B ─────────── -->
+<h2>B · ชิปในหัว popup → แผงเต็มความกว้าง <small>— "💬 12" ข้าง 🏆/🪙 · จุดแดงเมื่อมี 🐞 · แตะแล้วการ์ดโปรไฟล์หลบ แผง feedback ขึ้นแทน</small></h2>
+<p class="note">เหมาะถ้าอยากให้ feedback เป็น "ตัวเลขสุขภาพ" ของคน ๆ นี้ เห็นตั้งแต่ยังไม่เลื่อน · เสียพื้นที่หัวนิดเดียว · แต่เป็นอีก "หน้า" ต้องกดกลับ</p>
+<div class="frame" id="f-b1">
+  <div class="hdr"><span class="pic"></span><span class="name">NATT OFFICIAL</span><span class="chip rsu">🛡 RSU 2</span><span class="chip ext">👤 EXTERN 4 ▾</span><span class="ib">📱</span><span class="sp"></span><span class="ib">⧉</span><span class="flag"><b>🇺🇸</b>EN</span><span class="bal pts">🏆 31.48</span><span class="bal beri">🪙 80</span><span class="fbchip">💬 12 <span class="dot"></span></span><span class="x">×</span></div>
+  <div class="cards">
+    <div class="card c1"><header><h3>Personal details</h3><span class="prev">นักธม...</span><span class="mini">📄</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+    <div class="card c2"><header><h3>Contact</h3><span class="prev">Not provided</span><span class="mini">✏️</span></header></div>
+    <div class="card c3"><header><h3>Education &amp; certificates</h3><span class="prev">RSU</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+    <div class="card c4"><header><h3>Social</h3><span class="prev">Not provided</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+    <div class="card c5"><header><h3>🩺 Health</h3><span class="hs miss">Not filled</span><span class="sp"></span><span class="mini">✏️</span></header></div>
+    <div class="card c6"><header><h3>🔗 Work link</h3><span class="prev">drive.google.com</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+  </div>
+</div>
+<p class="note">หลังแตะ 💬 12</p>
+<div class="frame" id="f-b2">
+  <div class="hdr"><span class="pic"></span><span class="name">NATT OFFICIAL</span><span class="chip rsu">🛡 RSU 2</span><span class="chip ext">👤 EXTERN 4 ▾</span><span class="ib">📱</span><span class="sp"></span><span class="ib">⧉</span><span class="flag"><b>🇺🇸</b>EN</span><span class="bal pts">🏆 31.48</span><span class="bal beri">🪙 80</span><span class="fbchip" style="background:#1e293b;color:#fff;border-color:#1e293b;">💬 12</span><span class="x">×</span></div>
+  <div class="panel">
+    <div class="ph">💬 Quiz feedback <span class="hs fb">⭐ 8.4</span><span class="hs bug">🐞 1</span><span class="back">‹ Profile</span></div>
+    <div class="rail"><span class="hs on">All 12</span><span class="hs fb">⭐ ≤ 5 · 2</span><span class="hs n">💬 comment · 7</span><span class="hs bug">🐞 1</span><span class="hs n">💡 3</span><span class="srch">🔍 ควิซ / คำในคอมเมนต์</span></div>
+    <div class="rows">
+      <div class="row urgent"><span class="star low">⭐ 4</span><div><div class="q">🐞 Eye for all-2</div><div class="c"><i>“โจทย์ข้อ 3 เฉลยผิด น่าจะเป็นข้อ ข”</i></div></div><div class="d"><span>🐞</span>5 Nov</div></div>
+      <div class="row"><span class="star">⭐ 9</span><div><div class="q">Retail Pharmacy-2</div><div class="c"><i>“ชอบเคสร้านยา ใกล้ชีวิตจริง”</i><span class="t">💡 Pediatric dosing</span></div></div><div class="d"><span>👍</span>3 Nov</div></div>
+      <div class="row"><span class="star">⭐ 8</span><div><div class="q">Contraceptive Knowledge</div><div class="c"><span class="t">💡 Emergency contraception</span></div></div><div class="d"><span>·</span>29 Oct</div></div>
+      <div class="row"><span class="star low">⭐ 5</span><div><div class="q">🧗 BILASTINE Orodispersible Tab</div><div class="c"><i>“ศัพท์ยากไป อ่านโจทย์ไม่ทัน”</i></div></div><div class="d"><span>🧗</span>1 Nov</div></div>
+      <div class="row"><span class="star none">— </span><div><div class="q">Allergic Rhinitis-2</div><div class="c"><i>“ขอแบบฝึกเพิ่มครับ”</i><span class="t">💡 Nasal steroid</span></div></div><div class="d"><span>💡</span>1 Nov</div></div>
+    </div>
+    <div class="sum"><span>⭐ 30 วันล่าสุด <span class="bars"><i style="height:9px"></i><i style="height:12px"></i><i style="height:6px"></i><i style="height:14px"></i><i style="height:13px"></i><i style="height:5px"></i><i style="height:12px"></i></span></span><span>ใช้เวลาเฉลี่ย <b>4m 12s</b>/ควิซ</span><span>ให้ feedback <b>12/18</b> ควิซที่ทำ</span></div>
+  </div>
+</div>
+
+<!-- ─────────── C ─────────── -->
+<h2>C · แถบสัญญาณบรรทัดเดียวใต้หัว <small>— เห็นแค่สิ่งที่ต้องรู้: ⭐เฉลี่ย · จำนวน · คอมเมนต์ล่าสุด · 🐞 · แตะ = กางเป็นรายการแบบ A</small></h2>
+<p class="note">เบาที่สุด (บรรทัดเดียว ~30px) · เหมาะถ้าส่วนใหญ่แอดมินแค่อยาก "เหลือบดู" แล้วไปต่อ · ข้อเสีย: ไม่ใช่การ์ด ไม่มีปุ่ม 📋 copy เหมือนการ์ดอื่น</p>
+<div class="frame" id="f-c">
+  <div class="hdr"><span class="pic"></span><span class="name">NATT OFFICIAL</span><span class="chip rsu">🛡 RSU 2</span><span class="chip ext">👤 EXTERN 4 ▾</span><span class="ib">📱</span><span class="sp"></span><span class="ib">⧉</span><span class="flag"><b>🇺🇸</b>EN</span><span class="bal pts">🏆 31.48</span><span class="bal beri">🪙 80</span><span class="x">×</span></div>
+  <div class="strip"><span class="q">💬 12</span><span class="hs fb">⭐ 8.4</span><span class="bars"><i style="height:9px"></i><i style="height:12px"></i><i style="height:6px"></i><i style="height:14px"></i><i style="height:13px"></i><i style="height:5px"></i><i style="height:12px"></i></span><span class="last">ล่าสุด 5 Nov · Eye for all-2 · “โจทย์ข้อ 3 เฉลยผิด น่าจะเป็นข้อ ข”</span><span class="hs bug">🐞 1</span><span class="go">ดูทั้งหมด ▸</span></div>
+  <div class="cards">
+    <div class="card c1"><header><h3>Personal details</h3><span class="prev">นักธม...</span><span class="mini">📄</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+    <div class="card c2"><header><h3>Contact</h3><span class="prev">Not provided</span><span class="mini">✏️</span></header></div>
+    <div class="card c3"><header><h3>Education &amp; certificates</h3><span class="prev">RSU</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+    <div class="card c4"><header><h3>Social</h3><span class="prev">Not provided</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+    <div class="card c5"><header><h3>🩺 Health</h3><span class="hs miss">Not filled</span><span class="sp"></span><span class="mini">✏️</span></header></div>
+    <div class="card c6"><header><h3>🔗 Work link</h3><span class="prev">drive.google.com</span><span class="mini">📋</span><span class="mini">✏️</span></header></div>
+  </div>
+</div>
+
+<h2>ชิปภาษา <small>— ตามที่สั่ง: EN|TH สองช่อง → ชิปเดียวมีธง แตะสลับ</small></h2>
+<div class="frame" id="f-lang" style="width:auto; display:inline-flex; gap:28px; align-items:center; padding:14px 20px; border-radius:16px;">
+  <span style="font-size:12px;color:#64748b;">ก่อน</span><span class="lang"><span class="on">EN</span><span>TH</span></span>
+  <span style="font-size:12px;color:#64748b;">หลัง</span><span class="flag"><b>🇺🇸</b>EN</span><span style="color:#94a3b8;">→ แตะ →</span><span class="flag"><b>🇹🇭</b>TH</span>
+  <span style="font-size:12px;color:#64748b;">หรือธงล้วน</span><span class="flag" style="padding:3px 7px;"><b>🇺🇸</b></span><span class="flag" style="padding:3px 7px;"><b>🇹🇭</b></span>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/twemoji-js/14.0.2/twemoji.min.js" crossorigin="anonymous"></script>
+<script>if (window.twemoji) document.querySelectorAll('.flag b').forEach(b => twemoji.parse(b, { folder: 'svg', ext: '.svg' }));</script>
+</body>
+</html>
