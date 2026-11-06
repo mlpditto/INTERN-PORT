@@ -1,5 +1,8 @@
 /* Work ▸ History — lean timeline (V101.55). Renders the header summary, the chip rail and the rows.
    V101.280: a quiz without feedback says so — the 💬 is a labelled amber pill ("No feedback yet"), not an icon-only circle.
+   V101.281 (owner pick A): a Learning Note shows its NAME first — a note the intern did not name carries the first line of its
+   content as the title (index.html finalTitle), shown faint and one line; the content + tag chips appear only when tapped, and the
+   sourceType / sourceId dump is gone.
    State, filters and data stay in index.html (getFilteredUnifiedItems, unifiedCurrentFilter, …). */
 window.historyLean = (() => {
     const T = {
@@ -49,6 +52,20 @@ window.historyLean = (() => {
             case 'article': { const t = String(s.title || ''); const bare = t.replace(/^[\s\p{Extended_Pictographic}\uFE0F]+|[\s\p{Extended_Pictographic}\uFE0F]+$/gu, '').trim(); return bare || t || 'Article'; }   // V101.189
             default: return s.title || 'Untitled';
         }
+    }
+    // V101.281: the intern did not name this note — its title is the first line of its content (or the fallback), so the row
+    // shows it faint, one line, and never lets it grow on tap: the content lives in the expanded part.
+    function noteAutoTitled(s) {
+        if (s.submissionType !== 'learning_note') return false;
+        const t = String(s.title || '').trim(), c = String(s.description || (s.metadata && s.metadata.content) || '').trim();
+        return !t || t === 'Untitled Note' || (!!c && t === c.split('\n')[0].slice(0, 80).trim());
+    }
+    function noteTags(s) { const m = s.metadata || {}; return s.submissionType === 'learning_note' && Array.isArray(m.tags) ? m.tags.filter(Boolean) : []; }
+    function noteTagsMeta(s) { const t = noteTags(s); return t.length ? '<span class="hl-tg" title="' + esc(t.map(x => '#' + x).join(' · ')) + '"> · 🏷 ' + t.length + '</span>' : ''; }
+    function noteDetailHtml(s) {
+        const text = String(s.description || (s.metadata && s.metadata.content) || '').trim(), tags = noteTags(s);
+        const md = typeof window.renderMd === 'function' ? window.renderMd(text) : esc(text).replace(/\n/g, '<br>');
+        return (text ? '<div class="hl-note">' + md + '</div>' : '') + (tags.length ? '<div class="hl-ntags">' + tags.map(t => '<span class="hl-ntag">#' + esc(t) + '</span>').join('') + '</div>' : '');
     }
     // V101.84: a quiz that has a short title (admin Quiz editor → Short title) shows it; the full title is the hover / tapped-row text
     function shortOf(s, ctx) {
@@ -164,8 +181,10 @@ window.historyLean = (() => {
             body = window.internMessages ? internMessages.detailHtml(s) : '';   // V101.247: the message itself; the admin's reply is the 💬 line below (adminComment)
         } else if (type === 'article') {
             body = window.internArticles ? internArticles.detailHtml(s) : '';   // V101.176: the article itself, read in place
+        } else if (type === 'learning_note') {
+            body = noteDetailHtml(s);   // V101.281: the note itself + its tags (the generic key/value dump showed only internal ids)
         } else if (type !== 'quiz' && type !== 'work' && type !== 'explore_link' && type !== 'content_review') {
-            body = renderTypeDetailHtml(s);   // journal / quest / note / product keep their own detail
+            body = renderTypeDetailHtml(s);   // journal / quest / product keep their own detail
         }
         if (s.adminComment) body += '<div class="hl-comment">💬 ' + esc(s.adminComment).replace(/\*\*([^*\n]{1,200}?)\*\*/g, '<strong class="adm-key">$1</strong>') + '</div>';   // V101.245: **…** = the must-get-right phrase
         return body + actionsHtml(s, ctx);
@@ -185,8 +204,8 @@ window.historyLean = (() => {
         return '<div class="unified-history-card hl-row" data-delete-item="' + esc(s.id) + '" data-delete-type="' + esc(s.submissionType) + '" onclick="toggleUnifiedCard(this, event)" ' +
             'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault(); toggleUnifiedCard(this, event);}" role="listitem" tabindex="0" aria-expanded="false">' +
             '<div class="hl-main">' + leadHtml(s, ctx) +
-            '<div class="hl-tx lang-no-toggle"><div class="hl-tt" title="' + esc(titleOf(s)) + '">' + (short ? '<span class="hl-st">' + esc(short) + '</span><span class="hl-ft">' + esc(titleOf(s)) + '</span>' : esc(titleOf(s))) + fresh + '</div>' +
-            '<div class="hl-mt"><span>' + date + '</span><span class="hl-more-t"> · ' + time + extra + '</span>' + pillHtml(s) + '</div></div>' +
+            '<div class="hl-tx lang-no-toggle"><div class="hl-tt' + (noteAutoTitled(s) ? ' hl-tt-auto' : '') + '" title="' + esc(titleOf(s)) + '">' + (short ? '<span class="hl-st">' + esc(short) + '</span><span class="hl-ft">' + esc(titleOf(s)) + '</span>' : esc(titleOf(s))) + fresh + '</div>' +
+            '<div class="hl-mt"><span>' + date + '</span><span class="hl-more-t"> · ' + time + extra + '</span>' + noteTagsMeta(s) + pillHtml(s) + '</div></div>' +
             mat + valuesHtml(s) + '</div>' +
             '<div class="card-detail" style="display:none">' + detailHtml(s, ctx) + '</div></div>';
     }

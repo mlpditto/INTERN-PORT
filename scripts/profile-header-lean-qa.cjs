@@ -1,4 +1,4 @@
-// V101.117: intern profile header lean — ONE 40px block: avatar (ring = division colour, corner dot = group) · name over pts · Beri · LV ·
+// V101.117: intern profile header lean — ONE 40px block: avatar (ring = division colour; V101.281: the group dot moved to the Info title row) · name over pts · Beri · LV ·
 // the tool rail as the third column (phones: its own row under the name). The division badge row is gone (CSS-hidden, JS still writes it).
 // Real index.html (scripts stripped) in Playwright at 940px and 360px touch, plus the REAL paintProfileGroup / divColor.
 const fs = require('node:fs');
@@ -46,7 +46,8 @@ const SAMPLE = `
             assert.equal(await page.$eval('#u-division-badge', e => getComputedStyle(e).display), 'none', 'badge row hidden even when JS shows it');
             assert.equal(await page.$eval('#u-img', e => e.style.borderColor), 'rgb(224, 33, 138)', 'ring = division colour (V101.158: CU is pinned to Chulalongkorn pink #e0218a; the hash gave it the same purple as BUU)');
             assert.equal(await page.$eval('#u-img', e => e.title), 'CU › EXTERN', 'tooltip names division › group');
-            assert.equal(await page.$eval('#u-group-dot', e => e.hidden), false, 'corner dot = group');
+            assert.equal(await page.$('#u-group-dot'), null, 'V101.281: no corner dot on the avatar any more');
+            assert.deepEqual(await page.$eval('#pi-group-chip', e => [e.hidden, e.textContent.replace(/\s+/g, ''), e.querySelector('.pi-grp-ic').style.backgroundColor, e.title]), [false, 'CU›EXTERN', 'rgb(230, 126, 34)', 'CU › EXTERN'], 'the group chip in the Info title row: icon in the group colour · division › group');
             assert.deepEqual(errs, [], 'no page errors ' + tag);
             await page.context().close();
         }
