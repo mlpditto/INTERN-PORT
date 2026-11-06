@@ -70,8 +70,8 @@ const OPTS = ['ใช้การทดสอบแมนน์–วิทน�
         assert.deepEqual(await sheet.locator('.qsc-tab').evaluateAll(bs => bs.map(b => [b.textContent.trim(), b.getAttribute('aria-pressed')])), [['✨ AI picture', 'true'], ['📊 Chart from the numbers', 'false']]);
         assert.equal(await sheet.locator('.qsc-no span').count(), 4, 'the four "never" rules are shown');
         assert.deepEqual(await sheet.locator('[data-model]').evaluateAll(bs => bs.map(b => b.getAttribute('aria-pressed'))), ['true', 'false', 'false', 'false'], 'Nano Banana 2.1 first');
-        await sheet.locator('[data-model="or/openai/gpt-image-2.5-flare"]').evaluate(b => b.click());
-        assert.equal(await page.evaluate(() => localStorage.getItem('quiz_scene_ai_model')), 'or/openai/gpt-image-2.5-flare', 'the pick is remembered');
+        await sheet.locator('[data-model="or/openai/gpt-image-2.6-flare"]').evaluate(b => b.click());
+        assert.equal(await page.evaluate(() => localStorage.getItem('quiz_scene_ai_model')), 'or/openai/gpt-image-2.6-flare', 'the pick is remembered');
 
         // ✨ Generate with an empty brief → brief, picture, check → flagged
         await sheet.locator('.qsc-gen').evaluate(b => b.click());
@@ -81,7 +81,7 @@ const OPTS = ['ใช้การทดสอบแมนน์–วิทน�
         assert.equal(c1[0].model, 'claude-sonnet-5-5', 'the brief uses the Read first row\'s model');
         assert.ok(c1[0].prompt.includes(STEM) && OPTS.every(o => c1[0].prompt.includes(o)), 'the brief prompt carries the stem and every option');
         assert.ok(!/✓|correct|keyed/i.test(c1[0].prompt), 'NO answer key in the brief prompt');
-        assert.deepEqual([c1[1].model, c1[1].opts.imageApi, c1[1].opts.aspectRatio, c1[1].isJson], ['or/openai/gpt-image-2.5-flare', true, '4:3', false], 'the picked image model, Image API at 4:3');
+        assert.deepEqual([c1[1].model, c1[1].opts.imageApi, c1[1].opts.aspectRatio, c1[1].isJson], ['or/openai/gpt-image-2.6-flare', true, '4:3', false], 'the picked image model, Image API at 4:3');
         assert.ok(/NEVER in the picture/.test(c1[1].prompt) && c1[1].prompt.includes('slightly right-skewed histogram') && !/✓|correct/i.test(c1[1].prompt), 'the image prompt = the never-rules + the brief, no key');
         assert.deepEqual([c1[2].model, c1[2].vision && c1[2].vision.mime, c1[2].vision && c1[2].vision.len > 100], ['gemini-3.8-flash', 'image/jpeg', true], 'the check reads the picture (JPEG)');
         assert.ok(c1[2].prompt.includes('✓ ' + OPTS[1]) && !c1[2].prompt.includes('✓ ' + OPTS[0]), 'the check knows the keyed answer');

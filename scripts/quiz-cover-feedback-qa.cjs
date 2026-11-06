@@ -39,11 +39,11 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.equal(await page.locator('[data-apply]').innerText(), '👍');
         assert.equal(await page.locator('[data-discard]').innerText(), '👎');
         // the saved tally shows on the model chip
-        await page.waitForFunction(() => document.querySelector('[data-model-chip][data-value="or/openai/gpt-image-2.5-flare"]').title.includes('👍 2/3'));
+        await page.waitForFunction(() => document.querySelector('[data-model-chip][data-value="or/openai/gpt-image-2.6-flare"]').title.includes('👍 2/3'));
         assert.equal((await page.locator('[data-model-chip][data-value="as/gemini-nano-banana-2.1"]').getAttribute('title')).includes('👍'), false, 'no votes → no tally');
 
         // V102.412: the hint is a faint note to the RIGHT of 👍 / 👎 (inside the candidate row), not a line of its own under it
-        await page.locator('[data-model-chip][data-value="or/openai/gpt-image-2.5-flare"]').click();
+        await page.locator('[data-model-chip][data-value="or/openai/gpt-image-2.6-flare"]').click();
         await gen();
         assert.equal(await page.locator('.quiz-cover-ai-preview .quiz-cover-hint').innerText(), 'Check the image and text, then 👍 to apply it — or 👎 / Generate again to retry');
         const bx = async sel => page.locator(sel).first().boundingBox();
@@ -52,7 +52,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.equal((await page.locator('[role=status]').innerText()).trim(), '', 'no extra status line when nothing was blocked');
         assert.ok(hint.width <= 232, 'a narrow note: ' + hint.width);
         // 👍 = counted for the model AND the style, then applied
-        await page.locator('[data-model-chip][data-value="or/openai/gpt-image-2.5-flare"]').click();
+        await page.locator('[data-model-chip][data-value="or/openai/gpt-image-2.6-flare"]').click();
         await gen();
         await page.locator('[data-apply]').click();
         await page.waitForFunction(() => QuizCover.value() === 'https://example.com/ai.webp');
@@ -60,7 +60,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.equal(w.path, '_meta/cover_feedback');
         assert.deepEqual(w.opts, { merge: true });
         assert.deepEqual(JSON.parse(JSON.stringify(w.data)), { tally: { 'or_openai_gpt-image-2_5-flare': { up: { inc: 1 } } }, byStyle: { clay: { 'or_openai_gpt-image-2_5-flare': { up: { inc: 1 } } } }, updatedAt: 'TS' });
-        assert.ok((await page.locator('[data-model-chip][data-value="or/openai/gpt-image-2.5-flare"]').getAttribute('title')).includes('👍 3/4'), 'the chip tally follows at once');
+        assert.ok((await page.locator('[data-model-chip][data-value="or/openai/gpt-image-2.6-flare"]').getAttribute('title')).includes('👍 3/4'), 'the chip tally follows at once');
         assert.equal(await page.locator('[data-reasons]').isHidden(), true);
 
         // 👎 = counted, the image is dropped, reason chips appear
@@ -86,16 +86,16 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.equal(p.includes('misspelled or garbled'), false, 'used once, then cleared');
 
         // V102.419: Grok Imagine Quality — a chip of its own, the Image API at 3:4, and the vote counts for it (key = the id with / and . turned into _)
-        await page.locator('[data-model-chip][data-value="or/x-ai/grok-imagine-image-quality"]').click();
+        await page.locator('[data-model-chip][data-value="or/x-ai/grok-imagine-image-2.0"]').click();
         await gen();
         const gp = await page.evaluate(() => prompts[prompts.length - 1]);
-        assert.equal(gp.model, 'or/x-ai/grok-imagine-image-quality');
+        assert.equal(gp.model, 'or/x-ai/grok-imagine-image-2.0');
         assert.deepEqual(gp.opts, { feature: 'quiz_cover', imageApi: true, aspectRatio: '3:4' }, 'the Image API at the collection\'s 3:4');
         await page.locator('[data-apply]').click();
         await page.waitForFunction(() => QuizCover.value() === 'https://example.com/ai.webp');
-        assert.deepEqual(JSON.parse(JSON.stringify((await last()).data)).tally, { 'or_x-ai_grok-imagine-image-quality': { up: { inc: 1 } } }, 'the vote is for Grok');
+        assert.deepEqual(JSON.parse(JSON.stringify((await last()).data)).tally, { 'or_x-ai_grok-imagine-image-2.0': { up: { inc: 1 } } }, 'the vote is for Grok');
         await page.evaluate(() => { QuizCover.set(''); });
-        await page.locator('[data-model-chip][data-value="or/openai/gpt-image-2.5-flare"]').click();
+        await page.locator('[data-model-chip][data-value="or/openai/gpt-image-2.6-flare"]').click();
         await gen();
         // a failing save never breaks the editor
         await page.evaluate(() => { fail = true; });

@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     left.append(byId('step-1'), byId('step-2'), find('.alabasta-casecard-details'));   // V102.416: summary → prompt (the thing to edit before Generate) → source details
     const preview = find('.case-studio-preview');
     const settings = find('.case-studio-settings');
-    const chips = [...settings.querySelectorAll('#alabasta-case-card-quick-rail button')];
+    const chips = [...settings.querySelectorAll('#alabasta-case-card-quick-rail button[data-value]')];   // V102.592: the model chips only — image-model-prices.js adds 3 vendor-logo buttons to this rail (they were the blank first pill)
     // the <select>s stay as hidden value holders every other line reads; the visible controls are chip rails (quiz-cover look)
     const model = document.createElement('select');
     model.id = 'case-studio-image-model';
@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     seg(modeRail, [['ai', 'AI image', 'AI image — AI draws the whole image'], ['html-overlay', 'HTML', 'Illustration + HTML — AI draws the illustration; the title and tags are real HTML text']], { sel: mode });
     // V102.417 lean: one single line of short names (the logo says the family — Gemini ◆ 2.1 · 2 Lite · Pro, OpenAI Flare · Sunburst, Grok; the full name is the tooltip)
     const fullName = Object.fromEntries(chips.map(chip => [chip.dataset.value, chip.textContent.trim()]));
-    const SHORT = { 'as/gemini-nano-banana-2.1': '2.1', 'as/gemini-3.1-flash-lite-image': '2 Lite', 'as/gemini-3-pro-image': 'Pro', 'gpt-image-2.5-flare': 'Flare', 'gpt-image-2.5-sunburst': 'Sunburst', 'or/x-ai/grok-imagine-image-quality': 'Grok 2.0' };
+    const SHORT = { 'as/gemini-nano-banana-2.1': '2.1', 'as/gemini-3.1-flash-lite-image': '2 Lite', 'as/gemini-3-pro-image': 'Pro', 'gpt-image-2.6-flare': 'Flare', 'gpt-image-2.6-sunburst': 'Sunburst', 'or/x-ai/grok-imagine-image-2.0': 'Grok 2.0' };
     seg(modelRail, chips.map(chip => [chip.dataset.value, SHORT[chip.dataset.value] || chip.textContent.trim(), chip.textContent.trim() + ' (' + chip.dataset.value + ')']), { sel: model, logos: true });
     // V102.429 (style 5, mockup pick 2026-10-26): one logo per maker, that maker's models as plain chips beside it (Gemini · OpenAI · Grok)
     [...modelRail.querySelectorAll('button')].forEach(b => {
@@ -78,14 +78,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // 👍 / 👎 on the finished image → counted per model + template in _meta/case_card_feedback (admin-only doc, no rules change) and shown as "👍 n/m here".
     // The hints / suggestions come from an outside model comparison — expectations, not measurements of ours; our own votes replace them over time.
     const HINTS = {
-        'gpt-image-2.5-sunburst': 'Most accurate text · a little slower',
-        'gpt-image-2.5-flare': 'Fast drafts · quality close to Sunburst',
+        'gpt-image-2.6-sunburst': 'Most accurate text · a little slower',
+        'gpt-image-2.6-flare': 'Fast drafts · quality close to Sunburst',
         'as/gemini-3-pro-image': 'High quality · slower and pricier',
         'as/gemini-nano-banana-2.1': 'Good all-round · fast enough',
         'as/gemini-3.1-flash-lite-image': 'Fastest of the Google models · lower quality',
-        'or/x-ai/grok-imagine-image-quality': 'About 1 minute · needs OpenRouter credit'
+        'or/x-ai/grok-imagine-image-2.0': 'About 1 minute · needs OpenRouter credit'
     };
-    const SUGGEST = { infographic: 'gpt-image-2.5-sunburst', lifestyle: 'as/gemini-nano-banana-2.1', symptoms: 'as/gemini-3-pro-image', selfcare: 'gpt-image-2.5-flare', minimal: 'as/gemini-nano-banana-2.1' };
+    const SUGGEST = { infographic: 'gpt-image-2.6-sunburst', lifestyle: 'as/gemini-nano-banana-2.1', symptoms: 'as/gemini-3-pro-image', selfcare: 'gpt-image-2.6-flare', minimal: 'as/gemini-nano-banana-2.1' };
     const hintEl = document.createElement('div');
     hintEl.className = 'cs-model-hint'; hintEl.setAttribute('aria-live', 'polite');
     modelRail.after(hintEl);
