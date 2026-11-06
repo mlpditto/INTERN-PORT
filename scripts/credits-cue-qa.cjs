@@ -53,10 +53,10 @@ const DOT_BG = 'rgb(66, 133, 244)';
         await page.waitForTimeout(100);
         await page.evaluate(() => { try { localStorage.removeItem('quiz_scene_ai_model'); } catch (_) {} document.querySelector('.qimg-panel .qimg-scene').click(); });
         const sceneChips = await page.locator('.qsc-m [data-model]').evaluateAll(bs => bs.map(b => [b.dataset.model, b.dataset.bill || '', getComputedStyle(b, '::after').content !== 'none', b.title]));
-        assert.deepEqual(sceneChips.map(c => [c[0], c[1], c[2]]), [['as/gemini-nano-banana-2.1', 'google', true], ['or/openai/gpt-image-2.5-flare', '', false], ['or/bytedance-seed/seedream-5-0-lite', '', false], ['or/x-ai/grok-imagine-image-quality', '', false]], 'only Nano Banana carries the dot: ' + JSON.stringify(sceneChips));
+        assert.deepEqual(sceneChips.map(c => [c[0], c[1], c[2]]), [['as/gemini-nano-banana-2.1', 'google', true], ['or/openai/gpt-image-2.6-flare', '', false], ['or/bytedance-seed/seedream-5-0-lite', '', false], ['or/x-ai/grok-imagine-image-2.0', '', false]], 'only Nano Banana carries the dot: ' + JSON.stringify(sceneChips));
         assert.match(sceneChips[0][3], /Nano Banana 2\.1 · 🔵 paid by Google Cloud credits first/);
         assert.equal(await pseudo('.qsc-gen', '::after'), DOT_BG, 'Generate has the dot with Nano Banana');
-        await page.locator('.qsc-m [data-model="or/openai/gpt-image-2.5-flare"]').evaluate(b => b.click());
+        await page.locator('.qsc-m [data-model="or/openai/gpt-image-2.6-flare"]').evaluate(b => b.click());
         assert.equal(await pseudo('.qsc-gen', '::after'), 'none', 'no dot with an OpenRouter model');
 
         // ② Articles: ✨ Draft follows the design-D trigger
@@ -82,7 +82,7 @@ const DOT_BG = 'rgb(66, 133, 244)';
         await ccPick('as/gemini-nano-banana-2.1');
         assert.equal(await pseudo('#alabasta-case-card-generate-btn', '::before'), DOT_BG, 'Case Card Generate has the dot with Nano Banana');
         assert.equal(await page.locator('#alabastaCaseCardModal .cs-seg button[data-value="as/gemini-nano-banana-2.1"]').evaluate(b => getComputedStyle(b, '::after').content !== 'none'), true, 'and the chip has its dot');
-        await ccPick('or/x-ai/grok-imagine-image-quality');
+        await ccPick('or/x-ai/grok-imagine-image-2.0');
         assert.equal(await pseudo('#alabasta-case-card-generate-btn', '::before'), 'none', '…and not with Grok');
 
         // ① TTS engines

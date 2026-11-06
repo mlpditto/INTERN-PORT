@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     left.append(byId('step-1'), byId('step-2'), find('.alabasta-casecard-details'));   // V102.416: summary → prompt (the thing to edit before Generate) → source details
     const preview = find('.case-studio-preview');
     const settings = find('.case-studio-settings');
-    const chips = [...settings.querySelectorAll('#alabasta-case-card-quick-rail button')];
+    const chips = [...settings.querySelectorAll('#alabasta-case-card-quick-rail button[data-value]')];   // V102.592: the model chips only — image-model-prices.js adds 3 vendor-logo buttons to this rail (they were the blank first pill)
     // the <select>s stay as hidden value holders every other line reads; the visible controls are chip rails (quiz-cover look)
     const model = document.createElement('select');
     model.id = 'case-studio-image-model';
@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     seg(modeRail, [['ai', 'AI image', 'AI image — AI draws the whole image'], ['html-overlay', 'HTML', 'Illustration + HTML — AI draws the illustration; the title and tags are real HTML text']], { sel: mode });
     // V102.417 lean: one single line of short names (the logo says the family — Gemini ◆ 2.1 · 2 Lite · Pro, OpenAI Flare · Sunburst, Grok; the full name is the tooltip)
     const fullName = Object.fromEntries(chips.map(chip => [chip.dataset.value, chip.textContent.trim()]));
-    const SHORT = { 'as/gemini-nano-banana-2.1': '2.1', 'as/gemini-3.1-flash-lite-image': '2 Lite', 'as/gemini-3-pro-image': 'Pro', 'gpt-image-2.5-flare': 'Flare', 'gpt-image-2.5-sunburst': 'Sunburst', 'or/x-ai/grok-imagine-image-quality': 'Grok 2.0' };
+    const SHORT = { 'as/gemini-nano-banana-2.1': '2.1', 'as/gemini-3.1-flash-lite-image': '2 Lite', 'as/gemini-3-pro-image': 'Pro', 'gpt-image-2.6-flare': 'Flare', 'gpt-image-2.6-sunburst': 'Sunburst', 'or/x-ai/grok-imagine-image-2.0': 'Grok 2.0' };
     seg(modelRail, chips.map(chip => [chip.dataset.value, SHORT[chip.dataset.value] || chip.textContent.trim(), chip.textContent.trim() + ' (' + chip.dataset.value + ')']), { sel: model, logos: true });
     // V102.429 (style 5, mockup pick 2026-10-26): one logo per maker, that maker's models as plain chips beside it (Gemini · OpenAI · Grok)
     [...modelRail.querySelectorAll('button')].forEach(b => {
@@ -78,21 +78,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // 👍 / 👎 on the finished image → counted per model + template in _meta/case_card_feedback (admin-only doc, no rules change) and shown as "👍 n/m here".
     // The hints / suggestions come from an outside model comparison — expectations, not measurements of ours; our own votes replace them over time.
     const HINTS = {
-        'gpt-image-2.5-sunburst': 'Most accurate text · a little slower',
-        'gpt-image-2.5-flare': 'Fast drafts · quality close to Sunburst',
+        'gpt-image-2.6-sunburst': 'Most accurate text · a little slower',
+        'gpt-image-2.6-flare': 'Fast drafts · quality close to Sunburst',
         'as/gemini-3-pro-image': 'High quality · slower and pricier',
         'as/gemini-nano-banana-2.1': 'Good all-round · fast enough',
         'as/gemini-3.1-flash-lite-image': 'Fastest of the Google models · lower quality',
-        'or/x-ai/grok-imagine-image-quality': 'About 1 minute · needs OpenRouter credit'
+        'or/x-ai/grok-imagine-image-2.0': 'About 1 minute · needs OpenRouter credit'
     };
-    const SUGGEST = { infographic: 'gpt-image-2.5-sunburst', lifestyle: 'as/gemini-nano-banana-2.1', symptoms: 'as/gemini-3-pro-image', selfcare: 'gpt-image-2.5-flare', minimal: 'as/gemini-nano-banana-2.1' };
+    const SUGGEST = { infographic: 'gpt-image-2.6-sunburst', lifestyle: 'as/gemini-nano-banana-2.1', symptoms: 'as/gemini-3-pro-image', selfcare: 'gpt-image-2.6-flare', minimal: 'as/gemini-nano-banana-2.1' };
     const hintEl = document.createElement('div');
     hintEl.className = 'cs-model-hint'; hintEl.setAttribute('aria-live', 'polite');
     modelRail.after(hintEl);
     const fbKey = s => String(s).replace(/[^\w-]/g, '_');
     const fbRef = () => (typeof db !== 'undefined' && db && typeof firebase !== 'undefined') ? db.collection('_meta').doc('case_card_feedback') : null;
     let tally = {};
-    const votes = id => { const t = (tally.tally || {})[fbKey(id)] || {}; let up = 0, down = 0; Object.keys(t).forEach(k => { up += (t[k] || {}).up || 0; down += (t[k] || {}).down || 0; }); return { up, down }; };
+    // V102.592: a renamed model keeps the votes of the one it replaced (GPT Image 2.5 → 2.6, Grok Imagine Quality → 2.0)
+    const PREV = { 'gpt-image-2.6-flare': 'gpt-image-2.5-flare', 'gpt-image-2.6-sunburst': 'gpt-image-2.5-sunburst', 'or/x-ai/grok-imagine-image-2.0': 'or/x-ai/grok-imagine-image-quality' };
+    const votes = id => { let up = 0, down = 0; [id, PREV[id]].filter(Boolean).forEach(m => { const t = (tally.tally || {})[fbKey(m)] || {}; Object.keys(t).forEach(k => { up += (t[k] || {}).up || 0; down += (t[k] || {}).down || 0; }); }); return { up, down }; };
     const rateRow = document.createElement('div');
     rateRow.className = 'cs-rate'; rateRow.hidden = true;
     rateRow.innerHTML = '<span>Rate this image</span><button type="button" data-vote="up" title="Good — counted for this model" aria-label="Like this image">👍</button><button type="button" data-vote="down" title="Not good — counted for this model" aria-label="Dislike this image">👎</button>';
@@ -150,7 +152,15 @@ document.addEventListener('DOMContentLoaded', () => {
             avatar.replaceChildren(img);
         } else avatar.replaceChildren(initial);
     };
-    const syncId = () => { idChip.textContent = idBadge.textContent; idChip.hidden = idBadge.hidden || !idBadge.textContent; paintAvatar(); };
+    // V102.592 (owner): the header chip also shows the case no. as soon as "Patient agreed" is ticked (before any image), not only after Generate
+    const consentNo = () => {
+        const box = document.getElementById('alabasta-case-card-consent'); if (!box || !box.checked) return '';
+        const item = typeof getAlabastaCaseById === 'function' ? getAlabastaCaseById((byId('id') || {}).value || '') : null;
+        const no = String((item && (item.caseGroup && item.caseGroup.base || item.caseId)) || '').trim();
+        return no ? '#' + no : '';
+    };
+    const syncId = () => { const t = (!idBadge.hidden && idBadge.textContent) || consentNo(); idChip.textContent = t; idChip.hidden = !t; paintAvatar(); };
+    window.paintCaseCardConsentNo = () => syncId();
     new MutationObserver(syncId).observe(idBadge, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
     header.append(actions);
     inputs.append(byId('meta'));
@@ -225,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const consentBox = consentRow.querySelector('input');
     consentBox.onchange = () => {
         const want = consentBox.checked;
-        run(async () => { const done = typeof window.onCaseCardConsentChange === 'function' ? await window.onCaseCardConsentChange(want) : false; if (done === false) consentBox.checked = !want; else reviewed = ''; });
+        run(async () => { const done = typeof window.onCaseCardConsentChange === 'function' ? await window.onCaseCardConsentChange(want) : false; if (done === false) consentBox.checked = !want; else reviewed = ''; window.paintCaseCardConsentNo(); });
     };
     window.resetCaseStudioSteps = () => {
         generated = ''; reviewed = summary.value; lastGen = null; voted = false;
@@ -233,7 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
         byId('step-2').open = false; find('.alabasta-casecard-details').open = false; payEl.hidden = true; techBtn.textContent = TECH; render();
     };
     find('.alabasta-casecard-subtitle').textContent = 'Review the summary, pick a model, then generate.';
-    find('.alabasta-casecard-badge').textContent = '🛡 Privacy ✓';
+    find('.alabasta-casecard-badge').textContent = '🛡 Privacy';   // V102.592 (owner): the green pill already says OK — no ✓
     find('.alabasta-casecard-badge').title = 'Privacy checked · no identifiers should appear in the summary or image prompt · ตรวจข้อมูลระบุตัวบุคคลในสรุปและภาพอีกครั้งก่อนบันทึก';
     byId('step-1').querySelector('label').textContent = 'Anonymized summary';
     byId('step-1').querySelector('.alabasta-casecard-note').textContent = 'Check accuracy and remove identifying details before generating.';
