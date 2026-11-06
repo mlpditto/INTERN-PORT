@@ -12,7 +12,7 @@
     function toast(t) { if (typeof showToast === 'function') showToast(t); }
 
     function paintSnow() {
-        if (!on()) { if (snow) { snow.remove(); snow = null; } return; }
+        if (!on()) { if (snow) { snow.remove(); snow = null; } hideHint(); return; }
         if (snow) return;
         snow = document.createElement('div');
         snow.className = 'xm-snow';
@@ -31,7 +31,31 @@
         if (!audio) { audio = new Audio('assets/sounds/xm-musicbox.mp3'); audio.loop = true; audio.volume = 0.35; audio.preload = 'auto'; }
         return audio;
     }
-    function play() { if (!on()) return; var p = player().play(); started = true; if (p && p.catch) p.catch(function () { started = false; }); }
+    function play() {
+        if (!on()) return;
+        var p = player().play(); started = true;
+        if (p && p.then) p.then(showHint, function () { started = false; }); else showHint();
+    }
+    // V101.276 (owner): how to turn it off — once per device, the first time the music really starts: a ring pulses on the photo and a card
+    // points at it (👆 pressing while a red ring fills = the hold). Gone after 6 s, on a tap, or as soon as the photo is held.
+    var HINT_KEY = 'xm_hint_seen', hintEls = null, hintTimer = 0;
+    function hintSeen() { try { return localStorage.getItem(HINT_KEY) === '1'; } catch (e) { return !!hintEls; } }
+    function hideHint() { clearTimeout(hintTimer); if (hintEls) { hintEls.forEach(function (el) { el.remove(); }); hintEls = null; } }
+    function showHint() {
+        if (hintSeen() || hintEls || !on()) return;
+        var img = document.getElementById('u-img'); if (!img) return;
+        var r = img.getBoundingClientRect(); if (!r.width) return;
+        try { localStorage.setItem(HINT_KEY, '1'); } catch (e) { /* storage blocked */ }
+        var pulse = document.createElement('div'); pulse.className = 'xm-hint-pulse'; pulse.setAttribute('aria-hidden', 'true');
+        pulse.style.cssText = 'left:' + (r.left - 3) + 'px;top:' + (r.top - 3) + 'px;width:' + (r.width + 6) + 'px;height:' + (r.height + 6) + 'px';
+        var card = document.createElement('div'); card.className = 'xm-hint lang-no-toggle'; card.setAttribute('role', 'status');
+        card.innerHTML = '<span class="ring" aria-hidden="true"></span><span>🎵 Hold your photo to turn the music off</span>';   // owner: English only
+        card.style.left = Math.max(8, Math.min(window.innerWidth - 280, r.left - 6)) + 'px'; card.style.top = (r.bottom + 12) + 'px';
+        card.onclick = hideHint;
+        document.body.appendChild(pulse); document.body.appendChild(card);
+        hintEls = [pulse, card];
+        hintTimer = setTimeout(hideHint, 6000);
+    }
     function pause() { if (audio) audio.pause(); }
 
     // the first gesture anywhere starts the music (when it is wanted)
@@ -53,7 +77,7 @@
         var timer = 0, held = false;
         function start() {
             if (!on()) return;
-            held = false;
+            held = false; hideHint();
             timer = setTimeout(function () {
                 held = true;
                 var next = !(wanted() && audio && !audio.paused);

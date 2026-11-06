@@ -45,12 +45,21 @@ async function open(browser, opts = {}) {
         assert.deepEqual(snow, { n: 26, pe: 'none', pos: 'fixed', anim: 'xmSnow', aria: 'true' }, 'snow A: 26 flakes over the page, taps go through: ' + JSON.stringify(snow));
         await page.mouse.click(200, 700);
         assert.deepEqual(await page.evaluate(() => window.__calls), ['play'], 'music starts at the first tap (on by default)');
+        // V101.276 pine forest (owner pick B): the page itself wears the theme
+        const look = await page.evaluate(() => ({ bg: getComputedStyle(document.body).backgroundImage, strip: getComputedStyle(document.body, '::after').backgroundImage, foot: getComputedStyle(document.getElementById('intern-footer-line')).color }));
+        assert.ok(look.bg.includes('rgb(15, 61, 46)'), 'pine background: ' + look.bg.slice(0, 80)); assert.ok(look.strip.includes('rgb(220, 38, 38)'), 'candy-cane strip on top');
+        assert.equal(look.foot, 'rgb(209, 250, 229)', 'the version line turns light on the dark page');
+        // the mute hint: once, English only, below the photo; holding the photo removes it
+        await page.waitForTimeout(100);
+        const hint = await page.evaluate(() => { const h = document.querySelector('.xm-hint'), img = document.getElementById('u-img').getBoundingClientRect(); return h ? { text: h.innerText.trim(), below: h.getBoundingClientRect().top >= img.bottom, pulse: !!document.querySelector('.xm-hint-pulse'), seen: localStorage.getItem('xm_hint_seen') } : null; });
+        assert.deepEqual(hint, { text: '🎵 Hold your photo to turn the music off', below: true, pulse: true, seen: '1' }, 'the hint shows once the music starts: ' + JSON.stringify(hint));
         // long-press the photo → off, and the click after it does NOT open the browser
         const box = await page.locator('#u-img').boundingBox();
         const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
         const opened0 = await page.evaluate(() => window.__opened);
         await page.mouse.move(cx, cy); await page.mouse.down(); await page.waitForTimeout(750); await page.mouse.up();
         let st = await page.evaluate(() => ({ calls: window.__calls.slice(-1)[0], pref: localStorage.getItem('xm_music'), opened: window.__opened }));
+        assert.equal(await page.locator('.xm-hint, .xm-hint-pulse').count(), 0, 'holding the photo removes the hint');
         assert.equal(st.calls, 'pause', 'long-press = music off'); assert.equal(st.pref, 'off', 'remembered');
         assert.equal(st.opened, opened0, 'the long-press does not open the browser');
         // a normal tap still opens the browser, and does not restart the music
@@ -60,6 +69,7 @@ async function open(browser, opts = {}) {
         // long-press again → on
         await page.mouse.move(cx, cy); await page.mouse.down(); await page.waitForTimeout(750); await page.mouse.up();
         st = await page.evaluate(() => ({ last: window.__calls.slice(-1)[0], pref: localStorage.getItem('xm_music') }));
+        await page.waitForTimeout(100); assert.equal(await page.locator('.xm-hint').count(), 0, 'the hint never comes back on this device');
         assert.deepEqual(st, { last: 'play', pref: 'on' }, 'long-press again = music on');
         // theme switched off → snow gone, music paused
         await page.evaluate(() => applySeasonTheme('off')); await page.waitForTimeout(100);
