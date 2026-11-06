@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.591)</title>
+    <title>Nika Admin (V102.593)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -3671,6 +3671,10 @@
         .crai-model { display: inline-flex; align-items: center; border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 3px 9px; font-size: 0.78em; font-weight: 700; color: #475569; }
         .crai-head .dca-ai-review-btn { font-size: 1em; padding: 6px 10px; line-height: 1; }
         .crai-msg { margin-top: 6px; font-size: 0.82em; color: #78716c; }
+        .crai-warn { cursor: help; font-size: 1em; line-height: 1; }   /* V102.593: a failed check = ⚠️, the reason in the tooltip */
+        .crai-run { animation: craiSpin 1s linear infinite; opacity: .7; } @keyframes craiSpin { to { transform: rotate(360deg); } }
+        #editCaseNoteModal .ecn-note-head > .ecn-ai-acts { grid-area:1 / 2 !important; justify-self:start; display:inline-flex; align-items:center; gap:6px; }
+        #editCaseNoteModal .ecn-ai-acts #case-review-ai-head { display: inline-flex; align-items: center; gap: 6px; }
         .crai-finds { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
         .crai-f { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 10px; background: #f8fafc; border: 1px solid #e2e8f0; font-size: 0.82em; color: #334155; }
         .crai-f i { font-style: normal; flex: none; }
@@ -8596,7 +8600,7 @@
 <script src="case-article.js?v=V102.395"></script>
 <script src="dca-ai-trail.js?v=V102.390"></script>
 <script src="dxa-ai-trail.js?v=V102.389"></script>
-<script src="case-review-ai.js?v=V102.572"></script>
+<script src="case-review-ai.js?v=V102.593"></script>
 <script src="case-file-review.js?v=V102.550"></script>
 <link rel="stylesheet" href="case-import.css?v=V102.560">
 <link rel="stylesheet" href="case-jev-system.css?v=V102.565">
@@ -16415,7 +16419,7 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                 <button type="button" id="edit-case-note-translate-btn" onclick="translateEditCaseNote()" title="Translate to EN/KO with the model on the right · the note itself is never overwritten · แปลเป็น EN/KO ด้วยโมเดลที่เลือก ไม่ทับต้นฉบับ" style="background:#fff; color:#1f2937; border:1px solid #cbd5e1; border-radius:999px; padding:5px 12px; font-size:0.76em; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
                     <i class="fa-solid fa-language"></i> Translate
                 </button>
-                <span class="ecn-note-lbl"><span data-ecn="en">Translate with</span><span data-ecn="sep"> · </span><span data-ecn="ko">번역 모델</span><span data-ecn="sep2"> · </span><span data-ecn="th">แปลด้วย</span></span>
+                <span class="ecn-note-lbl" title="One model for Translate and the 🔍 AI check"><span data-ecn="en">Model</span><span data-ecn="sep"> · </span><span data-ecn="ko">모델</span><span data-ecn="sep2"> · </span><span data-ecn="th">โมเดล</span></span>
             </div>
             <textarea id="edit-case-note-text" placeholder="Edit case note..." style="width:100%; min-height:180px; resize:vertical; padding:14px 16px; border-radius:16px; border:1.5px solid #fcd34d; background:#fffef8; color:#111827; font-size:0.98em; line-height:1.55; box-shadow:inset 0 2px 6px rgba(245,158,11,0.06);"></textarea>
             <div id="ecn-review-slot" class="lang-no-toggle"></div>
@@ -44569,6 +44573,12 @@ They can connect again from LINE.
             const home = document.querySelector('#caseReviewScoreModal .modal-content'), slot = document.getElementById('ecn-review-slot');
             if (!home || !slot) return;
             ['case-review-ai-head', 'case-review-ai', 'case-review-reply'].forEach(id => { const el = document.getElementById(id); if (el) (sheet ? slot : home).appendChild(el); });
+            const tr = document.getElementById('edit-case-note-translate-btn'), hd = document.getElementById('case-review-ai-head');   // V102.593: 🔍 sits beside Translate, on the model rail's row
+            if (sheet && tr && hd) {   // Translate + 🔍 share the button cell of the header grid (one inline group)
+                let acts = document.getElementById('ecn-ai-acts');
+                if (!acts) { acts = document.createElement('span'); acts.id = 'ecn-ai-acts'; acts.className = 'ecn-ai-acts'; tr.before(acts); acts.appendChild(tr); }
+                acts.appendChild(hd);
+            }
         }
         const ecnCase = () => casesData.find(c => c.id === (document.getElementById('edit-case-note-id') || {}).value);
         function ecnScorePaint() {
@@ -44594,7 +44604,7 @@ They can connect again from LINE.
             toggleCaseReviewReply(!!c.adminComment);
             syncCaseReviewReply();
             ecnScorePaint();
-            if ((c.status || 'pending') === 'pending' && window.caseReviewAi) window.caseReviewAi.start(c);
+            if ((c.status || 'pending') === 'pending' && window.caseReviewAi) window.caseReviewAi.prime(c);   // V102.593: 🔍 only, nothing runs by itself
         }
         function ecnScoreClose() {
             const c = ecnCase();
@@ -55415,7 +55425,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     setTimeout(() => inputEl.focus(), 40);
                 }
                 if (window.caseFileReview) window.caseFileReview.start(caseItem);   // V102.547: the intern's PDF + what Gemini read
-                if (window.caseReviewAi) window.caseReviewAi.start(caseItem);   // V102.387: local-AI check as the modal opens
+                if (window.caseReviewAi) window.caseReviewAi.prime(caseItem);   // V102.593 (owner): the check runs on 🔍 only (was: the local AI on open)
                 forceShowModal('caseReviewScoreModal');
             });
         }

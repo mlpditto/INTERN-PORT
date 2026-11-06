@@ -1,4 +1,5 @@
-// Admin ▸ Cases ▸ Review: the score modal runs a LOCAL-model (Ollama `ol/local`) check as it opens (public/case-review-ai.js).
+// Admin ▸ Cases ▸ Review: the AI check (public/case-review-ai.js). V102.593 (owner): it uses the model picked in the Case Note's one "Model" rail
+// (#case-note-ai-model; Ollama is one vendor there; `ol/local` when there is no rail) and runs ONLY on 🔍 — opening draws the 🔍, nothing more.
 // The real script + the real modal markup/CSS from admin.html in a page, callUniversalAI stubbed:
 // findings render as icon rows (escaped), the suggested score pre-fills only an untouched field, a failure never blocks, a closed modal drops late answers,
 // and the prompt carries the Note but never the intern's name or the HN.
@@ -11,10 +12,11 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
 // static pins
 assert.ok(/<script src="case-review-ai\.js\?v=V102\.\d+"><\/script>/.test(admin), 'admin.html loads case-review-ai.js');
-assert.ok(/window\.caseReviewAi\.start\(caseItem\);[^\n]*\r?\n\s*forceShowModal\('caseReviewScoreModal'\);/.test(admin), 'the check starts as the modal opens');
+assert.ok(/window\.caseReviewAi\.prime\(caseItem\);[^\n]*\r?\n\s*forceShowModal\('caseReviewScoreModal'\);/.test(admin), 'opening the modal only draws the 🔍 (prime); the check never starts by itself');
+assert.ok(!/caseReviewAi\.start\(/.test(admin), 'admin.html never starts the check by itself');
 assert.ok(/window\.caseReviewAi\.hide\(\);\r?\n\s*forceHideModal\('caseReviewScoreModal'\);/.test(admin), 'closing the modal cancels / clears the check');
 assert.ok(admin.includes('<div id="case-review-ai" class="lang-no-toggle" hidden></div>'), 'findings container in the modal — lang-no-toggle, or lang-toggle.js hides every Thai finding / message (found live 2026-10-25)');
-assert.ok(js.includes("const MODEL = 'ol/local'"), 'local model first');
+assert.ok(js.includes("(document.getElementById('case-note-ai-model') || {}).value || 'ol/local'"), "the rail's model, local when there is no rail");
 const modal = admin.match(/<div id="caseReviewScoreModal"[\s\S]*?\n    <\/div>\r?\n/)[0];
 const css = [...admin.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].slice(0, 2).map(m => m[1]).join('\n');
 
@@ -45,6 +47,16 @@ const css = [...admin.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].slice(0, 2).
         }, { ok: opts.ok === undefined ? OK : opts.ok, hold: !!opts.hold });
     };
 
+    // 0. prime: only the 🔍, no call; 🔍 runs it
+    await run();
+    await page.evaluate(c => window.caseReviewAi.prime(c), CASE);
+    assert.equal(await page.evaluate(() => window.calls.length), 0, 'opening does not call the model');
+    assert.equal(await page.$eval('#case-review-ai-head', e => [!!e.querySelector('#case-review-ai-btn'), !!e.querySelector('.crai-model')].join()), 'true,false', 'just the 🔍, no model chip (the rail says the model)');
+    await page.click('#case-review-ai-btn');
+    await page.waitForSelector('#case-review-ai .crai-f');
+    assert.equal(await page.evaluate(() => window.calls.length), 1, '🔍 runs it');
+    await page.evaluate(() => window.caseReviewAi.hide());
+
     // 1. success: rows, ✨ chip, pre-filled field, prompt hygiene, escaping
     await run();
     await page.evaluate(c => window.caseReviewAi.start(c), CASE);
@@ -69,7 +81,7 @@ const css = [...admin.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].slice(0, 2).
     assert.ok(await page.$$eval('#case-review-ai .lang-th', e => e.length) > 0, 'proof the guard matters: without .lang-no-toggle the Thai is wrapped (and hidden under an EN-only body)');
     await page.evaluate(() => document.getElementById('case-review-ai').classList.add('lang-no-toggle'));
     // 1c. V102.423: lean header — the chip + 🔍 sit on the title row; the model also drafts a reply for the intern, used only when ✨ Draft is pressed
-    assert.equal(await page.$eval('#case-review-ai-head', e => e.closest('.csr-head') !== null && !!e.querySelector('.crai-model') && !!e.querySelector('#case-review-ai-btn')), true, 'chip + 🔍 on the title row');
+    assert.equal(await page.$eval('#case-review-ai-head', e => e.closest('.csr-head') !== null && !!e.querySelector('#case-review-ai-btn')), true, '🔍 on the title row');
     assert.equal(await page.$eval('#case-review-ai .crai-head', e => !!e).catch(() => false), false, 'no separate AI row any more');
     assert.ok(call.prompt.includes('reply (string: a kind message to the INTERN') && call.prompt.includes('missing (array'), 'the prompt asks for the missing info + the reply');
     assert.equal(await page.$eval('#case-review-reply-draft', e => e.disabled), false, '✨ Draft is available once the model answered');
@@ -100,10 +112,9 @@ const css = [...admin.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].slice(0, 2).
     await page.evaluate(() => window.caseReviewAi.hide());
     await run({ ok: 'fail' });
     await page.evaluate(c => window.caseReviewAi.start(c), CASE);
-    await page.waitForSelector('#case-review-ai .crai-msg');
-    assert.ok((await page.$eval('#case-review-ai .crai-msg', e => e.textContent)).includes('ใช้ไม่ได้'));
-    assert.equal(await page.$$eval('#case-review-ai .lang-th', e => e.length), 0, 'the Thai failure message is not hidden');
-    assert.equal(await page.$eval('#case-review-ai .crai-msg', e => e.title), 'Ollama is not reachable', 'full error in the tooltip');
+    await page.waitForSelector('#case-review-ai-head .crai-warn');
+    assert.ok((await page.$eval('#case-review-ai-head .crai-warn', e => e.title)).startsWith('Ollama is not reachable'), 'a failure = ⚠️ beside 🔍, the full error in its tooltip');
+    assert.equal(await page.$eval('#case-review-ai', e => e.hidden), true, 'no message line under it');
     assert.equal(await page.$eval('#case-review-ai-btn', e => e.disabled), false, 'retry available');
     assert.equal(await page.$$eval('#caseReviewScoreModal button', b => b.some(x => x.textContent.trim() === 'Save')), true);
     await run();
@@ -114,7 +125,7 @@ const css = [...admin.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].slice(0, 2).
     await page.evaluate(() => window.caseReviewAi.hide());
     await run({ hold: true });
     await page.evaluate(c => { window.caseReviewAi.start(c); }, CASE);   // not awaited: the held answer would never come back
-    assert.ok((await page.$eval('#case-review-ai-head', e => e.textContent)).includes('checking'), 'the title-row chip says it is checking');
+    assert.equal(await page.$eval('#case-review-ai-btn', e => e.disabled && e.classList.contains('crai-run')), true, 'the 🔍 spins (disabled) while it checks');
     await page.evaluate(() => window.caseReviewAi.hide());
     await page.evaluate(() => window.release());
     await page.waitForTimeout(200);
@@ -125,7 +136,15 @@ const css = [...admin.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].slice(0, 2).
     await run();
     await page.evaluate(() => window.caseReviewAi.start({ id: 'c2', note: 'hi' }));
     assert.equal(await page.evaluate(() => window.calls.length), 0);
+    assert.ok((await page.$eval('#case-review-ai-head .crai-warn', e => e.title)).includes('สั้นเกินไป'), 'too short = ⚠️ with the reason');
+
+    // 7. the rail's model is used
+    await page.evaluate(() => { const i = document.createElement('input'); i.type = 'hidden'; i.id = 'case-note-ai-model'; i.value = 'gpt-6-luna'; document.body.appendChild(i); });
+    await run();
+    await page.evaluate(c => window.caseReviewAi.start(c), CASE);
+    await page.waitForSelector('#case-review-ai .crai-f');
+    assert.equal(await page.evaluate(() => window.calls[0].model), 'gpt-6-luna', 'the check uses the model picked in the rail');
 
     await browser.close();
-    console.log('PASS: Case Review — local-model check on open: icon rows (escaped), ✨ suggested chip pre-fills only an untouched field, no name/HN in the prompt, failure → retry without blocking Save, late answers dropped after close');
+    console.log('PASS: Case Review — AI check on 🔍 only, with the rail model: icon rows (escaped), ✨ suggested chip pre-fills only an untouched field, no name/HN in the prompt, failure → retry without blocking Save, late answers dropped after close');
 })().catch(e => { console.error(e); process.exit(1); });
