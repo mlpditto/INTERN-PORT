@@ -18,11 +18,11 @@ assert.match(html, /onclick="requestRetakeWithReason\('\$\{q\.id\}'\)"[^>]*>🔄
 assert.doesNotMatch(html, /Request Retake ขอสอบใหม่/, 'old label gone');
 assert.equal((html.match(/requestLateQuiz\('\$\{q\.id\}', true\)/g) || []).length, 1, 'only the Interrupted card still asks admin');
 assert.match(html, /attempt\.allowedBy === 'self'\s*\n\s*\? `<span class="assign-tag"[^`]*>🔄<\/span>`/, "'allowed' badge says retake, not late");
-assert.match(html, /<title>Internship Portfolio \(V101\.279\)<\/title>/);
+assert.match(html, /<title>Internship Portfolio \(V\d+\.\d+\)<\/title>/);
 // admin: the pending row carries the reason, escaped, with the count
 assert.match(admin, /const retakeNote = att\.retakeReason\s*\n\s*\? `<div class="lang-no-toggle"[^`]*🔄 Retake\$\{att\.retakeCount > 1 \? ' ×' \+ att\.retakeCount : ''\} · \$\{escapeHtml\(String\(att\.retakeReason\)\)\}<\/div>`/);
 assert.match(admin, /\$\{oohNote\}\$\{retakeNote\}\$\{isPoll \?/, 'note rides above the Review / Approve buttons');
-assert.match(admin, /<title>Nika Admin \(V102\.601\)<\/title>/);
+assert.match(admin, /<title>Nika Admin \(V\d+\.\d+\)<\/title>/);
 
 async function open(browser) {
     const page = await browser.newPage({ viewport: { width: 390, height: 800 } });

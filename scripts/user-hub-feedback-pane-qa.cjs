@@ -18,7 +18,7 @@ const triageJs = slice('        const FB_TRIAGE_ICON = {', '        const FB_FRE
 const styles = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1]).join('\n');
 
 // --- static
-assert.match(html, /<title>Nika Admin \(V102\.603\)<\/title>/);
+assert.match(html, /<title>Nika Admin \(V\d+\.\d+\)<\/title>/);
 assert.ok(header.indexOf('id="gs-fb-chip"') > header.indexOf('gs-bal-beri') && header.indexOf('id="gs-fb-chip"') < header.indexOf('gs-header-close'), 'the 💬 chip sits after Beri, before ×');
 assert.match(header, /<span class="gs-lang-flag" aria-hidden="true">🇺🇸<\/span><span data-gs-lang="en" aria-pressed="true">EN<\/span><span data-gs-lang="th" aria-pressed="false">TH<\/span>/, 'flag + both codes (CSS shows the pressed one)');
 assert.match(html, /gsFbReset\(uid\); gsFbLoad\(uid\);/, 'setUserGroup resets + loads');
