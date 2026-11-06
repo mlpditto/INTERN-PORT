@@ -25,7 +25,7 @@ const run = code => vm.runInContext(code, ctx);
 run(`
 ${thai}
 const REVIEW_LINK_TYPE_ICON = { line_man: '🛍️', youtube: '▶️', other: '🔗' };
-const UNIFIED_PAGE_SIZE = 10; let unifiedRenderedCount = 10, userId = 'u1';
+const UNIFIED_PAGE_SIZE = 10; let unifiedRenderedCount = 12, userId = 'u1';   // V101.281: 12 fixtures (two notes), all on one page
 const day = 86400000, ago = d => ({ toMillis: () => Date.now() - d * day, toDate: () => new Date(Date.now() - d * day) });
 let reviewLinksCache = [{ id: 'L1', title: 'Khao Don', url: 'https://shop.example/khao', logoUrl: 'https://dl.example/khao.webp' }];
 let quizzesCache = [
@@ -44,7 +44,9 @@ let unifiedSubmissionsCache = [
   { id: 'c2', submissionType: 'case', score: 0, adminBonus: 0, status: 'pending', timestamp: ago(8), metadata: { caseId: '10477', diseaseSystemKey: 'neuro' } },
   { id: 'c3', submissionType: 'case', score: 0, adminBonus: 0.1, status: 'approved', timestamp: ago(50), metadata: { caseId: '10311', disease: 'GI', diseaseSystemKey: 'gi' } },
   { id: 'r1', submissionType: 'reflective', score: 0, adminBonus: 0, status: 'approved', timestamp: ago(0), metadata: { mood: 'Happy', moodEmoji: '😊', content: 'Learned a lot' } },
-  { id: 'w1', submissionType: 'work', title: 'Deck', score: 0, adminBonus: 0, status: 'approved', timestamp: ago(12), metadata: { link: 'https://example.com/deck' } }];
+  { id: 'w1', submissionType: 'work', title: 'Deck', score: 0, adminBonus: 0, status: 'approved', timestamp: ago(12), metadata: { link: 'https://example.com/deck' } },
+  { id: 'n1', submissionType: 'learning_note', title: 'ระบบจัดเก็บยาในร้าน', description: 'การฝึกงานในร้านยาทำให้ได้เรียนรู้ว่าความคุ้นเคยกับระบบการจัดเก็บยาเป็นสิ่งสำคัญ\\nยาที่จัดตามกลุ่มโรคช่วยให้หยิบได้เร็ว', score: 0.1, adminBonus: 0, status: 'pending', timestamp: ago(4), metadata: { tags: ['dispensing', 'inventory'], sourceType: 'learning_path_entries', sourceId: 'EYGf' } },
+  { id: 'n2', submissionType: 'learning_note', title: 'การฝึกงานในร้านยาทำให้ได้เรียนรู้ว่าความคุ้นเคยกับระบบการจัดเก็บยาเป็นสิ่งสำคัญ', description: 'การฝึกงานในร้านยาทำให้ได้เรียนรู้ว่าความคุ้นเคยกับระบบการจัดเก็บยาเป็นสิ่งสำคัญ และ <b>ต้องรอบคอบ</b>', score: 0, adminBonus: 0, status: 'approved', timestamp: ago(6), metadata: { sourceType: 'learning_path_entries', sourceId: 'abc' } }];
 window.caseTaxonomyCatalog = [{ key: 'gi', label: 'GI' }, { key: 'neuro', label: 'Neurological' }, { key: 'other', label: 'Other' }];
 window.CASE_SYSTEM_EMOJI = { gi: '🍽️', neuro: '🧠', other: '📋' };
 window.activityRewards = { beriFor: id => id === 'q1_u1' ? 5 : 0 };
@@ -52,7 +54,7 @@ ${names.map(fn).join('\n')}
 `);
 run(fs.readFileSync('public/history-lean.js', 'utf8'));
 
-assert.equal(run('getUnifiedAllItems().length'), 10);
+assert.equal(run('getUnifiedAllItems().length'), 12);
 
 run('window.historyLean.render(getUnifiedAllItems().sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()))');
 const out = ctx.__box.innerHTML;
@@ -79,6 +81,16 @@ assert.match(q1, /viewQuizAnswers\('q1'\)/); assert.match(q1, /openFeedbackForPa
 // V101.280: the 💬 says it — an amber "No feedback yet" pill (EN + ไทย), not an icon alone; gone once feedback was given
 assert.match(q1, /class="hl-ib hl-fb" onclick="openFeedbackForPastAttempt\('q1'\)"[^>]*aria-label="No feedback yet — give feedback">💬 <span>No feedback yet <i>ยังไม่ได้ให้ feedback<\/i><\/span><\/button>/, 'labelled feedback pill');
 assert.doesNotMatch(q2, /hl-fb|openFeedbackForPastAttempt/, 'feedback already given → no pill');
+// V101.281 (owner pick A): a note shows its NAME first; the content + tag chips only when tapped; no sourceType / sourceId dump
+const n1 = row('n1'), n2 = row('n2');
+assert.match(n1, /<div class="hl-tt" title="ระบบจัดเก็บยาในร้าน">ระบบจัดเก็บยาในร้าน<\/div>/, 'named note: the name, plain');
+assert.match(n1, /<span class="hl-tg" title="#dispensing · #inventory"> · 🏷 2<\/span>/, 'tag count in the meta line');
+assert.match(n1, /<div class="hl-note">การฝึกงานในร้านยา[\s\S]*<br>ยาที่จัดตามกลุ่มโรค/, 'content in the expanded part, line breaks kept');
+assert.match(n1, /<span class="hl-ntag">#dispensing<\/span><span class="hl-ntag">#inventory<\/span>/, 'tag chips in the expanded part');
+assert.doesNotMatch(n1, /sourceType|sourceId|EYGf|>Detail</, 'no internal ids');
+assert.match(n2, /<div class="hl-tt hl-tt-auto" title="การฝึกงาน/, 'auto-named note: faint one-line title');
+assert.match(n2, /&lt;b&gt;ต้องรอบคอบ&lt;\/b&gt;/, 'content escaped when there is no markdown renderer');
+assert.doesNotMatch(n2, /hl-tg|hl-ntags/, 'no tags → no 🏷, no chips');
 assert.doesNotMatch(q3, /viewQuizAnswers/);                      // pending → no answers / feedback
 // one file → a direct, logged download link (the javascript: one is dropped); several → a counted list
 assert.equal((q1.match(/href="https:\/\/example\.com\/a\.pdf"/g) || []).length, 2);   // inline + expanded
@@ -123,7 +135,7 @@ assert.doesNotMatch(out, /hl-loadmore/);
 // "N more" appears past one page and counts the rest
 run('for (let i = 0; i < 6; i++) unifiedSubmissionsCache.push({ id: "x" + i, submissionType: "work", title: "Extra " + i, score: 0, adminBonus: 0, status: "approved", timestamp: ago(90 + i), metadata: {} }); unifiedRenderedCount = 10;');
 run('window.historyLean.render(getUnifiedAllItems().sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()))');
-assert.match(ctx.__box.innerHTML, /class="hl-loadmore" onclick="loadMoreUnifiedHistory\(\)">6 more</);
+assert.match(ctx.__box.innerHTML, /class="hl-loadmore" onclick="loadMoreUnifiedHistory\(\)">8 more</);   // V101.281: 12 fixtures + 6 extras − 10 shown
 // V101.84: a quiz with a short title shows it; the full title is the hover text and the tapped-row text. No short title (q2) = the full title only.
 run('window.historyLean.render(getUnifiedAllItems().sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()))');
 assert.match(row('q1_u1'), /<div class="hl-tt" title="Vitamin B"><span class="hl-st">Vit B<\/span><span class="hl-ft">Vitamin B<\/span>/);

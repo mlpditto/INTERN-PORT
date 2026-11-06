@@ -38,7 +38,7 @@ async function open(browser, inClient) {
         await page.evaluate(() => { document.getElementById('u-img').dataset.ob = '1'; avatarBrowserInit(); document.getElementById('u-img').click(); });
         assert.equal(await page.evaluate(() => window.__open.length), 4, 'init twice does not double the handler (one open per tap)');
         // the badges on the photo are not part of it
-        assert.equal(await page.evaluate(() => { const b = document.getElementById('u-award-badge'), g = document.getElementById('u-group-dot'); window.__open = []; b.click(); g.click(); return window.__open.length; }), 0, 'the group dot / award badge do not open the browser');
+        assert.equal(await page.evaluate(() => { const b = document.getElementById('u-award-badge'); window.__open = []; b.click(); return window.__open.length; }), 0, 'the award badge does not open the browser (V101.281: the group dot is gone)');
         assert.deepEqual(errors.filter(e => !/firebase\./.test(e)), [], 'no page errors: ' + errors.join(' | '));
         await ctx.close();
 
