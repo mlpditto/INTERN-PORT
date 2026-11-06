@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.270)</title>
+    <title>Internship Portfolio (V101.271)</title>
     <link rel="stylesheet" href="nika-ask.css?v=V101.263">
     <link rel="stylesheet" href="daily-canvas.css?v=V101.266">
     <link rel="stylesheet" href="halloween.css?v=V101.249">
@@ -1767,6 +1767,19 @@
             background: #fff7e6;
             color: #b45309;
         }
+        /* V101.271: the system emoji sits inside the card (no group-head line on phones, the desktop disc already shows it);
+           pending = an amber card instead of the "Pending Review" line; ⚠️ + red edge = the daily log has no Plan / Assessment yet. */
+        .case-card-sys { margin-right: 6px; font-size: 1.15em; cursor: help; }
+        .case-card.dl-miss { border-left: 4px solid #ef4444; }
+        .case-dl-miss { display: inline-block; padding: 0 8px; border-radius: 999px; background: #fee2e2; cursor: help; }
+        @media (max-width: 700px) {
+            #case-list-grouped .case-group-head { display: none; }
+            #case-list-grouped .case-card-pre { display: none; }
+            #case-list-grouped .case-card.is-pending { background: #fffbeb; border-color: #fcd34d; }
+            #case-list-grouped .case-card.dl-miss { border-left-color: #ef4444; }   /* ⚠️ wins over the amber edge */
+            #case-list-grouped .case-card.is-pending .case-status-badge.pending { display: none; }
+        }
+        @media (min-width: 701px) { .case-card-sys { display: none; } }
 
 
         /* ── Work Tabs (V90.98) ────────────────────────────────── */
@@ -2492,12 +2505,14 @@
         .qr-admin-note .qan-body { font-size:0.95em; line-height:1.55; white-space:pre-wrap; }
         .qr-admin-note .qan-bonus { display:flex; align-items:center; gap:5px; margin-top:8px; font-weight:800; font-size:0.85em; color:#b45309; }
     </style>
-<link rel="stylesheet" href="personal-profile-tabs.css?v=V101.192">
+<link rel="stylesheet" href="personal-profile-tabs.css?v=V101.271">
 <script src="personal-profile-tabs.js?v=V101.163"></script>
 <link rel="stylesheet" href="submit-system-grid.css?v=V101.133">
 <link rel="stylesheet" href="case-extras.css?v=V101.261">
 <script defer src="submit-system-grid.js?v=V101.133"></script>
 <script defer src="case-extras.js?v=V101.261"></script>
+<link rel="stylesheet" href="case-daily-log-export.css?v=V101.271">
+<script defer src="case-daily-log-export.js?v=V101.271"></script>
 <link rel="stylesheet" href="invite-ticket.css?v=V101.168">
 <script defer src="invite-ticket.js?v=V101.168"></script>
 <link rel="stylesheet" href="learning-review.css?v=V99.81">
@@ -6465,11 +6480,10 @@
                 </div>
             </div>
 
-                <div style="flex:2;">
-                    <label
-                        style="font-size:0.78em; font-weight:bold; display:block; margin-bottom:4px; color:#555;">Institution / Workplace สถาบัน / ที่ทำงาน 소속 기관 / 근무지</label>
-                    <input type="text" id="pi-institute" placeholder="e.g. Khon Kaen University" data-th-placeholder="เช่น ม.ขอนแก่น" data-kr-placeholder="예: 콘깬 대학교"
-                        style="width:100%; padding:9px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.9em;">
+                <!-- V101.271: Institution / Workplace split in two + optional Student ID (the daily log export header). Icon + field, the name rides in title / aria-label. -->
+                <div class="pi-inst-rows">
+                    <div class="pi-inst-row"><span class="pi-inst-ic" title="Institution" data-th-title="สถาบัน" data-kr-title="소속 기관" aria-hidden="true">🏫</span><input type="text" id="pi-institute" placeholder="Institution" data-th-placeholder="สถาบัน" data-kr-placeholder="소속 기관" title="Institution, e.g. Khon Kaen University" data-th-title="สถาบัน เช่น ม.ขอนแก่น" data-kr-title="소속 기관 (예: 콘깬 대학교)" aria-label="Institution" data-th-aria-label="สถาบัน" data-kr-aria-label="소속 기관"></div>
+                    <div class="pi-inst-row"><span class="pi-inst-ic" title="Workplace" data-th-title="สถานที่ฝึก" data-kr-title="근무지" aria-hidden="true">🏥</span><input type="text" id="pi-workplace" placeholder="Workplace" data-th-placeholder="สถานที่ฝึก" data-kr-placeholder="근무지" title="Workplace — where you practise" data-th-title="สถานที่ฝึกงาน" data-kr-title="근무지 (실습 장소)" aria-label="Workplace" data-th-aria-label="สถานที่ฝึก" data-kr-aria-label="근무지"><span class="pi-inst-ic" title="Student ID (optional)" data-th-title="รหัสนักศึกษา (ไม่บังคับ)" data-kr-title="학번 (선택)" aria-hidden="true">🆔</span><input type="text" id="pi-student-id" class="pi-inst-id" maxlength="20" placeholder="ID" title="Student ID (optional)" data-th-title="รหัสนักศึกษา (ไม่บังคับ)" data-kr-title="학번 (선택)" aria-label="Student ID" data-th-aria-label="รหัสนักศึกษา" data-kr-aria-label="학번"></div>
                 </div>
             </details>
             <details class="pi-detail-card pi-card-contact"><summary>☎ Contact<span class="pi-end"><span class="pi-dot" data-dot="contact" hidden></span><span class="pi-chev" aria-hidden="true"></span></span></summary>
@@ -8954,6 +8968,8 @@
                     document.getElementById('pi-nickname').value = d.nickName || "";
                     document.getElementById('pi-nationality').value = d.nationality || "";
                     document.getElementById('pi-institute').value = d.institute || "";
+                    document.getElementById('pi-workplace').value = d.workplace || "";      // V101.271
+                    document.getElementById('pi-student-id').value = d.studentId || "";    // V101.271
                     document.getElementById('pi-phone').value = d.phone || "";
                     document.getElementById('pi-email').value = d.email || "";
                     setBirthdaySelects(d.birthday || "");
@@ -9087,6 +9103,8 @@
             const lnameEn = document.getElementById('pi-lastname-en').value.trim();
             const nname = document.getElementById('pi-nickname').value.trim();
             const institute = document.getElementById('pi-institute').value.trim();
+            const workplace = document.getElementById('pi-workplace').value.trim();     // V101.271: daily log export header
+            const studentId = document.getElementById('pi-student-id').value.trim();   // V101.271: optional
             const phone = document.getElementById('pi-phone').value.trim();
             const email = document.getElementById('pi-email').value.trim();
             const birthday = getBirthdayValue();
@@ -9129,6 +9147,8 @@
                     nickName: nname,
                     nationality: document.getElementById('pi-nationality').value,   // V101.162: '' | TH | JP | KR | SG
                     institute: institute,
+                    workplace: workplace,
+                    studentId: studentId,
                     phone: phone,
                     email: email,
                     birthday: birthday,
@@ -27067,6 +27087,7 @@ async function archiveDoneCard(cardId) {
                     <div class="case-rail-row"><span title="Cases over the last 6 months — not affected by the period filter" data-th-title="จำนวนเคสย้อนหลัง 6 เดือน ไม่เปลี่ยนตามตัวกรองช่วงเวลา" data-kr-title="최근 6개월 사례 수 (기간 필터와 무관)" aria-label="Activity over the last 6 months" data-th-aria-label="กิจกรรมย้อนหลัง 6 เดือน" data-kr-aria-label="최근 6개월 활동">📈</span><div class="case-rail-months">${months.map(m => `<span><b>${monthCount[m.key] || 0}</b>${m.label}</span>`).join('')}</div></div>
                     <details><summary title="Systems not yet logged in the selected period" data-th-title="ระบบที่ยังไม่บันทึกในช่วงเวลาที่เลือก" data-kr-title="선택한 기간에 기록되지 않은 계통">🗺️ ${window.uiText('{n} systems not logged yet|ยังไม่ได้บันทึก {n} ระบบ|미기록 계통 {n}').replace(/\{n\}/g, missing.length)} ▾</summary><div class="case-rail-missing">${missing.map(s => escapeHtml(s.label)).join(' · ') || 'All systems covered'}</div></details>
                 </div>`;
+            if (window.dlxPaint) window.dlxPaint(allCases);   // V101.271: 📅 · 📄 · ⚠️ · Word / PDF daily log line (case-daily-log-export.js)
         }
 
         // V95.37 Stats v3 — time-window pill handler (persisted) + CSV export.
@@ -27591,17 +27612,20 @@ async function archiveDoneCard(cardId) {
                 const parts = c.caseGroup ? (window.myCaseParts || []).filter(x => x.caseGroup.id === c.caseGroup.id).sort((x, y) => x.caseGroup.index - y.caseGroup.index) : [];
                 const isPending = parts.length ? parts.some(x => (x.status || 'pending') === 'pending') : (status === 'pending' || c.status === 'รอตรวจ');
                 const symptoms = Array.isArray(c.symptomTags) ? c.symptomTags : [];
+                const dl = c.dailyLog && typeof c.dailyLog === 'object' ? c.dailyLog : null;   // V101.271: a daily log without Plan / Assessment = ⚠️ on the card
+                const dlMiss = !!(dl && Object.keys(dl).length && (!dl.plan || !dl.assessment));
                 const dateText = c.timestamp && typeof c.timestamp.toDate === 'function'
                     ? window.formatUiDate(c.timestamp, c.timestamp.toDate().getFullYear() === new Date().getFullYear() ? {} : { year: '2-digit' })   // V101.189: same short date as the timeline
                     : '';
                 return `
-                            <div class="case-card${isPending ? '' : ' is-reviewed'}" data-emoji="${sysEmoji(sys)}" data-n="${ci + 1}" style="--h:${sysHue(sys)}">
+                            <div class="case-card${isPending ? ' is-pending' : ' is-reviewed'}${dlMiss ? ' dl-miss' : ''}"${isPending ? ' title="Pending review" data-th-title="รอตรวจ" data-kr-title="검토 대기"' : ''} data-emoji="${sysEmoji(sys)}" data-n="${ci + 1}" style="--h:${sysHue(sys)}">
                                 <div class="case-card-top">
                                     <div class="case-card-line">
-                                        <div class="case-card-id"><span class="case-card-pre">HN / Ref: </span>${escapeHtml(c.caseGroup?.base || c.caseId)}${parts.length ? ' <span class="case-parts-n">PDF · ' + parts.length + ' cases</span>' : ''}</div>
+                                        <div class="case-card-id" title="HN / Ref"><span class="case-card-sys" title="${escapeHtml(sys)}" aria-hidden="true">${sysEmoji(sys)}</span><span class="case-card-pre">HN / Ref: </span>${escapeHtml(c.caseGroup?.base || c.caseId)}${parts.length ? ' <span class="case-parts-n">PDF · ' + parts.length + ' cases</span>' : ''}</div>
                                         <div class="case-card-meta">
                                             ${c.customer ? `<span class="lang-no-toggle"><i class="fa-solid fa-user"></i> ${c.customer}</span>` : '<span><i class="fa-solid fa-user"></i> Unnamed patient</span>'}
                                             ${dateText ? `<span><i class="fa-solid fa-calendar"></i> ${dateText}</span>` : ''}
+                                            ${dlMiss ? `<span class="case-dl-miss" title="Daily log: ${!dl.plan && !dl.assessment ? 'Plan and Assessment' : !dl.plan ? 'Plan' : 'Assessment'} empty" data-th-title="Daily log: ยังไม่ได้เขียน ${!dl.plan && !dl.assessment ? 'Plan และ Assessment' : !dl.plan ? 'Plan' : 'Assessment'}" data-kr-title="Daily log: ${!dl.plan && !dl.assessment ? 'Plan · Assessment' : !dl.plan ? 'Plan' : 'Assessment'} 미작성" aria-label="Daily log incomplete">⚠️</span>` : ''}
                                         </div>
                                     </div>
                                     ${parts.length ? '<div class="case-parts">' + parts.map(x => '<span class="' + ((x.status || 'pending') === 'pending' ? '' : 'ok') + '">' + x.caseGroup.index + ' ' + ((x.status || 'pending') === 'pending' ? 'Pending' : 'Reviewed' + (x.adminBonus ? ' +' + x.adminBonus : '')) + '</span>').join('') + '</div>' : ''}
