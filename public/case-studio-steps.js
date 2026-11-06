@@ -92,7 +92,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const fbKey = s => String(s).replace(/[^\w-]/g, '_');
     const fbRef = () => (typeof db !== 'undefined' && db && typeof firebase !== 'undefined') ? db.collection('_meta').doc('case_card_feedback') : null;
     let tally = {};
-    const votes = id => { const t = (tally.tally || {})[fbKey(id)] || {}; let up = 0, down = 0; Object.keys(t).forEach(k => { up += (t[k] || {}).up || 0; down += (t[k] || {}).down || 0; }); return { up, down }; };
+    // V102.592: a renamed model keeps the votes of the one it replaced (GPT Image 2.5 → 2.6, Grok Imagine Quality → 2.0)
+    const PREV = { 'gpt-image-2.6-flare': 'gpt-image-2.5-flare', 'gpt-image-2.6-sunburst': 'gpt-image-2.5-sunburst', 'or/x-ai/grok-imagine-image-2.0': 'or/x-ai/grok-imagine-image-quality' };
+    const votes = id => { let up = 0, down = 0; [id, PREV[id]].filter(Boolean).forEach(m => { const t = (tally.tally || {})[fbKey(m)] || {}; Object.keys(t).forEach(k => { up += (t[k] || {}).up || 0; down += (t[k] || {}).down || 0; }); }); return { up, down }; };
     const rateRow = document.createElement('div');
     rateRow.className = 'cs-rate'; rateRow.hidden = true;
     rateRow.innerHTML = '<span>Rate this image</span><button type="button" data-vote="up" title="Good — counted for this model" aria-label="Like this image">👍</button><button type="button" data-vote="down" title="Not good — counted for this model" aria-label="Dislike this image">👎</button>';
