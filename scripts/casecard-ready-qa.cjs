@@ -8,7 +8,7 @@ const SUMMARY = 'Swollen eyelid that has not improved despite oral medication an
 
 (async () => {
     const b = await chromium.launch(); const pg = await b.newPage({ viewport: { width: 1700, height: 1200 } });
-    await pg.addInitScript(() => { try { localStorage.setItem('adminGuideSeen', '1'); localStorage.setItem('alabasta-case-card-model-pref', 'gpt-image-2.5-sunburst'); } catch (e) {} window.firebase = new Proxy(function () {}, { get: (t, k) => k === 'apps' ? [] : window.firebase, apply: () => window.firebase, construct: () => window.firebase }); });
+    await pg.addInitScript(() => { try { localStorage.setItem('adminGuideSeen', '1'); localStorage.setItem('alabasta-case-card-model-pref', 'gpt-image-2.6-sunburst'); } catch (e) {} window.firebase = new Proxy(function () {}, { get: (t, k) => k === 'apps' ? [] : window.firebase, apply: () => window.firebase, construct: () => window.firebase }); });
     await pg.route('**/*', r => { const u = r.request().url(); if (u.startsWith('file:') || /font-?awesome|webfonts/.test(u)) return r.continue(); if (/generative-ai/.test(u)) return r.fulfill({ contentType: 'application/javascript', body: 'export class GoogleGenerativeAI{constructor(){}getGenerativeModel(){return {}}} export const HarmCategory={},HarmBlockThreshold={};' }); return r.fulfill({ status: 200, contentType: 'application/javascript', body: '' }); });
     await pg.goto('file:///' + path.join(dir, 'admin.html').replace(/\\/g, '/'));
     await pg.waitForFunction(() => typeof openAlabastaCaseCard === 'function' && typeof generateAlabastaCaseCardImage === 'function' && document.readyState === 'complete', null, { timeout: 30000 }); await pg.waitForTimeout(800);
@@ -35,7 +35,7 @@ const SUMMARY = 'Swollen eyelid that has not improved despite oral medication an
     assert.equal(await pg.locator('#alabasta-case-card-image-download').evaluate(el => el.classList.contains('is-ready-dl')), false, 'not ready yet');
 
     // ---- ready: the PNG button invites
-    await pg.evaluate(() => { const c = document.createElement('canvas'); c.width = 400; c.height = 300; c.getContext('2d').fillRect(0, 0, 400, 300); window.__res({ text: c.toDataURL('image/png'), model: 'gpt-image-2.5-sunburst', raw: { usage: { costUsd: 0.04 } } }); });
+    await pg.evaluate(() => { const c = document.createElement('canvas'); c.width = 400; c.height = 300; c.getContext('2d').fillRect(0, 0, 400, 300); window.__res({ text: c.toDataURL('image/png'), model: 'gpt-image-2.6-sunburst', raw: { usage: { costUsd: 0.04 } } }); });
     await pg.waitForFunction(() => /Ready/.test(document.getElementById('alabasta-case-card-image-status').textContent), null, { timeout: 15000 });
     const dl = pg.locator('#alabasta-case-card-image-download');
     assert.ok(await dl.evaluate(el => el.classList.contains('is-ready-dl')), 'ready → the PNG button is marked');

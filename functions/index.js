@@ -1037,7 +1037,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
 
         // Image models use the Images API, never the chat completion fallback.
         if (provider === "openai" && /^gpt-image-/.test(model)) {
-            if (!['gpt-image-2.5-flare', 'gpt-image-2.5-sunburst'].includes(model)) {
+            if (!['gpt-image-2.6-flare', 'gpt-image-2.6-sunburst', 'gpt-image-2.5-flare', 'gpt-image-2.5-sunburst'].includes(model)) {   // 2026-11-06: + 2.6 (released 11-04); 2.5 kept for old saved picks
                 return res.status(400).json({ error: 'Unsupported image model' });
             }
             if (!process.env.OPENAI_API_KEY) return res.status(500).json({ error: 'OpenAI key unavailable' });

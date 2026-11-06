@@ -51,7 +51,7 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
 
         const seed = await run('or/bytedance-seed/seedream-5-0-flash');
         assert.deepEqual(seed, { err: null, model: 'or/bytedance-seed/seedream-5-0-flash', imageApi: true, btnDisabled: false, btnText: 'Create', shown: true }, 'Seedream → Image API, button back: ' + JSON.stringify(seed));
-        const sun = await run('or/openai/gpt-image-2.5-sunburst');
+        const sun = await run('or/openai/gpt-image-2.6-sunburst');
         assert.deepEqual([sun.err, sun.imageApi, sun.btnDisabled, sun.btnText], [null, true, false, 'Create'], 'Sunburst → Image API: ' + JSON.stringify(sun));
         const img2 = await run('or/openai/gpt-5.4-image-2');
         assert.deepEqual([img2.err, img2.imageApi, img2.btnText], [null, false, 'Create'], 'Image 2 stays on chat completions: ' + JSON.stringify(img2));

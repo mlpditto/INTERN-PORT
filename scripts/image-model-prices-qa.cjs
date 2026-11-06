@@ -52,20 +52,20 @@ assert(cover.includes('window.imagePriceHtml ? window.imagePriceHtml(model.id)')
             assert.equal(await rail.locator('button[data-value]').count(), 6, 'all six chips stay in the DOM');
             assert.equal(await rail.locator('button[data-value] .text-ai-logo').count(), 0, 'no per-chip logo (the vendor icon carries it)');
             await rail.locator('.gm-vendor[data-vendor="openai"]').click();
-            assert.deepEqual(await shown(), ['gpt-image-2.5-flare', 'gpt-image-2.5-sunburst'], 'OpenAI models only');
+            assert.deepEqual(await shown(), ['gpt-image-2.6-flare', 'gpt-image-2.6-sunburst'], 'OpenAI models only');
             assert.equal((await page.locator('#alabasta-case-card-quick-rail button.active').getAttribute('data-value')), 'as/gemini-nano-banana-2.1', 'browsing a vendor does not change the model');
             await rail.locator('.gm-vendor[data-vendor="grok"]').click();
-            assert.deepEqual(await shown(), ['or/x-ai/grok-imagine-image-quality']);
+            assert.deepEqual(await shown(), ['or/x-ai/grok-imagine-image-2.0']);
             // the page code moves `.active` (syncAlabastaCaseCardQuickRail): the vendor follows the picked model
-            await page.evaluate(() => document.querySelectorAll('#alabasta-case-card-quick-rail button[data-value]').forEach(c => c.classList.toggle('active', c.dataset.value === 'gpt-image-2.5-sunburst')));
+            await page.evaluate(() => document.querySelectorAll('#alabasta-case-card-quick-rail button[data-value]').forEach(c => c.classList.toggle('active', c.dataset.value === 'gpt-image-2.6-sunburst')));
             await page.waitForFunction(() => document.querySelector('.gm-vendor[aria-pressed="true"]').dataset.vendor === 'openai');
-            assert.deepEqual(await shown(), ['gpt-image-2.5-flare', 'gpt-image-2.5-sunburst']);
+            assert.deepEqual(await shown(), ['gpt-image-2.6-flare', 'gpt-image-2.6-sunburst']);
 
             // prices: from the table; unknown = nothing; idempotent; tooltip says "estimate"
             assert.deepEqual(await price('as/gemini-nano-banana-2.1'), ['$0.03']);
             assert.deepEqual(await price('as/gemini-3-pro-image'), ['≈$0.13']);
-            assert.deepEqual(await price('gpt-image-2.5-sunburst'), ['≈$0.04–0.08']);
-            for (const id of ['gpt-image-2.5-flare', 'or/x-ai/grok-imagine-image-quality']) {
+            assert.deepEqual(await price('gpt-image-2.6-sunburst'), ['≈$0.04–0.08']);
+            for (const id of ['gpt-image-2.6-flare', 'or/x-ai/grok-imagine-image-2.0']) {
                 assert.deepEqual(await price(id), [], id + ': unknown price shows nothing');
                 assert(!(await rail.locator(`button[data-value="${id}"]`).getAttribute('title')).includes('ต่อรูป'), id + ' tooltip names no price');
             }
