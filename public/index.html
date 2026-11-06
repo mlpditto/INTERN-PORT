@@ -3,11 +3,12 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.275)</title>
+    <title>Internship Portfolio (V101.278)</title>
     <link rel="stylesheet" href="nika-ask.css?v=V101.263">
     <link rel="stylesheet" href="daily-canvas.css?v=V101.266">
     <link rel="stylesheet" href="halloween.css?v=V101.249">
     <link rel="stylesheet" href="christmas.css?v=V101.275">
+    <link rel="stylesheet" href="lv-card.css?v=V101.278">
     <script defer src="christmas.js?v=V101.275"></script>
     <script>/* V101.235: 20 Oct – 2 Nov (Bangkok) the Journal wears Halloween (halloween.css), then it goes back on its own.
        V101.265 (owner): an admin can set the theme for every intern (app_settings/theme.intern = auto | hw | off); the last value is kept here so the page opens in it, then refreshed */
@@ -7551,12 +7552,14 @@
 
         function showNextAchievementUnlock() {
             const modal = document.getElementById('achievementUnlockModal');
+            if (achUnlockShown && achUnlockShown.lv && modal && modal.style.display === 'flex') lvAck(achUnlockShown.lv);   // V101.278: CONTINUE = acknowledged
             if (window.isContentCreator?.()) { achUnlockQueue.length = 0; achUnlockShown = null; if (modal) modal.style.display = 'none'; return; }   // V101.103
             const a = achUnlockQueue.shift() || null;
             achUnlockShown = a;
             if (!modal) return;
             if (!a) { modal.style.display = 'none'; return; }
             if (a.stamp) { showEventStampUnlock(a.stamp); return; }   // V101.46: same modal, event variant
+            if (a.lv) { showLevelUnlock(a); return; }   // V101.278: LEVEL UP (new card look)
             const t = BADGE_TIERS[a.tierIdx];
             const n = a.def.steps.length;
             const tierName = t.name.charAt(0) + t.name.slice(1).toLowerCase();
@@ -7620,6 +7623,41 @@
             } else {
                 explCopyLinkFallback(text, done, fail);
             }
+        }
+
+        // ---- V101.278: LEVEL UP — the new card look, in the same popup as badges / Event Stamps; CONTINUE acknowledges it ----
+        // users/{id}.lvSeen (self-write) + this device. The first time after this release the current LV is recorded silently, so nobody
+        // gets a popup for a level they reached long ago; from then on each new LV shows once, on any device. An admin preview never writes.
+        const LV_LOOK = [["#94a3b8", "#f8fafc", "#f1f5f9", "#475569", "🧭"], ["#0ea5e9", "#f0f9ff", "#e0f2fe", "#0369a1", "🎯"], ["#22c55e", "#f0fdf4", "#dcfce7", "#15803d", "🍳"], ["#14b8a6", "#f0fdfa", "#ccfbf1", "#0f766e", "🩺"], ["#d97706", "#fffbeb", "#fef3c7", "#92400e", "🏺"], ["#c2410c", "#fff7ed", "#ffedd5", "#9a3412", "🔨"], ["#a855f7", "#faf5ff", "#f3e8ff", "#7e22ce", "🎵"], ["#1d4ed8", "#eff6ff", "#dbeafe", "#1e3a8a", "⚓"], ["#ca8a04", "#fffbeb", "#fef08a", "#854d0e", "⭐"], ["#a78bfa", "#fdf4ff", "#1f1726", "#fde68a", "👑"]];   // [edge, wash, chip bg, chip text, emblem] per LV 1–10 (the same colours as lv-card.css)
+        const LV_SEEN_KEY = 'ip_lv_seen_v1', lvQueued = new Set();
+        let lvWaits = 0;
+        function lvSeen() { let n = 0; try { n = Number(localStorage.getItem(LV_SEEN_KEY)) || 0; } catch (e) { /* blocked */ } return Math.max(n, Number(myOwnRow().lvSeen) || 0); }
+        function lvAck(n) {
+            if (!(n > 0)) return;
+            try { localStorage.setItem(LV_SEEN_KEY, String(Math.max(n, Number(localStorage.getItem(LV_SEEN_KEY)) || 0))); } catch (e) { /* blocked */ }
+            if (isPreview || !userId || typeof db === 'undefined' || !(typeof firebase !== 'undefined' && firebase.firestore)) return;
+            if ((Number(myOwnRow().lvSeen) || 0) >= n) return;
+            if (window.myUserDoc) window.myUserDoc.lvSeen = n;
+            db.collection('users').doc(userId).update({ lvSeen: n }).catch(e => console.warn('LV ack not saved:', e && e.message));
+        }
+        function lvCheckLevelUp(n, name) {
+            if (!window.myUserDoc && !isPreview) { if (lvWaits++ < 10) setTimeout(() => lvCheckLevelUp(n, name), 1500); return; }   // needs the own doc (lvSeen from other devices)
+            const seen = lvSeen();
+            if (!seen) { if (!isPreview) lvAck(n); return; }   // first run: record silently
+            if (n > seen && !lvQueued.has(n)) { lvQueued.add(n); achUnlockQueue.push({ lv: n, name }); if (!achUnlockShown) showNextAchievementUnlock(); }
+        }
+        function showLevelUnlock(a) {
+            const [e, w, cb, ct, em] = LV_LOOK[Math.max(1, Math.min(10, a.lv)) - 1];
+            const kicker = document.getElementById('ach-unlock-kicker');
+            kicker.textContent = '⬆️ LEVEL UP'; kicker.style.color = ct === '#fde68a' ? '#7c3aed' : ct;
+            document.getElementById('ach-unlock-title').textContent = a.name || ('LV.' + a.lv);
+            document.getElementById('ach-unlock-desc').innerHTML = 'A new card look is yours <span class="lang-th">การ์ดโปรไฟล์ของคุณเปลี่ยนแล้ว</span> <span class="lang-kr">새 프로필 카드가 열렸어요</span>';
+            document.getElementById('ach-unlock-pips').innerHTML = '';
+            document.getElementById('ach-unlock-confetti').innerHTML = '';
+            const badge = document.getElementById('ach-unlock-badge');
+            badge.innerHTML = `<div class="lv-up" style="--e:${e};--w:${w};--cb:${cb};--ct:${ct}" aria-hidden="true">${em}<b>LV.${a.lv}</b></div>`;
+            badge.classList.remove('ach-pop'); void badge.offsetWidth; badge.classList.add('ach-pop');
+            document.getElementById('achievementUnlockModal').style.display = 'flex';
         }
 
         // ---- V101.46: Event Stamps --------------------------------------------------
@@ -15884,7 +15922,12 @@
             if (rankEl) {
                 const crewRank = getCrewRankByScore(score);
                 rankEl.textContent = crewRank.split(' ')[0];   // "LV.2" — the full name is the hover title
-                rankEl.title = crewRank;
+                // V101.278: a different card per LV (lv-card.css) + the points to the next LV in the tooltip
+                const lvN = parseInt(crewRank.slice(3), 10) || 1;
+                rankEl.title = crewRank + (nextRank.required > 0 ? ' · ' + (Math.round(nextRank.required * 100) / 100) + ' pts to ' + nextRank.label.replace(/^Lv\./, 'LV.') : '');
+                const lvCard = document.getElementById('section-profile-combined');
+                if (lvCard) lvCard.className = lvCard.className.split(/\s+/).filter(c => c && !/^lv(-\d+)?$/.test(c)).concat(['lv', 'lv-' + lvN]).join(' ');
+                if (typeof lvCheckLevelUp === 'function') lvCheckLevelUp(lvN, crewRank);
             }
             if (certificateEl) {
                 if (score >= 30) {
