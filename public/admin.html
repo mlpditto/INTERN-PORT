@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.597)</title>
+    <title>Nika Admin (V102.598)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -5730,6 +5730,7 @@
         /* V102.551: draft state, the intern's view, and a time badge only where the time stands out */
         .rv-wu-st { display:inline-flex; align-items:center; padding:3px 9px; border-radius:999px; border:1px solid #fde68a; background:#fff; color:#92400e; font-size:.74em; font-weight:800; white-space:nowrap; }
         .rv-wu-st[hidden] { display:none; } .rv-wu-st.sent { border-color:#86efac; background:#dcfce7; color:#166534; } .rv-wu-st.edited { border-color:#fdba74; background:#fff7ed; color:#9a3412; }
+        #rv-writeup-copy.rv-copied { border-color:#86efac !important; background:#dcfce7 !important; color:#166534 !important; }   /* V102.596: copied = a green frame for a moment */
         #rv-writeup-view { max-height:320px; overflow:auto; padding:14px 16px; border:1.5px solid #fde68a; border-radius:12px; background:#fffdf8; color:#1f2937; }
         #rv-writeup-view[hidden] { display:none; }
         .rv-wv-split { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px; align-items:stretch; }
@@ -32228,11 +32229,27 @@ ${qs}`;
                 if (!txt) throw new Error('the model sent back nothing.');
                 ta.value = txt;
                 rvWriteupTyped();
-                if (note) note.textContent = '✨ ' + model + ' · ' + Math.max(1, Math.round((Date.now() - t0) / 1000)) + ' s — read it, edit, then Send';
+                // V102.596 (owner): the rail already shows the model and the box says "edit before it goes out" — the note keeps only the seconds
+                if (note) { const sec = Math.max(1, Math.round((Date.now() - t0) / 1000)); note.textContent = '✨ ' + sec + ' s'; note.title = 'Drafted with ' + model + ' in ' + sec + ' s — read it, edit, then Send'; }
             } catch (e) {
                 if (note) note.textContent = '✨ ' + ((e && e.message) || 'AI draft failed');
             } finally { if (btn) btn.disabled = false; }
         }
+        // V102.596 (owner): 📋 one click = the review text on the clipboard (Send still copies too); ✓ for a moment, nothing else changes
+        async function rvWriteupCopy() {
+            const ta = document.getElementById('rv-writeup-text'), btn = document.getElementById('rv-writeup-copy');
+            const text = ta ? ta.value.trim() : '';
+            if (!text) { if (typeof showToast === 'function') showToast('Nothing to copy yet'); return; }
+            let ok = false;
+            try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {
+                try { ta.select(); ok = document.execCommand('copy'); ta.setSelectionRange(ta.value.length, ta.value.length); } catch (_) { ok = false; }
+            }
+            if (!btn) return;
+            btn.textContent = ok ? '✓' : '⚠️'; btn.classList.toggle('rv-copied', ok);
+            btn.title = ok ? 'Copied' : 'Could not copy — select the text and copy it';
+            clearTimeout(btn._t); btn._t = setTimeout(() => { btn.textContent = '📋'; btn.classList.remove('rv-copied'); btn.title = 'Copy the review (one click)'; }, 1500);
+        }
+        window.rvWriteupCopy = rvWriteupCopy;
         async function rvWriteupSend(attemptId) {
             const ta = document.getElementById('rv-writeup-text'), btn = document.getElementById('rv-writeup-send'), note = document.getElementById('rv-writeup-note');
             const text = ta ? ta.value.trim() : '';
@@ -32796,6 +32813,7 @@ ${qs}`;
                             <input type="hidden" id="${rvWriteupModelId}" value="${normalizeTextAIModel(localStorage.getItem('ai_review_writeup_model'))}">
                             <span id="rv-writeup-note" style="flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;font-size:0.78em;color:#78716c;margin-left:auto;"></span>
                             <button type="button" id="rv-writeup-draft" onclick="rvWriteupDraft()" class="rv-ib" style="${rvIconBtn}" title="Draft again with AI (replaces the text in the box)" data-th-title="ให้ AI ร่างใหม่ (แทนที่ข้อความในกล่อง)" data-kr-title="AI로 다시 초안 작성 (상자의 텍스트를 대체)" aria-label="Draft with AI">✨</button>
+                            <button type="button" id="rv-writeup-copy" onclick="rvWriteupCopy()" class="rv-ib" style="${rvIconBtn}" title="Copy the review (one click)" data-th-title="คัดลอกรีวิว (คลิกเดียว)" data-kr-title="리뷰 복사 (한 번 클릭)" aria-label="Copy the review">📋</button>
                             <button type="button" id="rv-writeup-send" onclick="rvWriteupSend('${attemptId}')" style="width:auto;height:34px;min-height:0;margin:0;background:#f59e0b;color:#fff;border:1.5px solid #d97706;padding:0 14px;border-radius:10px;font-weight:800;cursor:pointer;" title="Send — it shows on their quiz result and in History" data-th-title="ส่ง — ขึ้นในผลควิซและ History ของเขา" data-kr-title="보내기 — 퀴즈 결과와 History에 표시됩니다">📨 Send</button>
                         </div>
                         <div class="rv-wv-split">

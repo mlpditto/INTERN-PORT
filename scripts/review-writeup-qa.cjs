@@ -138,7 +138,13 @@ const waitIdle = page => page.waitForFunction(() => !document.getElementById('rv
         assert(!new RegExp('(^|[^A-Za-z])' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^A-Za-z]|$)', 'i').test(pr), 'the prompt must not carry: ' + s);   // whole word: "particles" is not "article"
       assert.equal(p[0].opts.feature, 'review_writeup', 'its own AI feature tag');
       assert.equal(await page.locator('#rv-writeup-text').inputValue(), DRAFT, 'the draft lands in the box, line breaks kept');
-      assert.match(await page.locator('#rv-writeup-note').innerText(), /^✨ gpt-6-luna · \d+ s — read it, edit, then Send$/, 'note: model + seconds');
+      assert.match(await page.locator('#rv-writeup-note').innerText(), /^✨ \d+ s$/, 'V102.596 note: seconds only (the rail shows the model)');
+      assert.match(await page.locator('#rv-writeup-note').getAttribute('title'), /^Drafted with gpt-6-luna in \d+ s — read it, edit, then Send$/, 'the model + hint ride the tooltip');
+      // V102.596: 📋 one click copies the box (Send still copies too)
+      await page.evaluate(() => { window.__clip = null; });   // the clipboard stub from above
+      await page.locator('#rv-writeup-copy').click(); await page.waitForTimeout(50);
+      assert.equal(await page.evaluate(() => window.__clip), await page.locator('#rv-writeup-text').inputValue(), '📋 copies the review text');
+      assert.equal(await page.locator('#rv-writeup-copy').innerText(), '✓', '✓ for a moment'); assert.equal(await page.locator('#rv-writeup-copy').evaluate(b => b.classList.contains('rv-copied')), true, 'green frame');
       assert.equal(await page.locator('#rv-writeup input[type=hidden][id^=ai-review-writeup-model-]').inputValue(), 'gpt-6-luna', 'the hidden model input carries the default');
       assert.deepEqual(await page.evaluate(() => window.__writes), [], 'nothing written before Send');
       assert.equal(await page.locator('#articlesModal:visible').count(), 0, 'the Article editor stays closed');
