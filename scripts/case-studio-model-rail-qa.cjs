@@ -31,12 +31,12 @@ const ADMIN = require('url').pathToFileURL(path.join(process.cwd(), 'public/admi
         const no = await page.evaluate(() => {
             window.getAlabastaCaseById = () => ({ caseId: '26-31877' });
             document.getElementById('alabasta-case-card-id').value = 'doc1';
-            const box = document.getElementById('alabasta-case-card-consent'), el = document.getElementById('cs-consent-no');
+            const box = document.getElementById('alabasta-case-card-consent'), el = document.querySelector('#alabastaCaseCardModal .cs-idc');
             box.checked = true; window.paintCaseCardConsentNo(); const on = [el.hidden, el.textContent];
             box.checked = false; window.paintCaseCardConsentNo(); return { on, off: el.hidden };
         });
-        assert.deepEqual(no.on, [false, '#26-31877'], 'ticked: the case no. shows beside "Patient agreed"');
+        assert.deepEqual(no.on, [false, '#26-31877'], 'ticked: the header chip shows the case no. before any image');
         assert.equal(no.off, true, 'not ticked: hidden');
-        console.log('PASS: Case Card Studio model rail — no blank pill, GPT Image 2.6 Flare / Sunburst, Grok Imagine 2.0, case no. beside the consent tick');
+        console.log('PASS: Case Card Studio model rail — no blank pill, GPT Image 2.6 Flare / Sunburst, Grok Imagine 2.0, case no. in the header when consent is ticked');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
