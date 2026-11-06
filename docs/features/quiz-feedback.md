@@ -8,6 +8,7 @@ Intern: after a quiz, or the reminder popup. Admin: Quiz Engine ▸ 💬 Feedbac
 
 ## Scripts that drive it
 
+- `user-hub-feedback-pane-qa` — V102.602 the per-intern view: User Hub ▸ 💬 chip ▸ pane (see user-hub.md); a row jumps into `showQuizFeedbackPanel(quizId, uid)`
 - `quiz-feedback-lean-qa` — lean sheet with EN | 한 | ไทย capsule, rating chips, topic
 - `quiz-feedback-ai-qa` — ✨ AI next-topic chips: skeleton → chips, proxy answered by the script
 - `quiz-feedback-remind-qa` — "feedback not given yet" rules (pending / inPeriod / decide)
