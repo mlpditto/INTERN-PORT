@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.598)</title>
+    <title>Nika Admin (V102.599)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -4839,6 +4839,10 @@
         #groupSelectModal .gs-card-field:hover .gs-copy-field, #groupSelectModal .gs-copy-field:focus-visible { opacity:1; }
         #groupSelectModal .gs-card-field input { grid-column:2 / -1; font-size:14px; padding:5px 8px; }
         #groupSelectModal .gs-profile-card:not(.gs-editing) .gs-empty-field { display:none; }
+        #groupSelectModal .gs-card-field.gs-needs-en { background:#fffbeb; box-shadow:inset 3px 0 0 #f59e0b; border-radius:8px; }   /* V102.599: a non-English certificate name waits for a fix */
+        #groupSelectModal .gs-card-field.gs-needs-en .gs-read-value { color:#b45309; font-weight:700; }
+        #groupSelectModal .gs-needs-en-pill { display:inline-block; margin-top:3px; padding:1px 8px; border-radius:999px; background:#fef3c7; color:#92400e; border:1px solid #fcd34d; font-size:11px; font-weight:700; cursor:help; white-space:nowrap; }
+        #groupSelectModal .gs-needs-en-pill[hidden] { display:none; }
         #groupSelectModal .gs-empty-note { font-size:11px; color:var(--text-sub); padding:0 12px 8px; }
         #groupSelectModal .gs-profile-card.gs-editing .gs-empty-note { display:none; }
         /* V102.280: profile cards start folded (title row + a one-line preview + the 📋 / ✏️ buttons); opening one folds the others.
@@ -40943,6 +40947,14 @@ They can connect again from LINE.
                 }
                 row.querySelector('.gs-copy-field').hidden = !value;
                 row.classList.toggle('gs-empty-field', !value); // V102.62: hidden in read mode
+                // V102.599 (owner): a certificate name that is not English waits for a fix — amber row + a pill; it goes away once it is English
+                if (row.querySelector('input').id === 'gs-cert-fullname') {
+                    const bad = !!value && /[^A-Za-z\s.'\-]/.test(value);
+                    row.classList.toggle('gs-needs-en', bad);
+                    let pill = row.querySelector('.gs-needs-en-pill');
+                    if (bad && !pill) { pill = document.createElement('span'); pill.className = 'gs-needs-en-pill'; row.querySelector('label').after(pill); }
+                    if (pill) { pill.hidden = !bad; pill.textContent = gsText('⚠️ Not English · waiting for a fix', '⚠️ ยังไม่ใช่ภาษาอังกฤษ · รอแก้'); pill.title = gsText('Press ✏️ and type the English first / last name', 'กด ✏️ แล้วพิมพ์ชื่อ-นามสกุลภาษาอังกฤษ'); }
+                }
             });
             document.querySelectorAll('.gs-profile-card').forEach(card => {
                 card.querySelector('.gs-copy-card').hidden = !Array.from(card.querySelectorAll('input')).some(input => input.value.trim());
