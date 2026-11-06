@@ -70,7 +70,7 @@ const SEED = { plans: { '2026-10': { daily: 300, days: {} } }, expenses: exp, to
         assert.equal(await page.$eval('#finModal .fin-cap.set', b => b.textContent.replace(/\s+/g, ' ').trim()), '🍜 6,000', 'a set cap shows on its chip');
         await page.evaluate(() => finTab('month'));
         const bars = await page.$$eval('#finModal .fin-crow', rs => rs.filter(r => r.querySelector('.fin-cap-bar')).map(r => r.querySelector('span').textContent + ' ' + r.querySelector('em').textContent + ' ' + r.querySelector('.fin-cap-bar i').className));
-        assert.deepEqual(bars, ['🍜 Food เหลือ ฿ 1,350 cool', '☕ Coffee เกิน ฿ 160 hot'], 'the cap bar rides its own row: เหลือ (green, 78%) / เกิน (red): ' + bars);
+        assert.deepEqual(bars, ['🍜 Food ฿ 1,350 left cool', '☕ Coffee ฿ 160 over hot'], 'the cap bar rides its own row: left (green, 78%) / over (red), English like the verdict: ' + bars);
         // sync: a newer clear on the other device wins and travels; an older value does not come back
         const sync = await page.evaluate(() => {
             const a = finLoad(), t = Date.now();
