@@ -93,7 +93,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.deepEqual(gp.opts, { feature: 'quiz_cover', imageApi: true, aspectRatio: '3:4' }, 'the Image API at the collection\'s 3:4');
         await page.locator('[data-apply]').click();
         await page.waitForFunction(() => QuizCover.value() === 'https://example.com/ai.webp');
-        assert.deepEqual(JSON.parse(JSON.stringify((await last()).data)).tally, { 'or_x-ai_grok-imagine-image-2.0': { up: { inc: 1 } } }, 'the vote is for Grok');
+        assert.deepEqual(JSON.parse(JSON.stringify((await last()).data)).tally, { 'or_x-ai_grok-imagine-image-2_0': { up: { inc: 1 } } }, 'the vote is for Grok');
         await page.evaluate(() => { QuizCover.set(''); });
         await page.locator('[data-model-chip][data-value="or/openai/gpt-image-2.6-flare"]').click();
         await gen();
