@@ -59,7 +59,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         let w = await last();
         assert.equal(w.path, '_meta/cover_feedback');
         assert.deepEqual(w.opts, { merge: true });
-        assert.deepEqual(JSON.parse(JSON.stringify(w.data)), { tally: { 'or_openai_gpt-image-2_5-flare': { up: { inc: 1 } } }, byStyle: { clay: { 'or_openai_gpt-image-2_5-flare': { up: { inc: 1 } } } }, updatedAt: 'TS' });
+        assert.deepEqual(JSON.parse(JSON.stringify(w.data)), { tally: { 'or_openai_gpt-image-2_6-flare': { up: { inc: 1 } } }, byStyle: { clay: { 'or_openai_gpt-image-2_6-flare': { up: { inc: 1 } } } }, updatedAt: 'TS' });
         assert.ok((await page.locator('[data-model-chip][data-value="or/openai/gpt-image-2.6-flare"]').getAttribute('title')).includes('👍 3/4'), 'the chip tally follows at once');
         assert.equal(await page.locator('[data-reasons]').isHidden(), true);
 
@@ -67,14 +67,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         await gen();
         await page.locator('[data-discard]').click();
         w = await last();
-        assert.deepEqual(JSON.parse(JSON.stringify(w.data)).tally, { 'or_openai_gpt-image-2_5-flare': { down: { inc: 1 } } });
+        assert.deepEqual(JSON.parse(JSON.stringify(w.data)).tally, { 'or_openai_gpt-image-2_6-flare': { down: { inc: 1 } } });
         assert.equal(await page.locator('.quiz-cover-ai-preview').isHidden(), true);
         assert.match(await page.locator('[role=status]').innerText(), /Noted 👎/);
         assert.equal(await page.locator('[data-reasons]').isVisible(), true);
         assert.deepEqual(await page.locator('[data-reasons] button').allInnerTexts(), ['Wrong text', 'Off topic', 'Too plain', 'Not pretty']);
         // a picked reason is counted, and goes into the NEXT prompt only
         await page.locator('[data-reasons] button[data-reason="text"]').click();
-        assert.deepEqual(JSON.parse(JSON.stringify((await last()).data)), { reasons: { 'or_openai_gpt-image-2_5-flare': { text: { inc: 1 } } }, updatedAt: 'TS' });
+        assert.deepEqual(JSON.parse(JSON.stringify((await last()).data)), { reasons: { 'or_openai_gpt-image-2_6-flare': { text: { inc: 1 } } }, updatedAt: 'TS' });
         assert.equal(await page.locator('[data-reasons] button[data-reason="text"]').getAttribute('aria-pressed'), 'true');
         await gen();
         let p = await page.evaluate(() => prompts[prompts.length - 1].prompt);

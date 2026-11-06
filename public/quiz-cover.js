@@ -50,7 +50,9 @@ const QuizCover = (() => {
     let lastGen = null, pendingFix = [], tally = {};
     const fbKey = s => String(s).replace(/[^\w-]/g, '_');
     const fbDoc = () => (typeof db !== 'undefined' && db && typeof firebase !== 'undefined') ? db.collection('_meta').doc('cover_feedback') : null;
-    const upDown = id => { const t = (tally.tally || {})[fbKey(id)] || {}; return { up: t.up || 0, down: t.down || 0 }; };
+    // V102.592: a renamed model keeps the votes of the one it replaced (GPT Image 2.5 → 2.6, Grok Imagine Quality → 2.0)
+    const PREV = { 'or/openai/gpt-image-2.6-flare': 'or/openai/gpt-image-2.5-flare', 'or/x-ai/grok-imagine-image-2.0': 'or/x-ai/grok-imagine-image-quality' };
+    const upDown = id => { let up = 0, down = 0; [id, PREV[id]].filter(Boolean).forEach(m => { const t = (tally.tally || {})[fbKey(m)] || {}; up += t.up || 0; down += t.down || 0; }); return { up, down }; };
     function tallyTitles(el) {
         el.querySelectorAll('[data-model-chip]').forEach(c => {
             const base = c.dataset.baseTitle || (c.dataset.baseTitle = c.title), { up, down } = upDown(c.dataset.value);
