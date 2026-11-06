@@ -11,7 +11,7 @@ Intern: home ▸ Mission ▸ a quiz card ▸ Start.
 - `quiz-cover-fold-qa` — corner fold on a not-started cover; ▶ pulses twice; "nobody yet" gold
 - `quiz-deadline-chip-qa` — deadline chip on the quiz card + preview sheet: red <24 h (pulse last 3 h), amber 24–72 h, calm 📅 beyond 3 days (card only; the preview sheet and in-button countdown still hide it); EN/TH/KO; no DOM writes while unchanged
 - `start-chip-qa` — V101.228 the chip IS the Start button (Aurora Pastel liquid glass): 32px pill + 24px ▶ orb, invisible 44px hit area, tiers calm/amber/red/plain "Start"/⏱ Late all start the quiz, cards that keep their footer keep the orange cover ▶, one line EN/TH, sheen only while on screen (3 sweeps), none under Reduce Motion, solid fallback without backdrop-filter, AA at every gradient stop
-- `quiz-card-details-toggle-qa` — "✦ Be the first" call; Details is a ▾ button
+- `quiz-card-details-toggle-qa` — V101.282 (owner pick E, `mockups/be-the-first.html`): the two nobody-yet challenge cards carry a gold ✦ before the title and the whole card breathes a gold glow (`--call-period` on the card, quickens toward the deadline; still under Reduce Motion); no "✦ Be the first" pill, no extra row, same height as the other cards; Details is a ▾ button
 - `quiz-done-count-qa` — "👥 n" did it + your own avatar only (live users rule applied)
 - `quiz-material-ribbon-qa` — pre-quiz materials ribbon on the cover, floating list for several
 - `quiz-start-confirm-qa` — lean start card: quote card is the read-aloud button, one rule, Cancel / Start

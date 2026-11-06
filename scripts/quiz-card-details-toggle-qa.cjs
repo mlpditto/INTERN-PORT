@@ -1,5 +1,5 @@
-// V101.188 — intern quiz card: (1) the two nobody-yet challenge cards carry a "✦ Be the first" call in the meta row whose shadow
-// breathes (never under Reduce Motion); (2) "Details" is no longer a text line — a ▾ button at the bottom of the side column
+// V101.188 → V101.282 (owner pick E) — intern quiz card: (1) the two nobody-yet challenge cards carry a gold ✦ before the title and
+// the whole card breathes a gold glow (--call-period on the card; never under Reduce Motion) — no "Be the first" pill, no extra row; (2) "Details" is no longer a text line — a ▾ button at the bottom of the side column
 // (🔗 · ☁️ · ▾, or 🔗 · ▾ with nothing to download) toggles the same <details>, whose <summary> is hidden. Real index.html
 // QuizCover.decorate + attachQuizMaterialRibbon + attachQuizDetailsToggle + populateQuizAvatarStacks at phone width, fake db.
 const assert = require('node:assert/strict');
@@ -44,11 +44,14 @@ async function open(browser, reduced) {
         await new Promise(res => setTimeout(res, 450));
         const $ = (id, s) => host.querySelector(`[data-qa="${id}"] ${s}`);
         const out = {};
-        out.calls = [...host.querySelectorAll('.quiz-first-call')].map(e => e.closest('.assignment-card').dataset.qa);
-        const call = $('first1', '.quiz-first-call'); const cs = call && getComputedStyle(call);
+        out.calls = [...host.querySelectorAll('.quiz-first-spark')].map(e => e.closest('.assignment-card').dataset.qa);
+        out.noPill = !host.querySelector('.quiz-first-call');
+        out.metaKids = [...$('first1', '.quiz-mission-meta').children].map(e => e.className.split(' ')[0]);   // the meta row is untouched
+        const call = $('first1', '.quiz-first-spark'); const cs = call && getComputedStyle(call);
+        const cardCs = getComputedStyle(host.querySelector('[data-qa="first1"]')); out.cardAnim = cardCs.animationName; out.cardDur = cardCs.animationDuration;
         out.callText = call && call.textContent; out.callAnim = cs && cs.animationName; out.callIter = cs && cs.animationIterationCount; out.callTitleTh = call && call.dataset.thTitle;
-        out.periods = ['first1', 'first3'].map(id => id + ':' + getComputedStyle($(id, '.quiz-first-call')).animationDuration);   // 65 h → 2 s, 4 h → 0.7 s
-        out.callInMeta = !!$('first1', '.quiz-mission-meta > .quiz-first-call');
+        out.periods = ['first1', 'first3'].map(id => id + ':' + getComputedStyle($(id, '.quiz-first-spark')).animationDuration);   // 65 h → 2 s, 4 h → 0.7 s
+        out.sparkInTitle = !!$('first1', '.assign-info h4 > .quiz-first-spark:first-child');
         out.sides = ['first1', 'first2', 'done1'].map(id => id + ':' + [...($(id, '.quiz-side') || { children: [] }).children].map(x => x.classList.contains('quiz-details-toggle') ? '▾' : x.classList.contains('quiz-mat-box') ? '☁' : (x.tagName === 'BUTTON' ? '🔗' : x.tagName)).join(' '));
         out.summaryDisplay = getComputedStyle($('first1', '.quiz-mission-details > summary')).display;
         const d = $('first1', '.quiz-mission-details'), t = $('first1', '.quiz-details-toggle');
@@ -67,9 +70,11 @@ async function open(browser, reduced) {
     try {
         const { r, errors } = await open(browser, false);
         assert.deepEqual(r.calls, ['first1', 'first3'], 'the call sits on the two nearest-deadline nobody-yet cards only: ' + r.calls);
-        assert.equal(r.callText, '✦ Be the first'); assert.equal(r.callAnim, 'quizCallBlink', 'faint ↔ bright blink'); assert.equal(r.callIter, 'infinite');
+        assert.equal(r.callText, '✦'); assert.equal(r.callAnim, 'quizSparkBreathe', 'the ✦ breathes'); assert.equal(r.callIter, 'infinite');
+        assert.equal(r.cardAnim, 'quizCardGlow', 'the whole card breathes a gold glow'); assert.equal(r.cardDur, '2s', 'card and ✦ share the period');
+        assert.ok(r.noPill, 'no "Be the first" pill any more'); assert.ok(!r.metaKids.some(k => /first/.test(k)), 'nothing added to the meta row: ' + r.metaKids);
         assert.deepEqual(r.periods, ['first1:2s', 'first3:0.7s'], 'the blink quickens as the deadline nears: ' + r.periods);
-        assert.ok(r.callTitleTh && r.callInMeta, 'TH tooltip + it lives in the meta row');
+        assert.ok(r.callTitleTh && r.sparkInTitle, 'TH tooltip on the ✦ + it opens the title');
         assert.deepEqual(r.sides, ['first1:🔗 ☁ ▾', 'first2:🔗 ▾', 'done1:'], 'side column order 🔗 · ☁️ · ▾; a card with nothing to download and no description keeps its bare 🔗 (no column): ' + JSON.stringify(r.sides));
         assert.equal(r.summaryDisplay, 'none', 'the "Details" text line is gone');
         assert.equal(r.closedHidden, true, 'description hidden while closed'); assert.equal(r.ariaBefore, 'false');
@@ -78,7 +83,7 @@ async function open(browser, reduced) {
         assert.ok(r.toggleTitleTh, 'TH tooltip on ▾'); assert.equal(r.toggleSize, '32x32', 'same tile as 🔗 / ☁️: ' + r.toggleSize);
         assert.deepEqual(errors, [], 'no page errors: ' + errors.join(' | '));
         const still = await open(browser, true);
-        assert.equal(still.r.callAnim, 'none', 'Reduce Motion → the call does not animate');
-        console.log('PASS: quiz card — ✦ Be the first (breathing shadow, 2 cards, meta row, TH tooltip, still under Reduce Motion); Details = ▾ under ☁️ / 🔗 (summary hidden, toggles the body, aria-expanded)');
+        assert.equal(still.r.callAnim, 'none', 'Reduce Motion → the ✦ does not animate'); assert.equal(still.r.cardAnim, 'none', 'nor the card');
+        console.log('PASS: quiz card — ✦ before the title + the card breathing gold (2 cards, same height as the rest, TH tooltip, still under Reduce Motion, no pill); Details = ▾ under ☁️ / 🔗 (summary hidden, toggles the body, aria-expanded)');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
