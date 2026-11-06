@@ -64,7 +64,7 @@ const INDEX = require('url').pathToFileURL(path.join(process.cwd(), 'public/inde
                     fold: !!fold, foldColor: fold ? getComputedStyle(fold).backgroundColor : '', foldW: fold ? fold.getBoundingClientRect().width : 0,
                     foldOpacity: fold ? getComputedStyle(fold).opacity : '', star: fold ? getComputedStyle(fold, '::after').content : '',
                     pulse: getComputedStyle(play).animationName, pulseCount: getComputedStyle(play).animationIterationCount,
-                    glow: getComputedStyle(cover).boxShadow,
+                    glow: getComputedStyle(cover).boxShadow, cardGlow: getComputedStyle(c).animationName,   // V101.282: the challenge glow moved from the cover ring to the whole card
                     first: c.classList.contains('quiz-first'), challenge: c.classList.contains('quiz-first-challenge'),
                     title: cover.title, th: cover.dataset.thTitle || '', kr: cover.dataset.krTitle || '', aria: cover.getAttribute('aria-label') || '',
                 };
@@ -94,9 +94,10 @@ const INDEX = require('url').pathToFileURL(path.join(process.cwd(), 'public/inde
             assert.equal(o[id].star, '"★"', id + ': ★ on the gold fold');
             assert.ok(o[id].aria.endsWith('— Be the first to clear this'), id + ': ' + o[id].aria);
         }
-        assert.ok(o.fresh0b.challenge && o.fresh0c.challenge, 'the two nearest deadlines get the gold frame');
-        assert.ok(o.fresh0b.glow.includes('rgb(217, 119, 6) 0px 0px 0px 2px'), '2px solid gold ring: ' + o.fresh0b.glow);
-        assert.ok(!o.fresh0a.challenge && o.fresh0a.glow === 'none', 'third nobody-yet quiz: gold fold + ★ only, no frame');
+        assert.ok(o.fresh0b.challenge && o.fresh0c.challenge, 'the two nearest deadlines are the challenge cards');
+        // V101.282 (owner pick E): no ring on the cover any more — the whole card breathes a gold glow (+ a ✦ before the title)
+        assert.equal(o.fresh0b.glow, 'none', 'no cover ring'); assert.equal(o.fresh0b.cardGlow, 'quizCardGlow', 'the card breathes gold: ' + o.fresh0b.cardGlow);
+        assert.ok(!o.fresh0a.challenge && o.fresh0a.glow === 'none' && o.fresh0a.cardGlow !== 'quizCardGlow', 'third nobody-yet quiz: gold fold + ★ only, no glow');
         assert.ok(!o.fresh1.challenge && !o.requested.challenge);
 
         // Reduce Motion → no pulse
