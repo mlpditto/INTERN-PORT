@@ -3,8 +3,11 @@
 // Advisory only: a failed / slow / missing local AI never blocks Save Score. The score it suggests pre-fills the field only while untouched.
 // V102.423: lean header (the model chip + 🔍 live on the title row, #case-review-ai-head); the findings below; the model ALSO drafts a short reply to the
 // intern (what is missing / what to add) — it only fills the reply box when the admin presses ✨ Draft; nothing is sent or saved by the AI.
+// V102.593 (owner): ONE model rail — the check uses the model picked in the Case Note's "Model" rail (#case-note-ai-model, the same one Translate
+// uses); Ollama is just one vendor there. It never runs by itself: 🔍 beside Translate starts it. A failure is a small ⚠️ (the reason in its tooltip).
 (function () {
-    const MODEL = 'ol/local';
+    const MODEL = () => ((document.getElementById('case-note-ai-model') || {}).value || 'ol/local');
+    const label = (id) => { const b = document.querySelector('#ecn-providers button[data-value="' + id + '"], #ecn-providers [data-model="' + id + '"]'); return (b && (b.getAttribute('aria-label') || b.textContent || '').trim()) || id; };
     const SCORES = [0.1, 0.2, 0.5];
     let run = 0;
     let abort = null;
@@ -64,12 +67,14 @@
         if (input && !input.dataset.crTouched && (!input.value || Number(input.value) === 0) && typeof setCaseReviewScoreValue === 'function') setCaseReviewScoreValue(s);
     }
 
-    // the title-row chip: running → "● Ollama · local · checking…"; otherwise "Ollama · local" + 🔍 (run again)
-    function head(state) {
+    // 🔍 only (the model is the rail's); running = 🔍 spins; a failure = ⚠️ beside it with the reason as its tooltip
+    function head(state, why) {
         const h = headEl();
+        const m = label(MODEL());
         const html = state === 'run'
-            ? '<span class="crai-model" title="Local model — nothing leaves this computer"><span class="crai-dot"></span>Ollama · local · checking…</span>'
-            : '<span class="crai-model" title="Local model — nothing leaves this computer">Ollama · local</span><button type="button" class="dca-ai-review-btn" id="case-review-ai-btn" title="AI Review" aria-label="AI Review">🔍</button>';
+            ? '<button type="button" class="dca-ai-review-btn crai-run" id="case-review-ai-btn" disabled title="Checking with ' + esc(m) + '…" aria-label="AI check running">🔍</button>'
+            : '<button type="button" class="dca-ai-review-btn" id="case-review-ai-btn" title="AI check with ' + esc(m) + ' (the model in the rail)" aria-label="AI check">🔍</button>'
+              + (state === 'err' ? '<span class="crai-warn" title="' + esc(why || 'The AI check failed') + ' — press 🔍 to try again" aria-label="AI check failed">⚠️</span>' : '');
         if (h) h.innerHTML = html;
         return '';
     }
@@ -90,18 +95,18 @@
         const note = String((caseItem && caseItem.note) || '').trim();
         const btnHook = () => { const b = document.getElementById('case-review-ai-btn'); if (b) b.onclick = () => start(caseItem); };
         el.hidden = false;
-        if (note.length < 10) { head('idle'); el.innerHTML = '<div class="crai-msg">Note สั้นเกินไป</div>'; btnHook(); return; }
+        if (note.length < 10) { head('err', 'Note สั้นเกินไป · the note is too short'); el.hidden = true; btnHook(); return; }
         head('run'); el.innerHTML = '';
         try {
-            const r = await window.callUniversalAI(MODEL, buildPrompt(caseItem), true, null, '', { feature: 'case_review_ai', temperature: 0.2, maxTokens: 800, signal: abort.signal });
+            const r = await window.callUniversalAI(MODEL(), buildPrompt(caseItem), true, null, '', { feature: 'case_review_ai', temperature: 0.2, maxTokens: 800, signal: abort.signal });
             if (mine !== run) return;
             const d = parse(r && r.text);
-            if (!d || typeof d !== 'object') throw new Error('The local model did not return JSON.');
+            if (!d || typeof d !== 'object') throw new Error('The model did not return JSON.');
             head('idle'); el.innerHTML = '<div class="crai-finds">' + render(d) + '</div>';
             applyScore(d); replyDraft(d);
         } catch (e) {
             if (mine !== run || (e && e.reviewCancelled)) return;
-            head('idle'); el.innerHTML = `<div class="crai-msg" title="${esc((e && e.message) || '')}">Local AI ใช้ไม่ได้ — กด 🔍 เพื่อลองใหม่</div>`;
+            head('err', (e && e.message) || ''); el.hidden = true; el.innerHTML = '';
         }
         btnHook();
     }
@@ -132,5 +137,12 @@
     document.addEventListener('input', (e) => { if (e.target && e.target.id === 'case-review-score-input') e.target.dataset.crTouched = '1'; });
     document.addEventListener('click', (e) => { if (e.target && e.target.closest && e.target.closest('#caseReviewScoreModal .case-score-chip')) { const i = document.getElementById('case-review-score-input'); if (i) i.dataset.crTouched = '1'; } });
 
-    window.caseReviewAi = { start, hide, buildPrompt, render, useDraft };
+    // the sheet / modal opens: only the 🔍 is drawn, nothing runs until it is pressed
+    function prime(caseItem) {
+        hide();
+        head('idle');
+        const b = document.getElementById('case-review-ai-btn'); if (b) b.onclick = () => start(caseItem);
+    }
+
+    window.caseReviewAi = { start, prime, hide, buildPrompt, render, useDraft };
 })();

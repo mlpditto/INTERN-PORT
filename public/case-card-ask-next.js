@@ -68,17 +68,21 @@
     }
 
     // ---------- the prompt section (5+6, English) ----------
+    // V102.597: a row with no English never reaches the card (a blank ＋🚩 row printed "→ Refer now" as a bullet)
+    function filled() {
+        return { flags: data.flags.filter(function (f) { return f.en; }), ask: data.ask.filter(function (q) { return q.en; }), pins: data.pins.filter(function (p) { return p.en; }), advice: data.advice };
+    }
     function promptBlock() {
         var where = { stomach: 'the stomach', gut: 'the intestines', pelvis: 'the lower belly / pelvis', chest: 'the chest', head: 'the head', throat: 'the throat', eye: 'the eyes', skin: 'the skin', urinary: 'the bladder', joint: 'a joint', medicine: 'the medicine icon' };
-        var L = ['', '', MARK + ' (keep everything else as described above) ###'];
-        if (data.pins.length) {
+        var d = filled(), L = ['', '', MARK + ' (keep everything else as described above) ###'];
+        if (d.pins.length) {
             L.push('1. Put small numbered "?" pins on the body figure, each with a short label bubble (use exactly these words):');
-            data.pins.forEach(function (p, i) { if (p.en) L.push('   ' + (i + 1) + '. at ' + (where[p.area] || p.area) + ': "' + p.en + '"'); });
+            d.pins.forEach(function (p, i) { L.push('   ' + (i + 1) + '. at ' + (where[p.area] || p.area) + ': "' + p.en + '"'); });
         }
-        if (data.flags.length || data.ask.length) {
-            L.push((data.pins.length ? '2' : '1') + '. Replace the Recommendations section with two boxes side by side (use exactly these words):');
-            if (data.flags.length) L.push('   left box, red, titled "Refer if": ' + data.flags.map(function (f) { return '"' + f.en + (f.thenEn ? ' → ' + f.thenEn : '') + '"'; }).join('; '));
-            if (data.ask.length) L.push('   right box, white, titled "Ask next", each with an empty checkbox: ' + data.ask.map(function (q) { return '"' + q.en + '"'; }).join('; '));
+        if (d.flags.length || d.ask.length) {
+            L.push((d.pins.length ? '2' : '1') + '. Replace the Recommendations section with two boxes side by side (use exactly these words):');
+            if (d.flags.length) L.push('   left box, red, titled "Refer if": ' + d.flags.map(function (f) { return '"' + f.en + (f.thenEn ? ' → ' + f.thenEn : '') + '"'; }).join('; '));
+            if (d.ask.length) L.push('   right box, white, titled "Ask next", each with an empty checkbox: ' + d.ask.map(function (q) { return '"' + q.en + '"'; }).join('; '));
             if (data.advice.en) L.push('   and one small line under the two boxes: "Advice: ' + data.advice.en + '"');
         }
         L.push('Keep these short; no patient names, IDs or dates.');
@@ -144,7 +148,7 @@
             + '<button type="button" class="cs-ask-draft" title="Draft the list from the anonymized summary with the model on the left">❓ Draft</button><span class="cs-ask-st" role="status"></span></div>'
             + '<div class="cs-ask-list"></div>'
             + '<div class="cs-ask-add" hidden><button type="button" data-add="flag" title="Add a red flag">＋🚩</button><button type="button" data-add="ask" title="Add a question">＋❓</button><button type="button" data-add="pin" title="Add a body pin">＋📍</button></div>'
-            + '<label class="cs-ask-oncard" hidden title="Adds ❓ pins on the body and the Refer if · Ask next band to the image prompt (English; not in HTML mode)"><input type="checkbox" data-oncard> On the card (5+6, English)</label>';
+            + '<label class="cs-ask-oncard" hidden title="Adds ❓ pins on the body and the Refer if · Ask next band to the image prompt (English; not in HTML mode)"><input type="checkbox" data-oncard> Show on the card: ❓ pins + Refer if · Ask next (English)</label>';
         anchor.after(fold);
         list = fold.querySelector('.cs-ask-list'); statusEl = fold.querySelector('.cs-ask-st'); peek = fold.querySelector('.cs-peek');
         if (window.bindRegistryModelInput) window.bindRegistryModelInput('cs-ask-model', 'ai_case_ask_model');
@@ -182,6 +186,10 @@
         return paintPage(w, h, sub, 1).canvas;
     }
     function paintPage(w, h, sub, k) {
+        var all = data; data = { flags: all.flags.filter(function (f) { return f.th || f.en; }), ask: all.ask.filter(function (q) { return q.th || q.en; }), pins: all.pins, advice: all.advice, onCard: all.onCard };
+        try { return paintPageInner(w, h, sub, k); } finally { data = all; }
+    }
+    function paintPageInner(w, h, sub, k) {
         var c = document.createElement('canvas'); c.width = w; c.height = h;
         var g = c.getContext('2d'), s = w / 1080 * k, F = '"Sarabun","Noto Sans Thai","Leelawadee UI",Tahoma,sans-serif', pad = 44 * s;
         g.fillStyle = '#fffaf2'; g.fillRect(0, 0, w, h);
