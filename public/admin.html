@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.602)</title>
+    <title>Nika Admin (V102.603)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -4949,7 +4949,7 @@
         #groupSelectModal .gs-lang-flag img.emoji { width:15px; height:15px; }
         /* V102.602: 💬 quiz feedback — a chip in the header (count · red dot = a report that still needs a fix); tap = the feedback pane
            replaces the profile cards (owner pick B, mockups/user-hub-feedback.html) */
-        #groupSelectModal .gs-fbchip { display:inline-flex; align-items:center; gap:4px; width:auto; min-height:0; height:26px; margin:0; padding:0 9px; border-radius:999px; font:inherit; font-size:12px; font-weight:800; cursor:pointer; background:#fefce8; color:#92400e; border:1px solid #fde68a; white-space:nowrap; }
+        #groupSelectModal .gs-fbchip { display:inline-flex; align-items:center; gap:3px; width:auto; min-height:0; height:26px; margin:0; padding:0 7px; border-radius:999px; font:inherit; font-size:12px; font-weight:800; cursor:pointer; background:#fefce8; color:#92400e; border:1px solid #fde68a; white-space:nowrap; }
         #groupSelectModal .gs-fbchip[aria-expanded="true"] { background:#1e293b; color:#fff; border-color:#1e293b; }
         #groupSelectModal .gs-fbchip.zero { background:#f8fafc; color:#94a3b8; border-color:#e2e8f0; }
         #groupSelectModal .gs-fbchip .gs-fb-dot { width:7px; height:7px; border-radius:50%; background:#ef4444; }
@@ -5100,7 +5100,7 @@
            (icon · value · copy), not a frame inside a frame; on a narrow screen they wrap under the name while EN/TH,
            points, Beri and × stay on the first line. */
         #groupSelectModal .gs-header { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin-bottom:10px; min-width:0; }
-        #groupSelectModal .gs-header-person { display:flex; align-items:center; gap:8px; min-width:0; flex:0 1 auto; }
+        #groupSelectModal .gs-header-person { display:flex; align-items:center; gap:8px; min-width:0; flex:1 1 0; }   /* V102.603: basis 0 — the name's ellipsis absorbs a narrow modal, × stays on the first line (was 0 1 auto: never shrank, wrapped instead) */
         #groupSelectModal #gs-hub-pic { width:36px; height:36px; border-radius:50%; object-fit:cover; flex-shrink:0; }
         /* V102.197: the photo is a button — a grey photo + 🙈 means the user is in Camp (hidden from boards); the menu flips it */
         #groupSelectModal .gs-pic-wrap { position:relative; flex-shrink:0; }
@@ -41729,7 +41729,8 @@ They can connect again from LINE.
         // already makes). Data: quiz_feedback where userId == uid (the index the Learning Path uses), read
         // once per hub open; quiz_attempts only when the pane opens (for "gave feedback on n/N").
         // ===================================================================
-        var _gsFb = { uid: null, list: null, attempts: null, filter: 'all', q: '' };
+        var _gsFb = { uid: null, list: null, attempts: null, filter: 'all', q: '', error: '' };
+        const gsFbMs = ts => (ts && typeof ts.toDate === 'function') ? ts.toDate().getTime() : 0;
         const GS_FB_FILTERS = [
             ['all', () => true, () => gsText('All', 'ทั้งหมด'), 'n'],
             ['low', f => f.rating != null && f.rating <= 5, () => '⭐ ≤ 5', 'part'],
@@ -41738,7 +41739,7 @@ They can connect again from LINE.
             ['want', f => !!(f.nextTopic || '').trim() || !!(f.triage && f.triage.category === 'request'), () => '💡', 'n']
         ];
         function gsFbReset(uid) {
-            _gsFb = { uid, list: null, attempts: null, filter: 'all', q: '' };
+            _gsFb = { uid, list: null, attempts: null, filter: 'all', q: '', error: '' };
             const pane = document.getElementById('gs-pane-feedback'), chip = document.getElementById('gs-fb-chip'), prof = document.getElementById('gs-pane-profile');
             if (pane) pane.hidden = true;
             if (prof) prof.hidden = false;
@@ -41746,10 +41747,13 @@ They can connect again from LINE.
         }
         async function gsFbLoad(uid) {
             try {
-                const snap = await db.collection('quiz_feedback').where('userId', '==', uid).orderBy('timestamp', 'desc').limit(200).get();
+                // V102.603: equality only — `where userId == … orderBy timestamp` needs a composite index (userId, timestamp)
+                // the live project does not have (quizId + timestamp exists, userId + timestamp does not), so the read failed and
+                // the chip said 0 for everyone. Sorted here instead; an intern's own feedback is a small set.
+                const snap = await db.collection('quiz_feedback').where('userId', '==', uid).get();
                 if (_gsFb.uid !== uid) return;   // the hub moved on to another intern
-                _gsFb.list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            } catch (e) { console.warn('[hub-feedback] load failed:', e && e.message); if (_gsFb.uid !== uid) return; _gsFb.list = []; }
+                _gsFb.list = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => gsFbMs(b.timestamp) - gsFbMs(a.timestamp));
+            } catch (e) { console.warn('[hub-feedback] load failed:', e && e.message); if (_gsFb.uid !== uid) return; _gsFb.list = []; _gsFb.error = (e && e.message) || 'load failed'; }   // V102.603: say so, never a silent 0
             if (typeof fbLoadIssues === 'function') { try { await fbLoadIssues(); } catch (_) {} }   // issue states decide the red dot
             if (_gsFb.uid !== uid) return;
             gsFbPaintChip();
@@ -41760,10 +41764,10 @@ They can connect again from LINE.
         function gsFbPaintChip() {
             const chip = document.getElementById('gs-fb-chip'), list = _gsFb.list;
             if (!chip || !list) return;
-            document.getElementById('gs-fb-n').textContent = list.length;
+            document.getElementById('gs-fb-n').textContent = _gsFb.error ? '!' : list.length;
             document.getElementById('gs-fb-dot').hidden = !list.some(gsFbNeedsFix);
-            chip.classList.toggle('zero', !list.length);
-            chip.title = (list.length ? list.length + ' ' : '') + gsText('quiz feedback from this intern — tap to read', 'ผลตอบรับควิซของคนนี้ — แตะเพื่อดู');
+            chip.classList.toggle('zero', !list.length && !_gsFb.error);
+            chip.title = _gsFb.error ? gsText('Could not load the feedback', 'โหลดผลตอบรับไม่ได้') + ' · ' + _gsFb.error : (list.length ? list.length + ' ' : '') + gsText('quiz feedback from this intern — tap to read', 'ผลตอบรับควิซของคนนี้ — แตะเพื่อดู');
             chip.hidden = false;
         }
         function gsFbToggle(open) {
@@ -41805,7 +41809,7 @@ They can connect again from LINE.
         }
         function gsFbPaintRows() {
             const rows = document.getElementById('gs-fb-rows'), items = gsFbFiltered();
-            if (!items.length) { rows.innerHTML = `<div class="fbp-empty">${(_gsFb.list || []).length ? gsText('Nothing matches', 'ไม่มีรายการที่ตรง') : gsText('No feedback from this intern yet', 'ยังไม่มีผลตอบรับจากคนนี้')}</div>`; return; }
+            if (!items.length) { rows.innerHTML = `<div class="fbp-empty">${_gsFb.error ? '⚠️ ' + gsText('Could not load the feedback', 'โหลดผลตอบรับไม่ได้') + ' · ' + escapeHtml(_gsFb.error) : (_gsFb.list || []).length ? gsText('Nothing matches', 'ไม่มีรายการที่ตรง') : gsText('No feedback from this intern yet', 'ยังไม่มีผลตอบรับจากคนนี้')}</div>`; return; }
             rows.innerHTML = items.map(f => {
                 const t = f.triage || {}, ico = FB_TRIAGE_ICON[t.category] ? FB_TRIAGE_ICON[t.category][0] : '·';
                 const star = f.rating == null ? '<span class="fbp-star none">—</span>' : `<span class="fbp-star${f.rating <= 5 ? ' low' : ''}">⭐ ${f.rating}</span>`;

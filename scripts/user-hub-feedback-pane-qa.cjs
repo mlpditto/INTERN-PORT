@@ -18,7 +18,7 @@ const triageJs = slice('        const FB_TRIAGE_ICON = {', '        const FB_FRE
 const styles = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1]).join('\n');
 
 // --- static
-assert.match(html, /<title>Nika Admin \(V102\.602\)<\/title>/);
+assert.match(html, /<title>Nika Admin \(V\d+\.\d+\)<\/title>/);
 assert.ok(header.indexOf('id="gs-fb-chip"') > header.indexOf('gs-bal-beri') && header.indexOf('id="gs-fb-chip"') < header.indexOf('gs-header-close'), 'the 💬 chip sits after Beri, before ×');
 assert.match(header, /<span class="gs-lang-flag" aria-hidden="true">🇺🇸<\/span><span data-gs-lang="en" aria-pressed="true">EN<\/span><span data-gs-lang="th" aria-pressed="false">TH<\/span>/, 'flag + both codes (CSS shows the pressed one)');
 assert.match(html, /gsFbReset\(uid\); gsFbLoad\(uid\);/, 'setUserGroup resets + loads');
@@ -55,7 +55,7 @@ async function open(browser, { twemoji = true } = {}) {
         window.attemptsFx = { U1: ['approved', 'approved', 'pending', 'graded', 'completed', 'started', 'allowed', 'approved', 'approved'], U2: [] };
         window.queries = []; window.panelCalls = []; window.pending = null;
         const result = docs => ({ docs: docs.map((d, i) => ({ id: 'd' + i, data: () => d })) });
-        window.db = { collection: c => { const q = { where: () => q, orderBy: () => q, limit: () => q, get: () => { queries.push(c); if (c === 'quiz_feedback') { if (window.failNext) { window.failNext = false; return Promise.reject(new Error('offline')); } return window.pending ? window.pending : Promise.resolve(result(fixtures[window.curUid] || [])); } return Promise.resolve(result((attemptsFx[window.curUid] || []).map(s => ({ status: s })))); } }; return q; } };
+        window.chain = []; window.db = { collection: c => { const q = { where: (...a) => { chain.push(['where', ...a]); return q; }, orderBy: (...a) => { chain.push(['orderBy', ...a]); return q; }, limit: (...a) => { chain.push(['limit', ...a]); return q; }, get: () => { queries.push(c); if (c === 'quiz_feedback') { if (window.failNext) { window.failNext = false; return Promise.reject(new Error('offline')); } return window.pending ? window.pending : Promise.resolve(result((fixtures[window.curUid] || []).slice().reverse())); } return Promise.resolve(result((attemptsFx[window.curUid] || []).map(s => ({ status: s })))); } }; return q; } };
         window.showQuizFeedbackPanel = (quizId, uid) => { panelCalls.push([quizId, uid]); };
         if (tw) window.twemoji = { parse: el => { el.innerHTML = '<img class="emoji" alt="' + el.textContent + '" src="data:image/svg+xml,">'; } };
     }, [page_html, twemoji]);
@@ -79,6 +79,7 @@ const texts = (page, sel) => page.locator(sel).evaluateAll(es => es.map(e => e.t
         assert.equal(await vis(page, '#gs-fb-dot'), true, 'red dot: one report still needs a fix');
         assert.equal(await page.locator('#gs-fb-chip').evaluate(e => e.classList.contains('zero')), false);
         assert.deepEqual(await page.evaluate(() => queries), ['quiz_feedback'], 'only the feedback read on open (attempts wait for the pane)');
+        assert.deepEqual(await page.evaluate(() => chain), [['where', 'userId', '==', 'U1']], 'V102.603: equality only — no orderBy / limit (needs a composite index the live project lacks); sorted client-side');
         // one header line: the chip sits level with ×
         const top = sel => page.locator(sel).evaluate(e => e.getBoundingClientRect().top);
         assert.ok(Math.abs(await top('#gs-fb-chip') - await top('.gs-header-close')) < 12, 'chip on the header line');
@@ -101,7 +102,9 @@ const texts = (page, sel) => page.locator(sel).evaluateAll(es => es.map(e => e.t
         assert.equal(await page.locator('.fbp-row').nth(1).locator('.fbp-t').innerText(), '💡 Pediatric dosing');
         assert.equal(await page.locator('.fbp-row').nth(4).locator('.fbp-star').innerText(), '—', 'no stars given');
         assert.equal(await page.locator('.fbp-row').nth(5).locator('.fbp-c').innerText(), '👍 no comment', 'a high mark with nothing written');
-        assert.equal(await page.locator('.fbp-row').nth(2).locator('.fbp-c i').count(), 0, 'topic only: no empty quote');
+        assert.equal(await page.locator('.fbp-row').nth(3).locator('.fbp-c i').count(), 0, 'topic only: no empty quote');
+        // V102.603: newest first by timestamp, sorted in the page (the read itself is unordered — the stub hands the docs back reversed)
+        assert.deepEqual(await texts(page, '.fbp-row .fbp-q'), ['❌ Eye for all-2', 'Retail-2', '🧗 BILASTINE Orodispersible Tab', 'Contraceptive Knowledge', '💡 Allergic Rhinitis-2', 'Retail-2']);
         // summary: bars for the rated ones in the last 30 days, avg time over the timed ones, given/attempted once the attempts land
         await page.waitForFunction(() => getFb().attempts === 7);
         const sum = (await page.locator('#gs-fb-sum').innerText()).replace(/\s+/g, ' ');
@@ -171,10 +174,23 @@ const texts = (page, sel) => page.locator(sel).evaluateAll(es => es.map(e => e.t
         await page.waitForTimeout(30);
         assert.equal(await page.locator('#gs-fb-n').innerText(), '0', 'late U1 data never paints over U2');
 
-        // a failed read: chip shows 0, no error thrown
+        // a failed read: the chip says ! with the reason, the pane says so too — never a silent 0 (V102.603)
         await page.evaluate(() => { window.curUid = 'U3'; window.failNext = true; gsFbReset('U3'); });
         await page.evaluate(() => gsFbLoad('U3'));
-        assert.equal(await page.locator('#gs-fb-n').innerText(), '0');
+        assert.equal(await page.locator('#gs-fb-n').innerText(), '!');
+        assert.match(await page.locator('#gs-fb-chip').getAttribute('title'), /Could not load the feedback · offline/);
+        assert.equal(await page.locator('#gs-fb-chip').evaluate(e => e.classList.contains('zero')), false);
+        await page.locator('#gs-fb-chip').click();
+        assert.equal(await page.locator('.fbp-empty').innerText(), '⚠️ Could not load the feedback · offline');
+        await page.locator('.fbp-back').click();
+
+        // V102.603: a ~700px modal keeps × and the chip on the header line — the name shrinks instead of the row wrapping
+        await page.setViewportSize({ width: 720, height: 900 });
+        await page.evaluate(() => { window.curUid = 'U1'; gsFbReset('U1'); document.getElementById('gs-title-name').textContent = 'NATT OFFICIAL WITH A LONG NAME'; });
+        await page.evaluate(() => gsFbLoad('U1'));
+        assert.ok(Math.abs(await top('#gs-fb-chip') - await top('.gs-header-close')) < 12, '720px: chip level with ×');
+        assert.ok(Math.abs(await top('.gs-header-person') - await top('.gs-header-close')) < 12, '720px: × on the name line');
+        assert.ok(await page.locator('#gs-title-name').evaluate(e => e.scrollWidth > e.clientWidth || e.clientWidth < 260), 'the name absorbs the width');
 
         assert.deepEqual(errors, [], 'no page errors');
         console.log('user-hub-feedback-pane-qa: ok');
