@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.595)</title>
+    <title>Nika Admin (V102.597)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -8617,6 +8617,7 @@
     <link rel="stylesheet" href="case-split-studio.css?v=V102.594">
     <script src="case-studio-steps.js?v=V102.592" defer></script>
     <script src="case-card-ask-next.js?v=V102.594" defer></script>
+    <script src="case-studio-tour.js?v=V102.597" defer></script>
     <script src="quiz-term-ai.js?v=V102.405" defer></script>
     <link rel="stylesheet" href="reflection-compact.css?v=V101.83">
     <script src="reflection-compact.js?v=V99.68"></script>
@@ -46026,11 +46027,12 @@ They can connect again from LINE.
                     costPill.insertAdjacentHTML('beforeend', ' · <span class="cc-gen-cost" style="font-variant-numeric:tabular-nums">$' + String(Number(imgCost.toFixed(3))) + '</span>');
                     costPill.title = 'Real cost of this image: $' + imgCost.toFixed(4);
                 }
-                if (imageMetaEl) imageMetaEl.textContent = `Generated with ${model || selectedModel}${compositedNote}`;
+                // V102.597 (owner): the picked chip already names the model — the line keeps only what is new; the model rides the tooltip
+                if (imageMetaEl) { imageMetaEl.textContent = compositedNote.replace(/^ · /, ''); imageMetaEl.title = `Generated with ${model || selectedModel}${compositedNote}`; }
                 // V102.426: every card is kept in the Codex Gallery at once (a failed upload only says so — the image + PNG are unaffected)
                 if (typeof saveCaseCardToGallery === 'function') {
                     saveCaseCardToGallery(caseDocId, caseItem, stampedUrl, model || selectedModel, getCaseCardLayout()).then(ok => {
-                        if (imageMetaEl) imageMetaEl.textContent += ok ? ' · saved to gallery ✓' : ' · gallery save failed';
+                        if (imageMetaEl) imageMetaEl.textContent = [imageMetaEl.textContent, ok ? 'saved to gallery ✓' : 'gallery save failed'].filter(Boolean).join(' · ');
                     });
                 }
                 // V92.42: removed redundant "Generated image is ready" footer line —

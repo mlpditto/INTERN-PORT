@@ -55,6 +55,12 @@ const DRAFT = {
         let p = await page.evaluate(() => document.getElementById('alabasta-case-card-prompt').value);
         assert.ok(p.startsWith('BASE PROMPT') && p.includes('### ASK NEXT ON THE CARD') && p.includes('at the stomach: "Where exactly? Cramping?"') && p.includes('titled "Refer if"') && p.includes('"Severe pain not easing? → Refer now"') && p.includes('titled "Ask next"') && p.includes('"Advice: Soft food'), 'pins + the Refer if / Ask next band, in English');
         assert.ok(!/[฀-๿]/.test(p.slice(p.indexOf('### ASK NEXT'))), 'no Thai in the image prompt (the AI garbles it)');
+        // V102.597: a blank ＋🚩 row never reaches the card (it printed "→ Refer now" as a bullet)
+        await page.click('.cs-ask-add [data-add=flag]');
+        p = await page.evaluate(() => document.getElementById('alabasta-case-card-prompt').value);
+        assert.ok(!p.includes('"" ') && !p.includes('"→') && p.split('→ Refer now').length === 2, 'the blank red flag is left out of the prompt');
+        await page.click('.cs-ask-row[data-k=flag][data-i="2"] [data-x]');
+        assert.ok((await page.$eval('.cs-ask-oncard', l => l.textContent)).includes('Show on the card: ❓ pins + Refer if · Ask next (English)'), 'the tick says what it does (no "5+6")');
         // edit a row → prompt follows; untick → section gone (only one copy ever)
         await page.fill('.cs-ask-row[data-k=ask][data-i="0"] input[data-f=en]', 'Pain started when?');
         p = await page.evaluate(() => document.getElementById('alabasta-case-card-prompt').value);
