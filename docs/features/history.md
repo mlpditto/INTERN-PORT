@@ -11,6 +11,7 @@ Intern: home ▸ History accordion (desktop: right rail with flood + news cards)
 - `history-header-qa` — accordion titled History, totals in the header even when folded
 - `history-header-clip-qa` — the last totals pill is not clipped by overflow:hidden
 - `history-lean-qa` — rows via history-lean.js in a vm (no browser)
+- `history-lean-qa` also pins V101.280: a graded standard quiz without feedback shows an amber **💬 No feedback yet ยังไม่ได้ให้ feedback** pill in its actions (opens the feedback sheet); gone once `feedbackGiven` is set. The icon-only 💬 circle was not understood as "you still owe feedback".
 - `history-consistency-qa` — date / bucket / status pills follow the UI language (EN TH KR)
 - `history-reflective-detail-qa` — a Reflective Log card shows the text and the mentor comment
 - `history-delete-menu-qa` — 🗑 ▸ Request delete form is not clipped near the bottom

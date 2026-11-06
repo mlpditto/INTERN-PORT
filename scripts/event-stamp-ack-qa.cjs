@@ -57,10 +57,16 @@ const STAMPS = [{ id: 'ev1_U1', title: 'Halloween', eventDate: '2026-10-31', bad
         await ctx.close();
         // admin preview: shows, CONTINUE closes, but never writes the intern's doc
         const p2 = await open(browser);
-        const pv = await p2.page.evaluate(stamps => { isPreview = true; userId = 'U1'; window.myUserDoc = null; myEventStamps = stamps; evStampsQueueNew(); return document.getElementById('achievementUnlockModal').style.display; }, STAMPS);
-        assert.equal(pv, 'flex', 'preview still shows it');
+        // V101.280: the preview waits for the intern's own doc like the app does (it used to skip the wait, so every preview
+        // re-showed stamps already acknowledged on the phone), shows only the rest; CONTINUE closes it but never writes the doc
+        const pv0 = await p2.page.evaluate(stamps => { isPreview = true; userId = 'U1'; window.myUserDoc = null; myEventStamps = stamps; evStampsQueueNew(); return { shown: document.getElementById('achievementUnlockModal').style.display, waits: evStampsWaits }; }, STAMPS);
+        assert.notEqual(pv0.shown, 'flex', 'preview no longer pops before the own doc is in'); assert.ok(pv0.waits >= 1, 'it waits for it');
+        const pv = await p2.page.evaluate(() => { window.myUserDoc = { id: 'U1', eventStampsSeen: ['ev1_U1'] }; evStampsQueueNew(); return { shown: document.getElementById('achievementUnlockModal').style.display, title: document.getElementById('ach-unlock-title').textContent }; });
+        assert.equal(pv.shown, 'flex', 'preview shows the stamp not yet acknowledged'); assert.equal(pv.title, 'Pharma Day', 'the one acknowledged on the phone stays quiet in the preview too');
         await p2.page.click('#achievementUnlockModal button:has-text("CONTINUE")');
         assert.equal(await p2.page.evaluate(() => window.__writes.length), 0, 'an admin preview never writes the intern\'s doc');
+        await p2.page.evaluate(() => { evStampsQueued.clear(); evStampsQueueNew(); });
+        assert.equal(await p2.page.evaluate(() => document.getElementById('achievementUnlockModal').style.display), 'none', 'this device remembers the preview\'s CONTINUE');
         await p2.ctx.close();
         assert.deepEqual(errors.filter(e => /stamp/i.test(e)), [], 'no errors');
         console.log('PASS: Event Stamp — CONTINUE = acknowledged for good (users.eventStampsSeen arrayUnion + this device), acknowledged elsewhere = not shown, nothing marked before CONTINUE, no double queue, preview never writes');

@@ -1,4 +1,5 @@
 /* Work ▸ History — lean timeline (V101.55). Renders the header summary, the chip rail and the rows.
+   V101.280: a quiz without feedback says so — the 💬 is a labelled amber pill ("No feedback yet"), not an icon-only circle.
    State, filters and data stay in index.html (getFilteredUnifiedItems, unifiedCurrentFilter, …). */
 window.historyLean = (() => {
     const T = {
@@ -143,7 +144,7 @@ window.historyLean = (() => {
                 const t = Number(s.score) > 0 ? 'View answers' : 'Review mistakes';
                 a += '<button type="button" class="hl-ib hl-p" onclick="viewQuizAnswers(\'' + esc(s.quizId) + '\')" title="' + t + '" aria-label="' + t + '">📊</button>';
                 const fq = ctx.quizzes.get(s.quizId);
-                if (!m.feedbackGiven && fq && (fq.quizType === 'standard' || !fq.quizType)) a += '<button type="button" class="hl-ib" onclick="openFeedbackForPastAttempt(\'' + esc(s.quizId) + '\')" title="Give feedback" aria-label="Give feedback">💬</button>';
+                if (!m.feedbackGiven && fq && (fq.quizType === 'standard' || !fq.quizType)) a += '<button type="button" class="hl-ib hl-fb" onclick="openFeedbackForPastAttempt(\'' + esc(s.quizId) + '\')" title="You have not given feedback on this quiz yet — tap to give it · ยังไม่ได้ให้ feedback ควิซนี้" aria-label="No feedback yet — give feedback">💬 <span>No feedback yet <i>ยังไม่ได้ให้ feedback</i></span></button>';   // V101.280: say it, not just an icon
             }
             a += matHtml(ctx, s, true);
         } else if (s.submissionType === 'explore_link' || s.submissionType === 'work' || s.submissionType === 'content_review') {
