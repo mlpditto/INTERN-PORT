@@ -9,15 +9,16 @@ async function open(browser, opts = {}) {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: opts.reduced ? 'reduce' : 'no-preference' });
     const page = await ctx.newPage();
     const errors = []; page.on('pageerror', e => errors.push(e.message));
-    await page.addInitScript(() => {
+    await page.addInitScript((webkit) => {
         window.__calls = []; window.__opened = 0;
-        window.Audio = function (src) { this.src = src; this.paused = true; this.play = () => { this.paused = false; window.__calls.push('play'); return Promise.resolve(); }; this.pause = () => { this.paused = true; window.__calls.push('pause'); }; };
+        // webkit: like iPhone / LINE on it — a finger's touchstart / pointerdown may not start sound, only touchend / click may
+        window.Audio = function (src) { this.src = src; this.paused = true; this.play = () => { const t = window.event && window.event.type; if (webkit && /touchstart|pointerdown/.test(t)) { window.__calls.push('refused'); return Promise.reject(new Error('NotAllowedError')); } this.paused = false; window.__calls.push('play'); return Promise.resolve(); }; this.pause = () => { this.paused = true; window.__calls.push('pause'); }; };
         window.liff = { isInClient: () => true, openWindow: () => { window.__opened++; }, init: () => new Promise(() => {}), isLoggedIn: () => false, getProfile: () => new Promise(() => {}) };
         const any = new Proxy(function () {}, { get: (t, k) => k === 'then' ? undefined : any, apply: () => any });
         const q = () => ({ where: q, orderBy: q, limit: q, get: async () => ({ docs: [], size: 0, empty: true, forEach() {} }), onSnapshot: () => () => {}, doc: () => ({ get: async () => ({ exists: false, data: () => null }), onSnapshot: () => () => {}, set: async () => {}, update: async () => {}, collection: q }) });
         const db = { collection: q, batch: () => ({ set() {}, update() {}, commit: async () => {} }), runTransaction: async () => {}, enablePersistence: async () => {}, settings() {} };
         window.firebase = new Proxy(function () {}, { get: (t, k) => { if (k === 'firestore') { const f = () => db; f.FieldValue = any; f.Timestamp = any; return f; } return k === 'then' ? undefined : any; }, apply: () => any });
-    });
+    }, !!opts.webkit);
     await page.route('**/*', r => (r.request().url().startsWith('file:') ? r.continue() : r.abort()));
     await page.goto(INDEX, { waitUntil: 'load' });
     await page.waitForTimeout(600);
@@ -76,6 +77,12 @@ async function open(browser, opts = {}) {
         assert.equal(await page.locator('.xm-snow').count(), 0); assert.equal(await page.evaluate(() => window.__calls.slice(-1)[0]), 'pause', 'theme off = music off');
         assert.deepEqual(errors.filter(e => /christmas|xm/i.test(e)), [], 'no errors from christmas.js');
         await ctx.close();
+        // V101.283: iPhone — the first tap's touchstart is refused, its touchend starts the music (one tap is enough)
+        const w = await open(browser, { webkit: true });
+        await w.page.evaluate(() => applySeasonTheme('xm')); await w.page.waitForTimeout(100);
+        await w.page.tap('#main-app'); await w.page.waitForTimeout(150);
+        assert.equal(await w.page.evaluate(() => window.xmMusic.isOn()), true, 'music starts on the first tap on iPhone: ' + JSON.stringify(await w.page.evaluate(() => window.__calls)));
+        await w.ctx.close();
         // reduced motion: no snow
         const r = await open(browser, { reduced: true });
         await r.page.evaluate(() => applySeasonTheme('xm')); await r.page.waitForTimeout(100);

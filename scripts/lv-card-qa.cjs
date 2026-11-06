@@ -57,6 +57,12 @@ const card = page => page.evaluate(() => { const c = document.getElementById('se
         assert.equal(new Set(looks.map(l => l.chip)).size, 10, 'ten different LV text colours: ' + looks.map(l => l.chip).join(' | '));
         assert.equal(new Set(looks.slice(0, 9).map(l => l.edge)).size, 9, 'nine different edge colours (LV.10 is the rainbow rim)');
         assert.equal(looks[9].title, 'LV.10 Captain', 'max level: no "pts to"');
+        // V101.283: the card does not clip — the flood 🏠 / 🏥 gauges straddle its edges (they were cut in half under overflow:hidden)
+        const clip = await page.evaluate(() => { const c = document.getElementById('section-profile-combined'), g = document.createElement('span');
+            g.className = 'fw-side'; g.style.cssText = 'left:-13px;bottom:0'; c.appendChild(g);
+            const r = g.getBoundingClientRect(), hit = document.elementFromPoint(r.left + 3, r.top + 13); g.remove();
+            return { overflow: getComputedStyle(c).overflow, visible: hit === g }; });
+        assert.deepEqual(clip, { overflow: 'visible', visible: true }, 'the flood gauge outside the card edge shows: ' + JSON.stringify(clip));
         // a new LV after that → LEVEL UP once; CONTINUE acknowledges it
         await page.evaluate(() => { window.myUserDoc.lvSeen = 4; window.__writes = []; });
         await setScore(page, 41);
