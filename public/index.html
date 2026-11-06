@@ -7638,7 +7638,7 @@
             if (isPreview || !userId || typeof db === 'undefined' || !(typeof firebase !== 'undefined' && firebase.firestore)) return;
             if ((Number(myOwnRow().lvSeen) || 0) >= n) return;
             if (window.myUserDoc) window.myUserDoc.lvSeen = n;
-            db.collection('users').doc(userId).update({ lvSeen: n }).catch(e => console.warn('LV ack not saved:', e && e.message));
+            try { db.collection('users').doc(userId).update({ lvSeen: n }).catch(e => console.warn('LV ack not saved:', e && e.message)); } catch (e) { console.warn('LV ack not saved:', e && e.message); }   // never breaks the card
         }
         function lvCheckLevelUp(n, name) {
             if (!window.myUserDoc && !isPreview) { if (lvWaits++ < 10) setTimeout(() => lvCheckLevelUp(n, name), 1500); return; }   // needs the own doc (lvSeen from other devices)
@@ -15927,7 +15927,7 @@
                 rankEl.title = crewRank + (nextRank.required > 0 ? ' · ' + (Math.round(nextRank.required * 100) / 100) + ' pts to ' + nextRank.label.replace(/^Lv\./, 'LV.') : '');
                 const lvCard = document.getElementById('section-profile-combined');
                 if (lvCard) lvCard.className = lvCard.className.split(/\s+/).filter(c => c && !/^lv(-\d+)?$/.test(c)).concat(['lv', 'lv-' + lvN]).join(' ');
-                if (typeof lvCheckLevelUp === 'function') lvCheckLevelUp(lvN, crewRank);
+                if (typeof lvCheckLevelUp === 'function') { try { lvCheckLevelUp(lvN, crewRank); } catch (e) { console.warn('LEVEL UP check failed:', e && e.message); } }
             }
             if (certificateEl) {
                 if (score >= 30) {
