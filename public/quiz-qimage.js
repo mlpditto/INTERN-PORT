@@ -158,9 +158,9 @@ window.QuizQImage = (() => {
     // (editable) — no AI, exact, free. Either way the picture becomes this panel's candidate and the panel's Insert uploads it as before.
     const SCENE_MODELS = [
         { id: 'as/gemini-nano-banana-2.1', logo: 'gemini', label: 'Nano Banana 2.1' },
-        { id: 'or/openai/gpt-image-2.5-flare', logo: 'openai', label: 'Image 2.5 Flare', imageApi: true },
+        { id: 'or/openai/gpt-image-2.6-flare', logo: 'openai', label: 'Image 2.6 Flare', imageApi: true },
         { id: 'or/bytedance-seed/seedream-5-0-lite', label: 'Seedream 5.0 Lite', imageApi: true },
-        { id: 'or/x-ai/grok-imagine-image-quality', logo: 'grok', label: 'Grok Imagine Quality', imageApi: true }
+        { id: 'or/x-ai/grok-imagine-image-2.0', logo: 'grok', label: 'Grok Imagine 2.0', imageApi: true }
     ];
     const SCENE_MODEL_KEY = 'quiz_scene_ai_model';
     const CHECK_MODEL = 'gemini-3.8-flash';   // reads Thai inside pictures (THAI_IMAGE_OK)

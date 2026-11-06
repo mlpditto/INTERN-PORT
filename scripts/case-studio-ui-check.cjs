@@ -125,12 +125,12 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         // a one-line hint for the chosen model, a ★ on the model suggested for the template (nothing switches by itself), our own votes
         const rail = '#cs-model-lbl + .cs-seg button';
         assert.equal(await page.locator('.cs-model-hint').innerText(),'Good all-round · fast enough','the hint of the chosen model');
-        assert.deepEqual(await page.locator(rail+'.cs-sug').evaluateAll(els=>els.map(e=>e.dataset.value)),['gpt-image-2.5-sunburst'],'★ on Sunburst for the case infographic');
+        assert.deepEqual(await page.locator(rail+'.cs-sug').evaluateAll(els=>els.map(e=>e.dataset.value)),['gpt-image-2.6-sunburst'],'★ on Sunburst for the case infographic');
         assert.equal(await page.locator('#case-studio-image-model').inputValue(),'as/gemini-nano-banana-2.1','the model is NOT switched by the suggestion');
         await page.locator('#cs-layout-lbl + .cs-seg button[data-value="selfcare"]').click();
         await page.waitForFunction(()=>!document.getElementById('alabastaCaseCardModal').classList.contains('case-studio-busy'));
-        assert.deepEqual(await page.locator(rail+'.cs-sug').evaluateAll(els=>els.map(e=>e.dataset.value)),['gpt-image-2.5-flare'],'the ★ follows the template');
-        assert.ok((await page.locator(rail+'[data-value="gpt-image-2.5-flare"]').getAttribute('title')).includes('Fast drafts') && (await page.locator(rail+'[data-value="gpt-image-2.5-flare"]').getAttribute('title')).includes('👍 2/3 here'), 'the chip title: hint + the saved votes');
+        assert.deepEqual(await page.locator(rail+'.cs-sug').evaluateAll(els=>els.map(e=>e.dataset.value)),['gpt-image-2.6-flare'],'the ★ follows the template');
+        assert.ok((await page.locator(rail+'[data-value="gpt-image-2.6-flare"]').getAttribute('title')).includes('Fast drafts') && (await page.locator(rail+'[data-value="gpt-image-2.6-flare"]').getAttribute('title')).includes('👍 2/3 here'), 'the chip title: hint + the saved votes');
         await page.locator('#cs-layout-lbl + .cs-seg button[data-value="infographic"]').click();
         await page.waitForFunction(()=>!document.getElementById('alabastaCaseCardModal').classList.contains('case-studio-busy'));
         assert.equal(await page.locator('#cs-layout-lbl + .cs-seg button[aria-checked=true]').getAttribute('data-value'),'infographic','infographic is the default');
@@ -155,7 +155,7 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         const r0 = await page.evaluate(()=>rebuilds);
         await page.locator('#alabasta-case-card-step-2 summary').click();
         await page.locator('#alabasta-case-card-prompt').fill('My custom prompt');
-        await page.locator('#cs-model-lbl + .cs-seg button[data-value="gpt-image-2.5-flare"]').click();
+        await page.locator('#cs-model-lbl + .cs-seg button[data-value="gpt-image-2.6-flare"]').click();
         for (const width of [1440,768,390,320]) {
             await page.setViewportSize({width,height:1000});
             const overflow = await page.locator('.case-studio-grid').evaluate(el=>el.scrollWidth>el.clientWidth+1);
@@ -163,7 +163,7 @@ const extract = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
         }
         await page.locator('#alabasta-case-card-generate-btn').click();
         await page.waitForFunction(()=>!document.getElementById('alabasta-case-card-save-btn').hidden);
-        assert.deepEqual(await page.evaluate(()=>requests[0]),{model:'gpt-image-2.5-flare',prompt:'My custom prompt'});
+        assert.deepEqual(await page.evaluate(()=>requests[0]),{model:'gpt-image-2.6-flare',prompt:'My custom prompt'});
         assert.equal(await page.evaluate(()=>rebuilds),r0,'an unchanged summary / layout does not rebuild the prompt');
         await page.locator('#alabasta-case-card-save-btn').click();
         await page.waitForFunction(()=>writes.some(w=>w.caseVisualPrompt==='My custom prompt'));

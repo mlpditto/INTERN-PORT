@@ -18,13 +18,13 @@ vm.createContext(ctx); vm.runInContext(src + '; this.set = setAlabastaCaseCardIm
 const tick = s => { now += s * 1000; ticks.filter(Boolean).forEach(f => f()); };
 const text = () => pill.innerHTML.replace(/<[^>]+>/g, '').trim();
 
-ctx.set(true, 'GPT Image 2.5 Sunburst');
+ctx.set(true, 'GPT Image 2.6 Sunburst');
 assert.equal(text(), 'Generating 0:00', 'starts at 0:00');
 assert.equal(pill.style.display, 'none', 'V102.446: the pill stays out of the way while generating (the Generate button carries the clock)');
 tick(12); assert.equal(text(), 'Generating 0:12', 'counts up each second');
 tick(53); assert.equal(text(), 'Generating 1:05', 'minutes:seconds past a minute');
 assert.equal(btn.txt, '1:05', 'the header button counts with the pill');
-ctx.set(false, 'GPT Image 2.5 Sunburst');
+ctx.set(false, 'GPT Image 2.6 Sunburst');
 assert.equal(text(), 'Ready · 1:05', 'done → Ready keeps the total');
 assert.equal(pill.style.display, '', 'and the pill is back');
 assert.equal(ticks.filter(Boolean).length, 0, 'the counter stops');
