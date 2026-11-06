@@ -10,7 +10,7 @@ const dl = cut('        async function mgwDownloadGalleryItem(', '        // ===
 // static: generate hands the stamped PNG to the saver and reports the outcome
 const gen = cut('        async function generateAlabastaCaseCardImage()', '        function buildAlabastaPoneglyphDraft');
 assert.ok(gen.includes('saveCaseCardToGallery(caseDocId, caseItem, stampedUrl, model || selectedModel, getCaseCardLayout())'), 'generate → saver with the stamped PNG');
-assert.ok(gen.includes("' · saved to gallery ✓'") && gen.includes("' · gallery save failed'"), 'the outcome is shown');
+assert.ok(gen.includes("'saved to gallery ✓'") && gen.includes("'gallery save failed'"), 'the outcome is shown (V102.597: joined with " · ", no model name before it)');
 assert.ok(admin.includes('data-filter="case"') && /data-filter="case"[^>]*>📋 Cases</.test(admin), '📋 Cases chip');
 
 (async () => {
