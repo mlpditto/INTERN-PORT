@@ -213,7 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const consentRow = document.createElement('label');
     consentRow.className = 'cs-consent';
     consentRow.title = 'Tick only when the patient agreed to share the workplace name and exact dates. Saved on this case; the summary is rebuilt from the original note.';
-    consentRow.innerHTML = '<input type="checkbox" id="alabasta-case-card-consent"><span>Patient agreed · workplace + dates may appear</span>';
+    consentRow.innerHTML = '<input type="checkbox" id="alabasta-case-card-consent"><span>Patient agreed · workplace + dates may appear</span><b id="cs-consent-no" class="cs-consent-no" title="Case no. (also stamped in the corner of the saved image)" hidden></b>';
     byId('step-1').querySelector('.alabasta-casecard-note').after(consentRow);
     // V102.438 (owner): the medicine that was dispensed, in its own field — typed by the admin, saved on the case, and written onto the card
     const dispRow = document.createElement('label');
@@ -225,7 +225,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const consentBox = consentRow.querySelector('input');
     consentBox.onchange = () => {
         const want = consentBox.checked;
-        run(async () => { const done = typeof window.onCaseCardConsentChange === 'function' ? await window.onCaseCardConsentChange(want) : false; if (done === false) consentBox.checked = !want; else reviewed = ''; });
+        run(async () => { const done = typeof window.onCaseCardConsentChange === 'function' ? await window.onCaseCardConsentChange(want) : false; if (done === false) consentBox.checked = !want; else reviewed = ''; window.paintCaseCardConsentNo(); });
+    };
+    // V102.592 (owner): with "Patient agreed" ticked, the case no. shows right on that row, so the admin sees which case the consent is for
+    window.paintCaseCardConsentNo = () => {
+        const el = document.getElementById('cs-consent-no'); if (!el) return;
+        const item = typeof getAlabastaCaseById === 'function' ? getAlabastaCaseById((byId('id') || {}).value || '') : null;
+        const no = String((item && (item.caseGroup && item.caseGroup.base || item.caseId)) || '').trim();
+        el.textContent = no ? '#' + no : '';
+        el.hidden = !(consentBox.checked && no);
     };
     window.resetCaseStudioSteps = () => {
         generated = ''; reviewed = summary.value; lastGen = null; voted = false;
