@@ -243,7 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
         byId('step-2').open = false; find('.alabasta-casecard-details').open = false; payEl.hidden = true; techBtn.textContent = TECH; render();
     };
     find('.alabasta-casecard-subtitle').textContent = 'Review the summary, pick a model, then generate.';
-    find('.alabasta-casecard-badge').textContent = '🛡 Privacy ✓';
+    find('.alabasta-casecard-badge').textContent = '🛡 Privacy';   // V102.592 (owner): the green pill already says OK — no ✓
     find('.alabasta-casecard-badge').title = 'Privacy checked · no identifiers should appear in the summary or image prompt · ตรวจข้อมูลระบุตัวบุคคลในสรุปและภาพอีกครั้งก่อนบันทึก';
     byId('step-1').querySelector('label').textContent = 'Anonymized summary';
     byId('step-1').querySelector('.alabasta-casecard-note').textContent = 'Check accuracy and remove identifying details before generating.';
