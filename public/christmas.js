@@ -63,7 +63,8 @@
         if (started || !on() || !wanted()) return;
         play();
     }
-    ['pointerdown', 'keydown', 'touchstart'].forEach(function (t) { document.addEventListener(t, firstGesture, { capture: true, passive: true }); });
+    // V101.283: also touchend / click — iPhone (and LINE on it) only lets sound start inside those, a touchstart / pointerdown from a finger is refused
+    ['pointerdown', 'keydown', 'touchstart', 'touchend', 'click'].forEach(function (t) { document.addEventListener(t, firstGesture, { capture: true, passive: true }); });
     document.addEventListener('visibilitychange', function () {
         if (!audio) return;
         if (document.hidden) audio.pause(); else if (started && wanted() && on()) audio.play().catch(function () { /* needs a new gesture */ });
