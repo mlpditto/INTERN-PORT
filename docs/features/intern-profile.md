@@ -16,6 +16,8 @@ Intern: home header → tap name / photo → Info modal; Personal Info cards; Kn
 - `know-thyself-qa` — "In my words" chip stored at personality.self with a merge set
 - `avatar-open-browser-qa` — tapping the LINE photo inside LIFF opens the app in the phone browser
 - `activity-rewards-check` — home activity reward tiles + monthly progress: 8 tiles, quiz dedup, month filter
+- `lv-card-qa` — a different card per LV, next LV in the chip tooltip, LEVEL UP popup acked by CONTINUE
+- `lv-wave-theme-qa` — LV.4+ taps the LV chip = 🌊 Ice tide theme (html.wave, users.theme + device), 🔒 below LV.4, blend with Christmas, version bottom-left
 
 ## What usually lies
 
