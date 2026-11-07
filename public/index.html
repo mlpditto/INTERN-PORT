@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.286)</title>
+    <title>Internship Portfolio (V101.287)</title>
     <link rel="stylesheet" href="nika-ask.css?v=V101.263">
     <link rel="stylesheet" href="daily-canvas.css?v=V101.266">
     <link rel="stylesheet" href="halloween.css?v=V101.249">
@@ -14405,7 +14405,7 @@
                 <div class="lang-no-toggle">
                     <div style="margin-bottom:15px;">
                         ${renderQuizStepBullets(question)}
-                        <div class="md-render" style="font-weight:bold; font-size:1.1em; color:#333;">${window.renderMd(question.q)}</div>
+                        <div class="md-render" style="font-weight:bold; font-size:1.1em; color:#333;">${window.renderMd(quizQBreak(question.q))}</div>
                     </div>
                     ${inputHtml}
                 </div>
@@ -14432,6 +14432,7 @@
                     document.getElementById('btn-quiz-next').style.display = 'inline-block';
                     document.getElementById('btn-quiz-submit').style.display = 'none';
                 }
+                quizFooterSync();   // V101.287
                 console.log(`[Quiz] Step ${currentStep + 1}/${totalSteps} rendered OK`);
             } catch (err) {
                 console.error('[Quiz] renderQuizStep Error:', err);
@@ -14505,17 +14506,56 @@
         }
         function quizStepChecked(step) { return quizInstantOn(step) && answerChecked[step] === true; }
         function quizStepAnswered(step) { const a = userAnswers[step]; return Array.isArray(a) ? a.length > 0 : (a !== null && a !== undefined); }
+        // V101.287 (owner pick C): Check, the verdict and Next are ONE footer button — picked → "✓ ตรวจคำตอบ" (green), checked →
+        // "✓ ถูกต้อง · Next →" (green) / "✗ ยังไม่ถูก · Next →" (orange), nothing picked → plain Next (skip). One language: the quiz toggle's.
+        // The content keeps only the explanation (no verdict box, no Check row); the choices already show ✓ / ✗.
         function quizInstantAnswerHtml(step, question) {
-            if (!quizInstantOn(step)) return '';
-            if (!answerChecked[step]) {
-                return `<button type="button" id="qz-check" onclick="checkQuizAnswer()" ${quizStepAnswered(step) ? '' : 'disabled'} title="Check this answer · ตรวจคำตอบข้อนี้ · 이 답 확인" style="width:auto; min-height:0; margin:12px 0 0; padding:9px 18px; border:none; border-radius:10px; background:#16a34a; color:#fff; font-weight:800; font-size:0.92em; cursor:pointer;">✓ Check · ตรวจคำตอบ · 확인</button>`;
-            }
-            const key = quizCorrectSet(step), a = userAnswers[step], mine = (Array.isArray(a) ? a : [a]).map(Number);
-            const right = key.length === mine.length && key.every(v => mine.includes(v));
-            const expl = question.explanation && String(question.explanation).trim() ? `<div class="md-render" style="margin-top:6px; font-weight:400;">${window.renderMd(question.explanation)}</div>` : '';
-            return `<div class="qz-verdict" style="margin-top:12px; padding:10px 12px; border-radius:10px; border-left:4px solid ${right ? '#16a34a' : '#dc2626'}; background:${right ? '#f0fdf4' : '#fef2f2'}; color:${right ? '#166534' : '#991b1b'}; font-weight:800; font-size:0.92em;">`
-                + (right ? '✓ Correct · ถูกต้อง · 정답' : '✗ Not quite · ยังไม่ถูก · 오답 — the green one is the answer · ข้อสีเขียวคือคำตอบ · 초록색이 정답') + expl + '</div>';
+            if (!quizStepChecked(step)) return '';
+            return question.explanation && String(question.explanation).trim() ? `<div class="md-render qz-expl" style="margin-top:12px; padding:9px 12px; border-radius:10px; background:#f8fafc; font-size:0.92em;">${window.renderMd(question.explanation)}</div>` : '';
         }
+        const QZ_VERDICT_TXT = {
+            check: { en: 'Check', th: 'ตรวจคำตอบ', ko: '정답 확인', ja: '答え合わせ', zh: '核对答案' },
+            right: { en: 'Correct', th: 'ถูกต้อง', ko: '정답', ja: '正解', zh: '正确' },
+            wrong: { en: 'Not quite', th: 'ยังไม่ถูก', ko: '오답', ja: '不正解', zh: '不对' }
+        };
+        function quizVerdictTxt(k) {
+            const sel = (typeof qtGetSelectedLang === 'function') ? qtGetSelectedLang() : 'orig';
+            const lang = sel === 'orig' && typeof qtQuizSourceLang === 'function' ? qtQuizSourceLang() : sel;
+            return QZ_VERDICT_TXT[k][lang] || QZ_VERDICT_TXT[k].en;
+        }
+        function quizStepRight(step) {
+            const key = quizCorrectSet(step), a = userAnswers[step], mine = (Array.isArray(a) ? a : [a]).map(Number);
+            return key.length === mine.length && key.every(v => mine.includes(v));
+        }
+        // the shown footer button (Next, or Submit on the last step) wears the Check / verdict state; a capture listener turns its tap into
+        // checkQuizAnswer() while it says "ตรวจคำตอบ" (its own onclick never runs then)
+        function quizFooterSync() {
+            const last = currentQuiz && currentQuiz.questions && currentStep === currentQuiz.questions.length - 1;
+            ['btn-quiz-next', 'btn-quiz-submit'].forEach(id => {
+                const b = document.getElementById(id); if (!b) return;
+                const mine = (id === 'btn-quiz-submit') === !!last;
+                const mode = !mine || !quizInstantOn(currentStep) || !quizStepAnswered(currentStep) ? '' : quizStepChecked(currentStep) ? (quizStepRight(currentStep) ? 'right' : 'wrong') : 'check';
+                if (!mode) {
+                    if (b.dataset.qzMode) { b.textContent = id === 'btn-quiz-submit' ? 'Submit Quiz' : 'Next'; b.style.background = ''; b.style.borderColor = ''; delete b.dataset.qzMode; b.classList.remove('lang-no-toggle'); }
+                    return;
+                }
+                const go = id === 'btn-quiz-submit' ? 'Submit' : 'Next →';
+                b.classList.add('lang-no-toggle');   // the verdict is already in the quiz's language — lang-toggle.js must not hide its Thai / Korean
+                b.textContent = mode === 'check' ? '✓ ' + quizVerdictTxt('check') : (mode === 'right' ? '✓ ' : '✗ ') + quizVerdictTxt(mode) + ' · ' + go;
+                const bg = mode === 'wrong' ? '#ea580c' : '#16a34a';
+                b.style.background = bg; b.style.borderColor = bg; b.dataset.qzMode = mode;
+            });
+            const f = document.getElementById('quiz-run-footer');
+            if (f && !f.dataset.qzCheck) {
+                f.dataset.qzCheck = '1';
+                f.addEventListener('click', e => {
+                    const b = e.target.closest('#btn-quiz-next, #btn-quiz-submit');
+                    if (b && b.dataset.qzMode === 'check') { e.preventDefault(); e.stopPropagation(); checkQuizAnswer(); }
+                }, true);
+            }
+        }
+        // a "คำถาม:" / "Question:" glued to the end of the case text starts its own line (Eye for all-2: "…overactive bladderคำถาม: …")
+        function quizQBreak(t) { return typeof t === 'string' ? t.replace(/([^\n])[ \t]*((?:คำถาม|Question)\s*[:：])/g, '$1\n$2') : t; }
         function checkQuizAnswer() {
             if (!currentQuiz || !quizInstantOn(currentStep) || !quizStepAnswered(currentStep)) return;
             answerChecked[currentStep] = true;
@@ -14538,7 +14578,7 @@
                 userAnswers[step] = originalIdx;
             }
             renderQuizStepUIOnly();
-            { const cb = document.getElementById('qz-check'); if (cb) cb.disabled = !quizStepAnswered(step); }   // V101.243
+            quizFooterSync();   // V101.287: picked → the footer button turns into ✓ Check
         }
 
         function renderQuizStepUIOnly() {
