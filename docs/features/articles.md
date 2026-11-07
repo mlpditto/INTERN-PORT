@@ -10,6 +10,8 @@ Admin: Dashboard ▸ 📰 Articles. Intern: the daily popup, History row, Codex 
 
 - `articles-admin-qa` — list, editor blend, read counts, 👥 who read + CSV, ✨ draft / translate
 - `articles-story-draft-qa` — ✨ Draft = a short story (scene → decision → practice, ≤ 2000 hard limit, V102.511); a "➡️ Next:" line → ✨ Episode 2 chip, refused until saved, then a NEW article "(2)" from the same source with the earlier episode in the prompt
+- `articles-copy-qa` — 📋 left of ✨ Draft copies title + body as typed (V102.605)
+- `articles-editor-hints-qa` — empty TH/KO body says interns see 🇬🇧 · ✨ From EN; Saved n h / d ago; When & who remembers open/folded per browser (V102.606)
 - `articles-intern-qa` — intern sheet on a 390 px phone with a fake Firestore
 - `articles-codex-draft-qa` — 🩺 drafts a PENDING Disease Codex entry from the article (dx)
 - `articles-drug-draft-qa` — 💊 drafts a PENDING Drug Codex entry from the article (dc)

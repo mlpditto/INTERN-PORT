@@ -421,11 +421,13 @@
             '<div class="opts">' + (opts.length ? opts.map(function (o) { return '<button type="button" onclick="Articles.addLink(\'' + o.kind + '\',' + esc(JSON.stringify(o.id)) + ')">' + (LINK_ICON[o.kind] || '') + esc(o.label) + '</button>'; }).join('') : '<span style="color:#94a3b8;font-size:12.5px;padding:4px 8px">' + empty + '</span>') + '</div></div>';
     }
     function dateLong(ms) { return ms == null ? '' : new Date(ms + BKK).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }); }
+    // V102.606 (owner pick B): 501 min ago → 8 h ago; past a day → 2 d ago
+    function agoText(m) { return m < 60 ? m + ' min ago' : m < 1440 ? Math.floor(m / 60) + ' h ago' : Math.floor(m / 1440) + ' d ago'; }
     function statusLine(a, now) {
         var st = status(a, now), dirty = JSON.stringify(a) !== S.base;
         var msg = { draft: 'Not live yet · 📅 Schedule when ready', scheduled: 'Goes live ' + dateLong(a.startAt), live: 'Showing now · ends ' + dateLong(a.endAt), ended: 'Ended ' + dateLong(a.endAt) + (a.rerun === 'off' ? '' : ' · 🔁 still reaches new interns') }[st];
         var mins = S.savedAt ? Math.max(0, Math.round((now - S.savedAt) / 60000)) : -1;
-        var save = dirty ? '<span class="art-save dirty">● Unsaved</span>' : mins >= 0 ? '<span class="art-save">Saved' + (mins ? ' · ' + mins + ' min ago' : '') + '</span>' : '';
+        var save = dirty ? '<span class="art-save dirty">● Unsaved</span>' : mins >= 0 ? '<span class="art-save">Saved' + (mins ? ' · ' + agoText(mins) : '') + '</span>' : '';
         return '<div class="art-stl" id="art-stl"><span class="art-st ' + st + '">' + { draft: 'Draft', scheduled: 'Scheduled', live: 'Live', ended: 'Ended' }[st] + '</span><span>' + msg + '</span>' + save + '</div>';
     }
     // V102.474: Save turns green ("✓ Saved") once it has gone through and stays green until the next edit; the pressed button is the one that turns
@@ -444,9 +446,11 @@
         var src = a.source ? '🔗 ' + esc(a.source.site) : '';
         return (q || c || src) ? [q ? '🧪 ' + q : '', c ? '💊 ' + c : '', src].filter(Boolean).join(' · ') : '<span style="color:#94a3b8">＋ quiz or drug</span>';
     }
+    // V102.606 (owner pick C): the folds remember open / folded per browser
+    function secOpen() { try { var o = JSON.parse(localStorage.getItem('articleSecOpen') || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
     function sec(key, label, summary, inner, openByDefault) {
         var open = S.open[key] != null ? S.open[key] : openByDefault;
-        return '<details class="art-sec"' + (open ? ' open' : '') + ' ontoggle="Articles.sec(\'' + key + '\', this.open)"><summary><b>' + label + '</b><span>' + summary + '</span><span class="chev">▾</span></summary><div class="in">' + inner + '</div></details>';
+        return '<details class="art-sec"' + (open ? ' open' : '') + ' ontoggle="Articles.sec(\'' + key + '\', this.open)"><summary onclick="Articles.secTap(\'' + key + '\', this.parentNode)"><b>' + label + '</b><span>' + summary + '</span><span class="chev">▾</span></summary><div class="in">' + inner + '</div></details>';
     }
     // V102.463 (owner pick A): paste a picture (an infographic, a screenshot) into the title or body and ✨ Draft writes the short read from it.
     // V102.487: several pictures of the SAME subject (a paper's first page, its graphical abstract, the highlights box, a product photo) — paste or drop adds to a list (max MAX_IMGS).
@@ -645,6 +649,11 @@
         return '<div class="art-xr">' + cx('dx', S.dxBusy, '🩺', 'Disease') + cx('dc', S.dcBusy, '💊', 'Drug') +
             '<button type="button" class="art-xc' + (nq ? ' ring ok' : '') + '" onclick="Articles.quizPick()" title="Link a quiz to this article">🔗 Quiz' + (nq ? ' ' + nq : '') + '</button></div>';
     }
+    // V102.606 (owner pick A): phones cannot hover the grey language chip — an empty TH / KO body says what the intern sees and what to tap
+    function bodyPh(a) {
+        if (S.lang !== 'en' && trFrom(a) === 'en') return 'ว่าง · intern เห็นฉบับ ' + FLAG.en + ' · กด ✨ From EN ด้านบน&#10;Empty · interns see the ' + FLAG.en + ' version · tap ✨ From EN';
+        return 'A short story the reader can picture and use at work — up to 2000 characters; longer material becomes episodes. Markdown works.';
+    }
     function editorHtml(now) {
         var a = S.cur, L = S.lang, t = (a.title || {})[L] || '', b = (a.body || {})[L] || '', have = langsOf(a), st = status(a, now), mm = mismatch(a, L);
         var NAME = { en: 'English', th: 'Thai', ko: 'Korean' };
@@ -659,7 +668,7 @@
             topicRowHtml(a),
             '<div class="art-md"><div class="art-tb"><button type="button" title="Bold" onclick="Articles.wrap(\'**\',\'**\')">B</button><button type="button" title="Italic" onclick="Articles.wrap(\'*\',\'*\')"><i>I</i></button><button type="button" title="Strikethrough" onclick="Articles.wrap(\'~~\',\'~~\')"><s>S</s></button>' +
             '<button type="button" title="Bullet list" onclick="Articles.wrap(\'\\n- \',\'\')">•</button><button type="button" title="Numbered list" onclick="Articles.wrap(\'\\n1. \',\'\')">1.</button><button type="button" title="Link" onclick="Articles.wrap(\'[\',\'](https://)\')">🔗</button>' + aiHtml(a) + '</div>' +
-            '<textarea class="art-ta" id="art-bodyta" onpaste="Articles.paste(event)" ondragover="Articles.dragOver(event)" ondrop="Articles.drop(event)" placeholder="A short story the reader can picture and use at work — up to 2000 characters; longer material becomes episodes. Markdown works." oninput="Articles.text(\'body\',this.value)">' + esc(b) + '</textarea>' +
+            '<textarea class="art-ta" id="art-bodyta" onpaste="Articles.paste(event)" ondragover="Articles.dragOver(event)" ondrop="Articles.drop(event)" placeholder="' + bodyPh(a) + '" oninput="Articles.text(\'body\',this.value)">' + esc(b) + '</textarea>' +
             '<div class="art-ft">' + (S.aiNote ? '<span class="ai">' + esc(S.aiNote) + '</span>' : '<span>Markdown</span>') + (S.epSrc && S.epSrc.a === a && epNextOf(b) ? '<button type="button" class="art-ep" onclick="Articles.episode()"' + (S.aiBusy ? ' disabled' : '') + ' title="The story did not fit in one read — save this episode, then draft the next one as a new article from the same source">✨ Episode ' + (S.epSrc.n + 1) + '</button>' : '') + '<span id="art-count" style="margin-left:auto"' + (b.length > MAX_BODY ? ' class="over"' : '') + '>' + b.length + ' / ' + MAX_BODY + ' · ~' + readMin(b) + ' min</span></div></div>',
             pasteHtml(a),
             '<div id="art-warn">' + hintHtml() + (mm ? '<div class="art-warn" role="status">⚠️ This looks like ' + NAME[mm] + ', not ' + NAME[L] + (((a.title || {})[mm] || (a.body || {})[mm]) ? '' : '<button type="button" onclick="Articles.moveLang(\'' + L + '\',\'' + mm + '\')">Move to ' + mm.toUpperCase() + '</button>') + '</div>' : '') + '</div>',
@@ -906,7 +915,7 @@
     function edit(id) {
         var a = id ? S.list.find(function (x) { return x.id === id; }) : null;
         S.cur = a ? fromDoc(a.id, Object.assign({}, a)) : blank(Date.now());
-        S.imgs = []; S.paste = null; S.lang = 'en'; S.err = ''; S.del = false; S.pick = ''; S.base = JSON.stringify(S.cur); S.savedAt = 0; S.hint = null; S.titleSug = null; S.hintOff = S.hintOff || {}; S.open = {}; S.who = false; S.whoF = 'all'; S.qs = false; S.qsF = 'open'; S.qErr = ''; S.qAiErr = ''; S.aiNote = ''; S.modelOpen = false; S.pvMore = false;
+        S.imgs = []; S.paste = null; S.lang = 'en'; S.err = ''; S.del = false; S.pick = ''; S.base = JSON.stringify(S.cur); S.savedAt = 0; S.hint = null; S.titleSug = null; S.hintOff = S.hintOff || {}; S.open = secOpen(); S.who = false; S.whoF = 'all'; S.qs = false; S.qsF = 'open'; S.qErr = ''; S.qAiErr = ''; S.aiNote = ''; S.modelOpen = false; S.pvMore = false;
         render();
     }
     var api = {
@@ -1218,6 +1227,8 @@
         hintLink: function () { var a = S.cur, h = S.hint; if (!a || !h) return; S.hint = null; a.links.push({ kind: 'disease', id: h.id, label: h.label }); save(a.status === 'scheduled'); },
         hintDismiss: function () { var a = S.cur; if (a && a.id) S.hintOff[a.id] = true; S.hint = null; render(); },
         sec: function (k, open) { S.open[k] = open; },
+        // only a real tap is remembered — a fold that renders open (a new article) fires 'toggle' too
+        secTap: function (k, el) { var o = secOpen(); o[k] = !el.open; try { localStorage.setItem('articleSecOpen', JSON.stringify(o)); } catch (e) { /* none */ } },
         // ⚠️ "Move to TH": the text typed into one language slot goes to the slot it is written in
         moveLang: function (from, to) {
             var a = S.cur; ['title', 'body'].forEach(function (k) { a[k][to] = a[k][from] || ''; a[k][from] = ''; });
