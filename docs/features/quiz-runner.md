@@ -20,6 +20,7 @@ Intern: home ▸ Mission ▸ a quiz card ▸ Start.
 - `rank-tier-qa` — Rank TIER-BOX mode (`mode:'tier'`): each option gets Best / OK / Avoid (nothing pre-selected, Lock waits for every row, stored in option order); scoring exact 1 · one level off ½ · Best↔Avoid 0, ⚠ not in Avoid caps ★3; DDD-1 Q2 = 0.72 ★3 / 0.92 ★4
 - `quiz-primer-qa` — per-question Read first page before the timer starts
 - `quiz-flag-qa` — 🚩 flag a sentence (Read first / question / choice): T3 how-to bubble until ticked per quiz, V2 reason card, flags ride the feedback doc (or a flags-only doc on Skip); admin card + not "empty"
+- `quiz-break-qa` — V101.289 ⏸ Break (admin chip ⏸ Break, off by default): ⏸ beside ▶ on Read first only, ≤ 2 breaks, not in practice / past the deadline; the sheet (no reason pre-picked, Cancel writes nothing) saves `pausedAt` + `breaks` + `breakState` with status still `started`; ▶ Resume on the card reopens Read first of that question with the same answers and choice order (no 🚫 brick); past the deadline what was answered is sent once, without a Submit confirm
 - `quiz-run-lean-qa` — lean runner: one progress row, language capsule, answer layout
 - `quiz-term-highlight-qa` — drugs / classes / conditions / doses / labs wrapped in the question text
 - `quiz-browse-tags-check` — intern Browse tag chips (qbTag* helpers with a DOM stub)

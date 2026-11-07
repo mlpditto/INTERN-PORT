@@ -4,7 +4,7 @@ const fs = require('fs');
 const src = fs.readFileSync('public/index.html', 'utf8').replace(/\r\n/g, '\n');
 const at = src.indexOf('const confirmMsg = hasEmptyAnswers');
 assert(at > 0, 'confirmMsg found');
-const block = src.slice(at, src.indexOf('if (!confirm(confirmMsg))', at));
+const block = src.slice(at, src.indexOf('!confirm(confirmMsg))', at));
 const lits = [...block.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map(m => JSON.parse('"' + m[1] + '"'));
 assert.equal(lits.length, 2, 'two messages: unanswered / confirm');
 const FLAGS = ['🇺🇸', '🇹🇭', '🇰🇷', '🇯🇵', '🇨🇳'];
