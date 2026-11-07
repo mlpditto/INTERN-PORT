@@ -72,7 +72,7 @@
             + '<p class="jt-en">An admin reads every note and may add points.</p>' },
         { ring: ['#dc-note'], html: '<div class="jt-step">4 / 4 · My Notes</div><p class="jt-t" id="jt-title">📚 โน้ตเก็บไว้ใน My Notes</p>'
             + '<div class="jt-notes" aria-hidden="true"><div>🎓 Cold chain วัคซีน <small>Vaccine</small></div><div>🎓 Paracetamol เด็ก <small>Dose</small></div><div>🎓 จัดเก็บยาตาม FEFO <small>Storage</small></div></div>'
-            + '<p class="jt-b">แตะแถว 🎓 แล้วเลื่อนลง จะเห็นโน้ตทั้งหมด กรองตามแท็กได้ เก็บได้สูงสุด <b>90 โน้ต</b></p>'
+            + '<p class="jt-b">อ่านซ้ำได้ที่ <b>Work ▸ History</b> แตะชิป 🎓 จะเห็นโน้ตทั้งหมด เก็บได้สูงสุด <b>90 โน้ต</b></p>'   // V101.284 (owner): point to History
             + '<p class="jt-en">ดูซ้ำได้ที่ปุ่ม ? เล็ก ๆ ข้างวันที่ · Replay with the ? by the date.</p>' }
     ];
 
