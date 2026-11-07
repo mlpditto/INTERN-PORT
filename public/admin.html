@@ -15183,6 +15183,7 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                     <label data-ic="🔀" class="logic-chip m-vio" title="Shuffle Choices · สลับตัวเลือก"><input type="checkbox" id="quiz-shuffle-choices" checked> <span>Shuffle</span></label>
                     <label data-ic="➗" class="logic-chip m-amb" title="Partial Credit (multi-answer): (correct − wrong) / total correct, min 0. Single-answer unaffected. · ให้คะแนนบางส่วนในข้อหลายคำตอบ"><input type="checkbox" id="quiz-partial-credit"> <span>Partial</span></label>
                     <label data-ic="🎓" class="logic-chip m-green" title="Practice: after each choice question the intern presses Check and sees right / wrong, the answer and the explanation straight away (the choice then locks). Leave OFF for exam sets — it shows the key. · ฝึก: เฉลยทีละข้อระหว่างทำ"><input type="checkbox" id="quiz-instant-answer"> <span>Practice</span></label>
+                    <label data-ic="⏸" class="logic-chip m-vio" title="Break: on a Read first page the intern may tap ⏸ พัก and come back later — at most 2 breaks, before the Deadline. The clock stops and the answers given stay. If the Deadline passes during a break, what was answered is sent. OFF (default): leaving mid-quiz still counts as done. · พักระหว่างทำได้"><input type="checkbox" id="quiz-allow-break"> <span>Break</span></label>
                     <i class="qe-sep" aria-hidden="true"></i>
                     <label data-ic="🔔" class="logic-chip m-cy" title="Notify LINE every submit. OFF (normal): an active quiz already announces two milestones to the LINE group by itself — the first intern to submit, and when everyone eligible has finished. ON: announce EVERY submission instead — one message per intern, so only use it on quizzes worth watching live (the OA's monthly message quota is shared with the case and digest pushes). · แจ้ง LINE ทุกครั้งที่ส่ง"><input type="checkbox" id="quiz-notify-group"> <span>Notify</span></label>
                     <label data-ic="⏰" class="logic-chip m-red" title="Deadline alert (LINE). ON (default): once the quiz has a Deadline, LINE alerts the intern group when it closes within 24 h, then sends each intern who has not submitted yet one message in the last hour, with their other quizzes closing within 6 h in it. Nothing is sent 22:00–07:00. Personal messages stop when the month's LINE quota is critical or the daily cap is reached. Turn OFF for a quiz that should close quietly. · เตือนก่อนหมดเวลาทาง LINE"><input type="checkbox" id="quiz-notify-deadline" checked> <span>Deadline</span></label>
@@ -27293,6 +27294,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             if (document.getElementById('quiz-is-homework')?.checked) modes.push('HW');
             if (document.getElementById('quiz-shuffle-choices')?.checked) modes.push('Shuffle');
             if (document.getElementById('quiz-partial-credit')?.checked) modes.push('Partial');
+            if (document.getElementById('quiz-allow-break')?.checked) modes.push('⏸');
             const parts = [target];
             if (unlock > 0) parts.push(`🔒≥${unlock}`);
             parts.push(`🏷️${tagCount}`);
@@ -27546,6 +27548,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-shuffle-choices').checked = q.shuffleChoices !== undefined ? q.shuffleChoices : true;
             { const pc = document.getElementById('quiz-partial-credit'); if (pc) pc.checked = !!q.partialCredit; }
             { const ia = document.getElementById('quiz-instant-answer'); if (ia) ia.checked = q.instantAnswer === true; }   // V102.502
+            { const ab = document.getElementById('quiz-allow-break'); if (ab) ab.checked = q.allowBreak === true; }   // V102.610 ⏸
             { const ng = document.getElementById('quiz-notify-group'); if (ng) ng.checked = !!q.notifyGroup; }
             { const nd = document.getElementById('quiz-notify-deadline'); if (nd) nd.checked = q.notifyDeadline !== false; }
             toggleTimerModeUI();
@@ -27647,6 +27650,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             document.getElementById('quiz-shuffle-choices').checked = true;
             { const pc = document.getElementById('quiz-partial-credit'); if (pc) pc.checked = false; }
             { const ia = document.getElementById('quiz-instant-answer'); if (ia) ia.checked = false; }   // V102.502
+            { const ab = document.getElementById('quiz-allow-break'); if (ab) ab.checked = false; }   // V102.610
             { const ng = document.getElementById('quiz-notify-group'); if (ng) ng.checked = false; }
             { const nd = document.getElementById('quiz-notify-deadline'); if (nd) nd.checked = true; }
             toggleTimerModeUI();
@@ -28075,6 +28079,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const shuffleChoices = document.getElementById('quiz-shuffle-choices').checked;
             const partialCredit = document.getElementById('quiz-partial-credit')?.checked || false;
             const instantAnswer = document.getElementById('quiz-instant-answer')?.checked || false;   // V102.502: practice — answer after each question
+            const allowBreak = document.getElementById('quiz-allow-break')?.checked || false;   // V102.610 ⏸ break on Read first (intern quiz-break.js)
             // V97.47: opt-in instant LINE push on submit (notifyQuizSubmitted).
             const notifyGroup = document.getElementById('quiz-notify-group')?.checked || false;
             const notifyDeadline = document.getElementById('quiz-notify-deadline')?.checked !== false;
@@ -28162,7 +28167,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const deadlineBeriMax = (_dbV && _dbV.value !== '') ? Math.max(0, parseInt(_dbV.value, 10) || 0) : null;
 
             return {
-                title, shortTitle, targetGroup, unlockScore, description, tags, tagList, materials, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, partialCredit, instantAnswer, notifyGroup, notifyDeadline, quizType, feedbackLimit, caseContent, questions, blueprint,
+                title, shortTitle, targetGroup, unlockScore, description, tags, tagList, materials, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, partialCredit, instantAnswer, allowBreak, notifyGroup, notifyDeadline, quizType, feedbackLimit, caseContent, questions, blueprint,
                 earlyBirdBeriFirst, deadlineBeriMax, coverUrl: QuizCover.value(), coverStyle: QuizCover.style(), coverBadge: QuizCover.badge(),
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
@@ -31196,6 +31201,7 @@ ${JSON.stringify(sourceObj)}`;
                 shuffleChoices: formData.shuffleChoices !== undefined ? formData.shuffleChoices : true,
                 partialCredit: formData.partialCredit || false,
                 instantAnswer: formData.instantAnswer === true,   // V102.502
+                allowBreak: formData.allowBreak === true,   // V102.610
                 notifyGroup: formData.notifyGroup || false,
                 notifyDeadline: formData.notifyDeadline !== false,
                 quizType: formData.quizType || 'standard',
@@ -31461,8 +31467,13 @@ ${JSON.stringify(sourceObj)}`;
                     const retakeNote = att.retakeReason
                         ? `<div class="lang-no-toggle" style="font-size:0.78em; color:#9a3412; margin-bottom:4px;">🔄 Retake${att.retakeCount > 1 ? ' ×' + att.retakeCount : ''} · ${escapeHtml(String(att.retakeReason))}</div>`
                         : '';
+                    // V102.610 ⏸ breaks taken during the run (intern quiz-break.js)
+                    const _brk = Array.isArray(att.breaks) ? att.breaks : [];
+                    const breakNote = _brk.length
+                        ? `<div class="lang-no-toggle" style="font-size:0.78em; color:#92400e; margin-bottom:4px;">⏸ ${_brk.length} · ${Math.round(_brk.reduce((t, b) => t + (b && b.back && b.at ? Math.max(0, b.back - b.at) : 0), 0) / 60000)}m${_brk.map(b => ({ work: ' 🏥', meal: ' 🍱', net: ' 📶', other: ' ✍️' })[b && b.reason] || '').join('')}${att.breakAutoSubmitted ? ' · sent at the deadline' : ''}</div>`
+                        : '';
                     actionHtml = `
-                            ${oohNote}${retakeNote}${isPoll ? '<span class="badge" style="background:#6c757d">Poll Response</span>' : `<button class="btn-sm btn-info" onclick="reviewQuiz('${att.id}')">Review</button>`}
+                            ${oohNote}${retakeNote}${breakNote}${isPoll ? '<span class="badge" style="background:#6c757d">Poll Response</span>' : `<button class="btn-sm btn-info" onclick="reviewQuiz('${att.id}')">Review</button>`}
                             <button class="btn-sm btn-success" onclick="approveQuiz('${att.id}', '${att.userId}', ${pointsToAdd})">Approve (${pointsToAdd.toFixed(2)} pts)</button>
                             <button class="btn-sm btn-danger" onclick="rejectQuiz('${att.id}')">Reject</button>
                         `;
@@ -32042,8 +32053,10 @@ ${JSON.stringify(sourceObj)}`;
 
                     // Calculate Duration (V102.261: + average per question — quizzes differ in length)
                     let durationStr = "";
+                    const _brkP = Array.isArray(att.breaks) ? att.breaks : [];   // V102.610 ⏸
+                    const _brkMs = _brkP.reduce((t, b) => t + (b && b.back && b.at ? Math.max(0, b.back - b.at) : 0), 0);
                     if (att.startTime && att.timestamp) {
-                        const diffMs = att.timestamp.toMillis() - att.startTime.toMillis();
+                        const diffMs = att.timestamp.toMillis() - att.startTime.toMillis() - _brkMs;
                         const diffSec = Math.floor(diffMs / 1000);
                         if (diffSec > 0) {
                             const mm = Math.floor(diffSec / 60);
@@ -32052,7 +32065,7 @@ ${JSON.stringify(sourceObj)}`;
                             const perQ = qN > 0 ? Math.round(diffSec / qN) : 0;
                             const perQStr = perQ ? ` · <span title="Average per question (${qN} questions)">⌀ ${perQ >= 60 ? Math.floor(perQ / 60) + 'm ' + (perQ % 60) + 's' : perQ + 's'}/Q</span>` : '';
                             const slow = perQ > 0 && avgQ > 0 && perQ > avgQ;
-                            durationStr = ` <br> <small style="color:${slow ? '#c2610c' : '#4361ee'}; font-weight:bold;${slow ? ' background:#ffe8cc; padding:2px 7px; border-radius:999px;' : ''}"${slow ? ' title="Slower than the class average per question"' : ''}>⏱ ${mm}m ${ss}s${perQStr}</small>`;
+                            durationStr = ` <br> <small style="color:${slow ? '#c2610c' : '#4361ee'}; font-weight:bold;${slow ? ' background:#ffe8cc; padding:2px 7px; border-radius:999px;' : ''}"${slow ? ' title="Slower than the class average per question"' : ''}>⏱ ${mm}m ${ss}s${perQStr}${_brkP.length ? ` · <span title="Breaks — not counted in the time">⏸ ${_brkP.length} · ${Math.round(_brkMs / 60000)}m</span>` : ''}</small>`;
                         }
                     }
 
