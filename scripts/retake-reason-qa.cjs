@@ -21,7 +21,7 @@ assert.match(html, /attempt\.allowedBy === 'self'\s*\n\s*\? `<span class="assign
 assert.match(html, /<title>Internship Portfolio \(V\d+\.\d+\)<\/title>/);
 // admin: the pending row carries the reason, escaped, with the count
 assert.match(admin, /const retakeNote = att\.retakeReason\s*\n\s*\? `<div class="lang-no-toggle"[^`]*🔄 Retake\$\{att\.retakeCount > 1 \? ' ×' \+ att\.retakeCount : ''\} · \$\{escapeHtml\(String\(att\.retakeReason\)\)\}<\/div>`/);
-assert.match(admin, /\$\{oohNote\}\$\{retakeNote\}\$\{isPoll \?/, 'note rides above the Review / Approve buttons');
+assert.match(admin, /\$\{oohNote\}\$\{retakeNote\}(\$\{breakNote\})?\$\{isPoll \?/, 'note rides above the Review / Approve buttons');
 assert.match(admin, /<title>Nika Admin \(V\d+\.\d+\)<\/title>/);
 
 async function open(browser) {

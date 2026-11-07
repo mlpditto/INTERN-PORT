@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.288)</title>
+    <title>Internship Portfolio (V101.289)</title>
     <link rel="stylesheet" href="nika-ask.css?v=V101.263">
     <link rel="stylesheet" href="daily-canvas.css?v=V101.266">
     <link rel="stylesheet" href="halloween.css?v=V101.249">
@@ -2562,7 +2562,7 @@
 <script src="internship-progress.js?v=V101.184"></script><link rel="stylesheet" href="internship-progress.css?v=V101.184">
 <script src="monthly-progress.js?v=V101.79"></script><link rel="stylesheet" href="monthly-progress.css?v=V101.39">
 <script src="assigned-goals.js?v=V100.30"></script><link rel="stylesheet" href="assigned-goals.css?v=V100.30">
-<link rel="stylesheet" href="quiz-user-focus.css?v=V101.250"><link rel="stylesheet" href="quiz-flag.css?v=V101.288"><script defer src="quiz-flag.js?v=V101.288"></script><script defer src="rank-quiz.js?v=V101.231"></script><script defer src="writing-progress.js?v=V101.232"></script><script defer src="quiz-term-highlight.js?v=V101.250"></script><script defer src="quiz-feedback-lang.js?v=V101.237"></script><script defer src="quiz-feedback-ai.js?v=V101.96"></script><script defer src="quiz-feedback-remind.js?v=V101.176"></script><script defer src="owed-remind.js?v=V101.228"></script>
+<link rel="stylesheet" href="quiz-user-focus.css?v=V101.250"><link rel="stylesheet" href="quiz-flag.css?v=V101.288"><script defer src="quiz-flag.js?v=V101.288"></script><link rel="stylesheet" href="quiz-break.css?v=V101.289"><script defer src="quiz-break.js?v=V101.289"></script><script defer src="rank-quiz.js?v=V101.231"></script><script defer src="writing-progress.js?v=V101.232"></script><script defer src="quiz-term-highlight.js?v=V101.250"></script><script defer src="quiz-feedback-lang.js?v=V101.237"></script><script defer src="quiz-feedback-ai.js?v=V101.96"></script><script defer src="quiz-feedback-remind.js?v=V101.176"></script><script defer src="owed-remind.js?v=V101.228"></script>
 <link rel="stylesheet" href="quiz-cover.css?v=V101.282">
 <link rel="stylesheet" href="case-insight-rail.css?v=V101.59">
 <script src="quiz-cover.js?v=V101.282"></script>
@@ -10855,6 +10855,7 @@
                 renderHistory();
                 updateGrandLineDashboard();
                 achievementSourceReady('quizzes');
+                if (window.qzBreak) qzBreak.checkDue();   // V101.289 a ⏸ break past its deadline is sent
             }, e => handleFirestoreListenerError('quizzes listener', e));
             db.collection("quiz_attempts").where("userId", "==", userId).onSnapshot(s => {
                 window.internshipProgress?.setAttempts(s.docs.map(d=>d.data()));
@@ -10870,6 +10871,7 @@
                 if (typeof updateMissionDoneBadge === 'function') updateMissionDoneBadge();
                 achievementSourceReady('quiz');
                 if (window.fbRemind) fbRemind.arm();   // V101.160: daily "feedback not given yet" popup
+                if (window.qzBreak) qzBreak.checkDue();   // V101.289
             }, e => handleFirestoreListenerError('quiz attempts listener', e));
         }
 
@@ -11906,6 +11908,12 @@
                                 statusBadge = `<span class="assign-tag" style="background:#fff3cd; color:#856404;">⏳ In Progress กำลังทำ</span>`;
                                 bodyHtml = `<div style="color:#666;">You're working on this quiz... คุณกำลังทำแบบทดสอบนี้อยู่...</div>`;
                                 actionHtml = `<button class="btn-warning" onclick="runQuiz('${q.id}')">▶️ Resume ทำต่อ</button>`;
+                            } else if (window.qzBreak && qzBreak.isPaused(attempt)) {
+                                // V101.289 ⏸ on a break (quiz-break.js): where it stopped and until when; ▶ opens 📖 Read first of that question
+                                const bi = qzBreak.cardInfo(q, attempt);
+                                statusBadge = `<span class="assign-tag" style="background:#fef3c7; color:#92400e;">⏸ On break พักอยู่ 휴식 중</span>`;
+                                bodyHtml = `<div class="lang-no-toggle" style="color:#666; font-size:0.9em;">Q ${bi.step}/${bi.total}${bi.due ? ' · 📅 ' + bi.due : ''}</div>`;
+                                actionHtml = `<button class="btn-primary btn-quiz-cta" onclick="runQuiz('${q.id}')" style="flex:1;">▶ Resume ทำต่อ 계속</button>`;
                             } else {
                                 // V94.72 PR 4a: graded quizzes brick on exit for exam integrity.
                                 // Show an honest interrupted state instead of a Resume button
@@ -12537,7 +12545,16 @@
             const existing = quizAttemptsCache[quizId];
             let isResuming = false;
 
-            if (existing && (existing.status === 'started' || existing.status === 'abandoned')) {
+            let _brkAtt = null;   // V101.289 ⏸ back from a break (quiz-break.js): resume where it stopped instead of the 🚫 brick below
+            if (window.qzBreak && qzBreak.isPaused(existing) && currentQuiz.quizType !== 'read_only') {
+                if (currentQuiz.deadline && new Date() > currentQuiz.deadline.toDate()) { currentQuiz = null; qzBreak.checkDue(); return; }   // past the deadline: what was answered is sent
+                _brkAtt = existing;
+                qzBreak.restore(existing);
+                isResuming = currentQuiz.timerMode === 'total_time';
+                const _brkBack = qzBreak.resumeData(existing);
+                quizAttemptsCache[quizId] = { ...existing, ..._brkBack };
+                db.collection("quiz_attempts").doc(`${quizId}_${userId}`).set({ ..._brkBack, ...(_oohStamp || {}) }, { merge: true }).catch(e => console.warn('[qzBreak] resume save', e));
+            } else if (existing && (existing.status === 'started' || existing.status === 'abandoned')) {
                 if (currentQuiz.quizType === 'read_only') {
                     // V94.72 PR 4a: read_only (learning) quizzes resume from the saved page
                     // instead of bricking — exam integrity doesn't apply to learning material.
@@ -12666,6 +12683,7 @@
                     shuffleMap[idx] = null; // No shuffle (original order)
                 }
             });
+            if (_brkAtt) qzBreak.restoreShuffle(_brkAtt);   // V101.289: the same choice order as before the break
 
             // V101.185: the header names the quiz (was "Quiz in progress"); the full title rides in the tooltip
             const _qrTitle = document.getElementById('quiz-run-title');
@@ -13269,7 +13287,7 @@
             } else if (status === 'allowed') {
                 right = badge('✅ Approved', '#166534', '#dcfce7');
             } else if (status === 'started') {
-                right = badge('▶ In progress', '#1d4ed8', '#dbeafe');
+                right = (window.qzBreak && qzBreak.isPaused(attempt)) ? badge('⏸ On break', '#92400e', '#fef3c7') : badge('▶ In progress', '#1d4ed8', '#dbeafe');   // V101.289
             } else if (status !== 'none') {
                 // V95.28: show the % the intern scored instead of a plain "ทำแล้ว".
                 // correctCount/totalQuestions is the auto-graded MCQ percentage;
@@ -14205,6 +14223,7 @@
                 }
                 { const qm0 = document.getElementById('quizModal'); if (qm0) qm0.classList.remove('rk-on'); }   // V101.231: lean Rank hides the shared footer; every render starts with it back
                 { const ps0 = document.getElementById('btn-quiz-primer-start'); if (ps0) ps0.style.display = 'none'; const bd0 = document.getElementById('quiz-q-type-badge'); if (bd0) bd0.removeAttribute('title'); }   // V101.141: the Read-first page's Start slot / badge hover
+                if (window.qzBreak) qzBreak.hide();   // V101.289 ⏸ shows on Read first only (quiz-break.js)
 
                 // 🔥 V80: Read-only Learning Mode UI
                 if (currentQuiz.quizType === 'read_only') {
@@ -14249,6 +14268,7 @@
                     const ps = document.getElementById('btn-quiz-primer-start');
                     if (ps) { ps.innerHTML = '▶' + (tt ? '' : ' ⏱ ' + (question.timer || 60) + 's'); ps.style.display = 'inline-block'; }
                     if (window.qzFlag) qzFlag.onRender('primer');   // V101.288 🚩 + the how-to bubble (quiz-flag.js)
+                    if (window.qzBreak) qzBreak.onPrimer();   // V101.289 ⏸ พัก beside ▶ when the quiz allows a break
                     return;
                 }
 
@@ -15293,9 +15313,9 @@
                 paint(); document.body.appendChild(ov);
             });
         }
-        async function submitQuiz() {
+        async function submitQuiz(opts) {   // V101.289: opts.breakAuto = the deadline passed during a ⏸ break — send without asking
             if (isSubmittingQuiz) return;
-            { const pend = rankPendingMatches(); if (pend.length) { isSubmittingQuiz = true; clearInterval(quizTimerInterval); await rankMatchSheet(pend); isSubmittingQuiz = false; } }   // V101.231
+            { const pend = (opts && opts.breakAuto) ? [] : rankPendingMatches(); if (pend.length) { isSubmittingQuiz = true; clearInterval(quizTimerInterval); await rankMatchSheet(pend); isSubmittingQuiz = false; } }   // V101.231
             isSubmittingQuiz = true;
 
             recordStepDuration(); // V86.14
@@ -15313,7 +15333,7 @@
             const confirmMsg = hasEmptyAnswers
                 ? "🇺🇸 You have unanswered questions. Submit anyway?\n🇹🇭 คุณยังตอบไม่ครบทุกข้อ ยืนยันที่จะส่งหรือไม่?\n🇰🇷 아직 답하지 않은 문항이 있습니다. 제출하시겠습니까?\n🇯🇵 未回答の問題があります。このまま送信しますか？\n🇨🇳 还有未回答的题目，仍要提交吗？"
                 : "🇺🇸 Confirm submit your answers?\n🇹🇭 ยืนยันส่งคำตอบ?\n🇰🇷 답안을 제출하시겠습니까?\n🇯🇵 回答を送信しますか？\n🇨🇳 确认提交您的答案？";
-            if (!confirm(confirmMsg)) {
+            if (!(opts && opts.breakAuto) && !confirm(confirmMsg)) {
                 isSubmittingQuiz = false;
                 // Restart timer logic
                 quizTimerInterval = setInterval(() => {
