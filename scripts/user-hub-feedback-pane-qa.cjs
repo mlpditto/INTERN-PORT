@@ -27,7 +27,7 @@ assert.ok(html.indexOf('id="gs-pane-feedback"') > html.indexOf('<div id="gs-pane
 
 const page_html = '<meta charset="utf-8"><div id="groupSelectModal" style="width:100%;display:block;position:static;background:none"><div class="modal-content" style="max-width:820px;width:95%;text-align:left;padding:24px;border-radius:30px;margin:0;">'
     + header + '<input type="hidden" id="gs-uid"><div id="gs-pane-profile"><div class="gs-profile-cards"><section class="gs-profile-card gs-folded"><header><h3>Personal details</h3></header></section><section class="gs-profile-card gs-folded"><header><h3>Contact</h3></header></section></div></div>'
-    + pane + '<button id="gs-save-btn" hidden></button></div></div><div id="quizFeedbackPanelModal" style="display:none"></div>';
+    + pane + '<button id="gs-save-btn" hidden></button></div></div><div id="dashboard-container"><div id="quizFeedbackPanelModal" class="modal" style="display:none"></div></div>';
 
 async function open(browser, { twemoji = true } = {}) {
     const page = await browser.newPage({ viewport: { width: 900, height: 900 } });
@@ -101,10 +101,16 @@ const texts = (page, sel) => page.locator(sel).evaluateAll(es => es.map(e => e.t
         assert.equal(await page.locator('.fbp-row').nth(1).locator('.fbp-q').innerText(), 'Retail-2', 'short title; praise has no lead icon');
         assert.equal(await page.locator('.fbp-row').nth(1).locator('.fbp-t').innerText(), '💡 Pediatric dosing');
         assert.equal(await page.locator('.fbp-row').nth(4).locator('.fbp-star').innerText(), '—', 'no stars given');
-        assert.equal(await page.locator('.fbp-row').nth(5).locator('.fbp-c').innerText(), '👍 no comment', 'a high mark with nothing written');
+        // V102.608 (owner): "👍 no comment" rides the quiz-name line — one line per row, no '·' placeholder above the date
+        const nc = page.locator('.fbp-row').nth(5);
+        assert.equal(await nc.locator('.fbp-q .fbp-nc').innerText(), '👍 no comment', 'a high mark with nothing written, inline');
+        assert.equal(await nc.locator('.fbp-c').count(), 0, 'no second line for it');
+        assert.equal(await nc.locator('.fbp-d span').count(), 0, 'no "·" above the date');
+        const h = await nc.evaluate(e => e.getBoundingClientRect().height);
+        assert.ok(h < 34, 'one-line row, height ' + h);
         assert.equal(await page.locator('.fbp-row').nth(3).locator('.fbp-c i').count(), 0, 'topic only: no empty quote');
         // V102.603: newest first by timestamp, sorted in the page (the read itself is unordered — the stub hands the docs back reversed)
-        assert.deepEqual(await texts(page, '.fbp-row .fbp-q'), ['❌ Eye for all-2', 'Retail-2', '🧗 BILASTINE Orodispersible Tab', 'Contraceptive Knowledge', '💡 Allergic Rhinitis-2', 'Retail-2']);
+        assert.deepEqual(await texts(page, '.fbp-row .fbp-q'), ['❌ Eye for all-2', 'Retail-2', '🧗 BILASTINE Orodispersible Tab', 'Contraceptive Knowledge', '💡 Allergic Rhinitis-2', 'Retail-2👍 no comment']);   // V102.608: the tag rides the name line
         // summary: bars for the rated ones in the last 30 days, avg time over the timed ones, given/attempted once the attempts land
         await page.waitForFunction(() => getFb().attempts === 7);
         const sum = (await page.locator('#gs-fb-sum').innerText()).replace(/\s+/g, ' ');
@@ -131,7 +137,11 @@ const texts = (page, sel) => page.locator(sel).evaluateAll(es => es.map(e => e.t
         // a row jumps to the per-quiz panel on this intern, lifted above the hub
         await page.locator('.fbp-row').nth(1).click();
         assert.deepEqual(await page.evaluate(() => panelCalls), [['q2', 'U1']]);
-        assert.equal(await page.locator('#quizFeedbackPanelModal').evaluate(e => e.style.zIndex), '100000');
+        // V102.608: the inline z-index lost to `.modal[style*="flex"]` (9999 !important) → it opened behind the hub (.force-show 99999).
+        // Check the COMPUTED z-index once the panel is shown the way showQuizFeedbackPanel shows it, and that it left #dashboard-container.
+        const z = await page.locator('#quizFeedbackPanelModal').evaluate(e => { e.style.display = 'flex'; const v = getComputedStyle(e).zIndex; e.style.display = 'none'; return { v: Number(v), body: e.parentElement === document.body, lift: e.classList.contains('qfp-lift') }; });
+        assert.ok(z.lift && z.body, 'lifted + at body level: ' + JSON.stringify(z));
+        assert.ok(z.v > 99999, 'computed z-index above the hub: ' + z.v);
 
         // EN → TH: labels follow, the flag swaps (through twemoji), only the current code shows
         await page.evaluate(() => gsSetLanguage('th'));
