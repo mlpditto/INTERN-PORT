@@ -41,7 +41,7 @@ const card = page => page.evaluate(() => { const c = document.getElementById('se
         await setScore(page, 30.48);
         let c = await card(page);
         assert.equal(c.cls, 'lv lv-4'); assert.equal(c.text, 'LV.4');
-        assert.equal(c.title, 'LV.4 Experienced Doctor · 9.52 pts to LV.5 Senior Archaeologist', 'the next LV in the tooltip: ' + c.title);
+        assert.equal(c.title, 'LV.4 Experienced Doctor · 9.52 pts to LV.5 Senior Archaeologist · 🌊 tap: wave theme on', 'the next LV in the tooltip (+ V101.285 the 🌊 switch hint): ' + c.title);
         assert.notEqual(await page.evaluate(() => document.getElementById('achievementUnlockModal').style.display), 'flex', 'no popup on the first run');
         assert.deepEqual(await page.evaluate(() => window.__writes), [{ p: 'users/U1', v: { lvSeen: 4 } }], 'the current LV is recorded silently');
         // every LV looks different (edge colour, emblem, chip text colour)
@@ -56,7 +56,7 @@ const card = page => page.evaluate(() => { const c = document.getElementById('se
         }
         assert.equal(new Set(looks.map(l => l.chip)).size, 10, 'ten different LV text colours: ' + looks.map(l => l.chip).join(' | '));
         assert.equal(new Set(looks.slice(0, 9).map(l => l.edge)).size, 9, 'nine different edge colours (LV.10 is the rainbow rim)');
-        assert.equal(looks[9].title, 'LV.10 Captain', 'max level: no "pts to"');
+        assert.equal(looks[9].title, 'LV.10 Captain · 🌊 tap: wave theme on', 'max level: no "pts to"');
         // V101.283: the card does not clip — the flood 🏠 / 🏥 gauges straddle its edges (they were cut in half under overflow:hidden)
         const clip = await page.evaluate(() => { const c = document.getElementById('section-profile-combined'), g = document.createElement('span');
             g.className = 'fw-side'; g.style.cssText = 'left:-13px;bottom:0'; c.appendChild(g);
