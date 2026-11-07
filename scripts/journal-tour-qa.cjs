@@ -81,6 +81,7 @@ const state = page => page.evaluate(() => {
                 assert.equal(s.next, i === 3 ? 'เข้าใจแล้ว ✓' : 'ถัดไป ›');
                 assert.equal(s.skip, i < 3, 'ข้าม on every scene but the last' + tag);
                 if (i === 1) assert.equal(s.finger, true, '👆 on the Note scene');
+                if (i === 3) { assert.ok(s.body.includes('อ่านซ้ำได้ที่ Work ▸ History') && s.body.includes('🎓'), 'scene 4 sends the reader to Work ▸ History (V101.284): ' + s.body); if (process.env.JT_SHOT) await page.locator('#journalTour .jt-tip, #journalTour [role="dialog"]').first().screenshot({ path: process.env.JT_SHOT }); }
                 if (i === 2) { await page.locator('#journalTour .jt-back').click(); assert.equal((await state(page)).step, want[1][0], '‹ goes back' + tag); await page.locator('#journalTour .jt-next').click(); }
                 await page.locator('#journalTour .jt-next').click();
             }
