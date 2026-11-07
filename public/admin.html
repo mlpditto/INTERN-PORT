@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.606)</title>
+    <title>Nika Admin (V102.607)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -5981,7 +5981,7 @@
         /* V102.496: the footer bar moved into the header row — one segmented Bonus control, the AI reason in a popover, Save & Score = ✅ icon */
         #reflectiveReviewModal .reflective-liquid-header { --rr-h:34px; flex-wrap:wrap; row-gap:8px; } /* V102.542: one height for every control in this row */
         #reflectiveReviewModal .reflective-liquid-header .reflective-liquid-title { flex:0 0 auto; }
-        #reflectiveReviewModal .rr-queue-count { padding:3px 10px; border-radius:999px; background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; font-size:0.62em; font-weight:800; letter-spacing:0; white-space:nowrap; }
+        #reflectiveReviewModal .rr-queue-count { padding:3px 10px; border-radius:999px; background:#eef2ff; border:1px solid #c7d2fe; color:#3730a3; font-size:0.62em; font-weight:800; letter-spacing:0; white-space:nowrap; }
         #reflectiveReviewModal .rr-queue-count[hidden] { display:none; }
         #reflectiveReviewModal .reflective-liquid-header .reflective-review-footer { flex:1 1 auto; margin:0; padding:0; border:0; gap:8px; justify-content:flex-end; flex-wrap:wrap; min-width:0; }
         #reflectiveReviewModal .reflective-liquid-header .rr-foot-bonus { flex:0 1 auto; flex-wrap:nowrap; gap:8px; }
@@ -71568,7 +71568,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
             const el = document.getElementById('rr-queue-count'), queue = rrReviewQueue(), i = queue.findIndex(l => l.id === id);
             if (!el) return;
             el.hidden = i < 0;
-            el.textContent = i < 0 ? '' : `${i + 1} / ${queue.length} รอตรวจ`;
+            // V102.607 (owner pick B): how many still wait, this one included (the queue wraps, so that is all of them) — one number, no Thai word
+            el.textContent = i < 0 ? '' : `📥 ${queue.length} left`;
+            el.title = i < 0 ? '' : `No reply yet: ${queue.length} (this one is ${i + 1} of ${queue.length}) · รอตอบ ${queue.length}`;
         }
 
         async function reviewReflective(id) {
@@ -71744,6 +71746,8 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 };
 
                 await logRef.update(upData);
+                // V102.607: count this one as reviewed now — the next row's "📥 n left" must not wait for the listener
+                { const c = reflectiveLogsCache.find(l => l.id === id); if (c) Object.assign(c, { adminComment: comment, adminBonus: bonus }); }
                 // V95.98: sync the dual-written submissions mirror (sourceId = reflective_logs id)
                 // so the intern's unified "pending" banner clears for this reflective log.
                 const rmBatch = db.batch();
