@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.288)</title>
+    <title>Internship Portfolio (V101.290)</title>
     <link rel="stylesheet" href="nika-ask.css?v=V101.263">
     <link rel="stylesheet" href="daily-canvas.css?v=V101.266">
     <link rel="stylesheet" href="halloween.css?v=V101.249">
@@ -1044,6 +1044,13 @@
         /* lean: collapse the body entirely when it has no content (no deadline/desc/materials)
            so empty cards don't carry dead vertical space. :empty ignores whitespace-only nodes. */
         .assign-body:empty { padding: 0; }
+        /* V101.290 (owner pick B): an interrupted graded quiz says it once — one pill in the title row is the state AND the retry request */
+        .assign-footer:empty { padding: 0; }
+        .qz-intr { max-width:100%; box-sizing:border-box; display:inline-flex; align-items:center; gap:6px; height:32px; min-height:0; width:auto; margin:4px 0 0; padding:0 4px 0 10px; border:none; border-radius:999px; background:#fee2e2; color:#991b1b; font-size:0.8em; font-weight:800; white-space:nowrap; cursor:pointer; }
+        .qz-intr .t { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+        .qz-intr b { flex:0 0 auto; display:inline-flex; align-items:center; height:26px; padding:0 10px; border-radius:999px; background:#f39c12; color:#1e293b; white-space:nowrap; }
+        .qz-intr-bar { flex-basis:100%; height:5px; margin-top:2px; border-radius:99px; background:#f1f5f9; overflow:hidden; }
+        .qz-intr-bar i { display:block; height:100%; background:#fca5a5; }
         /* V102.21: pre-quiz materials = one ribbon on the cover's top-left corner, coloured by file type (PDF red,
            OneDrive blue, YouTube red, Drive green, Canva violet…); the file name is in the hover. Several files: the
            ribbon shows the first type's icon + a count and opens a floating list (the card clips overflow). */
@@ -11917,9 +11924,13 @@
                                 // status='requesting' → admin's Pending queue (Allow/Deny) → Allow
                                 // flips to 'allowed' → intern retakes fresh. Admin still gates it, so
                                 // exam integrity is preserved.
-                                statusBadge = `<span class="assign-tag" style="background:#f8d7da; color:#721c24;">⚠️ Interrupted หยุดกลางคัน</span>`;
-                                bodyHtml = `<div style="color:#666;">This attempt was interrupted before submitting. Tap below to ask the admin to let you retry. แบบทดสอบนี้หยุดกลางคันก่อนส่ง กดปุ่มด้านล่างเพื่อขอให้แอดมินอนุมัติให้ทำใหม่</div>`;
-                                actionHtml = `<button class="btn-warning" onclick="requestLateQuiz('${q.id}', true)">📨 Request Retry ขอทำใหม่</button>`;
+                                // V101.290 (owner pick B, mockup-interrupted-card.html): one English pill — where it stopped + the request — and a thin bar; no body, no footer
+                                const _qn = Array.isArray(q.questions) ? q.questions.length : 0;
+                                const _at = Math.min(Math.max(0, attempt.currentStep || 0), Math.max(0, _qn - 1));
+                                statusBadge = `<button type="button" class="qz-intr lang-no-toggle" onclick="requestLateQuiz('${q.id}', true)" title="Stopped before submitting, so it counts as done. Tap to ask the admin to let you retry." aria-label="Stopped${_qn ? ` at question ${_at + 1} of ${_qn}` : ''} before submitting. Ask the admin to let you retry."><span class="t">⚠️ ${_qn ? `Q ${_at + 1}/${_qn}` : 'Stopped'}</span><b>📨 Retry</b></button>` +
+                                    (_qn ? `<span class="qz-intr-bar" aria-hidden="true"><i style="width:${Math.round(_at / _qn * 100)}%"></i></span>` : '');
+                                bodyHtml = '';
+                                actionHtml = '';
                             }
                         } else if (attempt.status === 'practice_done') {
                             // 🔥 V78: ONE-TIME practice completed
