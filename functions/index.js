@@ -407,6 +407,7 @@ exports.adjustQuizDeadline = onCall(async (request) => {
 });
 const { GoogleAuth } = require("google-auth-library");
 const axios = require("axios");
+const { sendTelegram, TG_SECRETS } = require('./telegram');   // 2026-11-07: admin alerts also go to Telegram
 const { PLAIN, plainBody } = require("./plain-http");   // no Brotli for admin-typed URLs (CVE-2026-111497)
 
 
@@ -2318,6 +2319,11 @@ exports.notifyOnAdminEdit = onCall(
 // ============================================================
 // V102.496: one "New Case Submitted" push per case is retired — the same case already arrives by e-mail. true brings the LINE bubbles back (admin 1:1 + group).
 const CASE_LINE_PUSH = false;
+// 2026-11-07 (owner, Telegram table): the per-event admin pings leave LINE (a group push costs one message per member) and go to
+// Telegram only. true brings each LINE push back; the digest stays on the LINE group + Telegram.
+const PRODUCT_LINE_PUSH = false;       // 🛒 new product (admin 1:1 + group)
+const QUIZ_SUBMIT_LINE_PUSH = false;   // ✅ quiz submitted (the 🔔 EVERY opt-in)
+const PURGE_LINE_PUSH = false;         // 🗑 notes about to be purged (admin 1:1, Mondays)
 // V102.547: Gemini reads the PDF on a Case right after Send (a callable from the page: Firestore triggers cannot deploy in this region).
 // The intern's call reads once; the admin's retry reads again. A failure leaves the case as it is and says so on it.
 // V102.550: the admin's retry may name another reader; the intern's call cannot.
@@ -2395,7 +2401,7 @@ exports.applyCaseSplit = onCall(async (request) => {
 });
 
 exports.notifyAdminOnNewCase = onCall(
-    { secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID', 'GMAIL_APP_PASSWORD'] },   // 2026-10-22: + the mail
+    { secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID', 'GMAIL_APP_PASSWORD', ...TG_SECRETS] },   // 2026-10-22: + the mail
     async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'Login required');
@@ -2559,6 +2565,8 @@ exports.notifyAdminOnNewCase = onCall(
         console.error(`[notifyAdminOnNewCase] MAIL_FAILED  case=${caseDocId}  message=${JSON.stringify((err && err.message) || 'unknown')}`);
     }
     results.push({ target: 'mail', ok: mailed });
+    // Telegram (2026-11-07): the headline only — no HN, no patient (the chat is not end-to-end encrypted).
+    await sendTelegram('notifyAdminOnNewCase', `🩺 New case · ${displayName}${disease ? ' · ' + disease : ''}`);
 
     const pushedCount = results.filter(r => r.ok && r.target !== 'mail').length;
     return { ok: pushedCount > 0 || mailed, pushed: pushedCount > 0, pushedCount, mailed, results, caseDocId };
@@ -2596,7 +2604,7 @@ exports.notifyAdminOnNewCase = onCall(
 //          ADMIN_LINE_GROUP_ID  (all already provisioned)
 // ============================================================
 exports.notifyAdminOnNewProduct = onCall(
-    { secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID'] },
+    { secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID', ...TG_SECRETS] },
     async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'Login required');
@@ -2712,6 +2720,10 @@ exports.notifyAdminOnNewProduct = onCall(
     }
 
     const flex = { type: 'flex', altText: altText, contents: bubble };
+    if (!PRODUCT_LINE_PUSH) {
+        const tg = await sendTelegram('notifyAdminOnNewProduct', altText);
+        return { ok: tg.ok, pushed: false, pushedCount: 0, telegram: tg.ok, results: [], productDocId };
+    }
     const results = await pushLineFlex(
         'notifyAdminOnNewProduct',
         targets,
@@ -2780,7 +2792,7 @@ exports.notifyPurgeDigest = onSchedule({
     schedule: 'every monday 09:00',
     timeZone: 'Asia/Bangkok',
     region: 'us-central1',
-    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID']
+    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', ...TG_SECRETS]
 }, async (event) => {
     const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     const adminLineId = process.env.ADMIN_LINE_USER_ID;
@@ -2877,7 +2889,7 @@ exports.notifyPurgeDigest = onSchedule({
         }
     };
 
-    try {
+    if (PURGE_LINE_PUSH) try {
         await axios.post('https://api.line.me/v2/bot/message/push', {
             to: adminLineId,
             messages: [flex]
@@ -2891,6 +2903,7 @@ exports.notifyPurgeDigest = onSchedule({
         const lineMessage = (err && err.response && err.response.data && err.response.data.message) || (err && err.message) || 'unknown';
         console.error(`[notifyPurgeDigest] PUSH_FAILED  status=${status || 'no-response'}  count=${total}  message=${JSON.stringify(lineMessage)}`);
     }
+    await sendTelegram('notifyPurgeDigest', altText);
 });
 
 // pingRestrictedGeminiModels (V96.85: RETIRED) — bimonthly keep-alive that
@@ -3048,6 +3061,13 @@ async function pushLineFlex(tag, targets, buildFlex, logSuffix) {
             results.push({ target: target.label, ok: false, code, status: status || null });
         }
     }
+    // Telegram (2026-11-07): one copy per admin / group run — the group's line when there is one (it carries no score),
+    // sent even when LINE refused (quota), when the copy matters most. Flood sends its own from sendFloodMail.
+    const tgTarget = targets.find(t => t.label === 'group') || targets.find(t => t.label === 'admin-1on1');
+    if (tgTarget && !/^flood|^notifyQuizSubmitted$/.test(tag)) {   // these send their own line
+        try { const f = buildFlex(tgTarget) || {}; await sendTelegram(tag, f.altText || f.text); }
+        catch (e) { console.warn(`[telegram] ${tag} skipped:`, e && e.message); }
+    }
     // One counter write per run, not per target — the increment carries the count.
     await recordLinePush(tag, results.filter(r => r.ok).length);
     return results;
@@ -3104,6 +3124,7 @@ async function runWatchLineQuota(deps) {
         try {
             const m = lineQuota.quotaMail({ month, day, limit, used, counter, byTag, pct: info.pct, perDay: info.perDay, projected: info.projected, runOutDay: info.runOutDay, tier: info.tier });
             await mail('INTERN-PORT LINE', m.subject, m.text);
+            await (d.sendTelegram || sendTelegram)('watchLineQuota', m.subject);
             await ref.set({ alert: { lastMailedTier: info.tier, lastMailedAt: FV.serverTimestamp() } }, { merge: true });
             mailed = true;
         } catch (e) { console.error('[watchLineQuota] mail failed — will try again tomorrow:', e && e.message); }
@@ -3116,7 +3137,7 @@ exports.watchLineQuota = onSchedule({
     schedule: '0 7 * * *',
     timeZone: 'Asia/Bangkok',
     region: 'us-central1',
-    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'GMAIL_APP_PASSWORD']
+    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'GMAIL_APP_PASSWORD', ...TG_SECRETS]
 }, async (event) => {
     await runWatchLineQuota();
 });
@@ -3363,7 +3384,7 @@ async function pushQuizScoreToIntern(opts) {
 }
 
 exports.notifyQuizSubmitted = onCall(
-    { secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID'] },
+    { secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID', ...TG_SECRETS] },
     async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'Login required');
@@ -3426,13 +3447,6 @@ exports.notifyQuizSubmitted = onCall(
     // (LINE quota — the 16:00 digest already reports done-vs-pending).
     // pushQuizScoreToIntern above still fires on every submission regardless.
     // notifyGroup:true stays usable on a quiz the admin has already closed.
-    if (quizData.notifyGroup !== true) {
-        return { skipped: true, reason: 'not-opted-in', personal };
-    }
-
-    const targets = resolveLineTargets('notifyQuizSubmitted');
-    if (!targets.length) return { skipped: true, reason: 'no-target', personal };
-
     let displayName = 'Unknown';
     try {
         const userDoc = await db.collection('users').doc(userId).get();
@@ -3441,6 +3455,15 @@ exports.notifyQuizSubmitted = onCall(
         console.warn(`[notifyQuizSubmitted] user read failed for ${userId}:`, err.message);
     }
     displayName = displayName.slice(0, 60);
+
+    // 2026-11-07 (owner): every real submission reaches the admin on Telegram (no quota) — name + quiz, never the score.
+    const telegram = (await sendTelegram('notifyQuizSubmitted', `✅ ${displayName} · ${quizTitle}`)).ok;
+    if (!QUIZ_SUBMIT_LINE_PUSH || quizData.notifyGroup !== true) {
+        return { skipped: true, reason: QUIZ_SUBMIT_LINE_PUSH ? 'not-opted-in' : 'line-off', telegram, personal };
+    }
+
+    const targets = resolveLineTargets('notifyQuizSubmitted');
+    if (!targets.length) return { skipped: true, reason: 'no-target', personal };
 
     const headline = '✅ Quiz Submitted';
 
@@ -4355,7 +4378,7 @@ exports.notifyQuizDigest = onSchedule({
     schedule: '0 23 * * 0,4',
     timeZone: 'Asia/Bangkok',
     region: 'us-central1',
-    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID']
+    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID', ...TG_SECRETS]
 }, async (event) => {
     const sunday = new Date().toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', weekday: 'short' }) === 'Sun';
     await runQuizDigest('scheduled', sunday ? { windowHours: 72, doneWhen: 'since Thu' } : { windowHours: 96, doneWhen: 'since Sun' });
@@ -4573,7 +4596,7 @@ exports.previewQuizDigest = onCall({
 // arrived off-cycle. Exists because the digest is assembled from live data, so
 // there is no way to reproduce it by hand.
 exports.sendQuizDigestNow = onCall({
-    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID'],
+    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID', ...TG_SECRETS],
     timeoutSeconds: 120
 }, async (request) => {
     requireAdminCallable(request);
@@ -5113,6 +5136,7 @@ async function sendFloodMail(subject, text) {
     const nodemailer = require('nodemailer');   // lazy: only the hourly job needs it
     const tx = nodemailer.createTransport({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user: FLOOD_MAIL, pass } });
     await tx.sendMail({ from: `"INTERN-PORT Flood" <${FLOOD_MAIL}>`, to: FLOOD_MAIL, subject, text });
+    await sendTelegram('floodTier', subject);   // 2026-11-07: the subject line only
 }
 
 // Weather + air quality at the point (Open-Meteo, keyless, CC BY 4.0), same fields as the popup card. Never throws.
@@ -5178,7 +5202,7 @@ exports.checkFloodAlerts = onSchedule({
     region: 'us-central1',
     timeoutSeconds: 300,
     memory: '256MiB',
-    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_GROUP_ID', 'GMAIL_APP_PASSWORD']
+    secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_GROUP_ID', 'GMAIL_APP_PASSWORD', ...TG_SECRETS]
 }, async (event) => {
     const db = admin.firestore();
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
