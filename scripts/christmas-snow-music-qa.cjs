@@ -72,6 +72,22 @@ async function open(browser, opts = {}) {
         st = await page.evaluate(() => ({ last: window.__calls.slice(-1)[0], pref: localStorage.getItem('xm_music') }));
         await page.waitForTimeout(100); assert.equal(await page.locator('.xm-hint').count(), 0, 'the hint never comes back on this device');
         assert.deepEqual(st, { last: 'play', pref: 'on' }, 'long-press again = music on');
+        // V101.286 (owner): quiet while a quiz is open — #quizModal shown = pause, closed = the music comes back (it was on before)
+        const qm = (d) => page.evaluate((v) => { document.getElementById('quizModal').style.display = v; }, d);
+        await qm('flex'); await page.waitForTimeout(50);
+        assert.equal(await page.evaluate(() => window.xmMusic.isOn()), false, 'quiz open = music paused');
+        await page.mouse.click(200, 700); await page.mouse.click(200, 700);
+        assert.equal(await page.evaluate(() => window.xmMusic.isOn()), false, 'taps during the quiz do not restart it');
+        await page.evaluate(() => { Object.defineProperty(document, 'hidden', { value: false, configurable: true }); document.dispatchEvent(new Event('visibilitychange')); });
+        assert.equal(await page.evaluate(() => window.xmMusic.isOn()), false, 'coming back to the app mid-quiz stays quiet');
+        await qm('none'); await page.waitForTimeout(50);
+        assert.equal(await page.evaluate(() => window.xmMusic.isOn()), true, 'quiz closed = music back');
+        // music turned off by the user → a quiz open / close never turns it on
+        await page.mouse.move(cx, cy); await page.mouse.down(); await page.waitForTimeout(750); await page.mouse.up();
+        assert.equal(await page.evaluate(() => window.xmMusic.isOn()), false);
+        await qm('flex'); await page.waitForTimeout(50); await qm('none'); await page.waitForTimeout(50);
+        assert.equal(await page.evaluate(() => window.xmMusic.isOn()), false, 'off stays off after a quiz');
+        await page.mouse.move(cx, cy); await page.mouse.down(); await page.waitForTimeout(750); await page.mouse.up();
         // theme switched off → snow gone, music paused
         await page.evaluate(() => applySeasonTheme('off')); await page.waitForTimeout(100);
         assert.equal(await page.locator('.xm-snow').count(), 0); assert.equal(await page.evaluate(() => window.__calls.slice(-1)[0]), 'pause', 'theme off = music off');
@@ -83,6 +99,15 @@ async function open(browser, opts = {}) {
         await w.page.tap('#main-app'); await w.page.waitForTimeout(150);
         assert.equal(await w.page.evaluate(() => window.xmMusic.isOn()), true, 'music starts on the first tap on iPhone: ' + JSON.stringify(await w.page.evaluate(() => window.__calls)));
         await w.ctx.close();
+        // V101.286: the first tap of the session lands inside an open quiz → no music until the quiz closes
+        const qz = await open(browser);
+        await qz.page.evaluate(() => { applySeasonTheme('xm'); document.getElementById('quizModal').style.display = 'flex'; }); await qz.page.waitForTimeout(100);
+        await qz.page.mouse.click(200, 700);
+        assert.deepEqual(await qz.page.evaluate(() => window.__calls), [], 'first tap inside a quiz: no music');
+        await qz.page.evaluate(() => { document.getElementById('quizModal').style.display = 'none'; }); await qz.page.waitForTimeout(50);
+        await qz.page.mouse.click(200, 700);
+        assert.equal(await qz.page.evaluate(() => window.xmMusic.isOn()), true, 'after the quiz, the next tap starts it');
+        await qz.ctx.close();
         // reduced motion: no snow
         const r = await open(browser, { reduced: true });
         await r.page.evaluate(() => applySeasonTheme('xm')); await r.page.waitForTimeout(100);

@@ -31,8 +31,22 @@
         if (!audio) { audio = new Audio('assets/sounds/xm-musicbox.mp3'); audio.loop = true; audio.volume = 0.35; audio.preload = 'auto'; }
         return audio;
     }
+    // V101.286 (owner): quiet while a quiz is open — #quizModal shown = the music pauses; it comes back when the quiz closes
+    function inQuiz() { var q = document.getElementById('quizModal'); return !!(q && getComputedStyle(q).display !== 'none'); }
+    var quizQuiet = false;
+    function quizSync() {
+        if (!audio) return;
+        if (inQuiz()) { if (!audio.paused) { quizQuiet = true; audio.pause(); } }
+        else if (quizQuiet) { quizQuiet = false; if (started && wanted() && on()) audio.play().catch(function () { /* needs a new gesture */ }); }
+    }
+    function watchQuiz() {
+        var q = document.getElementById('quizModal');
+        if (!q || q.dataset.xmWatch) return;
+        q.dataset.xmWatch = '1';
+        new MutationObserver(quizSync).observe(q, { attributes: true, attributeFilter: ['style', 'class'] });
+    }
     function play() {
-        if (!on()) return;
+        if (!on() || inQuiz()) return;
         var p = player().play(); started = true;
         if (p && p.then) p.then(showHint, function () { started = false; }); else showHint();
     }
@@ -60,14 +74,14 @@
 
     // the first gesture anywhere starts the music (when it is wanted)
     function firstGesture() {
-        if (started || !on() || !wanted()) return;
+        if (started || !on() || !wanted() || inQuiz()) return;
         play();
     }
     // V101.283: also touchend / click — iPhone (and LINE on it) only lets sound start inside those, a touchstart / pointerdown from a finger is refused
     ['pointerdown', 'keydown', 'touchstart', 'touchend', 'click'].forEach(function (t) { document.addEventListener(t, firstGesture, { capture: true, passive: true }); });
     document.addEventListener('visibilitychange', function () {
         if (!audio) return;
-        if (document.hidden) audio.pause(); else if (started && wanted() && on()) audio.play().catch(function () { /* needs a new gesture */ });
+        if (document.hidden) audio.pause(); else if (started && wanted() && on() && !inQuiz()) audio.play().catch(function () { /* needs a new gesture */ });
     });
 
     // long-press the profile photo = music off / on; the click that follows a long-press is swallowed so LINE does not open the browser
@@ -95,7 +109,7 @@
         if (on()) img.title = (img.title ? img.title + ' · ' : '') + 'Hold for music on / off';
     }
 
-    function apply() { paintSnow(); bindPhoto(); if (!on()) pause(); }
+    function apply() { paintSnow(); bindPhoto(); watchQuiz(); if (!on()) pause(); }
     // the theme can switch after load (app_settings/theme is read later), so follow the <html> class
     new MutationObserver(apply).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply); else apply();
