@@ -43,7 +43,7 @@ const end = backend.indexOf('\n});\n', backend.indexOf('exports.watchLineQuota =
 assert.ok(start > 0 && end > start, 'runner + schedule found');
 const src = backend.slice(start, end);
 assert.ok(!/message\/push|pushLineFlex|broadcast|multicast|narrowcast/.test(src), 'the watch never calls a LINE push endpoint — the alert must not spend the quota it guards');
-assert.ok(src.includes("schedule: '0 7 * * *'") && src.includes("timeZone: 'Asia/Bangkok'") && src.includes("secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'GMAIL_APP_PASSWORD']"), 'daily 07:00 Bangkok, token + Gmail secrets only');
+assert.ok(src.includes("schedule: '0 7 * * *'") && src.includes("timeZone: 'Asia/Bangkok'") && src.includes("secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'GMAIL_APP_PASSWORD', ...TG_SECRETS]"), 'daily 07:00 Bangkok, token + Gmail (+ Telegram, 2026-11-07) secrets only');
 assert.ok(src.includes("sendMail"), 'mail goes through the injectable helper (default sendAdminMail)');
 
 const docs = {};
@@ -57,7 +57,8 @@ const context = {
     admin: { firestore: Object.assign(() => db, { FieldValue: FV }) },
     axios: { get: async (url, o) => { apiCalls.push({ url, auth: o && o.headers && o.headers.Authorization, timeout: o && o.timeout }); if (apiReply instanceof Error) throw apiReply; return apiReply(url); } },
     sendAdminMail: async () => { throw new Error('the default mailer must not be used in the test'); },
-    lineQuota: Q
+    lineQuota: Q,
+    TG_SECRETS: ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_ADMIN_CHAT_ID'], sendTelegram: async () => ({ ok: false, code: 'not-set' })
 };
 vm.createContext(context); vm.runInContext(src, context);
 const run = (extra) => context.runWatchLineQuota(Object.assign({ db, FieldValue: FV, token: 'T', sendMail: async (from, subject, text) => { if (mailFail) throw new Error('smtp down'); mails.push({ from, subject, text }); } }, extra));

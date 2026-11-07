@@ -8,19 +8,20 @@ const assert = require('node:assert/strict');
 const backend = fs.readFileSync('functions/index.js', 'utf8');
 
 // static pins
-assert.ok(backend.includes("{ secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID', 'GMAIL_APP_PASSWORD'] }"), 'the callable declares the Gmail secret');
+assert.ok(backend.includes("{ secrets: ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID', 'GMAIL_APP_PASSWORD', ...TG_SECRETS] }"), 'the callable declares the Gmail (+ Telegram, 2026-11-07) secrets');
 assert.ok(backend.includes('async function sendAdminMail(fromName, subject, text, html) {') && backend.includes('async function sendFloodMail(subject, text) {'), 'sendAdminMail beside the untouched sendFloodMail');
 assert.ok(/async function sendAdminMail[\s\S]*?to: FLOOD_MAIL, subject, text(?:, \.\.\.\(html \? \{ html \} : \{\}\))? \}\);\r?\n\}/.test(backend), 'sendAdminMail mails the account itself (medlifeplus@gmail.com)');
 const start = backend.indexOf('exports.notifyAdminOnNewCase = onCall(');
 const src = backend.slice(start, backend.indexOf('\n});', start) + 4);
 assert.ok(!src.includes("reason: 'token-missing'") && !src.includes("reason: 'admin-id-missing'"), 'a missing LINE token / target no longer returns before the mail (the product notifier keeps its own early returns)');
-let CASE, pushes, mails, mailFail;
+let CASE, pushes, mails, mailFail, tg = [];
 const context = {
     exports: {}, console: { log() {}, warn() {}, error() {} },
     onCall: (opts, fn) => { fn.opts = opts; return fn; },
     HttpsError: class HttpsError extends Error { constructor(code, msg) { super(msg); this.code = code; } },
     admin: { firestore: () => ({ collection: () => ({ doc: () => ({ get: async () => ({ exists: !!CASE, data: () => CASE }) }) }) }) },
     process: { env: {} },
+    TG_SECRETS: ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_ADMIN_CHAT_ID'], sendTelegram: async (tag, text) => { tg.push(text); return { ok: true }; },
     CASE_LINE_PUSH: true,   // V102.496: the switch declared above the function in index.js; true = the LINE path these cases cover (the 'off' case is below)
     axios: { post: async (url, body, opts) => { pushes.push({ to: body.to, alt: body.messages[0].altText }); return { data: {} }; } },
     sendAdminMail: async (fromName, subject, text, html) => { mails.push({ fromName, subject, text, html }); if (mailFail) throw new Error('smtp down'); }
@@ -28,8 +29,8 @@ const context = {
 vm.createContext(context);
 vm.runInContext(src, context);
 const fn = context.exports.notifyAdminOnNewCase;
-assert.deepEqual(JSON.parse(JSON.stringify(fn.opts.secrets)), ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID', 'GMAIL_APP_PASSWORD']);   // vm realm → plain
-const call = (env, caseData, fail) => { context.process.env = env; CASE = caseData; pushes = []; mails = []; mailFail = !!fail; return fn({ auth: { uid: 'u1' }, data: { caseDocId: 'c1' } }); };
+assert.deepEqual(JSON.parse(JSON.stringify(fn.opts.secrets)), ['LINE_CHANNEL_ACCESS_TOKEN', 'ADMIN_LINE_USER_ID', 'ADMIN_LINE_GROUP_ID', 'GMAIL_APP_PASSWORD', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_ADMIN_CHAT_ID']);   // vm realm → plain
+const call = (env, caseData, fail) => { context.process.env = env; CASE = caseData; pushes = []; mails = []; tg = []; mailFail = !!fail; return fn({ auth: { uid: 'u1' }, data: { caseDocId: 'c1' } }); };
 const FULL = { displayName: 'สมชาย ใจดี', caseId: '26-26870', customer: 'นางสาว ก', disease: 'Hypertension', diseaseSystemLabel: 'Cardiovascular / ระบบหัวใจ', note: 'Amlodipine 5 mg · BP 150/95' };
 const LINE = { LINE_CHANNEL_ACCESS_TOKEN: 't', ADMIN_LINE_USER_ID: 'U123', ADMIN_LINE_GROUP_ID: 'C456', GMAIL_APP_PASSWORD: 'p' };
 
@@ -44,6 +45,7 @@ const LINE = { LINE_CHANNEL_ACCESS_TOKEN: 't', ADMIN_LINE_USER_ID: 'U123', ADMIN
     for (const s of ['สมชาย ใจดี ส่ง Case ใหม่', 'HN / Ref: 26-26870', 'ผู้ป่วย: นางสาว ก', 'โรค: Hypertension', 'ระบบ: Cardiovascular / ระบบหัวใจ', 'Note: Amlodipine 5 mg · BP 150/95', 'เปิดหน้า admin: https://mlpditto.github.io/INTERN-PORT/admin.html']) assert.ok(mails[0].text.includes(s), 'mail says: ' + s);
     assert.ok(!/undefined/.test(mails[0].text + mails[0].subject), 'nothing undefined in the mail');
     assert.ok(mails[0].html.includes('<a href="https://mlpditto.github.io/INTERN-PORT/admin.html">เปิดหน้า admin</a>') && !mails[0].html.includes('>https://'), 'HTML part: short link, no visible long URL');
+    assert.deepEqual(tg, ['🩺 New case · สมชาย ใจดี · Hypertension'], 'Telegram: name + disease only — no HN, no patient, no note');
     assert.ok(mails[0].html.includes('Amlodipine 5 mg · BP 150/95'), 'HTML part keeps the note');
 
     // 2. a sparse case: empty fields are left out, the subject falls back to the disease / Untitled

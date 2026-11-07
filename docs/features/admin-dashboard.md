@@ -12,6 +12,7 @@ Admin: Dashboard (first screen after login).
 - `line-usage-chip-qa` — "✈ 12/300" chip in the board toolbar; card folds out
 - `line-quota-chip-qa` — the chip / card show LINE's own count from `line_usage/{month}.api` while it is fresh (< 36 h): number, limit, colour of the worse tier, projection note, Send-digest gate on LINE's cap; stale / error / unlimited fall back to the counter
 - `line-quota-check` — `functions/line-quota.js` (tier maths: day-1 spike no alarm, pace projection + run-out day, 70 / 90 / 100 %, unlimited plan; the Thai owner mail) and the real `runWatchLineQuota` in a vm: writes the `api` block, mails once per tier per month, API failure recorded without mail, mail failure leaves `lastMailedTier`, never a LINE push
+- `telegram-admin-check` — `functions/telegram.js` + the real `pushLineFlex`: admin / group alerts copied to Telegram (one line + admin link; group line first, sent even when LINE is refused; none for intern-only or flood runs); silent without the two `TELEGRAM_*` secrets; the token never logged; each sending function declares the secrets; the case line has no HN / patient
 - `delete-request-context-check` — delete-requests.js context: profile / photo / quiz / legacy refs
 - `delete-request-quiz-check` — Delete on a quiz-attempt request really deletes and takes the score back
 - `note-delete-request-qa` — deletion queue includes archived notes, newest first
