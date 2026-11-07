@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.608)</title>
+    <title>Nika Admin (V102.609)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -4973,6 +4973,13 @@
         #groupSelectModal .gs-fbpane .fbp-q { font-size:12.5px; font-weight:700; color:var(--text-main, #1e293b); }
         #groupSelectModal .gs-fbpane .fbp-c { font-size:12px; color:#475569; margin-top:1px; }
         #groupSelectModal .gs-fbpane .fbp-c i { color:#64748b; }
+        /* V102.609 🚩 flags on a feedback card */
+        #quizFeedbackPanelModal .qfp-flags { margin-top:6px; display:flex; flex-direction:column; gap:5px; }
+        #quizFeedbackPanelModal .qfp-flag { display:grid; grid-template-columns:1fr auto; gap:2px 8px; align-items:center; padding:6px 9px; border:1px solid #fde68a; border-radius:9px; background:#fffbeb; font-size:12.5px; }
+        #quizFeedbackPanelModal .qfp-flag-w { font-size:11.5px; font-weight:800; color:#b45309; }
+        #quizFeedbackPanelModal .qfp-flag q { grid-column:1 / -1; padding:2px 7px; border-left:3px solid #f59e0b; border-radius:4px; background:rgba(253,224,71,.35); color:#78350f; font-style:italic; }
+        #quizFeedbackPanelModal .qfp-flag-n { grid-column:1 / -1; color:#475569; }
+        #quizFeedbackPanelModal .qfp-flag-go { width:auto; min-height:0; margin:0; padding:2px 8px; border:none; border-radius:8px; background:#eef2ff; color:#4338ca; font:inherit; font-size:11.5px; font-weight:800; cursor:pointer; }
         #groupSelectModal .gs-fbpane .fbp-nc { font-size:12px; font-weight:500; color:#94a3b8; margin-left:6px; white-space:nowrap; }   /* V102.608: 👍 no comment inline — one line per row */
         #groupSelectModal .gs-fbpane .fbp-t { display:inline-block; font-size:11px; color:#4338ca; background:#eef2ff; border-radius:999px; padding:1px 7px; margin-left:6px; font-weight:700; font-style:normal; }
         #groupSelectModal .gs-fbpane .fbp-d { font-size:11px; color:#94a3b8; white-space:nowrap; text-align:right; }
@@ -75441,6 +75448,7 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                             <button type="button" class="qfp-ib qfp-ib-del" onclick="deleteQuizFeedbackItem('${f.id}')" title="Delete this feedback (asks to confirm)" data-th-title="ลบผลตอบรับนี้ โดยจะขอยืนยัน" aria-label="Delete feedback">🗑</button></span></span>
                         </div>
                         ${rawComment ? `<div class="lang-no-toggle" style="margin-top:6px;font-size:0.85em;color:#475569;background:#fdf8f1;padding:8px 12px;border-radius:8px;border-left:3px solid #e7d8c4;white-space:pre-wrap;">${safeComment}</div>` : '<p title="No comment provided" data-th-title="ผู้ตอบไม่ได้กรอกความคิดเห็น" style="color:#80566a;margin:6px 0 0;font-size:0.85em;">No comment provided</p>'}
+                        ${qfpFlagsHtml(f)}
                         ${quizResultHtml}
                         ${(nt || hasAiReview) ? `<div style="margin-top:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:0.82em;">${nt ? `<span class="lang-no-toggle" style="color:#6d28d9;font-weight:700;" title="Next topic requested">🎯 ${qfpEscapeHtml(nt)}</span>` : ''}<span style="flex:1;"></span>${hasAiReview ? `<span onclick="var e=document.getElementById('qfp-ai-review-${f.id}');e.style.display=e.style.display==='none'?'block':'none'" title="🗡️ ${aiScoreText} — tap to show the issue and the suggestion" style="font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;background:#e0e7ff;color:#3730a3;cursor:pointer;">🗡️ ${f.aiFeedbackScore.toFixed(1)} · 💡</span>` : ''}</div>` : ''}
                         <div id="qfp-ai-review-${f.id}" style="margin-top:6px; font-size:0.8em; color:#334155; background:#eef2ff; border:1px solid #c7d2fe; border-radius:8px; padding:8px 10px; line-height:1.5; display:none;">
@@ -75463,7 +75471,32 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
         // V102.246: a 10/10 with no comment and no next topic says nothing an admin can act on — it is dropped from the review list (never deleted: it keeps its
         // bonus record and still counts in the average / Responses). The 👍 chip shows them.
         function qfpIsEmptyPraise(f) {
-            return typeof f.rating === 'number' && f.rating >= 10 && !qfpNormalizeTopic(f.comment) && !qfpNormalizeTopic(f.nextTopic);
+            return typeof f.rating === 'number' && f.rating >= 10 && !qfpNormalizeTopic(f.comment) && !qfpNormalizeTopic(f.nextTopic) && !(Array.isArray(f.flags) && f.flags.length);
+        }
+        // V102.609 🚩: interns flag a sentence of 📖 Read first / the question / a choice during the quiz (intern quiz-flag.js); they ride the
+        // feedback doc as `flags` [{part, step, opt, quote, reason, note}] — or a flags-only doc (`flagsOnly`) when the form was skipped.
+        function qfpHasFlags(f) { return !!(f && Array.isArray(f.flags) && f.flags.length); }
+        const QFP_FLAG_REASON = { wrong: '❌ Wrong', unclear: '❓ Unclear', typo: '✏️ Typo', outdated: '🕰 Outdated' };
+        function qfpFlagsHtml(f) {
+            if (!qfpHasFlags(f)) return '';
+            return '<div class="qfp-flags lang-no-toggle">' + f.flags.map(x => {
+                const step = Number(x.step) || 0, where = (x.part === 'primer' ? '📖 Read first · ' : '') + 'Q' + (step + 1) + (x.part === 'opt' && x.opt != null ? ' · choice ' + String.fromCharCode(65 + Number(x.opt)) : '');
+                return `<div class="qfp-flag"><span class="qfp-flag-w">🚩 ${qfpEscapeHtml(where)}${QFP_FLAG_REASON[x.reason] ? ' · ' + QFP_FLAG_REASON[x.reason] : ''}</span>`
+                    + `<button type="button" class="qfp-flag-go" onclick="qfpOpenFlag(${step})" title="Open this question in the quiz editor">✏️ Q${step + 1}</button>`
+                    + `<q>${qfpEscapeHtml(x.quote || '')}</q>${x.note ? `<span class="qfp-flag-n">✍️ ${qfpEscapeHtml(x.note)}</span>` : ''}</div>`;
+            }).join('') + '</div>';
+        }
+        // ✏️ Qn: the quiz editor, scrolled to that question with a short yellow ring
+        async function qfpOpenFlag(step) {
+            if (!_qfpCurrentId || typeof openQuizModal !== 'function') return;
+            document.getElementById('quizFeedbackPanelModal').style.display = 'none';
+            await openQuizModal(_qfpCurrentId);
+            setTimeout(() => {
+                const it = document.querySelectorAll('#quiz-questions-container .quiz-q-item')[step]; if (!it) return;
+                it.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                it.style.outline = '3px solid #f59e0b'; it.style.outlineOffset = '2px';
+                setTimeout(() => { it.style.outline = ''; it.style.outlineOffset = ''; }, 2600);
+            }, 450);
         }
         function qfpMatchesFilter(f) {
             const rc = qfpNormalizeTopic(f.comment);
@@ -75474,7 +75507,7 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                 case 'signal':   { const g = qfpSignal(f); return !!g && g.kind === 'ended'; }   // V102.259
                 case 'short':    return rc.length > 0 && rc.length < 100;
                 case 'low':      return typeof f.rating === 'number' && f.rating <= 5;
-                case 'fix':      return fbNeedsFix(f);
+                case 'fix':      return fbNeedsFix(f) || (Array.isArray(f.flags) && f.flags.length > 0);   // 🚩 flags are reported mistakes too
                 default:         return true;
             }
         }
@@ -75513,7 +75546,7 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                 unscored: _qfpFeedbacks.filter(f => norm(f).length > 0 && typeof f.aiFeedbackScore !== 'number').length,
                 short: _qfpFeedbacks.filter(f => { const n = norm(f).length; return n > 0 && n < 100; }).length,
                 low: _qfpFeedbacks.filter(f => typeof f.rating === 'number' && f.rating <= 5).length,
-                fix: _qfpFeedbacks.filter(fbNeedsFix).length,
+                fix: _qfpFeedbacks.filter(f => fbNeedsFix(f) || (Array.isArray(f.flags) && f.flags.length > 0)).length,
             };
             counts.signal = _qfpFeedbacks.filter(f => { const g = qfpSignal(f); return g && g.kind === 'ended'; }).length;   // V102.259
             const chipTips = { all: 'All', fix: 'Reported bugs still open', unscored: 'Not AI-scored yet', short: 'Shorter than 100 characters', low: 'Low rating (5 or less)', praise: '10/10 with no comment (kept out of All; never gets an add-on)', signal: 'Signal — the training is over and no add-on was credited' };
@@ -75820,7 +75853,8 @@ Reply ONLY with raw JSON, no markdown:
         function qfpIsEmptyFeedback(f) {
             return !(typeof f.rating === 'number' && (f.rating > 0 || (f.rating === 0 && f.ratingProvided === true)))
                 && !qfpNormalizeTopic(f.comment)
-                && !qfpNormalizeTopic(f.nextTopic);
+                && !qfpNormalizeTopic(f.nextTopic)
+                && !(Array.isArray(f.flags) && f.flags.length);   // 🚩 a flags-only entry is not empty
         }
 
         // V102.252: ↩️ Repair. Until V102.251 deleting a feedback subtracted `pointsEarned` — the QUIZ score snapshot, not a feedback reward — and wrote a manual_adjust

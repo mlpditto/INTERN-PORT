@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.287)</title>
+    <title>Internship Portfolio (V101.288)</title>
     <link rel="stylesheet" href="nika-ask.css?v=V101.263">
     <link rel="stylesheet" href="daily-canvas.css?v=V101.266">
     <link rel="stylesheet" href="halloween.css?v=V101.249">
@@ -2562,7 +2562,7 @@
 <script src="internship-progress.js?v=V101.184"></script><link rel="stylesheet" href="internship-progress.css?v=V101.184">
 <script src="monthly-progress.js?v=V101.79"></script><link rel="stylesheet" href="monthly-progress.css?v=V101.39">
 <script src="assigned-goals.js?v=V100.30"></script><link rel="stylesheet" href="assigned-goals.css?v=V100.30">
-<link rel="stylesheet" href="quiz-user-focus.css?v=V101.250"><script defer src="rank-quiz.js?v=V101.231"></script><script defer src="writing-progress.js?v=V101.232"></script><script defer src="quiz-term-highlight.js?v=V101.250"></script><script defer src="quiz-feedback-lang.js?v=V101.237"></script><script defer src="quiz-feedback-ai.js?v=V101.96"></script><script defer src="quiz-feedback-remind.js?v=V101.176"></script><script defer src="owed-remind.js?v=V101.228"></script>
+<link rel="stylesheet" href="quiz-user-focus.css?v=V101.250"><link rel="stylesheet" href="quiz-flag.css?v=V101.288"><script defer src="quiz-flag.js?v=V101.288"></script><script defer src="rank-quiz.js?v=V101.231"></script><script defer src="writing-progress.js?v=V101.232"></script><script defer src="quiz-term-highlight.js?v=V101.250"></script><script defer src="quiz-feedback-lang.js?v=V101.237"></script><script defer src="quiz-feedback-ai.js?v=V101.96"></script><script defer src="quiz-feedback-remind.js?v=V101.176"></script><script defer src="owed-remind.js?v=V101.228"></script>
 <link rel="stylesheet" href="quiz-cover.css?v=V101.282">
 <link rel="stylesheet" href="case-insight-rail.css?v=V101.59">
 <script src="quiz-cover.js?v=V101.282"></script>
@@ -6166,6 +6166,7 @@
             <div id="feedback-score-display"><span id="feedback-score-val">0.00</span><span id="feedback-time-val" hidden></span></div>
 
             <div id="fb-form-content">
+                <div id="fb-flags" hidden></div><!-- V101.288 🚩 flags from this run (quiz-flag.js) -->
                 <div class="fb-review-grid"><section class="fb-rating-panel" aria-label="Quiz rating">
                     <div id="fb-rating-stars" role="group" aria-label="Rating 0 to 10">
 <button type="button" data-val="0" style="--h:0" aria-pressed="false" onclick="setFbRating(0)" title="Rate 0 out of 10">0</button>
@@ -14247,6 +14248,7 @@
                     ['btn-quiz-prev', 'btn-quiz-next', 'btn-quiz-submit'].forEach(id => { const b = document.getElementById(id); if (b) b.style.display = 'none'; });
                     const ps = document.getElementById('btn-quiz-primer-start');
                     if (ps) { ps.innerHTML = '▶' + (tt ? '' : ' ⏱ ' + (question.timer || 60) + 's'); ps.style.display = 'inline-block'; }
+                    if (window.qzFlag) qzFlag.onRender('primer');   // V101.288 🚩 + the how-to bubble (quiz-flag.js)
                     return;
                 }
 
@@ -14416,6 +14418,7 @@
                     drugs: (typeof dcState !== 'undefined' && dcState.codex) || [], diseases: (typeof dxState !== 'undefined' && dxState.codex) || [],
                     terms: (currentQuiz.questions[currentStep] || {}).terms   // V101.207: the admin's AI-marked terms for this question
                 });
+                if (window.qzFlag) qzFlag.onRender('q');   // V101.288 🚩 marks for this question (after the highlighter, which moves the text)
 
                 // Update footer buttons
                 document.getElementById('btn-quiz-prev').style.display = currentStep > 0 ? 'inline-block' : 'none';
@@ -15544,6 +15547,7 @@
                     const timeUsed = quizTotalStartTime ? Math.floor((new Date() - quizTotalStartTime) / 1000) : 0;
                     currentTimeUsedForFeedback = timeUsed;
                     fbPrepare(currentQuiz.id, pointsAwarded, timeUsed);
+                    if (window.qzFlag) qzFlag.renderFeedback();   // V101.288
                     // No rating is selected until the user chooses a value.
                     // (Replaced V93.01 slider default of 5 which still nudged feedback bias.)
                     setFbRating(null);
@@ -15747,6 +15751,8 @@
 
         function closeFeedbackModal() {
             if (window.fbAi) fbAi.cancel();
+            // V101.288: skipped with 🚩 flags → they still reach the admin, as a flags-only doc (never counted as feedback given)
+            if (window.qzFlag && qzFlag.count() && currentQuizIdForFeedback) qzFlag.saveOrphans({ quizId: currentQuizIdForFeedback, userId: userId, displayName: userProfile.displayName, timeUsedSeconds: currentTimeUsedForFeedback, pointsEarned: currentPointsForFeedback });
             document.getElementById('quizFeedbackModal').style.display = 'none';
             const form = document.getElementById('fb-form-content');
             const card = document.getElementById('fb-reward-card');
@@ -15793,7 +15799,8 @@
             // dismissal instead: close the modal, write nothing, no reward card.
             const ratingValue = rating === '' ? null : Number(rating);
             if (ratingValue !== null && (!Number.isInteger(ratingValue) || ratingValue < 0 || ratingValue > 10)) return;
-            if (ratingValue === null && !nextTopic && !trimmedComment) {
+            const flagCount = window.qzFlag ? qzFlag.count() : 0;   // V101.288 🚩
+            if (ratingValue === null && !nextTopic && !trimmedComment && !flagCount) {
                 closeFeedbackModal();
                 return;
             }
@@ -15814,8 +15821,10 @@
                     comment: trimmedComment,
                     timeUsedSeconds: currentTimeUsedForFeedback,
                     pointsEarned: currentPointsForFeedback,
+                    ...(flagCount ? { flags: qzFlag.payload() } : {}),
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
+                if (flagCount) qzFlag.clear();
 
                 // V97.19: flag the attempt so the "Give Feedback" button (Mission card +
                 // History detail) can hide itself once feedback exists, instead of staying
@@ -15829,7 +15838,7 @@
                 let streak = 1;
                 try {
                     const snap = await db.collection("quiz_feedback").where("userId", "==", userId).get();
-                    streak = snap.size || 1;
+                    streak = snap.docs.filter(d => !(d.data() || {}).flagsOnly).length || 1;   // V101.288: a flags-only doc is not feedback
                 } catch (_) {
                     // streak query is best-effort — show reward with fallback count.
                 }
@@ -15860,9 +15869,8 @@
                 const existing = await db.collection("quiz_feedback")
                     .where("quizId", "==", quizId)
                     .where("userId", "==", userId)
-                    .limit(1)
                     .get();
-                if (!existing.empty) {
+                if (existing.docs.some(d => !(d.data() || {}).flagsOnly)) {   // V101.288: a 🚩 flags-only doc is not feedback
                     alert(fbT('already'));
                     return;
                 }
@@ -15881,6 +15889,7 @@
                 : 0;
 
             fbPrepare(quizId, currentPointsForFeedback, currentTimeUsedForFeedback);   // V101.95: this path never refreshed the score / time (it showed 0.00 / 00:00)
+            if (window.qzFlag) qzFlag.renderFeedback();   // V101.288: none on this path (flags live only for the run that just ended)
             setFbRating(null);
             document.getElementById('fb-next-topic').value = "";
             document.getElementById('fb-comment').value = "";
