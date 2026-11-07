@@ -2,7 +2,9 @@
 // One question costs one of DAILY a day, refunded when the service was busy. Paused while a quiz is open: the callable decides, the page only shows it.
 // The log keeps the question and the outcome, never who asked.
 const DAILY = 10;
-const QUIZ_LOCK_MS = 3 * 60 * 60 * 1000;   // a quiz closed without finishing stays 'started' for ever, so the lock has to end by itself
+const QUIZ_LOCK_MS = 3 * 60 * 60 * 1000;   // a quiz closed without finishing stays 'started' for ever, so the lock has to end by itself — counted from the LAST activity (lastActive is saved on every Next / break / resume)
+const BREAK_LOCK_MS = 24 * 60 * 60 * 1000;   // ⏸ a break on a quiz with no deadline locks Nika this long after it began
+const BREAK_MAX_MS = 7 * 24 * 60 * 60 * 1000;   // and never longer than this, whatever the deadline
 const MIN_Q = 3, MAX_Q = 300, MAX_SOURCES = 5;
 const NONE = 'NOT_IN_LIBRARY';
 const ANSWER_URL = 'https://discoveryengine.googleapis.com/v1/projects/intern-port-edfa7/locations/global/collections/default_collection/engines/nika-search/servingConfigs/default_search:answer';
@@ -45,12 +47,24 @@ function parseAnswer(data) {
     return sources.length ? { answer: dropLeadIn(text), sources } : { notFound: true };   // an answer with no source is not one we can stand behind
 }
 
+const ms = t => (t && typeof t.toMillis === 'function') ? t.toMillis() : 0;
 async function quizOpen(db, userId, now) {
     const snap = await db.collection('quiz_attempts').where('userId', '==', userId).where('status', '==', 'started').get();
-    return snap.docs.some(d => {
-        const a = d.data() || {}, t = a.startTime || a.timestamp;
-        return a.isPractice !== true && t && t.toMillis && now - t.toMillis() < QUIZ_LOCK_MS;
-    });
+    for (const d of snap.docs) {
+        const a = d.data() || {};
+        if (a.isPractice === true) continue;
+        if (a.pausedAt) {
+            // V102.612 ⏸ on a break (intern quiz-break.js): still mid-quiz — locked until the quiz's deadline (the intern's page then sends
+            // what was answered), 24 h after the break began when the quiz has no deadline, and never past 7 days.
+            const q = a.quizId ? await db.collection('quizzes').doc(a.quizId).get() : null;
+            const due = q && q.exists ? ms((q.data() || {}).deadline) : 0, at = ms(a.pausedAt);
+            if (now < Math.min(due || at + BREAK_LOCK_MS, at + BREAK_MAX_MS)) return true;
+            continue;
+        }
+        const t = Math.max(ms(a.startTime), ms(a.timestamp), ms(a.lastActive));
+        if (t && now - t < QUIZ_LOCK_MS) return true;
+    }
+    return false;
 }
 
 // deps: { db, FieldValue, HttpsError, isAdmin, dayKey, now, token(), post(url, body, token) }
@@ -93,4 +107,4 @@ async function handle(request, deps) {
     return { ...out, left };
 }
 
-module.exports = { DAILY, QUIZ_LOCK_MS, NONE, MAX_Q, requestBody, parseAnswer, handle };
+module.exports = { DAILY, QUIZ_LOCK_MS, BREAK_LOCK_MS, BREAK_MAX_MS, NONE, MAX_Q, requestBody, parseAnswer, handle };
