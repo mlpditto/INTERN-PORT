@@ -49,8 +49,11 @@ const { sendTelegram, TG_SECRETS } = require(path.join(__dirname, '../functions/
         await pushLineFlex('notifyAdminOnNewProduct', [{ to: 'U1', label: 'admin-1on1' }], () => ({ type: 'flex', altText: '🛒 New product: Para from Boss' }), '');
         assert.deepEqual(tg.map(x => x.text), ['🛒 New product: Para from Boss'], 'admin-only run → its line');
         tg = []; lineFails = true;
-        await pushLineFlex('notifyQuizSubmitted', [{ to: 'C1', label: 'group' }], () => ({ type: 'flex', altText: '✅ Quiz Submitted — Asthma' }), '');
+        await pushLineFlex('notifyQuizDigest', [{ to: 'C1', label: 'group' }], () => ({ type: 'flex', altText: '📊 Quiz digest — 1 done' }), '');
         assert.equal(tg.length, 1, 'LINE refused (quota) → Telegram still sent');
+        tg = [];
+        await pushLineFlex('notifyQuizSubmitted', [{ to: 'C1', label: 'group' }], () => ({ type: 'flex', altText: '✅ Quiz Submitted — Asthma' }), '');
+        assert.equal(tg.length, 0, 'quiz submit sends its own line, never a second copy');
         tg = []; lineFails = false;
         await pushLineFlex('notifyQuizScore', [{ to: 'U9', label: 'intern-1on1' }], () => ({ type: 'flex', altText: 'score' }), '');
         assert.equal(tg.length, 0, 'intern-only run → nothing');
@@ -67,6 +70,14 @@ const { sendTelegram, TG_SECRETS } = require(path.join(__dirname, '../functions/
         assert(src.includes("await sendTelegram('floodTier', subject);"), 'flood subject line');
         assert(src.includes("await (d.sendTelegram || sendTelegram)('watchLineQuota', m.subject);"), 'quota subject line');
         assert(src.includes("await sendTelegram('notifyPurgeDigest', altText);"), 'purge digest line');
+        // owner table 2026-11-07: per-event pings Telegram only; the digest keeps the LINE group
+        for (const k of ['PRODUCT_LINE_PUSH', 'QUIZ_SUBMIT_LINE_PUSH', 'PURGE_LINE_PUSH']) assert(new RegExp('^const ' + k + ' = false;', 'm').test(src), k + ' declared and false');
+        assert(src.includes('if (!PRODUCT_LINE_PUSH) {') && src.indexOf('if (!PRODUCT_LINE_PUSH) {') < src.indexOf("'notifyAdminOnNewProduct',\n        targets"), 'product: Telegram before (instead of) the LINE push');
+        assert(src.includes('if (PURGE_LINE_PUSH) try {'), 'purge LINE push behind its switch');
+        const qs = src.indexOf("await sendTelegram('notifyQuizSubmitted'"), qg = src.indexOf('if (!QUIZ_SUBMIT_LINE_PUSH || quizData.notifyGroup !== true)');
+        assert(qs > 0 && qg > qs, 'quiz submit: Telegram for every submission, before the LINE gate');
+        assert(!/scoreText|correct/.test(src.slice(qs, src.indexOf('\n', qs))), 'quiz submit line has no score');
+        assert(src.includes("resolveLineTargets('notifyQuizDigest').filter(t => !t.withScores)"), 'digest: LINE group only (no admin 1:1 copy)');
     } finally {
         console.log = origLog; console.error = origErr; console.warn = origWarn;
     }

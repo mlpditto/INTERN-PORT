@@ -2319,6 +2319,11 @@ exports.notifyOnAdminEdit = onCall(
 // ============================================================
 // V102.496: one "New Case Submitted" push per case is retired — the same case already arrives by e-mail. true brings the LINE bubbles back (admin 1:1 + group).
 const CASE_LINE_PUSH = false;
+// 2026-11-07 (owner, Telegram table): the per-event admin pings leave LINE (a group push costs one message per member) and go to
+// Telegram only. true brings each LINE push back; the digest stays on the LINE group + Telegram.
+const PRODUCT_LINE_PUSH = false;       // 🛒 new product (admin 1:1 + group)
+const QUIZ_SUBMIT_LINE_PUSH = false;   // ✅ quiz submitted (the 🔔 EVERY opt-in)
+const PURGE_LINE_PUSH = false;         // 🗑 notes about to be purged (admin 1:1, Mondays)
 // V102.547: Gemini reads the PDF on a Case right after Send (a callable from the page: Firestore triggers cannot deploy in this region).
 // The intern's call reads once; the admin's retry reads again. A failure leaves the case as it is and says so on it.
 // V102.550: the admin's retry may name another reader; the intern's call cannot.
@@ -2715,6 +2720,10 @@ exports.notifyAdminOnNewProduct = onCall(
     }
 
     const flex = { type: 'flex', altText: altText, contents: bubble };
+    if (!PRODUCT_LINE_PUSH) {
+        const tg = await sendTelegram('notifyAdminOnNewProduct', altText);
+        return { ok: tg.ok, pushed: false, pushedCount: 0, telegram: tg.ok, results: [], productDocId };
+    }
     const results = await pushLineFlex(
         'notifyAdminOnNewProduct',
         targets,
@@ -2880,7 +2889,7 @@ exports.notifyPurgeDigest = onSchedule({
         }
     };
 
-    try {
+    if (PURGE_LINE_PUSH) try {
         await axios.post('https://api.line.me/v2/bot/message/push', {
             to: adminLineId,
             messages: [flex]
@@ -3055,7 +3064,7 @@ async function pushLineFlex(tag, targets, buildFlex, logSuffix) {
     // Telegram (2026-11-07): one copy per admin / group run — the group's line when there is one (it carries no score),
     // sent even when LINE refused (quota), when the copy matters most. Flood sends its own from sendFloodMail.
     const tgTarget = targets.find(t => t.label === 'group') || targets.find(t => t.label === 'admin-1on1');
-    if (tgTarget && !/^flood/.test(tag)) {
+    if (tgTarget && !/^flood|^notifyQuizSubmitted$/.test(tag)) {   // these send their own line
         try { const f = buildFlex(tgTarget) || {}; await sendTelegram(tag, f.altText || f.text); }
         catch (e) { console.warn(`[telegram] ${tag} skipped:`, e && e.message); }
     }
@@ -3438,13 +3447,6 @@ exports.notifyQuizSubmitted = onCall(
     // (LINE quota — the 16:00 digest already reports done-vs-pending).
     // pushQuizScoreToIntern above still fires on every submission regardless.
     // notifyGroup:true stays usable on a quiz the admin has already closed.
-    if (quizData.notifyGroup !== true) {
-        return { skipped: true, reason: 'not-opted-in', personal };
-    }
-
-    const targets = resolveLineTargets('notifyQuizSubmitted');
-    if (!targets.length) return { skipped: true, reason: 'no-target', personal };
-
     let displayName = 'Unknown';
     try {
         const userDoc = await db.collection('users').doc(userId).get();
@@ -3453,6 +3455,15 @@ exports.notifyQuizSubmitted = onCall(
         console.warn(`[notifyQuizSubmitted] user read failed for ${userId}:`, err.message);
     }
     displayName = displayName.slice(0, 60);
+
+    // 2026-11-07 (owner): every real submission reaches the admin on Telegram (no quota) — name + quiz, never the score.
+    const telegram = (await sendTelegram('notifyQuizSubmitted', `✅ ${displayName} · ${quizTitle}`)).ok;
+    if (!QUIZ_SUBMIT_LINE_PUSH || quizData.notifyGroup !== true) {
+        return { skipped: true, reason: QUIZ_SUBMIT_LINE_PUSH ? 'not-opted-in' : 'line-off', telegram, personal };
+    }
+
+    const targets = resolveLineTargets('notifyQuizSubmitted');
+    if (!targets.length) return { skipped: true, reason: 'no-target', personal };
 
     const headline = '✅ Quiz Submitted';
 
