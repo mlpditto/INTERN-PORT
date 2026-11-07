@@ -19,6 +19,7 @@ Intern: home ▸ Mission ▸ a quiz card ▸ Start.
 - `rank-quiz-runner-qa` — Rank (order mode) in the real runner: type → lock → tap order → reveal; a COUNTED quiz shows only “✓ Order locked — answers show after you submit” (key, ★, points, Beri wait for Submit; the typed answer’s self-match is asked once before Submit’s confirm), PRACTICE reveals at once; lean action row ‹ · n/N · ↺ · 🔒 Lock · Next (Submit on the last question), the shared footer hidden on Rank steps only, hit areas ≥ 40–44 px
 - `rank-tier-qa` — Rank TIER-BOX mode (`mode:'tier'`): each option gets Best / OK / Avoid (nothing pre-selected, Lock waits for every row, stored in option order); scoring exact 1 · one level off ½ · Best↔Avoid 0, ⚠ not in Avoid caps ★3; DDD-1 Q2 = 0.72 ★3 / 0.92 ★4
 - `quiz-primer-qa` — per-question Read first page before the timer starts
+- `quiz-flag-qa` — 🚩 flag a sentence (Read first / question / choice): T3 how-to bubble until ticked per quiz, V2 reason card, flags ride the feedback doc (or a flags-only doc on Skip); admin card + not "empty"
 - `quiz-run-lean-qa` — lean runner: one progress row, language capsule, answer layout
 - `quiz-term-highlight-qa` — drugs / classes / conditions / doses / labs wrapped in the question text
 - `quiz-browse-tags-check` — intern Browse tag chips (qbTag* helpers with a DOM stub)
