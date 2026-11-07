@@ -112,6 +112,19 @@ const fresh = () => { DB = { user_auth_links: { anon1: { effectiveUserId: 'U1' }
         assert.equal((await ask({ peek: true })).paused, false, JSON.stringify(a));
     }
 
+    // V102.612: the 3 h counts from the last activity, so a quiz resumed after a long break locks again
+    fresh(); DB.quiz_attempts.q1_U1 = { userId: 'U1', quizId: 'q1', status: 'started', startTime: ts(NOW - 5 * H), lastActive: ts(NOW - H) };
+    assert.equal((await ask({ peek: true })).paused, true, 'active an hour ago');
+    // ⏸ on a break: locked until the deadline; no deadline → 24 h after the break began; never past 7 days
+    const brk = (pausedAgo, dueIn) => { fresh(); DB.quiz_attempts.q1_U1 = { userId: 'U1', quizId: 'q1', status: 'started', startTime: ts(NOW - pausedAgo - H), pausedAt: ts(NOW - pausedAgo) }; if (dueIn != null) DB.quizzes = { q1: { deadline: ts(NOW + dueIn) } }; return ask({ peek: true }).then(r => r.paused); };
+    assert.equal(await brk(5 * H, H), true, 'break 5 h, deadline in 1 h');
+    assert.equal(await brk(5 * H, -60000), false, 'deadline passed');
+    assert.equal(await brk(23 * H), true, 'no deadline, 23 h');
+    assert.equal(await brk(25 * H), false, 'no deadline, 25 h');
+    assert.equal(await brk(8 * 24 * H, 10 * 24 * H), false, 'never past 7 days');
+    fresh(); DB.quiz_attempts.q1_U1 = { userId: 'U1', quizId: 'q1', status: 'started', isPractice: true, pausedAt: ts(NOW - H) };
+    assert.equal((await ask({ peek: true })).paused, false, 'practice never locks');
+
     // an admin can try it without a LINE link
     fresh();
     r = await ask({ question: 'What to monitor?' }, { uid: 'adm', token: { admin: true } });
