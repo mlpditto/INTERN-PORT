@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.607)</title>
+    <title>Nika Admin (V102.608)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -4973,6 +4973,7 @@
         #groupSelectModal .gs-fbpane .fbp-q { font-size:12.5px; font-weight:700; color:var(--text-main, #1e293b); }
         #groupSelectModal .gs-fbpane .fbp-c { font-size:12px; color:#475569; margin-top:1px; }
         #groupSelectModal .gs-fbpane .fbp-c i { color:#64748b; }
+        #groupSelectModal .gs-fbpane .fbp-nc { font-size:12px; font-weight:500; color:#94a3b8; margin-left:6px; white-space:nowrap; }   /* V102.608: 👍 no comment inline — one line per row */
         #groupSelectModal .gs-fbpane .fbp-t { display:inline-block; font-size:11px; color:#4338ca; background:#eef2ff; border-radius:999px; padding:1px 7px; margin-left:6px; font-weight:700; font-style:normal; }
         #groupSelectModal .gs-fbpane .fbp-d { font-size:11px; color:#94a3b8; white-space:nowrap; text-align:right; }
         #groupSelectModal .gs-fbpane .fbp-d span { display:block; font-size:13px; }
@@ -6532,6 +6533,7 @@
         /* V102.166: .modal[style*="flex"/"block"] above pins EVERY modal at 9999 !important, so an inline z-index is ignored and the
            later one in the DOM wins — Groups & Divisions (opened from the User Hub) rendered UNDER the User Hub. An id rule (more specific,
            also !important) restores the order: User Hub 9999 < Divisions 10000 < Visibility 10001. */
+        #quizFeedbackPanelModal.qfp-lift { z-index: 100100 !important; }   /* V102.608: opened from the User Hub (.force-show 99999) — an inline z-index lost to .modal[style*="flex"] (9999 !important), so the panel opened BEHIND the hub */
         #divisionsModal { z-index: 100100 !important; }   /* V102.175: above forceShowModal's .force-show (99999 / content 100000) — the User Hub is one, so Divisions opened BEHIND it */
         #groupSettingsModal { z-index: 100200 !important; }
         #tagDrillDownModal { z-index: 100300 !important; }   /* V102.218: opened from the User Hub (force-show 99999 / 100000) … */
@@ -15947,7 +15949,7 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
         <!-- Quiz feedback: Warm Focus -->
         <div id="quizFeedbackPanelModal" class="modal lang-no-toggle" style="z-index:2501;">
             <div class="modal-content qfp-panel">
-                <button type="button" class="close-modal" aria-label="Close feedback" title="Close feedback" data-th-title="ปิดผลตอบรับ" onclick="document.getElementById('quizFeedbackPanelModal').style.display='none'">&times;</button>
+                <button type="button" class="close-modal" aria-label="Close feedback" title="Close feedback" data-th-title="ปิดผลตอบรับ" onclick="const m = document.getElementById('quizFeedbackPanelModal'); m.style.display='none'; m.classList.remove('qfp-lift')">&times;</button>
                 <div class="qfp-head">
                     <h3 title="Quiz feedback overview" data-th-title="ภาพรวมผลตอบรับแบบทดสอบ" aria-label="Quiz Feedback">📊</h3>
                     <div id="qfp-quiz-title" title="Quiz title" data-th-title="ชื่อชุดแบบทดสอบ"></div>
@@ -41875,9 +41877,10 @@ They can connect again from LINE.
                 const t = f.triage || {}, ico = FB_TRIAGE_ICON[t.category] ? FB_TRIAGE_ICON[t.category][0] : '·';
                 const star = f.rating == null ? '<span class="fbp-star none">—</span>' : `<span class="fbp-star${f.rating <= 5 ? ' low' : ''}">⭐ ${f.rating}</span>`;
                 const c = (f.comment || '').trim(), topic = (f.nextTopic || '').trim();
-                const body = (c ? `<i>“${escapeHtml(c)}”</i>` : (!topic && f.rating >= 8 ? `<span style="color:#94a3b8;">👍 ${gsText('no comment', 'ไม่มีคอมเมนต์')}</span>` : '')) + (topic ? `<span class="fbp-t">💡 ${escapeHtml(topic)}</span>` : '');
+                const body = (c ? `<i>“${escapeHtml(c)}”</i>` : '') + (topic ? `<span class="fbp-t">💡 ${escapeHtml(topic)}</span>` : '');
+                const nc = (!c && !topic && f.rating >= 8) ? `<span class="fbp-nc">👍 ${gsText('no comment', 'ไม่มีคอมเมนต์')}</span>` : '';   // V102.608: inline, not a second line
                 const lead = (ico !== '·' && ico !== '👍') ? ico + ' ' : '';
-                return `<div class="fbp-row${gsFbNeedsFix(f) ? ' urgent' : ''}" role="button" tabindex="0" onclick="gsFbOpenQuiz('${escapeHtml(f.quizId || '')}')" onkeydown="if(event.key==='Enter')this.click()" title="${gsText('Open this quiz’s Feedback panel on this intern', 'เปิดแผงผลตอบรับของควิซนี้ที่คนนี้')}">${star}<div><div class="fbp-q">${lead}${escapeHtml(gsFbQuizTitle(f.quizId))}</div>${body ? `<div class="fbp-c">${body}</div>` : ''}</div><div class="fbp-d"><span>${ico}</span>${gsFbDate(f.timestamp)}</div></div>`;
+                return `<div class="fbp-row${gsFbNeedsFix(f) ? ' urgent' : ''}" role="button" tabindex="0" onclick="gsFbOpenQuiz('${escapeHtml(f.quizId || '')}')" onkeydown="if(event.key==='Enter')this.click()" title="${gsText('Open this quiz’s Feedback panel on this intern', 'เปิดแผงผลตอบรับของควิซนี้ที่คนนี้')}">${star}<div><div class="fbp-q">${lead}${escapeHtml(gsFbQuizTitle(f.quizId))}${nc}</div>${body ? `<div class="fbp-c">${body}</div>` : ''}</div><div class="fbp-d">${ico !== '·' && !(nc && ico === '👍') ? `<span>${ico}</span>` : ''}${gsFbDate(f.timestamp)}</div></div>`;
             }).join('');
         }
         function gsFbPaintSum() {
@@ -41895,7 +41898,9 @@ They can connect again from LINE.
         }
         function gsFbOpenQuiz(quizId) {
             if (!quizId || typeof showQuizFeedbackPanel !== 'function') return;
-            document.getElementById('quizFeedbackPanelModal').style.zIndex = 100000;   // above the hub (z 4000) — the same lift the Review modal uses
+            const m = document.getElementById('quizFeedbackPanelModal');
+            if (m.parentElement !== document.body) document.body.appendChild(m);   // V102.608: out of #dashboard-container, like #divisionsModal (V102.176)
+            m.classList.add('qfp-lift');   // above the hub (.force-show 99999) — see #quizFeedbackPanelModal.qfp-lift
             showQuizFeedbackPanel(quizId, _gsFb.uid);
         }
 
