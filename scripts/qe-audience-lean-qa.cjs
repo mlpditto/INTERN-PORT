@@ -58,7 +58,7 @@ const IDS = ['quiz-system-select', 'quiz-campaign-chips', 'quiz-campaign', 'quiz
     assert.equal(await page.evaluate(() => document.getElementById('qe-modes').closest('.qe-head') !== null), true, 'V102.561: on the title row');
     await page.evaluate(() => { const m = document.getElementById('qe-modes'); document.body.appendChild(m); m.style.setProperty('display', 'inline-flex', 'important'); });   // this harness shows the Audience block alone
     const shuffle = page.locator('label.logic-chip:has(#quiz-shuffle-choices)'), poll = page.locator('label.logic-chip:has(#quiz-is-poll)');
-    assert.equal(await page.locator('#qe-modes .logic-chip').count(), 8); assert.equal(await page.locator('#qe-aud .logic-chip').count(), 0);
+    assert.equal(await page.locator('#qe-modes .logic-chip').count(), 9);   // V102.610 + ⏸ Break assert.equal(await page.locator('#qe-aud .logic-chip').count(), 0);
     assert.equal((await poll.textContent()).trim(), 'Poll', 'the name stays in the DOM for screen readers');
     assert.ok((await poll.getAttribute('title')).includes('·'), 'the full name + TH in the tooltip');
     assert.equal(await page.$eval('#quiz-shuffle-choices', i => getComputedStyle(i).opacity), '0', 'no visible box');

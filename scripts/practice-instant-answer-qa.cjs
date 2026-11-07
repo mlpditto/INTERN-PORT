@@ -13,7 +13,7 @@ const admin = fs.readFileSync('public/admin.html', 'utf8');
 assert.ok(admin.includes('<input type="checkbox" id="quiz-instant-answer"> <span>Practice</span>'), 'admin chip');
 assert.ok(admin.includes("ia.checked = q.instantAnswer === true;"), 'admin loads the flag');
 assert.ok(admin.includes("ia.checked = false;"), 'a new quiz starts with it off');
-assert.ok(/const instantAnswer = document\.getElementById\('quiz-instant-answer'\)\?\.checked \|\| false;/.test(admin) && /partialCredit, instantAnswer, notifyGroup/.test(admin), 'admin reads it into the form data');
+assert.ok(/const instantAnswer = document\.getElementById\('quiz-instant-answer'\)\?\.checked \|\| false;/.test(admin) && /partialCredit, instantAnswer, (allowBreak, )?notifyGroup/.test(admin), 'admin reads it into the form data');
 assert.ok(admin.includes('instantAnswer: formData.instantAnswer === true,'), 'admin writes it to the quiz doc');
 
 (async () => {
