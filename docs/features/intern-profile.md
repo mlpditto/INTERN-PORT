@@ -12,6 +12,7 @@ Intern: home header → tap name / photo → Info modal; Personal Info cards; Kn
 - `profile-card-qa` — profile card activity states, timeline modes, Log / Case destinations (both pages)
 - `settings-in-info-qa` — ⚙ moved into the Info modal; privacy panel folds under the title
 - `personal-info-health-qa` — persona cards start folded, born-at / reference persons / optional Health (admin side too)
+- `info-field-points-qa` — Info ▸ Persona: +0.1 score per filled field (27, Health not paid), −0.1 when emptied, silent, registered only; `users.infoPts` (V101.292). Admin Recalculate Score adds it back (V102.613)
 - `intern-address-checkin-ring-qa` — two addresses (ID card + current) and the check-in ring
 - `know-thyself-qa` — "In my words" chip stored at personality.self with a merge set
 - `avatar-open-browser-qa` — tapping the LINE photo inside LIFF opens the app in the phone browser

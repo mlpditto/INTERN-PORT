@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.291)</title>
+    <title>Internship Portfolio (V101.292)</title>
     <link rel="stylesheet" href="nika-ask.css?v=V101.263">
     <link rel="stylesheet" href="daily-canvas.css?v=V101.266">
     <link rel="stylesheet" href="halloween.css?v=V101.249">
@@ -9244,6 +9244,31 @@
                 });
         }
 
+        // V101.292 (owner): 0.1 to the score for each Persona field that holds something, not said on screen; emptying a field takes its 0.1 back.
+        // Health is not paid for (owner pick). Read from the saved doc (the period goes through saveMyDates and may not change), so the score
+        // follows what is really stored. users.infoPts = { field: true } is what has been paid; admin Recalculate Score adds it back.
+        const INFO_POINT_FIELDS = ['firstName', 'lastName', 'nickName', 'nationality', 'birthday', 'birthPlace',
+            'firstNameEn', 'middleNameEn', 'lastNameEn', 'institute', 'workplace', 'studentId',
+            'phone', 'email', 'addressIdCard', 'address', 'refName1', 'refPhone1', 'refName2', 'refPhone2',
+            'startDate', 'endDate', 'socials.facebook', 'socials.line', 'socials.instagram', 'socials.tiktok', 'socials.duolingo'];
+        function infoPointsDelta(doc) {
+            const had = (doc && doc.infoPts) || {}, now = {};
+            INFO_POINT_FIELDS.forEach(k => { const v = k.split('.').reduce((o, p) => (o && o[p] != null ? o[p] : ''), doc || {}); if (String(v).trim()) now[k] = true; });
+            const add = Object.keys(now).filter(k => !had[k]).length, drop = Object.keys(had).filter(k => !now[k]).length;
+            return { now, add, drop };
+        }
+        async function infoFieldPoints() {
+            if (!window.myRegistered || !userId || !window.db) return;   // no CODE, no earning (the rules would refuse the score)
+            const ref = db.collection('users').doc(userId);
+            try {
+                await db.runTransaction(async tx => {
+                    const snap = await tx.get(ref); if (!snap.exists) return;
+                    const d = infoPointsDelta(snap.data());
+                    if (!d.add && !d.drop) return;
+                    tx.update(ref, { infoPts: d.now, score: firebase.firestore.FieldValue.increment(Math.round(d.add - d.drop) / 10) });
+                });
+            } catch (e) { console.warn('info points:', e && e.message); }
+        }
         async function savePersonalInfo() {
             if (!validatePersonalCards()) return;
             const socialInputs = ['facebook', 'line', 'instagram', 'tiktok', 'duolingo'].map(k => document.getElementById('pi-social-' + k));
@@ -9336,6 +9361,7 @@
                     document.getElementById('u-end-date').value = piEnd;
                     await saveMyDates();
                 }
+                await infoFieldPoints();   // V101.292: +0.1 / −0.1 per field, nothing said
                 alert("Personal info saved");
                 document.getElementById('personalInfoModal').style.display = 'none';
             } catch (e) {

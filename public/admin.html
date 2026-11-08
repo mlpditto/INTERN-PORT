@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.612)</title>
+    <title>Nika Admin (V102.613)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -57541,6 +57541,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     if (data.status !== 'none' && data.receivedAt) totalScore += 0.1;
                     totalScore += (data.earnedScore || 0) + (data.bonusGiven || 0);
                 });
+                // V102.613: the silent self-awarded 0.1s — Info fields (users.infoPts) and the first 📤 share of each article (articleSeen[id].shared)
+                {
+                    const u = (await db.collection("users").doc(uid).get()).data() || {};
+                    totalScore += Object.keys(u.infoPts || {}).length * 0.1;
+                    totalScore += Object.values(u.articleSeen || {}).filter(a => a && a.shared && [].concat(a.shared).length).length * 0.1;
+                }
                 const lSnap = await db.collection("checkin_logs").where("userId", "==", uid).get();
                 lSnap.forEach(d => {
                     const l = d.data();
