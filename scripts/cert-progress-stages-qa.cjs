@@ -111,7 +111,7 @@ assert.ok(admin.includes("certStagePick = 'auto';"), 'every open starts on Auto'
         await page.evaluate(() => toggleCertBrand('seal'));
         assert.ok(has(mid, '28 / 40 วัน (days) · 70% · Progressing') && !has(mid, '40 วัน / 40 days'), 'progress line replaces the day count');
         assert.ok(!has(mid, 'SCAN TO VERIFY') && !has(mid, 'Progress · no number'), 'no scan-to-verify, no QR box on a progress certificate by default');
-        // V102.613 (owner: "in progress ยังไม่ต้องมี QR กับ ลายเซ็น ให้เลือกได้"): ✍️ Sign / ▢ QR are off unless turned on; Completed keeps both
+        // V102.614 (owner: "in progress ยังไม่ต้องมี QR กับ ลายเซ็น ให้เลือกได้"): ✍️ Sign / ▢ QR are off unless turned on; Completed keeps both
         assert.ok(!has(mid, 'Managing Pharmacist') && has(plain, 'Managing Pharmacist') && has(plain, 'QR on export'), 'progress: no signature block by default; Completed: signature + QR box');
         const midBoth = await draw({ hours: '', skills: [], stage: { key: 'mid', text: '28 / 40 วัน (days) · 70% · Progressing', pct: 70, sign: true, qr: true } });
         assert.ok(has(midBoth, 'Managing Pharmacist') && has(midBoth, 'Progress · no number') && !has(midBoth, 'SCAN TO VERIFY'), 'Sign + QR on: signature block + the numberless box');
@@ -195,6 +195,6 @@ assert.ok(admin.includes("certStagePick = 'auto';"), 'every open starts on Auto'
         assert.ok(bd.at.every(y => y === bd.at[0]) && bd.at[0] >= bd.sk[0] + 7 && bd.at[0] + 21 <= 472, 'the row sits under the skills line and above the signature: ' + JSON.stringify(bd));
         assert.ok(bd.exports, 'the canvas with badges still exports (PDF)');
         assert.deepEqual(errs, []);
-        console.log('PASS: certificate by progress (V102.600) — Auto stage from days/hours, manual pick, print box, stage wording/colour/watermark, seal on/off via Brand ▸ Seal (IN PROGRESS below 100%), no scan below 100%, Completed = identical pixels, PharmCamp no stage, ✂️ First / Last, progress PDF unregistered, 〰 name line off by default + chip, Brand row (logo · watermark · seal · Co. name), 🏅 badges in one row under Skills (best tier first, PDF still exports), time-clock hours = start + hours trained, no bar (V102.612), ✍️ Sign / ▢ QR off on progress unless turned on (V102.613)');
+        console.log('PASS: certificate by progress (V102.600) — Auto stage from days/hours, manual pick, print box, stage wording/colour/watermark, seal on/off via Brand ▸ Seal (IN PROGRESS below 100%), no scan below 100%, Completed = identical pixels, PharmCamp no stage, ✂️ First / Last, progress PDF unregistered, 〰 name line off by default + chip, Brand row (logo · watermark · seal · Co. name), 🏅 badges in one row under Skills (best tier first, PDF still exports), time-clock hours = start + hours trained, no bar (V102.612), ✍️ Sign / ▢ QR off on progress unless turned on (V102.614)');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
