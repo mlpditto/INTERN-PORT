@@ -69,14 +69,15 @@ assert.ok(/dateText: _hrs \? _extra\.hours : drawArgs\[1\]/.test(admin), 'the re
         assert.equal(plain.t, 0, 'the transform is back to identity after the draw');
         // V102.582 (owner pick D): the gold foil seal — its words run round the rim letter by letter (the old centred MEDLIFE PLUS ran past the disc)
         assert.ok(!plain.calls.some(c => c.t === 'MEDLIFE PLUS') && [...'MEDLIFEPLUSCERTIFIED'].every(ch => plain.calls.some(c => c.t === ch && c.y < 140)), 'seal letters round the rim, top-right');
-        assert.ok(plain.calls.some(c => c.t === 'วันที่ (DATE)') && plain.calls.some(c => c.t === '40 วัน / 40 days'), 'dates mode: label + day count');
+        // V102.616 (owner): DATE ISSUED (today) on the right, the period · day count on the line under it
+        assert.ok(plain.calls.some(c => c.t === 'วันที่ออกให้ (DATE ISSUED)') && plain.calls.some(c => c.t.includes('40 วัน / 40 days')), 'dates mode: label + day count');
 
         const skills = ['Dispensing', 'Patient Counseling', 'Inventory & Stock', 'OTC & Health Products'];
         const hrs = await draw({ hours: '200 ชั่วโมง · 27 พฤศจิกายน 2569 (200 hours · 27 November 2026)', skills }, 'both');
         const find = t => hrs.calls.find(c => c.t === t);
-        assert.ok(find('ฝึกงานครบ (COMPLETED)'), 'hours label');
+        assert.ok(find('วันที่ออกให้ (DATE ISSUED)'), 'hours mode: still DATE ISSUED (V102.616)');
         assert.ok(!hrs.calls.some(c => /40 วัน|October/.test(c.t)), 'no day count, no start date');
-        assert.ok(find('200 ชั่วโมง · 27 พฤศจิกายน 2569') && find('(200 hours · 27 November 2026)'), 'the hours text, wrapped before " (" like a date');
+        assert.ok(find('200 ชั่วโมง · 27 พฤศจิกายน 2569 (200 hours · 27 November 2026)'), 'the hours text, under DATE ISSUED');
         const sk = find(skills.join('   ·   '));
         assert.ok(sk, 'the skills line');
         assert.ok(sk.y <= 464, 'the skills line clears the signature (top ≈ 472): y=' + sk.y);
@@ -84,9 +85,9 @@ assert.ok(/dateText: _hrs \? _extra\.hours : drawArgs\[1\]/.test(admin), 'the re
         assert.equal(name.y, namePlain.y - 36, 'name → skills rose 36px (V102.600: intro only 10px)');
         assert.equal(find('Managing Pharmacist').y, plain.calls.find(c => c.t === 'Managing Pharmacist').y, 'the signature block did not move');
         const th = await draw({ hours: '200 ชั่วโมง · 27 พฤศจิกายน 2569', skills: ['จ่ายยาตามใบสั่ง'] }, 'th');
-        assert.ok(th.calls.some(c => c.t === 'ฝึกงานครบ') && th.calls.some(c => c.t === 'จ่ายยาตามใบสั่ง'), 'TH: Thai label + Thai skill');
+        assert.ok(th.calls.some(c => c.t === 'วันที่ออกให้') && th.calls.some(c => c.t === 'จ่ายยาตามใบสั่ง'), 'TH: Thai label + Thai skill');
         const en = await draw({ hours: '', skills: ['Dispensing'] }, 'en');
-        assert.ok(en.calls.some(c => c.t === 'DATE') && en.calls.some(c => c.t === 'Dispensing'), 'skills work in dates mode too');
+        assert.ok(en.calls.some(c => c.t === 'DATE ISSUED') && en.calls.some(c => c.t === 'Dispensing'), 'skills work in dates mode too');
 
         // 4. the modal rows: Period chips, hours fields, skill chips remembered
         const m = await page.evaluate(() => {
@@ -110,7 +111,7 @@ assert.ok(/dateText: _hrs \? _extra\.hours : drawArgs\[1\]/.test(admin), 'the re
         });
         assert.deepEqual(m.chips, ['Dispensing', 'Counseling', 'Inventory', 'OTC', 'Drug law', 'Drug info']);
         assert.deepEqual(m.restored, ['dispensing', 'otc'], 'last picks come back');
-        assert.deepEqual(m.extraDates, { hours: '', skills: ['Dispensing', 'OTC & Health Products'], stage: null }, 'dates mode (no dates → no stage): skills only, in the chip order');
+        assert.deepEqual(m.extraDates, { hours: '', skills: ['Dispensing', 'OTC & Health Products'], stage: null, hoursDone: m.extraDates.hoursDone }, 'dates mode (no dates → no stage): skills only, in the chip order');
         assert.equal(m.fieldsShown, true);
         assert.equal(m.incomplete, '', 'hours mode without hours / date → falls back to the dates');
         assert.equal(m.hours, '200 ชั่วโมง · 27 พฤศจิกายน 2569 (200 hours · 27 November 2026)');
