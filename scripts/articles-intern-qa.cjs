@@ -146,7 +146,7 @@ const D = 864e5, BKK = 7 * 3600e3;
       window.myUserDoc.articleSeen = { a1: { act: 'x', at: now } };
       renderUnifiedHistory(); await wait(100);
       const row = document.querySelector('[data-delete-type="article"]');
-      out.hist = row ? [row.querySelector('.hl-tt').textContent, [...row.querySelector('.art-d').classList].filter(c => /^art-(new|closed|read)$/.test(c)).join(), !!row.querySelector('.dr-menu'), !!document.querySelector('#unified-type-filters [data-filter="article"]')] : null;
+      out.hist = row ? [row.querySelector('.hl-tt').firstChild.textContent, [...row.querySelector('.art-d').classList].filter(c => /^art-(new|closed|read)$/.test(c)).join(), !!row.querySelector('.dr-menu'), !!document.querySelector('#unified-type-filters [data-filter="article"]')] : null;
       if (row) {
         row.click(); await wait(50);
         out.histRead = [row.getAttribute('aria-expanded'), [...row.querySelector('.art-d').classList].filter(c => /^art-(new|closed|read)$/.test(c)).join(), writes[writes.length - 1][2].articleSeen.a1.act, row.querySelector('.art-md').innerHTML === window.renderMd(docs.a1.body.en), row.querySelectorAll('.art-link').length];
@@ -159,13 +159,13 @@ const D = 864e5, BKK = 7 * 3600e3;
         d.click(); await wait(10);
         out.listen = { on, mid, off: [d.classList.contains('playing'), d.getAttribute('aria-pressed')], said: said.length >= 1, lang: said[0].lang, tm: /^\d+m$/.test(d.querySelector('.art-tm').textContent) }; }
         // V101.193: the language pill in the row (a1 has en + th); a tap swaps the body in place — the row stays open, nothing is written (V101.202: one pill, cycles)
-        const chips = () => [...row.querySelectorAll('.art-hist .lng')].map(b => b.textContent + ':' + b.dataset.lang);
+        const chips = () => [...row.querySelectorAll('.hl-tt .art-tfl')].map(b => b.textContent + ':' + b.dataset.lang);
         const wBefore = writes.length;
         out.histLng = chips();
-        { const css = getComputedStyle(row.querySelector('.art-top')); out.histInline = [css.position, css.top, css.right]; }   // V101.251: the pill sits on the title line
-        row.querySelector('.art-hist .lng').click(); await wait(20);
+        { const b = row.querySelector('.art-tfl'); out.histInline = [!!b.closest('.hl-tt'), getComputedStyle(b).display, !row.querySelector('.art-top')]; }   // V101.291: the pill sits after the title (no longer floats over the body)
+        row.querySelector('.art-tfl').click(); await wait(20);
         out.histLngTh = [chips().join(' '), row.querySelector('.art-md').innerHTML === window.renderMd(docs.a1.body.th), row.getAttribute('aria-expanded'), writes.length - wBefore];
-        row.querySelector('.art-hist .lng').click(); await wait(20);
+        row.querySelector('.art-tfl').click(); await wait(20);
         out.histLngBack = [chips().join(' '), row.querySelector('.art-md').innerHTML === window.renderMd(docs.a1.body.en)];
         internArticles.onUserDoc(); await wait(50);
         out.stillOpen = document.querySelector('[data-delete-type="article"]').getAttribute('aria-expanded');
@@ -200,7 +200,7 @@ const D = 864e5, BKK = 7 * 3600e3;
     assert.deepEqual(r.histRead, ['true', 'art-read', 'hist', true, 4], 'opening the row reads it in place (disc → green ring, act hist, body + 🩺/💊/quiz/Codex links)');
     assert.deepEqual(r.listen, { on: [true, 'true', 'true'], mid: [true, true, true], off: [false, 'false'], said: true, lang: 'en-US', tm: true }, 'V101.206: tapping the disc speaks (ring fills, bars, countdown) without toggling the row; a second tap stops and restores the time badge: ' + JSON.stringify(r.listen));
     assert.deepEqual(r.histLng, ['🇬🇧:en'], 'V101.202: the row carries one language pill (a1 has no ko), EN on');
-    assert.deepEqual(r.histInline, ['absolute', '14px', '0px'], 'V101.251: the pill sits on the title line: ' + r.histInline);
+    assert.deepEqual(r.histInline, [true, 'inline-block', true], 'V101.291: the pill sits after the title: ' + r.histInline);
     assert.deepEqual(r.histLngTh, ['🇹🇭:th', true, 'true', 0], 'a tap: Thai body in place, pill → 🇹🇭, row still open, no write');
     assert.deepEqual(r.histLngBack, ['🇬🇧:en', true], 'a second tap: back to the English body');
     assert.equal(r.stillOpen, 'true', 'the next users snapshot does not collapse the open row');
