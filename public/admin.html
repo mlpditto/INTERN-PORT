@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.611)</title>
+    <title>Nika Admin (V102.612)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -64825,6 +64825,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             else ko = `${one(s)} – ${one(e)}`;
             return `${ko} (${formatCertDateRange(startISO, endISO, 'ce')})`;
         }
+        // V102.612 (owner pick A): a progress certificate with time-clock hours — start date + hours trained, same
+        // calendar rules as the date range (TH, EN, or TH (EN); Korean = KO (EN)). '' when there is no start or no hours.
+        function certSinceText(startISO, hoursDone) {
+            const h = Math.floor(Number(hoursDone) || 0);
+            if (!startISO || h < 1) return '';
+            const th = `เริ่ม ${formatCertDateRange(startISO, startISO, 'be')} · ผ่านการฝึก ${h} ชม.`;
+            const en = `Started ${formatCertDateRange(startISO, startISO, 'ce')} · ${h} hours trained`;
+            if (certLang === 'ko') { const d = new Date(startISO + 'T00:00:00'); return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 시작 · ${h}시간 수련 (${en})`; }
+            return certDateCal === 'be' ? th : certDateCal === 'ce' ? en : `${th} (${en})`;
+        }
         // V100.68: the date text for the current language — Korean ignores the BE/CE chips.
         function certDateText(startISO, endISO) {
             return certLang === 'ko' ? formatCertDateRangeKo(startISO, endISO) : formatCertDateRange(startISO, endISO, certDateCal);
@@ -65300,7 +65310,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // V102.582 (owner pick D): a gold foil seal — three thin gold rings, no fill (it sits quietly on the ivory),
             // MEDLIFE PLUS along the top of the rim and CERTIFIED along the bottom (the old centred words ran past the
             // navy disc), a gold star in the middle. Same spot, same size, same hide-at-3-awards rule.
-            if (awardList.length <= 2 && !stage) (() => {
+            // V102.612 (owner: "Seal ไม่แสดงผล?"): the Brand ▸ Seal chip is the whole seal, on progress stages too
+            // (there it reads IN PROGRESS, never CERTIFIED). It was skipped below 100% and the chip only hid the rim words.
+            if (awardList.length <= 2 && certBrandOn('seal')) (() => {
                 const cx = w - 92, cy = 90, r = 38;
                 const ring = (rr, lw) => { ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.strokeStyle = GOLD; ctx.lineWidth = lw; ctx.stroke(); };
                 // letters along the circle at radius rr, centred on the top (dir 1) or the bottom (dir -1), upright either way
@@ -65319,8 +65331,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 };
                 ctx.save();
                 ring(r, 2); ring(r - 3.5, 0.8); ring(r - 14, 0.8);
-                if (certBrandOn('seal')) arcText('MEDLIFE PLUS', r - 9, "700 7.6px Montserrat", 1, 0.8);
-                arcText('CERTIFIED', r - 9, "600 7px Montserrat", -1, 1.4);
+                arcText('MEDLIFE PLUS', r - 9, "700 7.6px Montserrat", 1, 0.8);
+                arcText(stage ? 'IN PROGRESS' : 'CERTIFIED', r - 9, "600 7px Montserrat", -1, stage ? 0.9 : 1.4);
                 ctx.beginPath();
                 for (let i = 0; i < 10; i++) { const rr = i % 2 ? 11 * 0.45 : 11, a = -Math.PI / 2 + i * Math.PI / 5; ctx.lineTo(cx + rr * Math.cos(a), cy + rr * Math.sin(a)); }
                 ctx.closePath(); ctx.fillStyle = GOLD; ctx.fill();
@@ -65515,8 +65527,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 while (80 + labelW + 10 + ctx.measureText(stage.text).width > 370 && px > 7) { px -= 0.5; ctx.font = `400 ${px}px ${FF}`; }
                 ctx.fillStyle = "#666";
                 ctx.fillText(stage.text, 80 + labelW + 10, 500);
-                ctx.fillStyle = "#e2e8f0"; ctx.fillRect(80, 504, 260, 3);
-                ctx.fillStyle = GOLD; ctx.fillRect(80, 504, 260 * Math.max(0, Math.min(100, stage.pct || 0)) / 100, 3);
+                if (stage.since) dates = stage.since;   // V102.612 (owner pick A): start + hours trained, no end date, no bar
+                else {
+                    ctx.fillStyle = "#e2e8f0"; ctx.fillRect(80, 504, 260, 3);
+                    ctx.fillStyle = GOLD; ctx.fillRect(80, 504, 260 * Math.max(0, Math.min(100, stage.pct || 0)) / 100, 3);
+                }
                 ctx.font = `bold 14px ${FF}`;
                 duration = '';
             }
@@ -65868,6 +65883,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // the ✓ print box (Progress row): off = no progress line or bar, the usual day count stays
             const pr = document.getElementById('cert-progress-print'), printIt = !pr || pr.checked;
             const stage = k !== 'done' ? { key: k, text: printIt ? (p ? certProgressText(p, certLang) + ' · ' : '') + CERT_STAGES[k].name : '', pct: p ? p.pct : 0 } : null;
+            // V102.612 (owner pick A): with time-clock hours the date reads "เริ่ม … · ผ่านการฝึก n ชม." — no end date, no bar
+            const since = stage && printIt && certUser ? certSinceText(document.getElementById('cert-start').value, certUser.hoursDone) : '';
+            if (since) Object.assign(stage, { text: CERT_STAGES[k].name, since });
             return { hours: hrs ? certHoursText(hrs.hours, hrs.at) : '', skills, stage };
         }
 

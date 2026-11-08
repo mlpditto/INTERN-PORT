@@ -1,6 +1,6 @@
 // V102.600 (owner): certificate by progress + 🏅 badges row. The REAL certificate block + modal rows from public/admin.html:
 // Auto picks Early (<40%) / Mid (40–79%) / Near (80–99%) / Completed (100%) from the days done (or time-clock hours);
-// a stage chip overrides it; below 100% the title, wording and colour change, the corner seal and "scan to verify" go,
+// a stage chip overrides it; below 100% the title, wording and colour change, the seal reads IN PROGRESS, "scan to verify" goes,
 // and "x / y วัน (days) · % · stage" + a bar print under DATE (the ✓ print box turns that line off); PharmCamp has no
 // stage; ✂️ First / Last shows only when the user has no EN first/last name yet; a progress PDF is never registered.
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict');
@@ -91,7 +91,7 @@ assert.ok(admin.includes("certStagePick = 'auto';"), 'every open starts on Auto'
         await page.evaluate(() => ['logo', 'wm', 'seal', 'co'].forEach(k => toggleCertBrand(k)));
         const noBrand = await draw({ hours: '', skills: [] });
         assert.ok(!has(noBrand, 'MEDLIFE PLUS CO.,LTD.') && !['M', 'P', 'U', 'S'].some(ch => noBrand.calls.some(c => c.t === ch && c.y < 140)), 'all off: no company line, no MEDLIFE PLUS on the seal');
-        assert.ok(['C', 'E', 'R', 'T', 'I', 'F', 'D'].every(ch => noBrand.calls.some(c => c.t === ch && c.y > 100 && c.y < 140)), 'the seal keeps CERTIFIED');
+        assert.ok(!['C', 'E', 'R', 'T', 'I', 'F', 'D'].some(ch => noBrand.calls.some(c => c.t === ch && c.y > 100 && c.y < 140)), 'Seal off: the whole seal goes (V102.612)');
         assert.ok(await page.evaluate(() => ['logo', 'wm', 'seal', 'co'].every(k => !certBrandOn(k)) && document.querySelectorAll('#cert-brand-row [data-brand]').length === 4), '4 Brand chips, all off now');
         await page.evaluate(() => ['logo', 'wm', 'seal', 'co'].forEach(k => toggleCertBrand(k)));
         assert.equal((await draw({ hours: '', skills: [] })).png, plain.png, 'back on → today\'s certificate again');
@@ -100,7 +100,15 @@ assert.ok(admin.includes("certStagePick = 'auto';"), 'every open starts on Auto'
         assert.ok(has(mid, 'INTERNSHIP') && has(mid, 'PROGRESS CERTIFICATE') && !has(mid, 'CERTIFICATE'), 'Mid: INTERNSHIP · PROGRESS CERTIFICATE');
         assert.ok(has(mid, 'ได้ปฏิบัติงานฝึกงานด้วยความมุ่งมั่น') && has(mid, '(Has been actively participating in the internship program)'), 'Mid wording');
         assert.ok(has(mid, 'IN PROGRESS'), 'Mid: watermark');
-        assert.ok(!['M', 'E', 'D', 'C', 'R', 'T'].some(ch => mid.calls.some(c => c.t === ch && c.y < 140)), 'no corner seal below 100%');
+        // V102.612 (owner: "Seal ไม่แสดงผล?"): Seal on = the seal prints on a progress stage too, reading IN PROGRESS, never CERTIFIED
+        const sealWord = (d) => d.calls.filter(c => c.y > 100 && c.y < 140 && c.t.length === 1 && c.t !== ' ').map(c => c.t).join('');
+        assert.ok(sealWord(mid).includes('INPROGRESS') && !sealWord(mid).includes('CERTIFIED'), 'Mid + Seal on: the seal reads IN PROGRESS: ' + sealWord(mid));
+        assert.ok(sealWord(plain).includes('CERTIFIED'), 'Completed seal reads CERTIFIED');
+        await page.evaluate(() => toggleCertBrand('seal'));
+        const midNoSeal = await draw({ hours: '', skills: [], stage: { key: 'mid', text: '28 / 40 วัน (days) · 70% · Progressing', pct: 70 } });
+        assert.ok(!['M', 'E', 'D', 'C', 'R', 'T'].some(ch => midNoSeal.calls.some(c => c.t === ch && c.y < 140)), 'Mid + Seal off: no seal');
+        assert.notEqual(midNoSeal.png, mid.png, 'the Seal chip changes the progress certificate');
+        await page.evaluate(() => toggleCertBrand('seal'));
         assert.ok(has(mid, '28 / 40 วัน (days) · 70% · Progressing') && !has(mid, '40 วัน / 40 days'), 'progress line replaces the day count');
         assert.ok(!has(mid, 'SCAN TO VERIFY') && has(mid, 'Progress · no number'), 'no scan-to-verify on a progress certificate');
         assert.equal(mid.calls.find(c => c.t === 'PROGRESS CERTIFICATE').c, '#0f766e', 'Mid accent colour');
@@ -112,6 +120,39 @@ assert.ok(admin.includes("certStagePick = 'auto';"), 'every open starts on Auto'
         assert.ok(has(off, '40 วัน / 40 days') && !off.calls.some(c => /70%/.test(c.t)), 'print off: the usual day count, no progress line');
         const hrsMid = await draw({ hours: '112 ชั่วโมง · 15 พฤศจิกายน 2569', skills: [], stage: { key: 'mid', text: '112 / 160 ชม. (hours) · 70% · Progressing', pct: 70 } });
         assert.ok(has(hrsMid, 'วันที่ (DATE)') && !has(hrsMid, 'ฝึกงานครบ (COMPLETED)'), 'hours mode below 100% keeps the DATE label (not COMPLETED)');
+        // V102.612 (owner pick A): time-clock hours → "เริ่ม … · ผ่านการฝึก n ชม." in place of the end date, no bar; no hours → range + bar
+        const sn = await page.evaluate(() => {
+            const fixed = new Date('2026-11-08T10:00:00').getTime(); Date.now = () => fixed;
+            certStagePick = 'auto'; certPeriodMode = 'dates'; certLang = 'en'; certDateCal = 'both';
+            certUser.hoursDone = 86.6; const both = getCurrentCertificateExtra().stage;
+            certDateCal = 'be'; const be = certSinceText('2026-10-19', 86.6); certDateCal = 'ce'; const ce = certSinceText('2026-10-19', 86.6);
+            certLang = 'ko'; const ko = certSinceText('2026-10-19', 86.6); certLang = 'both'; certDateCal = 'both';
+            document.getElementById('cert-progress-print').checked = false; const noPrint = getCurrentCertificateExtra().stage.since; document.getElementById('cert-progress-print').checked = true;
+            certUser.hoursDone = 0.4; const none = getCurrentCertificateExtra().stage.since;
+            certUser.hoursDone = 0;
+            return { both, be, ce, ko, noPrint, none };
+        });
+        assert.deepEqual(sn, {
+            both: { key: 'mid', text: 'Progressing', pct: 52, since: 'เริ่ม 19 ตุลาคม 2569 · ผ่านการฝึก 86 ชม. (Started 19 October 2026 · 86 hours trained)' },
+            be: 'เริ่ม 19 ตุลาคม 2569 · ผ่านการฝึก 86 ชม.', ce: 'Started 19 October 2026 · 86 hours trained',
+            ko: '2026년 10월 19일 시작 · 86시간 수련 (Started 19 October 2026 · 86 hours trained)', noPrint: undefined, none: undefined
+        });
+        const barAt = (extra) => page.evaluate((extra) => {
+            const c = document.createElement('canvas'); c.width = CERT_BASE_WIDTH; c.height = CERT_BASE_HEIGHT;
+            const ctx = c.getContext('2d'), rects = [], texts = [];
+            const fr = ctx.fillRect.bind(ctx); ctx.fillRect = (x, y, ww, hh) => { if (Math.round(y + ctx.getTransform().f) === 504 && hh === 3) rects.push(ww); return fr(x, y, ww, hh); };
+            const ft = ctx.fillText.bind(ctx); ctx.fillText = (t, x, y, ...r) => { texts.push(String(t)); return ft(t, x, y, ...r); };
+            drawCertificate(ctx, 'Sample Intern', '19 ตุลาคม 2569 – 27 พฤศจิกายน 2569 (19 October 2026 – 27 November 2026)', [], 1, 0, 'internship', 'en', null, {}, '40 วัน / 40 days', extra);
+            return { rects, texts };
+        }, extra);
+        const withHrs = await barAt({ hours: '', skills: [], stage: sn.both });
+        assert.deepEqual(withHrs.rects, [], 'A: no progress bar');
+        assert.ok(withHrs.texts.includes('เริ่ม 19 ตุลาคม 2569 · ผ่านการฝึก 86 ชม.') && withHrs.texts.includes('(Started 19 October 2026 · 86 hours trained)'), 'A: start + hours on two lines: ' + withHrs.texts.filter(t => /2569|2026/.test(t)).join(' | '));
+        assert.ok(!withHrs.texts.some(t => /27 November|27 พฤศจิกายน/.test(t)) && withHrs.texts.includes('Progressing'), 'A: no end date, small line = stage only');
+        const noHrs = await barAt({ hours: '', skills: [], stage: { key: 'mid', text: '21 / 40 days · 52% · Progressing', pct: 52 } });
+        assert.equal(noHrs.rects.length, 2, 'no hours: the bar stays');
+        assert.ok(noHrs.texts.some(t => /27 November 2026/.test(t)), 'no hours: the date range stays');
+
         // 4. 🏅 Badges (owner pick A): the real badge art + tier helpers, best tier first, one row under Skills, and the canvas still exports (PDF)
         const badgeJs = cut('        const BADGE_STATS_DEFS = [', '        // V102.263') + cut('        const BADGE_TIERS = [', '        function badgeSvgHtml(') +
             cut('        function badgeSvgHtml(', '\n        }\n') + '\n        }\n' + cut('        function userBadgeTier(u, id) {', '        // Sort key:');
@@ -142,6 +183,6 @@ assert.ok(admin.includes("certStagePick = 'auto';"), 'every open starts on Auto'
         assert.ok(bd.at.every(y => y === bd.at[0]) && bd.at[0] >= bd.sk[0] + 7 && bd.at[0] + 21 <= 472, 'the row sits under the skills line and above the signature: ' + JSON.stringify(bd));
         assert.ok(bd.exports, 'the canvas with badges still exports (PDF)');
         assert.deepEqual(errs, []);
-        console.log('PASS: certificate by progress (V102.600) — Auto stage from days/hours, manual pick, print box, stage wording/colour/watermark, no seal / scan below 100%, Completed = identical pixels, PharmCamp no stage, ✂️ First / Last, progress PDF unregistered, 〰 name line off by default + chip, Brand row (logo · watermark · seal · Co. name), 🏅 badges in one row under Skills (best tier first, PDF still exports)');
+        console.log('PASS: certificate by progress (V102.600) — Auto stage from days/hours, manual pick, print box, stage wording/colour/watermark, seal on/off via Brand ▸ Seal (IN PROGRESS below 100%), no scan below 100%, Completed = identical pixels, PharmCamp no stage, ✂️ First / Last, progress PDF unregistered, 〰 name line off by default + chip, Brand row (logo · watermark · seal · Co. name), 🏅 badges in one row under Skills (best tier first, PDF still exports), time-clock hours = start + hours trained, no bar (V102.612)');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
