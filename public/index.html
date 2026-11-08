@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.292)</title>
+    <title>Internship Portfolio (V101.294)</title>
     <link rel="stylesheet" href="nika-ask.css?v=V101.263">
     <link rel="stylesheet" href="daily-canvas.css?v=V101.266">
     <link rel="stylesheet" href="halloween.css?v=V101.249">
@@ -2573,7 +2573,7 @@
 <link rel="stylesheet" href="quiz-cover.css?v=V101.282">
 <link rel="stylesheet" href="case-insight-rail.css?v=V101.59">
 <script src="quiz-cover.js?v=V101.282"></script>
-<script src="activity-rewards.js?v=V101.84"></script><link rel="stylesheet" href="activity-rewards.css?v=V101.43">
+<script src="activity-rewards.js?v=V101.84"></script><link rel="stylesheet" href="activity-rewards.css?v=V101.294">
 <script src="peds-dosing.js?v=V101.62"></script><script src="flood-watch.js?v=V101.150"></script><script src="history-news.js?v=V101.137"></script><link rel="stylesheet" href="flood-watch.css?v=V101.148">
 </head>
 
@@ -9695,6 +9695,11 @@
 
         // Same day arithmetic as updateTimelineBar so the pace target and the gate
         // can never disagree about how long the internship is.
+        // V101.294 (owner): from the last day of the internship on, anyone may request — below the points gate too.
+        function certLastDayReached(endVal) {
+            const en = (typeof schParseDay === 'function') ? schParseDay(endVal) : null;
+            return !!en && new Date() >= en;
+        }
         function certRequiredPoints(startVal, endVal) {
             const st = (typeof schParseDay === 'function') ? schParseDay(startVal) : null;
             const en = (typeof schParseDay === 'function') ? schParseDay(endVal)   : null;
@@ -9819,8 +9824,8 @@
             // V100.59: the button used to appear for anyone past endDate, whatever the
             // score — a bypass of the gate the ⋯ menu enforces. Below the gate the slot
             // stays hidden, same "secret mission" treatment as the ⋯ entry.
-            const certReady = (data.score || 0) >= certRequiredPoints(data.startDate, data.endDate);
-            if (now >= e && (data.certApproved || data.certRequested || certReady)) {
+            // V101.294 (owner): from the last day on, the request shows for everyone, whatever the score.
+            if (now >= e) {
                 btn.style.display = '';
                 // V100.61: approved outranks "sent" — same order as the ⋯ entry.
                 if (data.certApproved) btn.innerHTML = `<span style="color:#28a745; font-weight:700;"><i class="fa-solid fa-certificate"></i> Certificate approved อนุมัติแล้ว</span>`;
@@ -9851,28 +9856,35 @@
             // users (e.g. score 2.12) submit a request — fixed to `>=`.
             // V97.39: the gate is no longer a flat 30 — it scales with the rotation.
             const certNeed = certRequiredPoints(userData.startDate, userData.endDate);
-            const hasCert = userData.startDate && userData.endDate && (userData.score || 0) >= certNeed;
+            const hasCert = userData.startDate && userData.endDate && ((userData.score || 0) >= certNeed || certLastDayReached(userData.endDate));
             const certRequested = userData.certRequested || false;
             const certApproved = userData.certApproved || false;
             const score = userData.score || 0;
 
-            const show = (html, onclick, disabled) => {
+            // V101.294 (owner pick 3): no text — the 🏅 ring keeps its place and shows 🎓 (tap = request), ⏳ (sent) or 🎓✓ (approved);
+            // the words live in the title / aria-label. `.cert-ready|pend|ok` on #badge-cert draws it (activity-rewards.css).
+            const ring = document.getElementById('badge-cert');
+            const setRing = st => { if (ring) ['ready', 'pend', 'ok'].forEach(k => ring.classList.toggle('cert-' + k, k === st)); };
+            const show = (html, onclick, disabled, label, st) => {
+                setRing(st);
+                item.title = label; item.setAttribute('aria-label', label);
                 item.style.display = '';
                 item.innerHTML = html;
                 item.disabled = !!disabled;
-                item.style.opacity = disabled ? '0.75' : '';
+                item.style.opacity = '';   // V101.294: ⏳ / 🎓✓ are states, not greyed-out buttons
                 item.style.cursor = disabled ? 'default' : '';
                 item.onclick = disabled ? null : onclick;
             };
 
             if (certApproved) {
-                show('<i class="fa-solid fa-certificate" style="color:#28a745;"></i> Certificate approved', null, true);
+                show('🎓<i class="cert-tick" aria-hidden="true">✓</i>', null, true, 'Certificate approved · อนุมัติใบรับรองแล้ว', 'ok');
             } else if (certRequested) {
-                show('<i class="fa-solid fa-clock" style="color:#f39c12;"></i> Certificate request pending', null, true);
+                show('⏳', null, true, 'Request sent — waiting for the admin · ส่งคำขอแล้ว รอแอดมิน', 'pend');
             } else if (hasCert) {
-                show('<i class="fa-solid fa-certificate" style="color:#667eea;"></i> Request Certificate',
-                     () => requestCertificateFromLIFF(), false);
+                show('🎓', () => requestCertificateFromLIFF(), false, 'Request your certificate · ขอใบรับรอง', 'ready');
+                if (window.certTourMaybe) window.certTourMaybe();   // V101.294 (owner pick A): once per device, a 2-step how-to
             } else {
+                setRing(null);
                 // Not yet available: show NOTHING. `score` is deliberately unused here — the
                 // old locked state printed it, duplicating the number already on the card.
                 item.style.display = 'none';
@@ -9890,8 +9902,8 @@
                 const _certDoc = await db.collection("users").doc(userId).get();
                 const _certData = _certDoc.data() || {};
                 const _certNeed = certRequiredPoints(_certData.startDate, _certData.endDate);
-                if ((_certData.score || 0) < _certNeed) {
-                    showToast(`⚠️ You need ${_certNeed} points before you can request a certificate · ต้องมีคะแนนถึง ${_certNeed} ก่อน`);
+                if ((_certData.score || 0) < _certNeed && !certLastDayReached(_certData.endDate)) {
+                    showToast(`⚠️ You need ${_certNeed} points before you can request a certificate · ต้องมีคะแนนถึง ${_certNeed} ก่อน หรือรอถึงวันสุดท้ายของการฝึก`);
                     checkUser();
                     return;
                 }
@@ -9967,8 +9979,8 @@
             // (score decayed since render) must not submit below the threshold.
             const _certData = (await db.collection("users").doc(userId).get()).data() || {};
             const _certNeed = certRequiredPoints(_certData.startDate, _certData.endDate);
-            if ((_certData.score || 0) < _certNeed) {
-                showToast(`⚠️ You need ${_certNeed} points before you can request a certificate · ต้องมีคะแนนถึง ${_certNeed} ก่อน`);
+            if ((_certData.score || 0) < _certNeed && !certLastDayReached(_certData.endDate)) {
+                showToast(`⚠️ You need ${_certNeed} points before you can request a certificate · ต้องมีคะแนนถึง ${_certNeed} ก่อน หรือรอถึงวันสุดท้ายของการฝึก`);
                 checkUser();
                 return;
             }
@@ -28279,6 +28291,7 @@ async function archiveDoneCard(cardId) {
 <script src="daily-canvas.js?v=V101.266"></script>
 <script src="knowthyself-nudge.js?v=V101.267"></script>
 <script src="journal-tour.js?v=V101.284" defer></script>
+<script src="cert-tour.js?v=V101.294" defer></script>
 <script src="nika-ask.js?v=V101.263"></script>
 <script src="intern-guide.js?v=V101.136" defer></script>
 <script src="complete-moments.js?v=V101.212" defer></script>
