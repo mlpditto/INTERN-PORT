@@ -204,7 +204,7 @@ window.historyLean = (() => {
         return '<div class="unified-history-card hl-row" data-delete-item="' + esc(s.id) + '" data-delete-type="' + esc(s.submissionType) + '" onclick="toggleUnifiedCard(this, event)" ' +
             'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault(); toggleUnifiedCard(this, event);}" role="listitem" tabindex="0" aria-expanded="false">' +
             '<div class="hl-main">' + leadHtml(s, ctx) +
-            '<div class="hl-tx lang-no-toggle"><div class="hl-tt' + (noteAutoTitled(s) ? ' hl-tt-auto' : '') + '" title="' + esc(titleOf(s)) + '">' + (short ? '<span class="hl-st">' + esc(short) + '</span><span class="hl-ft">' + esc(titleOf(s)) + '</span>' : esc(titleOf(s))) + fresh + '</div>' +
+            '<div class="hl-tx lang-no-toggle"><div class="hl-tt' + (noteAutoTitled(s) ? ' hl-tt-auto' : '') + '" title="' + esc(titleOf(s)) + '">' + (short ? '<span class="hl-st">' + esc(short) + '</span><span class="hl-ft">' + esc(titleOf(s)) + '</span>' : esc(titleOf(s))) + fresh + (s.submissionType === 'article' && window.internArticles && internArticles.flagHtml ? internArticles.flagHtml(s) : '') + '</div>' +
             '<div class="hl-mt"><span>' + date + '</span><span class="hl-more-t"> · ' + time + extra + '</span>' + noteTagsMeta(s) + pillHtml(s) + '</div></div>' +
             mat + valuesHtml(s) + '</div>' +
             '<div class="card-detail" style="display:none">' + detailHtml(s, ctx) + '</div></div>';

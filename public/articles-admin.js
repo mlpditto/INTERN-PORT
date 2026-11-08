@@ -118,8 +118,8 @@
         }).filter(Boolean);
     }
     function stats(a, now) {
-        var c = { n: 0, read: 0, closed: 0, wait: 0, saved: 0, quiz: 0, rerun: 0 };
-        readers(a, now).forEach(function (x) { c.n++; c[x.st]++; if (x.s && x.s.saved) c.saved++; if (x.s && x.s.act === 'quiz') c.quiz++; if (x.kind === 'rerun') c.rerun++; });
+        var c = { n: 0, read: 0, closed: 0, wait: 0, saved: 0, quiz: 0, rerun: 0, shared: 0 };
+        readers(a, now).forEach(function (x) { c.n++; c[x.st]++; if (x.s && x.s.saved) c.saved++; if (x.s && x.s.shared) c.shared++; if (x.s && x.s.act === 'quiz') c.quiz++; if (x.kind === 'rerun') c.rerun++; });
         return c;
     }
     // User Hub: 📰 read/for-them per intern; nothing when no published article is for them (no data = no chip)
@@ -705,7 +705,7 @@
         var c = stats(a, now), pct = c.n ? Math.round(c.read * 100 / c.n) : 0;
         return '<div class="art-stats" id="art-stats"><div class="hd"><span>Read</span><span>' + c.read + ' / ' + c.n + ' · ' + pct + '%</span></div><div class="bar"><i style="width:' + pct + '%"></i></div>' +
             '<div class="n"><span title="Read">✓ ' + c.read + '</span><span title="Closed without reading">👁 ' + c.closed + '</span><span title="Not seen yet">⏳ ' + c.wait + '</span>' +
-            (c.saved ? '<span title="Saved 🔖">🔖 ' + c.saved + '</span>' : '') + (c.quiz ? '<span title="Opened the quiz">🧪 ' + c.quiz + '</span>' : '') + (c.rerun ? '<span title="New interns (re-run)">🔁 ' + c.rerun + '</span>' : '') + '</div>' +
+            (c.saved ? '<span title="Saved 🔖">🔖 ' + c.saved + '</span>' : '') + (c.quiz ? '<span title="Opened the quiz">🧪 ' + c.quiz + '</span>' : '') + (c.shared ? '<span title="Shared to LINE / Facebook">📤 ' + c.shared + '</span>' : '') + (c.rerun ? '<span title="New interns (re-run)">🔁 ' + c.rerun + '</span>' : '') + '</div>' +
             '<button type="button" class="who" onclick="Articles.who(true)">👥 Who read it ›</button>' + (qOf(a.id).all.length ? '<button type="button" class="who" onclick="Articles.qs(\'' + esc(a.id) + '\')">💬 Questions (' + qOf(a.id).all.length + ') ›</button>' : '') + '</div>';
     }
     // ---- 💬 Any Q? (V102.430)
@@ -865,7 +865,7 @@
                 var div = typeof userDivisionOf === 'function' ? userDivisionOf(u) : u.division;
                 var how = x.s && x.s.act ? ACT[x.s.act] || x.s.act : x.s ? 'popup waiting' : 'not opened the app since it went live';
                 return '<div class="art-wr" data-st="' + x.st + '"' + (typeof openUserHub === 'function' ? ' style="cursor:pointer" onclick="Articles.close();openUserHub(\'' + esc(u.id) + '\')"' : '') + '><span class="av">' + pic + '</span>' +
-                    '<span class="nm"><b>' + esc(name(u)) + '</b>' + (div ? ' <span style="font-size:11px;color:#64748b">· ' + esc(div) + '</span>' : '') + '<small>' + (x.kind === 'rerun' ? '🔁 ' : '') + esc(how) + (x.s && x.s.saved ? ' · 🔖' : '') + '</small></span>' +
+                    '<span class="nm"><b>' + esc(name(u)) + '</b>' + (div ? ' <span style="font-size:11px;color:#64748b">· ' + esc(div) + '</span>' : '') + '<small>' + (x.kind === 'rerun' ? '🔁 ' : '') + esc(how) + (x.s && x.s.saved ? ' · 🔖' : '') + (x.s && x.s.shared ? ' · 📤 ' + [].concat(x.s.shared).map(function (k) { return k === 'fb' ? 'Facebook' : 'LINE'; }).join(' + ') : '') + '</small></span>' +
                     '<span class="pill ' + x.st + '">' + { read: '✓ Read', closed: '👁 Closed', wait: '⏳ Not yet' }[x.st] + '</span><span class="tm">' + (x.s && x.s.at ? whenStr(msOf(x.s.at)) : '') + '</span></div>';
             }).join('') : '<div class="art-empty">Nobody here.</div>') + '</div>' +
             '<div class="art-btns" style="position:static;margin:8px 0 0;padding:8px 0 0"><button type="button" onclick="Articles.csv()">⬇ CSV</button></div></div>';
@@ -991,8 +991,8 @@
             var a = S.cur; if (!a) return;
             // V102.386: a cell that starts with = + @ (or - followed by more) gets a leading ' so a spreadsheet never runs it as a formula (same rule as pixCsvCell / toCsvField)
             var q = function (v) { v = String(v == null ? '' : v); var g = /^[=+@]/.test(v) || /^-.+/.test(v); if (g) v = "'" + v; return (g || /[",\n]/.test(v)) ? '"' + v.replace(/"/g, '""') + '"' : v; };
-            var lines = [['name', 'division', 'group', 'state', 'how', 'when (Bangkok)', 'saved', 'new intern (re-run)'].join(',')].concat(whoRows(Object.assign({}, a)).map(function (x) {
-                return [x.u.displayName || x.u.fullName || x.u.id, typeof userDivisionOf === 'function' ? userDivisionOf(x.u) : x.u.division, x.u.group || '', x.st, x.s && x.s.act ? x.s.act : '', x.s && x.s.at ? whenStr(msOf(x.s.at)) : '', x.s && x.s.saved ? 'yes' : '', x.kind === 'rerun' ? 'yes' : ''].map(q).join(',');
+            var lines = [['name', 'division', 'group', 'state', 'how', 'when (Bangkok)', 'saved', 'new intern (re-run)', 'shared'].join(',')].concat(whoRows(Object.assign({}, a)).map(function (x) {
+                return [x.u.displayName || x.u.fullName || x.u.id, typeof userDivisionOf === 'function' ? userDivisionOf(x.u) : x.u.division, x.u.group || '', x.st, x.s && x.s.act ? x.s.act : '', x.s && x.s.at ? whenStr(msOf(x.s.at)) : '', x.s && x.s.saved ? 'yes' : '', x.kind === 'rerun' ? 'yes' : '', x.s && x.s.shared ? [].concat(x.s.shared).join(' ') : ''].map(q).join(',');
             }));
             var blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' }), url = URL.createObjectURL(blob), el = document.createElement('a');
             el.href = url; el.download = 'article-readers-' + (a.id || 'new') + '.csv'; document.body.appendChild(el); el.click(); el.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);

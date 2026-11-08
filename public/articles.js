@@ -82,7 +82,7 @@
     // V101.202 (owner): one language pill, like the app's EN / KR / TH button — it shows the language on screen; a tap moves to the next one the article has
     function nextLang(have, l) { return have[(have.indexOf(l) + 1) % have.length]; }
     // V101.268 (owner): the pill is the country flag (🇬🇧 / 🇹🇭 / 🇰🇷), like the 💬 Any Q? chip; the name is in title + aria-label
-    function langBtn(have, l, onclick) { return '<button type="button" class="lng fl" data-lang="' + l + '" title="' + LNAME[l] + '" aria-label="Language: ' + LNAME[l] + ' (tap for ' + LNAME[nextLang(have, l)] + ')" onclick="' + onclick + '">' + FLAGS[l] + '</button>'; }
+    function langBtn(have, l, onclick, cls) { return '<button type="button" class="lng fl' + (cls ? ' ' + cls : '') + '" data-lang="' + l + '" title="' + LNAME[l] + '" aria-label="Language: ' + LNAME[l] + ' (tap for ' + LNAME[nextLang(have, l)] + ')" onclick="' + onclick + '">' + FLAGS[l] + '</button>'; }
     // V101.217 (owner): the 💬 Any Q? form carries one flag chip too (🇬🇧 → 🇹🇭 → 🇰🇷), like the Guide — its labels exist in all three languages whatever the article has
     var FLAGS = { en: '🇬🇧', th: '🇹🇭', ko: '🇰🇷' }, LNAME = { en: 'English', th: 'ไทย', ko: '한국어' }, LORDER = ['en', 'th', 'ko'];
     function flagBtn(l) { var n = LORDER[(LORDER.indexOf(l) + 1) % LORDER.length]; return '<button type="button" class="lng fl" data-lang="' + l + '" title="' + LNAME[l] + '" aria-label="Language: ' + LNAME[l] + ' (tap for ' + LNAME[n] + ')" onclick="internArticles.askLang()">' + FLAGS[l] + '</button>'; }
@@ -204,7 +204,7 @@
             '.art-hist .art-md{font-size:13.5px;line-height:1.55}.art-hist .art-md p{margin:0 0 6px}.art-hist .art-md.art-clamp{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:6;overflow:hidden}' +
             '.art-hist .art-more-h{display:inline-block;width:auto;min-height:0;margin:2px 0 6px;padding:2px 0;border:0;background:none;box-shadow:none;color:#4361ee;font:700 13px/1 Kanit,sans-serif;cursor:pointer}.art-hist .art-more-h[hidden]{display:none}' +
             '@media (min-width:1100px){.art-hist .art-md{columns:2;column-gap:36px}.art-hist .art-md.art-clamp{display:block;-webkit-line-clamp:unset;overflow:visible}.art-hist .art-more-h{display:none}}' +
-            '.hl-pill.art-ok{background:#dcfce7;color:#166534}.hl-pill.art-new{background:#eef2ff;color:#4361ee}.art-hist{padding:0 0 6px}.art-hist .art-top{position:absolute;top:14px;right:0}.hl-row[aria-expanded="true"]:has(.art-top) .hl-tx{padding-right:44px}.art-hist .art-links{margin:8px 0 2px}' +
+            '.hl-pill.art-ok{background:#dcfce7;color:#166534}.hl-pill.art-new{background:#eef2ff;color:#4361ee}.art-hist{padding:0 0 6px}.hl-row .art-tfl{display:none}.hl-row[aria-expanded="true"] .art-tfl{display:inline-block;vertical-align:middle;margin:0 0 0 8px;padding:3px 8px;min-height:0;width:auto;border:1px solid #c7d2fe;background:#eef2ff;color:#4361ee;font:800 11px/1.2 Kanit,sans-serif;border-radius:999px;box-shadow:none;cursor:pointer}.art-sh{display:inline-flex;align-items:center;gap:5px;margin-left:6px;vertical-align:middle}.art-sh i{font-style:normal;color:#cbd5e1;margin-right:1px}.art-src .art-sh button{display:inline-flex;align-items:center;justify-content:center;height:24px;min-width:24px;min-height:0;margin:0;padding:0 6px;border-radius:7px;border:0;box-shadow:none;color:#fff;font:900 10px/1 Arial,sans-serif;text-decoration:none;cursor:pointer}.art-src .art-sh .ln{background:#06c755}.art-src .art-sh .fb{background:#1877f2;font-size:15px;padding:0 8px}.art-src .art-sh button.on{background:linear-gradient(135deg,#0461c4,#3ea6ef);box-shadow:0 0 0 2px #d0ebfb}.art-hist .art-links{margin:8px 0 2px}' +
             // V101.213: the intern's 💬 questions under the article in History, the admin's reply as a green bubble
             '.art-qa{margin:10px 0 2px;padding-top:8px;border-top:1px dashed #e2e8f0;font:400 13px/1.45 Kanit,sans-serif;color:#334155}.art-qa>b{display:block;font-weight:800;font-size:12.5px;color:#4338ca;margin-bottom:4px}' +
             '.art-qa .q{padding:5px 0;overflow-wrap:anywhere}.art-qa .q small{display:block;color:#94a3b8;font-size:11.5px}.art-qa .r{margin-top:4px;background:#ecfdf5;color:#065f46;border-radius:4px 12px 12px 12px;padding:5px 10px;white-space:pre-wrap}';
@@ -462,12 +462,13 @@
     function detailHtml(s) {
         var a = find((s.metadata || {}).articleId); if (!a) return '';
         css();
-        var tx = textOf(a, uiLang()), have = langs(a);
-        // V101.251: on the title line (positioned against the History row) · V101.193: the sheet's language pill here too when the article has more than one language — a tap swaps the body in place (V101.202: one pill, cycles)
-        var lng = have.length > 1 ? '<div class="art-top">' + langBtn(have, tx.lang, 'internArticles.histLang(this)') + '</div>' : '';
+        var tx = textOf(a, uiLang());
+        // V101.291 (owner pick C): the language pill moved into the title (flagHtml, history-lean.js); · 📤 LINE f at the end of the Source line
+        var src = srcHtml(a, uiLang()), sh = shareHtml(a);
+        src = src ? src.replace(/<\/div>$/, sh + '</div>') : '<div class="art-src">' + sh + '</div>';
         // V101.270: the first 6 lines + Read more (hidden when it all fits); ≥1100 px the whole body in two columns
         var t = T[uiLang()] || T.en;
-        return '<div class="art-hist lang-no-toggle" data-art="' + esc(a.id) + '">' + lng + '<div class="art-md art-clamp">' + md(tx.body) + '</div><button type="button" class="art-more-h" onclick="internArticles.histMore(this)">' + t.more + ' ▾</button>' + srcHtml(a, uiLang()) + linksHtml(a) + qaHtml(s) + '</div>';
+        return '<div class="art-hist lang-no-toggle" data-art="' + esc(a.id) + '"><div class="art-md art-clamp">' + md(tx.body) + '</div><button type="button" class="art-more-h" onclick="internArticles.histMore(this)">' + t.more + ' ▾</button>' + src + linksHtml(a) + qaHtml(s) + '</div>';
     }
     // V101.270: Read more only when the 6 lines hide something (the row's toggle has already shown the detail by now)
     function fitMore(box) {
@@ -480,10 +481,61 @@
         btn.textContent = open ? t.less + ' ▴' : t.more + ' ▾';
     }
     function histLang(btn, l) {
-        var box = btn.closest('.art-hist'), a = box && find(box.dataset.art); if (!a) return;
+        var row = btn.closest('.hl-row'), box = row && row.querySelector('.art-hist'), a = box && find(box.dataset.art); if (!a) return;
         var have = langs(a), tx = textOf(a, l || nextLang(have, btn.dataset.lang));
-        box.querySelector('.art-md').innerHTML = md(tx.body); fitMore(box);
-        btn.outerHTML = langBtn(have, tx.lang, 'internArticles.histLang(this)');
+        box.querySelector('.art-md').innerHTML = md(tx.body); fitMore(row);
+        btn.outerHTML = langBtn(have, tx.lang, 'internArticles.histLang(this)', 'art-tfl');
+    }
+    // V101.291: the History row's language pill, after the title (shown only while the row is open) — when the article has more than one language
+    function flagHtml(s) {
+        var a = find((s.metadata || {}).articleId); if (!a) return '';
+        var have = langs(a); return have.length > 1 ? langBtn(have, textOf(a, uiLang()).lang, 'internArticles.histLang(this)', 'art-tfl') : '';
+    }
+    // ---- 📤 share (V101.291, owner pick C): LINE always, Facebook only with a Source link (it needs a URL). The first share of an article
+    // adds 0.1 to the score once (not said on screen); the icon tapped turns wave blue. articleSeen[id].shared = ['line', 'fb'] tells the admin.
+    function srcUrl(a) { return a.source && /^https?:\/\//i.test(a.source.url || '') ? a.source.url : ''; }
+    // shared = ['line', 'fb'] (an older single string is read as one)
+    function sharedOf(s) { var v = (s || {}).shared; return Array.isArray(v) ? v : v ? [v] : []; }
+    function shareHtml(a) {
+        var on = sharedOf((me().articleSeen || {})[a.id]), id = esc(JSON.stringify(a.id));
+        var b = function (k, cls, label, txt) { return '<button type="button" class="' + cls + (on.indexOf(k) >= 0 ? ' on' : '') + '" data-sh="' + k + '" aria-label="Share on ' + label + '" title="' + label + '" onclick="internArticles.share(' + id + ',\'' + k + '\')">' + txt + '</button>'; };
+        return '<span class="art-sh"><i>·</i>📤 ' + b('line', 'ln', 'LINE', 'LINE') + (srcUrl(a) ? b('fb', 'fb', 'Facebook', 'f') : '') + '</span>';
+    }
+    function shareText(a) {
+        var tx = textOf(a, uiLang()), u = srcUrl(a);
+        if (u) return tx.title + '\n' + u;
+        var first = String(tx.body || '').split('\n').map(function (l) { return l.replace(/[*_#>`]/g, '').trim(); }).filter(Boolean)[0] || '';
+        return '📰 ' + tx.title + (first ? '\n' + first.slice(0, 160) : '');
+    }
+    function markShared(id, where) {
+        var m = window.myUserDoc = window.myUserDoc || {}; m.articleSeen = m.articleSeen || {};
+        var had = sharedOf(m.articleSeen[id]);
+        m.articleSeen[id] = Object.assign({}, m.articleSeen[id], { shared: had.indexOf(where) >= 0 ? had : had.concat(where) });   // keeps `at` (the read time)
+        document.querySelectorAll('.art-hist[data-art="' + id.replace(/"/g, '') + '"] .art-sh [data-sh="' + where + '"]').forEach(function (e) { e.classList.add('on'); });   // only the icon tapped
+        if (blocked() || !window.db || !window.myRegistered) return Promise.resolve(false);
+        var ref = window.db.collection('users').doc(uid());
+        return window.db.runTransaction(function (tx) {
+            return tx.get(ref).then(function (snap) {
+                var had = sharedOf((((snap.exists && snap.data()) || {}).articleSeen || {})[id]), w = {};
+                w[id] = { shared: had.indexOf(where) >= 0 ? had : had.concat(where), sharedAt: firebase.firestore.FieldValue.serverTimestamp() };
+                var f = { articleSeen: w };
+                if (!had.length) f.score = firebase.firestore.FieldValue.increment(0.1);   // once per article
+                tx.set(ref, f, { merge: true });
+                return !had.length;
+            });
+        }).catch(function (e) { console.warn('articles share:', e && e.message); return false; });
+    }
+    function share(id, where) {
+        var a = find(id); if (!a) return Promise.resolve(false);
+        var u = srcUrl(a), text = shareText(a);
+        if (where === 'fb' && !u) return Promise.resolve(false);
+        var go = where === 'fb' ? 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(u) : 'https://line.me/R/share?text=' + encodeURIComponent(text);
+        var open = function () { internArticles.openSrc(go); return true; };
+        // in LINE: the friend / group picker (like 🏅 badges); a cancel is not a share
+        var p = where === 'line' && window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')
+            ? Promise.resolve().then(function () { return liff.shareTargetPicker([{ type: 'text', text: text }]); }).then(function (r) { return !!r; }, open)
+            : Promise.resolve(open());
+        return p.then(function (ok) { return ok ? markShared(id, where) : false; });
     }
     // tapping an article row open in History = read (the row stays open: the pill is patched in place, no re-render)
     document.addEventListener('click', function (e) {
@@ -504,7 +556,7 @@
             else refreshHistory(false);
         },
         historyItems: function () { return historyItems(S.list, me(), Date.now(), S.qs); },
-        histMore: histMore,
+        histMore: histMore, flagHtml: flagHtml, share: share,
         owed: function () { return owed(S.list, me(), Date.now()); },
         detailHtml: detailHtml, pillHtml: pillHtml, discHtml: discHtml, listen: listen, stopListen: stopListen, close: close, histLang: histLang,
         gotIt: gotIt, anyQ: anyQ, askSend: askSend,
