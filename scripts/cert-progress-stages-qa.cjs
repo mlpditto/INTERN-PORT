@@ -63,9 +63,9 @@ assert.ok(admin.includes("certStagePick = 'auto';"), 'every open starts on Auto'
         });
         assert.deepEqual(m, {
             auto: 'Auto · 🟢 Mid', text: '28 / 40 วัน · 70%', bar: '70%', badge: '🟢 Mid', split: true,
-            extra: { key: 'mid', text: '28 / 40 วัน (days) · 70% · Progressing', pct: 70 },
+            extra: { key: 'mid', text: '28 / 40 วัน (days) · 70% · Progressing', pct: 70, sign: false, qr: false },
             manual: ['near', 'true', 'Auto'], done: null,
-            noPrint: { key: 'mid', text: '', pct: 70 }, splitAfter: false,
+            noPrint: { key: 'mid', text: '', pct: 70, sign: false, qr: false }, splitAfter: false,
             hours: ['112 / 160 ชม. · 70%', 'mid'], camp: [true, null]
         });
 
@@ -110,7 +110,19 @@ assert.ok(admin.includes("certStagePick = 'auto';"), 'every open starts on Auto'
         assert.notEqual(midNoSeal.png, mid.png, 'the Seal chip changes the progress certificate');
         await page.evaluate(() => toggleCertBrand('seal'));
         assert.ok(has(mid, '28 / 40 วัน (days) · 70% · Progressing') && !has(mid, '40 วัน / 40 days'), 'progress line replaces the day count');
-        assert.ok(!has(mid, 'SCAN TO VERIFY') && has(mid, 'Progress · no number'), 'no scan-to-verify on a progress certificate');
+        assert.ok(!has(mid, 'SCAN TO VERIFY') && !has(mid, 'Progress · no number'), 'no scan-to-verify, no QR box on a progress certificate by default');
+        // V102.613 (owner: "in progress ยังไม่ต้องมี QR กับ ลายเซ็น ให้เลือกได้"): ✍️ Sign / ▢ QR are off unless turned on; Completed keeps both
+        assert.ok(!has(mid, 'Managing Pharmacist') && has(plain, 'Managing Pharmacist') && has(plain, 'QR on export'), 'progress: no signature block by default; Completed: signature + QR box');
+        const midBoth = await draw({ hours: '', skills: [], stage: { key: 'mid', text: '28 / 40 วัน (days) · 70% · Progressing', pct: 70, sign: true, qr: true } });
+        assert.ok(has(midBoth, 'Managing Pharmacist') && has(midBoth, 'Progress · no number') && !has(midBoth, 'SCAN TO VERIFY'), 'Sign + QR on: signature block + the numberless box');
+        const chips = await page.evaluate(() => {
+            ['sign', 'qr'].forEach(k => localStorage.removeItem('cert_prog_' + k));
+            const off = getCurrentCertificateExtra().stage; toggleCertProg('sign'); paintCertStage();
+            const on = [getCurrentCertificateExtra().stage.sign, getCurrentCertificateExtra().stage.qr, document.querySelector('[data-prog="sign"]').getAttribute('aria-pressed'), document.querySelector('[data-prog="qr"]').getAttribute('aria-pressed')];
+            toggleCertProg('sign'); paintCertStage();
+            return { off: [off.sign, off.qr], on, back: certProgOn('sign') };
+        });
+        assert.deepEqual(chips, { off: [false, false], on: [true, false, 'true', 'false'], back: false }, 'the chips toggle, show their state and are remembered');
         assert.equal(mid.calls.find(c => c.t === 'PROGRESS CERTIFICATE').c, '#0f766e', 'Mid accent colour');
         const near = await draw({ hours: '', skills: [], stage: { key: 'near', text: '37 / 40 วัน (days) · 92% · Near completion', pct: 92 } });
         assert.ok(has(near, 'CERTIFICATE') && has(near, 'OF ACHIEVEMENT') && has(near, 'กำลังจะสำเร็จการฝึกงาน') && !has(near, 'IN PROGRESS'), 'Near: Certificate of Achievement, no watermark');
@@ -133,7 +145,7 @@ assert.ok(admin.includes("certStagePick = 'auto';"), 'every open starts on Auto'
             return { both, be, ce, ko, noPrint, none };
         });
         assert.deepEqual(sn, {
-            both: { key: 'mid', text: 'Progressing', pct: 52, since: 'เริ่ม 19 ตุลาคม 2569 · ผ่านการฝึก 86 ชม. (Started 19 October 2026 · 86 hours trained)' },
+            both: { key: 'mid', text: 'Progressing', pct: 52, since: 'เริ่ม 19 ตุลาคม 2569 · ผ่านการฝึก 86 ชม. (Started 19 October 2026 · 86 hours trained)', sign: false, qr: false },
             be: 'เริ่ม 19 ตุลาคม 2569 · ผ่านการฝึก 86 ชม.', ce: 'Started 19 October 2026 · 86 hours trained',
             ko: '2026년 10월 19일 시작 · 86시간 수련 (Started 19 October 2026 · 86 hours trained)', noPrint: undefined, none: undefined
         });
@@ -183,6 +195,6 @@ assert.ok(admin.includes("certStagePick = 'auto';"), 'every open starts on Auto'
         assert.ok(bd.at.every(y => y === bd.at[0]) && bd.at[0] >= bd.sk[0] + 7 && bd.at[0] + 21 <= 472, 'the row sits under the skills line and above the signature: ' + JSON.stringify(bd));
         assert.ok(bd.exports, 'the canvas with badges still exports (PDF)');
         assert.deepEqual(errs, []);
-        console.log('PASS: certificate by progress (V102.600) — Auto stage from days/hours, manual pick, print box, stage wording/colour/watermark, seal on/off via Brand ▸ Seal (IN PROGRESS below 100%), no scan below 100%, Completed = identical pixels, PharmCamp no stage, ✂️ First / Last, progress PDF unregistered, 〰 name line off by default + chip, Brand row (logo · watermark · seal · Co. name), 🏅 badges in one row under Skills (best tier first, PDF still exports), time-clock hours = start + hours trained, no bar (V102.612)');
+        console.log('PASS: certificate by progress (V102.600) — Auto stage from days/hours, manual pick, print box, stage wording/colour/watermark, seal on/off via Brand ▸ Seal (IN PROGRESS below 100%), no scan below 100%, Completed = identical pixels, PharmCamp no stage, ✂️ First / Last, progress PDF unregistered, 〰 name line off by default + chip, Brand row (logo · watermark · seal · Co. name), 🏅 badges in one row under Skills (best tier first, PDF still exports), time-clock hours = start + hours trained, no bar (V102.612), ✍️ Sign / ▢ QR off on progress unless turned on (V102.613)');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
