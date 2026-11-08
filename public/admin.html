@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.614)</title>
+    <title>Nika Admin (V102.615)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -64732,6 +64732,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         let certDateCal = 'both';  // 'be' (พ.ศ.) | 'ce' (ค.ศ.) | 'both'
         function setCertLang(v) { certLang = v; paintCertOptRails(); updateCertPreview(); }
         function setCertDateCal(v) { certDateCal = v; paintCertOptRails(); updateCertPreview(); }
+        // V102.615 (owner): an English-only certificate carries no Thai — its dates are always CE, like Korean.
+        function certCalNow() { return certLang === 'ko' || certLang === 'en' ? 'ce' : certDateCal; }
         // V100.77: certMenuModal's LANG/YR chips are independently toggleable (TH+EN both
         // lit = 'both') instead of a dedicated 3rd combo chip — certModal/certPasteModal
         // still call setCertLang/setCertDateCal directly and are untouched. Refuses to
@@ -64762,7 +64764,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const cur = isCal ? certDateCal : certLang;
                 // V100.68: Korean certificates always use the Gregorian year, so the
                 // BE/CE chips are shown inactive rather than silently ignored.
-                const locked = isCal && certLang === 'ko';
+                const locked = isCal && (certLang === 'ko' || certLang === 'en');   // V102.615: English-only = CE too
                 // V100.76: certMenuModal opts into the cert's own ivory/gold palette via
                 // data-cert-accent="gold" — certModal/certPasteModal leave it unset and
                 // keep the original blue, unchanged.
@@ -64793,7 +64795,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     b.style.opacity = locked ? '0.45' : '';
                     b.style.cursor = locked ? 'not-allowed' : 'pointer';
                 });
-                rail.title = locked ? 'Korean uses the Western year (CE)' : '';
+                rail.title = locked ? (certLang === 'en' ? 'English uses the Western year (CE)' : 'Korean uses the Western year (CE)') : '';
             });
         }
 
@@ -64842,11 +64844,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const th = `เริ่ม ${formatCertDateRange(startISO, startISO, 'be')} · ผ่านการฝึก ${h} ชม.`;
             const en = `Started ${formatCertDateRange(startISO, startISO, 'ce')} · ${h} hours trained`;
             if (certLang === 'ko') { const d = new Date(startISO + 'T00:00:00'); return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 시작 · ${h}시간 수련 (${en})`; }
-            return certDateCal === 'be' ? th : certDateCal === 'ce' ? en : `${th} (${en})`;
+            const cal = certCalNow();
+            return cal === 'be' ? th : cal === 'ce' ? en : `${th} (${en})`;
         }
         // V100.68: the date text for the current language — Korean ignores the BE/CE chips.
         function certDateText(startISO, endISO) {
-            return certLang === 'ko' ? formatCertDateRangeKo(startISO, endISO) : formatCertDateRange(startISO, endISO, certDateCal);
+            return certLang === 'ko' ? formatCertDateRangeKo(startISO, endISO) : formatCertDateRange(startISO, endISO, certCalNow());
         }
         // V100.70: inclusive day count, local-midnight parsed (see formatCertDateRange).
         function certDurationDays(startISO, endISO) {
@@ -65989,7 +65992,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 dateText: (u.startDate && u.endDate)
                     ? certDateText(u.startDate, u.endDate)
                     : (opts.dateRange ? certDateText(opts.dateRange.start, opts.dateRange.end) : ''),
-                lang: certLang, cal: certLang === 'ko' ? 'ce' : certDateCal, userId: u.id
+                lang: certLang, cal: certCalNow(), userId: u.id
             }));
             let certNos;
             try {
@@ -66187,7 +66190,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 return {
                     name: parts[0].trim(), nickname: (parts[1] || '').trim(),
                     template: tpl, dateStart: ps, dateEnd: pe || ps, dateText: dateText,
-                    lang: certLang, cal: certLang === 'ko' ? 'ce' : certDateCal, userId: null
+                    lang: certLang, cal: certCalNow(), userId: null
                 };
             });
             let certNos;
@@ -66245,7 +66248,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     name: _fn, nickname: _nn, nameTh: getCurrentCertificateNames().th, nameKo: getCurrentCertificateNames().ko, template: currentCertTemplate,
                     dateStart: _hrs ? _hrs.at : _s, dateEnd: _hrs ? _hrs.at : (_e || _s), dateText: _hrs ? _extra.hours : drawArgs[1],
                     hours: _hrs ? _hrs.hours : null, skills: _extra.skills,
-                    lang: certLang, cal: certLang === 'ko' ? 'ce' : certDateCal,
+                    lang: certLang, cal: certCalNow(),
                     userId: certUser ? certUser.uid : null
                 }]);
             } catch (err) {

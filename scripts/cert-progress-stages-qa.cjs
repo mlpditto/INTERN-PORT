@@ -136,15 +136,19 @@ assert.ok(admin.includes("certStagePick = 'auto';"), 'every open starts on Auto'
         const sn = await page.evaluate(() => {
             const fixed = new Date('2026-11-08T10:00:00').getTime(); Date.now = () => fixed;
             certStagePick = 'auto'; certPeriodMode = 'dates'; certLang = 'en'; certDateCal = 'both';
-            certUser.hoursDone = 86.6; const both = getCurrentCertificateExtra().stage;
+            certUser.hoursDone = 86.6; const enOnly = getCurrentCertificateExtra().stage;
+            const enRange = certDateText('2026-10-19', '2026-11-27');   // V102.615: English-only = CE whatever YEAR says
+            certLang = 'both'; const both = getCurrentCertificateExtra().stage;
             certDateCal = 'be'; const be = certSinceText('2026-10-19', 86.6); certDateCal = 'ce'; const ce = certSinceText('2026-10-19', 86.6);
             certLang = 'ko'; const ko = certSinceText('2026-10-19', 86.6); certLang = 'both'; certDateCal = 'both';
             document.getElementById('cert-progress-print').checked = false; const noPrint = getCurrentCertificateExtra().stage.since; document.getElementById('cert-progress-print').checked = true;
             certUser.hoursDone = 0.4; const none = getCurrentCertificateExtra().stage.since;
             certUser.hoursDone = 0;
-            return { both, be, ce, ko, noPrint, none };
+            return { enOnly, enRange, both, be, ce, ko, noPrint, none };
         });
         assert.deepEqual(sn, {
+            enOnly: { key: 'mid', text: 'Progressing', pct: 52, since: 'Started 19 October 2026 · 86 hours trained', sign: false, qr: false },
+            enRange: '19 October 2026 – 27 November 2026',
             both: { key: 'mid', text: 'Progressing', pct: 52, since: 'เริ่ม 19 ตุลาคม 2569 · ผ่านการฝึก 86 ชม. (Started 19 October 2026 · 86 hours trained)', sign: false, qr: false },
             be: 'เริ่ม 19 ตุลาคม 2569 · ผ่านการฝึก 86 ชม.', ce: 'Started 19 October 2026 · 86 hours trained',
             ko: '2026년 10월 19일 시작 · 86시간 수련 (Started 19 October 2026 · 86 hours trained)', noPrint: undefined, none: undefined
