@@ -32,7 +32,7 @@ async function open(browser, w, h, saved) {
 
 const measure = page => page.evaluate(() => {
     const m = document.getElementById('certModal'), mc = m.querySelector('.cert-mc'), side = m.querySelector('.cert-side'), cv = document.getElementById('cert-canvas').getBoundingClientRect(), sr = side.getBoundingClientRect();
-    const btn = [...m.querySelectorAll('.cert-pv button')].map(b => b.getBoundingClientRect());
+    const btn = [...m.querySelectorAll('.cert-hd .cert-act button')].map(b => b.getBoundingClientRect());   // V102.621: Save · PDF · Approve live in the header
     return { cls: m.className.match(/cl-[ab]/g), pressed: [...m.querySelectorAll('.cert-lay [aria-pressed="true"]')].map(b => b.dataset.lay),
         pageScroll: m.scrollHeight > m.clientHeight + 1, cardScroll: mc.scrollHeight > mc.clientHeight + 1, sideScroll: side.scrollHeight > side.clientHeight + 1,
         sideLeft: sr.left < cv.left, canvasInView: cv.top >= 0 && cv.bottom <= innerHeight && cv.width > 500, buttonsInView: btn.every(b => b.bottom <= innerHeight && b.width > 0),
@@ -67,6 +67,32 @@ const measure = page => page.evaluate(() => {
             ({ page } = await open(browser, w, h, 'b'));
             assert.deepEqual((await measure(page)).cls, ['cl-b'], 'reopening keeps B');
             await page.close();
+        }
+        // V102.621 (owner): a tall screen — the window is as tall as its content, no empty band above/below the certificate;
+        // the header holds 💾 · ⤓ (one group) and ✓ Approve, nothing under the preview
+        {
+            const { page, errs } = await open(browser, 1236, 1277, 'b');
+            const t = await page.evaluate(() => {
+                const m = document.getElementById('certModal'), mc = m.querySelector('.cert-mc').getBoundingClientRect(), side = m.querySelector('.cert-side'), cv = document.getElementById('cert-canvas').getBoundingClientRect(), pv = document.getElementById('cert-preview-container').getBoundingClientRect();
+                return { h: mc.height, sideH: side.scrollHeight, gap: Math.round(pv.height - cv.height), cvW: Math.round(cv.width), pvW: Math.round(pv.width),
+                    act: [...m.querySelectorAll('.cert-hd .cert-act button')].map(b => b.getAttribute('aria-label') || b.textContent.trim()), below: m.querySelectorAll('.cert-pv > div:not(#cert-preview-container) button').length };
+            });
+            assert.ok(t.h < 1277 * 0.96 - 100, 'shorter than the old fixed 96vh: ' + JSON.stringify(t));
+            assert.ok(t.gap <= 20 && t.cvW >= t.pvW - 20, 'the certificate fills its box, no empty band: ' + JSON.stringify(t));
+            assert.deepEqual([t.act, t.below], [['Save', 'Download PDF', 'Approve'], 0], 'header actions, none under the preview');
+            assert.deepEqual(errs, []);
+            await page.close();
+        }
+        // ✓ Approve = Save, then the PDF — and no PDF when the save stopped (bad dates)
+        {
+            const fn = (head) => { const i = admin.indexOf(head); let d = 0; for (let j = admin.indexOf('{', i); ; j++) { if (admin[j] === '{') d++; else if (admin[j] === '}' && --d === 0) return admin.slice(i, j + 1); } };
+            const run = new Function('saveResult', `const calls = []; const document = { getElementById: id => ({ id }) };
+                async function saveUserDates() { calls.push('save'); return saveResult; } async function certPdfBusy(b) { calls.push('pdf:' + b.id); }
+                ${fn('async function certApprove(btn)')} return certApprove({ disabled: false }).then(() => calls);`);
+            assert.deepEqual(await run(true), ['save', 'pdf:btn-gen-pdf'], 'Approve: save then PDF');
+            assert.deepEqual(await run(undefined), ['save'], 'a save that stopped (alert / cancel) issues nothing');
+            assert.ok(/return true;\s+\/\/ V102\.621/.test(fn('async function saveUserDates()')), 'saveUserDates says when it saved');
+            assert.ok(/certLang = 'en'; paintCertLangChip\(\); paintCertOptRails\(\);\s+setCertLayout\(\); document\.getElementById\('certModal'\)/.test(admin), 'every open starts English-only');
         }
         // phones keep one column (no side panel)
         const { page } = await open(browser, 390, 844, null);
