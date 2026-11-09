@@ -94,20 +94,37 @@ const INDEX = pathToFileURL(path.join(__dirname, '..', 'public', 'index.html')).
         await o.ctx.close();
 
         // only "in 3 days": no confetti, the snow stays, the toast
-        const t3 = await open([{ id: 'B', name: 'Mint', md: '11-11', days: 3 }], 'Z');
-        const s3 = await state(t3.page);
+        const s3t = await open([{ id: 'B', name: 'Mint', md: '11-11', days: 3 }], 'Z');
+        const s3 = await state(s3t.page);
         assert.ok(!s3.bd && s3.pieces === 0 && s3.toast === '🎂 อีก 3 วัน (11 พ.ย.) วันเกิด Mint', 'T-3 only: toast, no confetti: ' + JSON.stringify(s3));
-        await t3.ctx.close();
+        await s3t.ctx.close();
 
         // the birthday person
         const m = await open(items, 'A');
         const sm = await state(m.page);
         assert.ok(sm.bd && sm.me && sm.pieces === 46 && sm.gold >= 15 && sm.nameAfter === '" 🎂"', 'me: more + gold confetti, 🎂 after the name: ' + JSON.stringify(sm));
         assert.equal(sm.toast, '🎂 Happy birthday Joey! สุขสันต์วันเกิด · 🎂 อีก 3 วัน (11 พ.ย.) วันเกิด Mint', 'me: the greeting, not "today is Joey\'s birthday"');
-        await m.page.evaluate(() => { window.__xm = []; window.xmMusic = { isOn: () => true, pause: () => window.__xm.push('pause'), play: () => window.__xm.push('play') }; });
+        // V101.296 (owner): the song loops all day, no Christmas music; hold the photo = off / on for the day
+        await m.page.evaluate(() => {
+            window.__xm = []; window.xmMusic = { isOn: () => true, pause: () => window.__xm.push('pause'), play: () => window.__xm.push('play') };
+            window.__loops = []; const st = window.setTimeout;
+            window.setTimeout = (f, d, ...a) => { if (d >= 14000 && d <= 16000) { window.__loops.push(d); window.__next = f; return 0; } return st(f, d, ...a); };
+        });
         await m.page.click('body'); await m.page.waitForTimeout(100); await m.page.click('body'); await m.page.waitForTimeout(100);
-        const tune = await m.page.evaluate(() => ({ osc: window.__osc, xm: window.__xm.slice(), seen: localStorage.getItem('bd_tune_2026-11-08') }));
-        assert.ok(tune.osc === 50 && tune.xm[0] === 'pause' && tune.seen === '1', 'the first tap plays Happy Birthday once (25 notes × 2), Christmas music paused: ' + JSON.stringify(tune));
+        const u1 = await m.page.evaluate(() => ({ osc: window.__osc, xm: window.__xm.slice(), loops: window.__loops.slice(), on: bdBirthdays.isPlaying() }));
+        assert.ok(u1.osc === 50 && u1.on && u1.loops.length === 1 && u1.xm[0] === 'pause' && !u1.xm.includes('play'), 'first tap: one round (25 notes × 2), the next round queued after a 4 s rest, Christmas music paused and never resumed: ' + JSON.stringify(u1));
+        const u2 = await m.page.evaluate(() => { window.__next(); return { osc: window.__osc, loops: window.__loops.length }; });
+        assert.deepEqual(u2, { osc: 100, loops: 2 }, 'it keeps looping');
+        const hold = async () => { await m.page.evaluate(() => document.getElementById('u-img').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))); await m.page.waitForTimeout(750); await m.page.evaluate(() => document.getElementById('u-img').dispatchEvent(new PointerEvent('pointerup', { bubbles: true }))); };
+        await hold();
+        const u3 = await m.page.evaluate(() => ({ on: bdBirthdays.isPlaying(), mute: localStorage.getItem('bd_mute_2026-11-08'), toast: document.querySelector('#toast .toast-msg').textContent }));
+        assert.deepEqual(u3, { on: false, mute: '1', toast: '🔇 Birthday song off · ปิดเพลงวันเกิด (hold the photo to turn it on)' }, 'hold the photo: song off for the day');
+        await m.page.click('body'); await m.page.waitForTimeout(100);
+        assert.equal(await m.page.evaluate(() => bdBirthdays.isPlaying()), false, 'a tap does not bring it back while it is off');
+        await hold();
+        { const dbg = await m.page.evaluate(() => ({ on: bdBirthdays.isPlaying(), mute: localStorage.getItem('bd_mute_2026-11-08'), toast: document.querySelector('#toast .toast-msg').textContent, hidden: document.hidden })); assert.equal(dbg.on, true, 'hold again: song on ' + JSON.stringify(dbg)); }
+        const xm = fs.readFileSync(path.join(__dirname, '..', 'public', 'christmas.js'), 'utf8');
+        assert.ok(/if \(!on\(\) \|\| inQuiz\(\) \|\| bdMe\(\)\) return;/.test(xm) && /if \(!on\(\) \|\| bdMe\(\)\) return;   \/\/ birthday\.js owns the hold/.test(xm) && /if \(!on\(\) \|\| bdMe\(\)\) pause\(\);/.test(xm), 'christmas.js: no Christmas music and no Christmas hold on your birthday');
         assert.deepEqual(m.errs, []);
         await m.ctx.close();
 
@@ -129,6 +146,6 @@ const INDEX = pathToFileURL(path.join(__dirname, '..', 'public', 'index.html')).
         assert.ok(/update\(\{ birthdayHidden: next \}\)/.test(html) && /paintBirthdayHidden\(d\.birthdayHidden === true\)/.test(html), 'the chip saves users.birthdayHidden at once and Info loads it');
         assert.ok(!/'birthdayHidden'/.test(html.slice(html.indexOf('const INFO_POINT_FIELDS'), html.indexOf('function infoPointsDelta'))), 'hiding is not paid for');
         await n.ctx.close();
-        console.log('PASS: 🎂 birthdays (V101.295) — today + in 3 days by nickname, no year, hidden / inactive left out, 29 Feb, New Year; getBirthdays login-only, minimal fields; confetti instead of snow for everyone, one toast a day, T-3 toast only, the birthday person: gold confetti + 🎂 + greeting + Happy Birthday once at the first tap; Info 🙈 chip');
+        console.log('PASS: 🎂 birthdays (V101.295) — today + in 3 days by nickname, no year, hidden / inactive left out, 29 Feb, New Year; getBirthdays login-only, minimal fields; confetti instead of snow for everyone, one toast a day, T-3 toast only, the birthday person: gold confetti + 🎂 + greeting + Happy Birthday looping all day from the first tap, no Christmas music, hold the photo = off / on (V101.296); Info 🙈 chip');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

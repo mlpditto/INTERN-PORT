@@ -12,6 +12,7 @@ Intern: open the LIFF app (new-version banner, toasts). Admin: any modal that op
 - `update-version-qa` — the version title stays inside the byte range old tabs poll
 - `update-banner-lean-qa` — intern "new version" banner is one ~32 px row
 - `index-toast-fit-qa` — intern toast fits its message (no 250 px floor)
+- `toast-checkin-countdown-qa` — the 🔥 check-in toast drains and closes itself after 10 s; hover / touch pauses, ✕ closes, other toasts stay
 - `admin-toast-fit-qa` — admin toast fits its message, wraps at the 560 px cap
 - `divisions-modal-over-userhub-qa` — Divisions & Groups paints above the User Hub, Visibility above that
 - `liff-preview-over-userhub-qa` — the LIFF Preview phone frame paints above the User Hub

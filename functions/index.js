@@ -362,6 +362,29 @@ exports.getBirthdays = onCall(async (request) => {
     return { today, items: bd.birthdaysAround(snap.docs.map((d) => Object.assign({ id: d.id }, d.data())), today, isActiveMember) };
 });
 
+// V101.297 (owner pick C + 1, 2026-11-09): the intern's 🎓✓ → ⬇️ PDF. The PDF stays admin-only in Storage; this hands back a
+// download URL for the caller's OWN issued certificate only. Identity = the LINE ID token (verified with LINE), because the
+// anonymous Firebase uid can be linked to any userId by the client. See functions/cert-download.js.
+exports.getMyCertificate = onCall(async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
+    const cd = require('./cert-download');
+    const userId = String((request.data && request.data.userId) || '');
+    const sub = await cd.verifyLineIdToken(axios, request.data && request.data.idToken);
+    if (!sub) throw new HttpsError('unauthenticated', 'LINE login expired');
+    const db = admin.firestore();
+    const userSnap = userId ? await db.collection('users').doc(userId).get() : null;
+    const user = userSnap && userSnap.exists ? userSnap.data() : null;
+    if (!cd.ownsUserDoc(userId, sub, user)) throw new HttpsError('permission-denied', 'Not your account');
+    const no = String(user.certNo || '');
+    const [certSnap, filesSnap] = no ? await Promise.all([db.collection('certificates').doc(no).get(), db.collection('certificate_files').doc(no).get()]) : [null, null];
+    const files = filesSnap && filesSnap.exists ? filesSnap.data() : null;
+    const problem = cd.certProblem(userId, user, certSnap && certSnap.exists ? certSnap.data() : null, files);
+    if (problem) throw new HttpsError('failed-precondition', problem);
+    const { getDownloadURL } = require('firebase-admin/storage');
+    const url = await getDownloadURL(admin.storage().bucket('intern-port-edfa7.firebasestorage.app').file(cd.filePath(files)));
+    return { no, url };
+});
+
 // === V94.68: server-side quiz deadline auto-shrink (capped at 50%) ===
 // Each non-practice quiz submission pulls the quiz `deadline` in by 10% of the
 // time still remaining — but never past 50% of the original window. This used
