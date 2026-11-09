@@ -34,11 +34,13 @@ const page = `<!doctype html><meta charset="utf-8"><meta name="viewport" content
             assert.equal(await p.locator(m + ' .lnr-chip.active').count(), 0);
             assert.equal(await p.locator(m + ' .lnr-need').isVisible(), true);
             assert.equal(await p.locator(m + ' .lnr-save').evaluate(b => getComputedStyle(b).opacity), '0.55');
+            assert.equal(await p.locator(m + ' .lnr-save').innerText(), '⭐ Pick pts first', 'V102.620: the faded button says what it needs');
             await p.click(m + ' .lnr-save');
             assert.equal(await p.locator('#lnr-score-row.lnr-invalid').count(), 1, 'Save & Award without pts marks the row');
             assert.deepEqual(await p.evaluate(() => __alerts), [], 'no alert');
             await p.click(m + ' .lnr-chip[data-score="1.0"]');
             assert.deepEqual([await p.locator(m + ' .lnr-need').isVisible(), await p.locator('#lnr-score-row.lnr-invalid').count(), await p.locator(m + ' .lnr-save').evaluate(b => getComputedStyle(b).opacity)], [false, 0, '1'], 'a pick clears it');
+            assert.equal(await p.locator(m + ' .lnr-save').innerText(), 'Save & Award');
             await p.fill('#lnr-score-input', '3');
             assert.equal(await p.locator(m + ' .lnr-need').isVisible(), true, 'out of range = not scored');
             await p.fill('#lnr-score-input', '0.3');
@@ -55,7 +57,9 @@ const page = `<!doctype html><meta charset="utf-8"><meta name="viewport" content
             // quick feedback: 7 emoji chips, the name in title / aria-label, a tap still appends the sentence
             const tpl = p.locator(m + ' .lnr-tpl-row .lnr-tpl');
             assert.equal(await tpl.count(), 7);
-            assert.equal(await tpl.evaluateAll(b => b.filter(x => /[A-Za-z]/.test(x.textContent)).length), 0, 'no words on the chips');
+            // V102.620: one word beside the emoji on a wide screen (>= 900 px), emoji only on a phone
+            assert.equal(await tpl.evaluateAll(b => b.filter(x => /[A-Za-z]/.test(x.innerText)).length), width >= 900 ? 7 : 0, 'words only on a wide screen');
+            assert.equal((await tpl.first().innerText()).replace(/\s+/g, ''), width >= 900 ? '👍Structure' : '👍');
             assert.equal(await tpl.first().getAttribute('aria-label'), 'Great structure');
             await p.fill('#lnr-comment', ''); await tpl.first().click();
             assert.equal(await p.inputValue('#lnr-comment'), 'Great structure! 👍');
@@ -71,6 +75,9 @@ const page = `<!doctype html><meta charset="utf-8"><meta name="viewport" content
 
             // the count is on the folded summary
             assert.equal(await p.locator(m + ' details.lnr-conversation > summary #lnr-thread-count').count(), 1);
+            // V102.620: empty → a quiet grey summary with 0; the faded Save says what it needs, then reads Save & Award
+            assert.equal(await p.evaluate(() => getComputedStyle(document.querySelector('#lnr-thread-count'), '::after').content), '"0"');
+            assert.equal(await p.evaluate(() => getComputedStyle(document.querySelector('#learningNoteReviewModal .lnr-conversation > summary')).color), 'rgb(148, 163, 184)');
             assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no side scroll');
             assert.deepEqual(errs, []);
             await p.close();
