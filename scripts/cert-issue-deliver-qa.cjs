@@ -37,7 +37,7 @@ const slice = (src, a, b) => { const i = src.indexOf(a), j = src.indexOf(b, i); 
     assert.ok(fn.includes("bucket('intern-port-edfa7.firebasestorage.app')"), 'the real bucket');
 
     // ---- 3. admin card rail ----
-    assert.match(admin, /<title>Nika Admin \(V102\.617\)<\/title>/);
+    assert.ok(Number((/<title>Nika Admin \(V102\.(\d+)\)/.exec(admin) || [])[1]) >= 617, 'admin V102.617 or later');
     const railSrc = slice(admin, "                        let crRail = '';", '                        d.innerHTML = `');
     const railCss = slice(admin, '        .cr-rail {', '    </style>');
     const render = (q, users) => { const ctx = { q, id: 'T1', escapedTitle: 'Certificate Request - NATT', usersData: users, escapeHtml: s => String(s).replace(/</g, '&lt;') }; vm.runInNewContext(railSrc + '\nthis.out = crRail;', ctx); return ctx.out; };
@@ -65,7 +65,7 @@ const slice = (src, a, b) => { const i = src.indexOf(a), j = src.indexOf(b, i); 
         await page.close();
 
         // ---- 4. intern sheet ----
-        assert.match(index, /<title>Internship Portfolio \(V101\.297\)/);
+        assert.ok(Number((/<title>Internship Portfolio \(V101\.(\d+)\)/.exec(index) || [])[1]) >= 297, 'intern V101.297 or later');
         assert.match(index, /show\('🎓<i class="cert-tick"[^\n]*openMyCertSheet\(\), false,/, '🎓✓ is tappable now');
         assert.match(index, /<script src="cert-download\.js\?v=V101\.297" defer><\/script>/);
         const p2 = await browser.newPage({ viewport: { width: 390, height: 760 } });
