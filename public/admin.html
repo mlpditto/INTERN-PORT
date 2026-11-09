@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.619)</title>
+    <title>Nika Admin (V102.620)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -6071,6 +6071,22 @@
         #learningNoteReviewModal #lnr-tags-selected:not(:empty) { padding-top:5px; }
         #learningNoteReviewModal .lnr-tag-add { display:flex; gap:6px; margin-top:6px; }
         #learningNoteReviewModal .lnr-count:not(:empty) { margin-left:6px; padding:0 7px; border-radius:999px; background:#ede9fe; font-size:.8em; }
+        /* V102.620 LN Review v2 (mockup-lnr-plan.html, owner pick C): emoji + one word ≥ 900 px · "Conversation 0" quiet while empty · the faded Save says what it needs */
+        #learningNoteReviewModal .lnr-tpl .w { display:none; }
+        @media (min-width: 900px) { #learningNoteReviewModal .lnr-tpl-row .lnr-tpl { width:auto; padding:0 10px 0 7px; display:inline-flex; align-items:center; gap:4px; } #learningNoteReviewModal .lnr-tpl .w { display:inline; font-size:12px; font-weight:700; color:#5b21b6; } }
+        #learningNoteReviewModal .lnr-conversation:has(.lnr-count:empty) > summary { color:#94a3b8; font-weight:600; font-size:.9em; }
+        #learningNoteReviewModal .lnr-count:empty::after { content:"0"; margin-left:6px; padding:0 7px; border-radius:999px; background:#f1f5f9; font-size:.85em; }
+        #learningNoteReviewModal.lnr-noscore .lnr-save .lbl-ok, #learningNoteReviewModal:not(.lnr-noscore) .lnr-save .lbl-need { display:none; }
+        /* 🔎 search plan: a card under the AI checks, ＋ Send plan under the comment draft (lnr-ai.js) */
+        #learningNoteReviewModal .lnr-ai-plan { margin-top:8px; border:1px solid #bae6fd; border-radius:12px; background:#f0f9ff; padding:7px 10px; }
+        #learningNoteReviewModal .lnr-ai-plan-h { font-weight:800; color:#0369a1; margin-bottom:2px; } #learningNoteReviewModal .lnr-ai-plan-h small { color:#64748b; font-weight:600; }
+        #learningNoteReviewModal .lnr-ai-step { display:flex; align-items:flex-start; gap:7px; padding:4px 0; border-top:1px dashed #bae6fd; line-height:1.4; cursor:pointer; font-weight:400; margin:0; }
+        #learningNoteReviewModal .lnr-ai-step:nth-child(2) { border-top:none; }
+        #learningNoteReviewModal .lnr-ai-step input { width:15px; height:15px; margin:2px 0 0; flex:0 0 auto; accent-color:#0284c7; }
+        #learningNoteReviewModal .lnr-ai-step span { flex:1; min-width:0; word-break:break-word; } #learningNoteReviewModal .lnr-ai-step:has(input:not(:checked)) span { color:#94a3b8; text-decoration:line-through; }
+        #learningNoteReviewModal .lnr-ai-step code { background:#fff; border:1px solid #bae6fd; border-radius:5px; padding:0 4px; font-size:.92em; }
+        #learningNoteReviewModal .lnr-ai-plan-send { width:auto; min-height:0; height:26px; margin:6px 0 0; padding:0 10px; border:1px dashed #38bdf8; border-radius:999px; background:#f0f9ff; color:#0369a1; font-size:.78em; font-weight:800; cursor:pointer; }
+        #learningNoteReviewModal .lnr-ai-plan-send.on { border-style:solid; border-color:#0284c7; background:#0284c7; color:#fff; }
         /* V102.611 ✨ AI review (lnr-ai.js, owner pick C + model + steer): a row under the note, a card of checks, dashed ghosts where they are used */
         #learningNoteReviewModal .lnr-ai { margin-top:12px; padding:10px 12px; border:1px solid #ddd6fe; border-radius:12px; background:#fff; }
         #learningNoteReviewModal .lnr-ai-top { display:flex; align-items:flex-start; gap:8px; }
@@ -8686,7 +8702,7 @@
     <!-- V93.08: cache-bust on taxonomy.js for the LP Firestore overlay rollout -->
     <script src="ai-model-registry.js?v=V102.365"></script>
     <script src="ai-model-ui.js?v=V102.589"></script>
-    <script defer src="lnr-ai.js?v=V102.611"></script>
+    <script defer src="lnr-ai.js?v=V102.620"></script>
     <script src="ollama-local.js?v=V102.109"></script>
 <script src="case-dup.js?v=V102.569"></script>
 <script src="case-article.js?v=V102.395"></script>
@@ -17921,15 +17937,15 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                 <div>
                     <textarea id="lnr-comment" rows="3" placeholder="Feedback for the student…" oninput="this.closest('.lnr-row').classList.remove('lnr-invalid')" style="width:100%; border-radius:12px; padding:10px 12px; border:1.5px solid #d8b4fe; font-size:0.9em; resize:vertical; box-sizing:border-box; margin:0;"></textarea>
                     <div class="lnr-err" role="alert">Write what to fix before Request Revision</div>
-                    <div class="lnr-ai-draft" id="lnr-ai-draft" hidden></div>
+                    <div class="lnr-ai-draft" id="lnr-ai-draft" hidden></div><button type="button" class="lnr-ai-plan-send" id="lnr-ai-plan-send" aria-pressed="false" hidden></button>
                     <div class="lnr-tpl-row" aria-label="Quick feedback: tap to add to the comment">
-                        <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Great structure! 👍')" title="Great structure" aria-label="Great structure">👍</button>
-                        <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Strong reflection — keep going! 🌟')" title="Strong reflection" aria-label="Strong reflection">🌟</button>
-                        <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Excellent insight! 🎯')" title="Excellent insight" aria-label="Excellent insight">🎯</button>
-                        <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Add more examples 📝')" title="More examples" aria-label="More examples">📝</button>
-                        <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Could expand on this 💭')" title="Could expand" aria-label="Could expand">💭</button>
-                        <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Check this reference 🔗')" title="Check reference" aria-label="Check reference">🔗</button>
-                        <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Consider adding tags 🏷️')" title="Add tags" aria-label="Add tags">🏷️</button>
+                        <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Great structure! 👍')" title="Great structure" aria-label="Great structure">👍<span class="w">Structure</span></button>
+                        <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Strong reflection — keep going! 🌟')" title="Strong reflection" aria-label="Strong reflection">🌟<span class="w">Reflection</span></button>
+                        <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Excellent insight! 🎯')" title="Excellent insight" aria-label="Excellent insight">🎯<span class="w">Insight</span></button>
+                        <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Add more examples 📝')" title="More examples" aria-label="More examples">📝<span class="w">Examples</span></button>
+                        <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Could expand on this 💭')" title="Could expand" aria-label="Could expand">💭<span class="w">Expand</span></button>
+                        <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Check this reference 🔗')" title="Check reference" aria-label="Check reference">🔗<span class="w">Reference</span></button>
+                        <button type="button" class="lnr-tpl" onclick="lnrAppendTemplate('Consider adding tags 🏷️')" title="Add tags" aria-label="Add tags">🏷️<span class="w">Tags</span></button>
                     </div>
                 </div>
             </div>
@@ -17978,7 +17994,7 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                 <button type="button" class="btn-sm" onclick="closeLearningNoteReviewModal()" style="width:auto; min-width:88px; background:#e5e7eb; color:#374151; border:none; border-radius:12px; padding:10px 14px; font-weight:800; min-height:auto;">Cancel</button>
                 <button type="button" class="btn-sm" onclick="requestLearningNoteRevision()" title="Send back to student for edits — no points awarded" style="width:auto; min-width:140px; background:#fff; color:#92400e; border:1.5px solid #fcd34d; border-radius:12px; padding:10px 14px; font-weight:800; min-height:auto;">🔄 Request Revision</button>
                 <button type="button" class="btn-sm" onclick="approveLearningNoteNoScore()" title="Mark reviewed without awarding points" style="width:auto; min-width:130px; background:#fff; color:#475569; border:1.5px solid #cbd5e1; border-radius:12px; padding:10px 14px; font-weight:800; min-height:auto;">Approve no pts</button>
-                <button type="button" class="btn-sm lnr-save" onclick="saveLearningNoteReview()" style="width:auto; min-width:140px; background:linear-gradient(135deg,#6c5ce7,#a29bfe); color:#fff; border:none; border-radius:12px; padding:10px 18px; font-weight:900; min-height:auto;">Save &amp; Award</button>
+                <button type="button" class="btn-sm lnr-save" onclick="saveLearningNoteReview()" style="width:auto; min-width:140px; background:linear-gradient(135deg,#6c5ce7,#a29bfe); color:#fff; border:none; border-radius:12px; padding:10px 18px; font-weight:900; min-height:auto;"><span class="lbl-ok">Save &amp; Award</span><span class="lbl-need">⭐ Pick pts first</span></button>
             </div>
         </div>
     </div>
@@ -71481,6 +71497,9 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                     submissionUpdate.pointsAmount = firebase.firestore.FieldValue.increment(bonus);
                 }
                 submissionUpdate['metadata.tags'] = editedTags;
+                // V102.620 🔎 the AI search plan, only when the admin tapped ＋ Send plan (intern: Work ▸ History, ln-plan.js)
+                const searchPlan = window.lnrAi && typeof lnrAi.plan === 'function' ? lnrAi.plan() : null;
+                if (searchPlan) submissionUpdate.searchPlan = searchPlan;
                 batch.update(db.collection("submissions").doc(id), submissionUpdate);
 
                 const sourceId = note.metadata && note.metadata.sourceId;

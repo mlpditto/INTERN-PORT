@@ -11,6 +11,7 @@ Intern: home ▸ History accordion (desktop: right rail with flood + news cards)
 - `history-header-qa` — accordion titled History, totals in the header even when folded
 - `history-header-clip-qa` — the last totals pill is not clipped by overflow:hidden
 - `history-lean-qa` — rows via history-lean.js in a vm (no browser)
+- `ln-plan-qa` — V101.298: a reviewed Learning Note with `searchPlan` shows the 🔎 plan checklist under the 💬 comment (ln-plan.js; see journal-reflective.md).
 - `history-lean-qa` also pins V101.281 (owner pick A, `mockups/history-note-row.html`): a Learning Note row shows its NAME first — a note the intern did not name carries the first line of its content as the title, shown faint and one line (`.hl-tt-auto`, never grows on tap); the meta line adds `· 🏷 n`; the expanded part is the note itself (`renderMd`, else escaped with line breaks) + tag chips; the sourceType / sourceId key/value dump is gone.
 - `history-lean-qa` also pins V101.280: a graded standard quiz without feedback shows an amber **💬 No feedback yet ยังไม่ได้ให้ feedback** pill in its actions (opens the feedback sheet); gone once `feedbackGiven` is set. The icon-only 💬 circle was not understood as "you still owe feedback".
 - `history-consistency-qa` — date / bucket / status pills follow the UI language (EN TH KR)

@@ -187,6 +187,7 @@ window.historyLean = (() => {
             body = renderTypeDetailHtml(s);   // journal / quest / product keep their own detail
         }
         if (s.adminComment) body += '<div class="hl-comment">💬 ' + esc(s.adminComment).replace(/\*\*([^*\n]{1,200}?)\*\*/g, '<strong class="adm-key">$1</strong>') + '</div>';   // V101.245: **…** = the must-get-right phrase
+        if (type === 'learning_note' && window.lnPlan) body += lnPlan.html(s);   // V101.298 🔎 the admin's search plan (ln-plan.js)
         return body + actionsHtml(s, ctx);
     }
     function rowHtml(s, ctx) {
