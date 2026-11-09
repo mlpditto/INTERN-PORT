@@ -11,6 +11,8 @@
     <link rel="stylesheet" href="lv-card.css?v=V101.283">
     <link rel="stylesheet" href="wave-theme.css?v=V101.285">
     <script defer src="christmas.js?v=V101.286"></script>
+    <link rel="stylesheet" href="birthday.css?v=V101.295">
+    <script defer src="birthday.js?v=V101.295"></script>
     <script>/* V101.235: 20 Oct – 2 Nov (Bangkok) the Journal wears Halloween (halloween.css), then it goes back on its own.
        V101.265 (owner): an admin can set the theme for every intern (app_settings/theme.intern = auto | hw | off); the last value is kept here so the page opens in it, then refreshed */
     var SEASON_THEMES = { hw: ['10-20', '11-02'], xm: ['12-01', '12-31'] };   // Bangkok month-day; a new theme is one more entry + its CSS (christmas.css)
@@ -6535,6 +6537,10 @@
                         <select id="pi-bday-month" style="flex:1.1; min-width:0; padding:9px 2px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.9em; background:white;"><option value="">Month</option></select>
                         <select id="pi-bday-year" style="flex:1.3; min-width:0; padding:9px 2px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:0.9em; background:white;"><option value="">Year</option></select>
                     </div>
+                    <!-- V101.295 (owner): everyone sees 🎂 birthdays (nickname, day + month, no year) unless you hide yours; saved at once -->
+                    <button type="button" id="pi-bday-hide" class="lang-no-toggle" aria-pressed="false" onclick="toggleBirthdayHidden()"
+                        title="Others get confetti and a toast on your birthday (nickname, day + month, never the year). Tap to hide / show."
+                        style="margin-top:6px; padding:4px 10px; border-radius:999px; border:1px solid #e2e8f0; background:#fff; font-size:0.78em; font-weight:700; color:#475569; cursor:pointer;">👀 Others see your 🎂</button>
                 </div>
             </div>
             <div style="margin-bottom:10px;">
@@ -9037,6 +9043,7 @@
                     // leaderboard query and stays empty for non-admins.
                     window.myUserDoc = Object.assign({ id: userId }, da);
                     if (typeof lvWaveSync === 'function') lvWaveSync(); // V101.285: users/{id}.theme from any device
+                    if (window.bdBirthdays) bdBirthdays.sync(); // V101.295: 🎂 confetti + toasts (birthday.js), once a day
                     if (typeof schRefreshOpenPane === 'function') schRefreshOpenPane();
                     if (typeof fwOnUserDoc === 'function') fwOnUserDoc(da.floodWatch); // V101.27
                     if (window.internArticles) internArticles.onUserDoc(); // V101.176: 📰 article popup (articles.js) — arms once, then keeps History in step
@@ -9156,6 +9163,7 @@
                     document.getElementById('pi-phone').value = d.phone || "";
                     document.getElementById('pi-email').value = d.email || "";
                     setBirthdaySelects(d.birthday || "");
+                    if (typeof paintBirthdayHidden === 'function') paintBirthdayHidden(d.birthdayHidden === true);   // V101.295
                     document.getElementById('pi-start-date').value = d.startDate || "";
                     document.getElementById('pi-end-date').value = d.endDate || "";
                     document.getElementById('pi-date-msg').textContent = '';
@@ -9266,6 +9274,24 @@
                     console.warn(`[settings] ${field} write failed:`, e.message);
                     if (status) { status.style.color = '#dc2626'; status.textContent = 'Save failed บันทึกไม่สำเร็จ'; }
                 });
+        }
+
+        // V101.295 (owner): 🙈 hide my birthday from others (users.birthdayHidden) — getBirthdays leaves hidden ones out. Saved at once, no points.
+        function paintBirthdayHidden(hidden) {
+            const b = document.getElementById('pi-bday-hide');
+            if (!b) return;
+            b.setAttribute('aria-pressed', String(!!hidden));
+            b.textContent = hidden ? '🙈 Hidden from others' : '👀 Others see your 🎂';
+            b.style.color = hidden ? '#94a3b8' : '#475569';
+        }
+        function toggleBirthdayHidden() {
+            const b = document.getElementById('pi-bday-hide');
+            if (!b || !userId || !window.db) return;
+            const next = b.getAttribute('aria-pressed') !== 'true';
+            paintBirthdayHidden(next);
+            db.collection('users').doc(userId).update({ birthdayHidden: next })
+                .then(() => showToast(next ? '🙈 Birthday hidden · ซ่อนวันเกิดแล้ว · 생일 숨김' : '👀 Others will see your 🎂 · คนอื่นเห็นวันเกิด · 생일 공개'))
+                .catch(e => { paintBirthdayHidden(!next); showToast('Save failed บันทึกไม่สำเร็จ 저장 실패'); console.warn('[birthdayHidden]', e.message); });
         }
 
         // V101.292 (owner): 0.1 to the score for each Persona field that holds something, not said on screen; emptying a field takes its 0.1 back.
