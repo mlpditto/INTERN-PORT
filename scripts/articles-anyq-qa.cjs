@@ -31,6 +31,7 @@ assert.ok(ruleKeys, 'firestore.rules has the article_questions block');
         await page.route('**/*', r => r.request().url().startsWith('file:') ? r.continue() : r.abort());
         await page.goto(pathToFileURL(path.resolve('public/index.html')).href, { waitUntil: 'load' });
         await page.waitForFunction(() => window.internArticles && window.completeMoment);
+        await page.evaluate(() => { internArticles._S.cl = 'en'; });   // V101.301: articles open in Thai now — these checks read the English copy
         await page.evaluate(() => {
             document.getElementById('main-app').style.setProperty('display', 'block', 'important');
             const ov = document.getElementById('loading-overlay'); if (ov) ov.style.setProperty('display', 'none', 'important');
@@ -134,7 +135,7 @@ assert.ok(ruleKeys, 'firestore.rules has the article_questions block');
         assert.equal(await page.evaluate(() => !!document.getElementById('cm-back')), false, 'gone by itself after 3 s');
 
         // ---- 6. Thai UI: Thai labels, never hidden by lang-toggle
-        await page.evaluate(() => { document.body.classList.add('lang-th-on'); window.myUserDoc.articleSeen = {}; internArticles._show({ a: window.__art, kind: 'live' }); });
+        await page.evaluate(() => { document.body.classList.add('lang-th-on'); internArticles._S.cl = 'th'; window.myUserDoc.articleSeen = {}; internArticles._show({ a: window.__art, kind: 'live' }); });
         await page.click('#art-sheet .ok');
         await page.click('#art-sheet .foot .anyq');
         const th = await page.evaluate(() => ({ kinds: [...document.querySelectorAll('#art-sheet .aq-k button')].map(b => b.innerText.trim()), noToggle: document.getElementById('art-sheet').classList.contains('lang-no-toggle'), sub: document.querySelector('#art-sheet .aq-sub').innerText }));

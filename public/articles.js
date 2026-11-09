@@ -12,7 +12,7 @@
 (function () {
     'use strict';
     var BKK = 7 * 3600e3, DONE = ['ok', 'quiz', 'codex', 'hist'];
-    var S = { list: null, loading: false, armed: false, tries: 0, cur: null, lang: 'en', more: false, sig: '', qs: [], qsUnsub: null };
+    var S = { list: null, loading: false, armed: false, tries: 0, cur: null, cl: 'th', lang: 'en', more: false, sig: '', qs: [], qsUnsub: null };
     var T = {
         en: { source: 'Source', kicker: 'Article', min: 'min', more: 'Read more', less: 'Show less', got: 'Got it', save: 'Save', saved: 'Saved', mute: 'Don’t pop up articles', hist: 'All articles in History', rerun: 'For new interns', close: 'Close',
             read: 'Read', anyq: 'Any Q?', askSub: 'Goes to the article’s author · your name is not shown', ask: 'A question', wrong: 'Wrong / out of date', add: 'Please add',
@@ -72,11 +72,11 @@
         list.forEach(function (a) { if (isDone(seen[a.id])) return; var k = kindOf(a, me, now); if (k === 'live') live.push(a); else if (k === 'rerun') rerun.push(a); });
         live.sort(function (x, y) { return msOf(y.startAt) - msOf(x.startAt); });
         rerun.sort(function (x, y) { return msOf(x.startAt) - msOf(y.startAt); });
-        return live.concat(rerun).map(function (a) { return { id: a.id, title: textOf(a, uiLang()).title }; });
+        return live.concat(rerun).map(function (a) { return { id: a.id, title: textOf(a, S.cl).title }; });
     }
     function langs(a) { return ['en', 'th', 'ko'].filter(function (l) { return String((a.title || {})[l] || '').trim() && String((a.body || {})[l] || '').trim(); }); }
     function textOf(a, lang) {
-        var have = langs(a), l = have.indexOf(lang) >= 0 ? lang : have.indexOf('en') >= 0 ? 'en' : (have[0] || 'en');
+        var have = langs(a), l = have.indexOf(lang) >= 0 ? lang : have.indexOf('th') >= 0 ? 'th' : have.indexOf('en') >= 0 ? 'en' : (have[0] || 'en');
         return { lang: l, title: (a.title || {})[l] || (a.title || {}).en || '', body: (a.body || {})[l] || (a.body || {}).en || '' };
     }
     // V101.202 (owner): one language pill, like the app's EN / KR / TH button — it shows the language on screen; a tap moves to the next one the article has
@@ -87,6 +87,7 @@
     var FLAGS = { en: '🇬🇧', th: '🇹🇭', ko: '🇰🇷' }, LNAME = { en: 'English', th: 'ไทย', ko: '한국어' }, LORDER = ['en', 'th', 'ko'];
     function flagBtn(l) { var n = LORDER[(LORDER.indexOf(l) + 1) % LORDER.length]; return '<button type="button" class="lng fl" data-lang="' + l + '" title="' + LNAME[l] + '" aria-label="Language: ' + LNAME[l] + ' (tap for ' + LNAME[n] + ')" onclick="internArticles.askLang()">' + FLAGS[l] + '</button>'; }
     function uiLang() { var b = document.body; return b && b.classList.contains('lang-th-on') ? 'th' : b && b.classList.contains('lang-kr-on') ? 'ko' : 'en'; }
+    // V101.301 (owner): an article opens in Thai — S.cl, falls back to English when it has no Thai; the flag still steps to the others. Labels in History follow the app language.
     // History rows: every article this intern can see now (live / rerun) or has already seen
     // V101.213: + the intern's own 💬 Any Q? questions on it (qs = their article_questions docs). A reply moves the row up to the reply's time
     // and lights the row's "new" dot for a day (reviewedAt); the questions + replies are listed under the article when it is opened.
@@ -100,7 +101,7 @@
             var rep = qa.reduce(function (m, q) { return q.status === 'answered' ? Math.max(m, msOf(q.repliedAt) || 0) : m; }, 0);
             if (rep > t) t = rep;
             var stamp = function (ms) { return { toMillis: function () { return ms; }, toDate: function () { return new Date(ms); }, seconds: Math.floor(ms / 1000) }; };
-            out.push(Object.assign({ id: 'art_' + a.id, submissionType: 'article', title: textOf(a, uiLang()).title || 'Article', status: 'article', score: 0, noDelete: true, timestamp: stamp(t),
+            out.push(Object.assign({ id: 'art_' + a.id, submissionType: 'article', title: textOf(a, S.cl).title || 'Article', status: 'article', score: 0, noDelete: true, timestamp: stamp(t),
                 metadata: { articleId: a.id, emoji: (a.cover && a.cover.emoji) || '📰', state: st, saved: !!(s && s.saved), qa: qa.map(function (q) { return { kind: q.kind, text: q.text, status: q.status, reply: q.reply || '' }; }) } },
                 rep ? { reviewedAt: stamp(rep) } : {}));
         });
@@ -142,7 +143,7 @@
     function find(id) { return (S.list || []).find(function (a) { return a.id === id; }); }
     // V101.197/198: the articles "about" a Codex entry (pred) that this intern can see now, or has read; newest first
     function aboutCodex(pred) {
-        var m = me(), now = Date.now(), seen = m.articleSeen || {}, L = uiLang();
+        var m = me(), now = Date.now(), seen = m.articleSeen || {}, L = S.cl;
         return (S.list || []).filter(function (a) { return pred(a) && (kindOf(a, m, now) || isDone(seen[a.id])); })
             .sort(function (x, y) { return msOf(y.startAt) - msOf(x.startAt); })
             .map(function (a) { return { id: a.id, title: textOf(a, L).title, read: isDone(seen[a.id]) }; });
@@ -222,14 +223,17 @@
         return '<div class="art-src">' + (T[lang] || T.en).source + ': <button type="button" onclick="internArticles.openSrc(' + esc(JSON.stringify(u)) + ')">' + esc(a.source.site || u) + ' ↗</button></div>';
     }
     function linksHtml(a) {
+        // V101.301 (owner): a Codex entry named like the article itself just repeated the title on a pill — call it by its kind then
+        var heads = ['en', 'th', 'ko'].map(function (l) { return String((a.title || {})[l] || '').trim().toLowerCase(); }).filter(Boolean);
+        var name = function (n, kind) { n = String(n || '').trim(); return !n || heads.indexOf(n.toLowerCase()) >= 0 ? kind : n; };
         // V101.196: the Disease Codex entry drafted from this article (articles/{id}.dx.publishedId, set when the admin approves it)
-        var dx = a.dx && a.dx.publishedId ? '<button type="button" class="art-link codex" onclick="internArticles.openDx(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(a.dx.publishedId)) + ')">🩺 ' + esc(a.dx.name || 'Disease Codex') + '</button>' : '';
+        var dx = a.dx && a.dx.publishedId ? '<button type="button" class="art-link codex" onclick="internArticles.openDx(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(a.dx.publishedId)) + ')">🩺 ' + esc(name(a.dx.name, 'Disease Codex')) + '</button>' : '';
         // V101.200: the Drug Codex entry drafted from this article (articles/{id}.dc.publishedId) — same handler as a ＋ Codex link
-        var dc = a.dc && a.dc.publishedId ? '<button type="button" class="art-link codex" onclick="internArticles.openCodex(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(a.dc.publishedId)) + ')">💊 ' + esc(a.dc.name || 'Drug Codex') + '</button>' : '';
+        var dc = a.dc && a.dc.publishedId ? '<button type="button" class="art-link codex" onclick="internArticles.openCodex(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(a.dc.publishedId)) + ')">💊 ' + esc(name(a.dc.name, 'Drug Codex')) + '</button>' : '';
         return ((a.links || []).length || dx || dc) ? '<div class="art-links">' + dx + dc + (a.links || []).map(function (l) {
             return l.kind === 'quiz' ? '<button type="button" class="art-link" onclick="internArticles.openQuiz(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(l.id)) + ')">🧪 ' + esc(l.label) + ' <b>🪙 +1</b></button>'
-                : l.kind === 'disease' ? '<button type="button" class="art-link codex" onclick="internArticles.openDx(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(l.id)) + ')">🩺 ' + esc(l.label) + '</button>'   // V101.197: ＋ Disease link
-                : '<button type="button" class="art-link codex" onclick="internArticles.openCodex(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(l.id)) + ')">💊 ' + esc(l.label) + '</button>';
+                : l.kind === 'disease' ? '<button type="button" class="art-link codex" onclick="internArticles.openDx(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(l.id)) + ')">🩺 ' + esc(name(l.label, 'Disease Codex')) + '</button>'   // V101.197: ＋ Disease link
+                : '<button type="button" class="art-link codex" onclick="internArticles.openCodex(' + esc(JSON.stringify(a.id)) + ',' + esc(JSON.stringify(l.id)) + ')">💊 ' + esc(name(l.label, 'Drug Codex')) + '</button>';
         }).join('') + '</div>' : '';
     }
     // V101.269 (owner pick A, mockups/article-history-link-mockup.html): 📰 in the footer = every article in History; the badge = how many
@@ -317,7 +321,7 @@
     }
     function show(c) {
         css();
-        S.cur = c; S.lang = uiLang(); S.more = false; S.got = false; S.ask = null;
+        S.cur = c; S.lang = S.cl; S.more = false; S.got = false; S.ask = null;
         var back = document.createElement('div'); back.id = 'art-back'; back.onclick = function () { close('x'); };
         var sh = document.createElement('div'); sh.id = 'art-sheet'; sh.className = 'lang-no-toggle'; sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-modal', 'true'); sh.setAttribute('aria-labelledby', 'art-title');
         document.body.appendChild(back); document.body.appendChild(sh);
@@ -409,7 +413,7 @@
     function discHtml(s) {
         discCss();
         var m = s.metadata || {}, a = find(m.articleId), st = m.state === 'read' ? 'read' : m.state === 'closed' ? 'closed' : 'new';
-        var tx = a ? textOf(a, uiLang()) : null, sec = tx ? secs(plain(tx.title + '. ' + tx.body)) : 0, mn = sec ? Math.max(1, Math.round(sec / 60)) : 0;
+        var tx = a ? textOf(a, S.cl) : null, sec = tx ? secs(plain(tx.title + '. ' + tx.body)) : 0, mn = sec ? Math.max(1, Math.round(sec / 60)) : 0;
         var T = { en: 'Listen', th: 'ฟัง', ko: '듣기' }[uiLang()];
         return '<span class="hl-lead"><button type="button" class="hl-disc art-d art-' + st + '" data-art-listen="' + esc(m.articleId || '') + '" aria-pressed="false" aria-label="' + T + (mn ? ' · ' + mn + ' min' : '') + '" title="' + T + '">'
             + '<span class="g">' + esc(m.emoji || '📰') + '</span><span class="art-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>' + (mn ? '<i class="art-tm" data-t="' + mn + 'm">' + mn + 'm</i>' : '') + '</button></span>';
@@ -427,7 +431,7 @@
         if (!btn || !synth || typeof SpeechSynthesisUtterance !== 'function') return;
         var was = LS.btn === btn; stopListen(); if (was) return;
         var id = btn.getAttribute('data-art-listen'), a = find(id); if (!a) return;
-        var tx = textOf(a, uiLang()), text = plain(tx.title + '. ' + tx.body); if (!text) return;
+        var tx = textOf(a, S.cl), text = plain(tx.title + '. ' + tx.body); if (!text) return;
         var pieces = text.match(/[^.!?。\n]+[.!?。]?\s*/g) || [text], chunks = [], cur = '';
         pieces.forEach(function (p) { if ((cur + p).length > 220 && cur) { chunks.push(cur); cur = p; } else cur += p; });
         if (cur) chunks.push(cur);
@@ -462,7 +466,7 @@
     function detailHtml(s) {
         var a = find((s.metadata || {}).articleId); if (!a) return '';
         css();
-        var tx = textOf(a, uiLang());
+        var tx = textOf(a, S.cl);
         // V101.291 (owner pick C): the language pill moved into the title (flagHtml, history-lean.js); · 📤 LINE f at the end of the Source line
         var src = srcHtml(a, uiLang()), sh = shareHtml(a);
         src = src ? src.replace(/<\/div>$/, sh + '</div>') : '<div class="art-src">' + sh + '</div>';
@@ -489,7 +493,7 @@
     // V101.291: the History row's language pill, after the title (shown only while the row is open) — when the article has more than one language
     function flagHtml(s) {
         var a = find((s.metadata || {}).articleId); if (!a) return '';
-        var have = langs(a); return have.length > 1 ? langBtn(have, textOf(a, uiLang()).lang, 'internArticles.histLang(this)', 'art-tfl') : '';
+        var have = langs(a); return have.length > 1 ? langBtn(have, textOf(a, S.cl).lang, 'internArticles.histLang(this)', 'art-tfl') : '';
     }
     // ---- 📤 share (V101.291, owner pick C): LINE always, Facebook only with a Source link (it needs a URL). The first share of an article
     // adds 0.1 to the score once (not said on screen); the icon tapped turns wave blue. articleSeen[id].shared = ['line', 'fb'] tells the admin.
@@ -502,7 +506,7 @@
         return '<span class="art-sh"><i>·</i>📤 ' + b('line', 'ln', 'LINE', 'LINE') + (srcUrl(a) ? b('fb', 'fb', 'Facebook', 'f') : '') + '</span>';
     }
     function shareText(a) {
-        var tx = textOf(a, uiLang()), u = srcUrl(a);
+        var tx = textOf(a, S.cl), u = srcUrl(a);
         if (u) return tx.title + '\n' + u;
         var first = String(tx.body || '').split('\n').map(function (l) { return l.replace(/[*_#>`]/g, '').trim(); }).filter(Boolean)[0] || '';
         return '📰 ' + tx.title + (first ? '\n' + first.slice(0, 160) : '');
@@ -612,6 +616,6 @@
             if (S.cur) close('codex'); else markRead(articleId, 'codex');
             if (typeof dxOpenLinkedDrug === 'function') dxOpenLinkedDrug(drugId);
         },
-        _S: S, _pick: pick, _owed: owed, _kindOf: kindOf, _audienceOk: audienceOk, _historyItems: historyItems, _textOf: textOf, _bkkDay: bkkDay, _isDone: isDone, _later: later, _show: show, _award: awardQuizBeri
+        _S: S, _pick: pick, _owed: owed, _kindOf: kindOf, _audienceOk: audienceOk, _historyItems: historyItems, _textOf: textOf, _linksHtml: linksHtml, _bkkDay: bkkDay, _isDone: isDone, _later: later, _show: show, _award: awardQuizBeri
     };
 })();

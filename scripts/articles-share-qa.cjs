@@ -26,6 +26,7 @@ const D = 864e5;
     await page.route('**/*', r => r.request().url().startsWith('file:') ? r.continue() : r.abort());
     await page.goto(pathToFileURL(path.resolve('public/index.html')).href, { waitUntil: 'load' });
     await page.waitForFunction(() => window.internArticles && typeof renderUnifiedHistory === 'function');
+    await page.evaluate(() => { internArticles._S.cl = 'en'; });   // V101.301: articles open in Thai now — these checks read the English copy
     const o = await page.evaluate(async ({ D }) => {
       document.getElementById('main-app').style.setProperty('display', 'block', 'important');
       const ov = document.getElementById('loading-overlay'); if (ov) ov.style.setProperty('display', 'none', 'important');

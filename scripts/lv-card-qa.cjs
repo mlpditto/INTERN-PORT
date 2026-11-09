@@ -63,6 +63,10 @@ const card = page => page.evaluate(() => { const c = document.getElementById('se
             const r = g.getBoundingClientRect(), hit = document.elementFromPoint(r.left + 3, r.top + 13); g.remove();
             return { overflow: getComputedStyle(c).overflow, visible: hit === g }; });
         assert.deepEqual(clip, { overflow: 'visible', visible: true }, 'the flood gauge outside the card edge shows: ' + JSON.stringify(clip));
+        // V101.301 (owner screenshot): a Content Creator's card is one row — the LV emblem sat under the rail's 🎬 switch. No LV there, no emblem.
+        const cafe = await page.evaluate(() => { document.body.classList.add('cafe-mode'); const c = document.getElementById('section-profile-combined');
+            const v = getComputedStyle(c, '::after').content; document.body.classList.remove('cafe-mode'); return [v, getComputedStyle(c, '::after').content]; });
+        assert.deepEqual(cafe, ['none', '"' + EMB[9] + '"'], 'Content Creator view: no LV emblem; back in the intern view it returns');
         // a new LV after that → LEVEL UP once; CONTINUE acknowledges it
         await page.evaluate(() => { window.myUserDoc.lvSeen = 4; window.__writes = []; });
         await setScore(page, 41);
