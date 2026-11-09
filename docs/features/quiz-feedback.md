@@ -15,6 +15,7 @@ Intern: after a quiz, or the reminder popup. Admin: Quiz Engine ▸ 💬 Feedbac
 - `quiz-user-ui-check` — quiz + feedback responsive at four widths, language callback, topic dedup
 - `quiz-feedback-qa` — admin panel model chips: one per catalogue model, legacy defaults migrate
 - `quiz-feedback-lean-signal-qa` — admin panel: one row of pills, slim AI Insight, icon filter rail, ⏰ Signal
+- `quiz-feedback-card-bc-qa` — feedback card on one line: rating tile (👍 = no comment), glow by band, blurred result chip, buttons faint until hover
 - `feedback-empty-praise-qa` — a 10/10 with no comment is kept behind a 👍 chip, still counted
 - `feedback-addon-bonus-qa` — 🎁 add-on credits 0–1.0 once per quiz as its own checkin_logs row
 - `feedback-delete-keeps-quiz-points-qa` — deleting a feedback never takes quiz points

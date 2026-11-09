@@ -59,7 +59,8 @@ const modalEnd = html.indexOf('        <!-- V92.95: Score Audit Modal',modalStar
         }
         assert.equal(await page.locator('#qfp-ai-btn').isDisabled(),true);
         assert.equal(await page.locator('#qfp-comments details').count(),0,'V102.259: no Details / Manage fold any more — three flat rows');
-        assert.match(await page.locator('#qfp-comments').innerText(),/No comment provided/);
+        assert.doesNotMatch(await page.locator('#qfp-comments').innerText(),/No comment provided/,'V102.618: no words — 👍 on the rating tile says it');
+        assert.equal(await page.locator('#qfp-comments .qfp-rate i').count()>0,true,'👍 rides on the rating tile when there is no comment');
         assert.doesNotMatch(await page.locator('#qfp-summary').innerText(),/blank|★/);
         // the rail is drawn when the panel opens and the comment-less state hides it — open with a comment to drive it
         await page.evaluate(async()=>{fixture=[{id:'f1',userId:'u1',displayName:'Bua',rating:7,comment:'ข้อสอบดีมาก',timeUsedSeconds:353}];await showQuizFeedbackPanel('test');});
