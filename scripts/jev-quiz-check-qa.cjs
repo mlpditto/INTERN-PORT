@@ -26,23 +26,38 @@ const ADMIN = pathToFileURL(path.resolve('public/admin.html')).href;
       const box = () => page.locator('#jqc-box').innerText();
 
       { const html = require('node:fs').readFileSync('public/admin.html', 'utf8'); assert.ok(html.includes('id="jev-quiz-check" class="review-tab" aria-label="Jev check" onclick="jevQuizCheck.run(this)"') && html.includes('${items}${jev}</div>'), 'V102.558: a tab beside Scorecard and Rewrites'); assert.equal(await page.locator('#jev-quiz-check').count(), 0, 'no longer in the editor toolbar'); }
-      await btn(); await page.waitForTimeout(50);
+      // V102.619 (owner): a never-saved quiz runs too — 💡 is checked, translations wait for Save
+      await page.evaluate(() => { window.__reply = { enabled: true, questions: 1, checked: 1, errors: 0, noExplanation: 0, flags: [], langs: [] }; });
+      await btn(); await page.waitForTimeout(100);
+      assert.match(await box(), /🌐 after Save/); assert.match(await box(), /Nothing to look at/);
+      assert.equal((await page.evaluate(() => window.__calls)).at(-1)[1].quizId, '', 'sent without an id, with the questions on screen');
+      await page.click('.jqc-x');
+      // until the new function is deployed it refuses up front (invalid-argument, nothing spent) → the old note
+      await page.evaluate(() => { const e = new Error('quizId required'); e.code = 'functions/invalid-argument'; window.__reply = e; });
+      await btn(); await page.waitForTimeout(100);
       assert.match(await box(), /Save the quiz first/);
-      assert.equal((await page.evaluate(() => window.__calls)).length, 0, 'an unsaved quiz spends nothing');
       await page.click('.jqc-x');
 
       await page.evaluate(() => { window.__id = 'quiz1'; window.__reply = { enabled: true, questions: 15, checked: 40, errors: 1, noExplanation: 2, flags: [
         { kind: 'stale', lang: 'ko', q: null, verdict: 'bad' }, { kind: 'key', q: 2, score: 0.05, verdict: 'bad' }, { kind: 'lang', lang: 'th', q: 7, score: 0.5, verdict: 'look' }] }; });
       await btn(); await page.waitForTimeout(100);
       const t = await box();
-      assert.match(t, /Korean translation is older/); assert.match(t, /Q3[\s\S]*points away from the marked answer[\s\S]*0\.05/); assert.match(t, /Q8[\s\S]*Thai translation may differ/);
-      assert.match(t, /38 OK/); assert.match(t, /1 could not be checked/); assert.ok(!/not checked/.test(t.replace('could not be checked', '')), 'no pill for an empty list');
+      // V102.619 (owner pick C): one matrix — questions down, 💡 + TH + KO across; the whole-quiz Korean note fills its column
+      const mx = await page.evaluate(() => ({ head: [...document.querySelectorAll('.jqc-m thead th')].map(c => c.textContent), rows: document.querySelectorAll('.jqc-m tbody tr').length,
+        q3: [...document.querySelectorAll('.jqc-m tbody tr')[2].querySelectorAll('td')].map(c => c.textContent + '|' + (c.title || '')), q8: [...document.querySelectorAll('.jqc-m tbody tr')[7].querySelectorAll('td')].map(c => c.textContent),
+        ko: [...document.querySelectorAll('.jqc-m tbody tr td:nth-of-type(3)')].every(c => c.textContent === '🕒' && /Korean translation is older/.test(c.title)) }));
+      assert.deepEqual(mx.head, ['', '💡', 'TH', 'KO'], 'columns: ' + mx.head);
+      assert.equal(mx.rows, 15, 'one row per question');
+      assert.ok(/^≠\|Explanation points away from the marked answer · 0\.05$/.test(mx.q3[0]), 'Q3 💡 ≠ with the reason + score in the tooltip: ' + mx.q3[0]);
+      assert.deepEqual(mx.q8.slice(1), ['≈', '🕒'], 'Q8: TH may differ, KO older: ' + mx.q8);
+      assert.ok(mx.ko, 'the KO column is 🕒 all the way down');
+      assert.ok(!/translation is older than this question/.test(t), 'no sentences in the box — they live in the tooltips');
+      assert.match(t, /38 OK/); assert.match(t, /1 could not be checked/); assert.ok(!/not checked/.test(await page.locator('.jqc-p').innerText()), 'no pill for an empty list');
       assert.deepEqual((await page.evaluate(() => window.__calls)).at(-1), ['jevCheckQuiz', { quizId: 'quiz1', questions: [{ q: 'on screen', content: '', type: 'choice', options: ['a'], correct: [0], explanation: 'e' }] }], 'V102.557: the questions on screen go, unsaved edits included');
-      assert.equal(await page.locator('.jqc-list .jqc-bad').count(), 2);
-      assert.equal(await page.locator('.jqc-list .jqc-go').count(), 2, 'a whole-quiz note has nowhere to open');
+      assert.equal(await page.locator('.jqc-list').count(), 0, 'no row-per-flag list any more');
       const r = await page.locator('#jqc-box').boundingBox();
       assert.ok(r.x >= 0 && r.x + r.width <= width, 'the box fits @' + width);
-      await page.locator('.jqc-go').first().click();
+      await page.locator('.jqc-m .jqc-go[data-q="2"]').click();
       assert.equal(await page.evaluate(() => window.__page), 2, 'Open goes to Q3'); assert.equal(await page.evaluate(() => window.__closed), 1, 'and closes the Review');
       assert.equal(await page.locator('#jqc-box').isVisible(), false);
 
@@ -69,7 +84,8 @@ const ADMIN = pathToFileURL(path.resolve('public/admin.html')).href;
       assert.equal(await page.evaluate(() => document.activeElement.className), 'jqc-del-no', 'Cancel is focused');
       await page.click('.jqc-del-no');
       assert.equal(await page.locator('.jqc-del.asking').count(), 0, 'Cancel goes back');
-      await page.locator('.jqc-qs .jqc-go').nth(1).click(); assert.equal(await page.evaluate(() => window.__page), 4, 'a chip opens that question');
+      assert.deepEqual(await page.evaluate(() => [3, 4].map(i => document.querySelectorAll('.jqc-m tbody tr')[i].querySelector('td').textContent)), ['–', '–'], 'no explanation → – in the 💡 column');
+      await page.locator('.jqc-m .jqc-go[data-q="4"]').click(); assert.equal(await page.evaluate(() => window.__page), 4, 'a row opens that question');
       // 🗑 Delete removes that question from the editor (not saved until Save Quiz), closes Jev + the Review, re-pages, autosaves
       await page.evaluate(() => { document.querySelectorAll('.quiz-q-item').forEach(n => n.remove()); const host = document.createElement('div'); host.id = 'jqc-test-qs'; host.innerHTML = '<div class="quiz-q-item" data-k="0"></div><div class="quiz-q-item" data-k="1"></div>'; document.body.append(host); window.__auto = 0; window.triggerAutoSave = () => { window.__auto++; }; window.__closedBefore = window.__closed; });
       await btn(); await page.waitForTimeout(100); await page.click('.jqc-cmp'); await page.waitForTimeout(150);
