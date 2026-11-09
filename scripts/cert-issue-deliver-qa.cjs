@@ -89,7 +89,7 @@ const slice = (src, a, b) => { const i = src.indexOf(a), j = src.indexOf(b, i); 
         await p2.waitForFunction(() => log.some(l => l[0] === 'open'));
         assert.deepEqual(await p2.evaluate(() => log), [['call', 'getMyCertificate', 'tok', 'Unatt'], ['open', 'https://firebasestorage.googleapis.com/x.pdf?token=t', true]]);
         assert.equal(await p2.$eval('#certSheet .cs-dl', b => b.textContent), '⬇️ PDF', 'button comes back after the call');
-        await p2.screenshot({ path: process.env.QA_SHOT || 'cert-sheet-qa.png' }).catch(() => {});
+        if (process.env.QA_SHOT) await p2.screenshot({ path: process.env.QA_SHOT }).catch(() => {});
         await p2.click('#certSheet .cs-sh');
         const shared = (await p2.evaluate(() => log.find(l => l[0] === 'share')))[1];
         assert.ok(shared.includes('verify.html?no=MLP-2026-0042-ABCD') && !shared.includes('firebasestorage'), 'share = verify link, never the PDF link');
