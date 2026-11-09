@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.299)</title>
+    <title>Internship Portfolio (V101.300)</title>
     <link rel="stylesheet" href="nika-ask.css?v=V101.263">
     <link rel="stylesheet" href="daily-canvas.css?v=V101.266">
     <link rel="stylesheet" href="halloween.css?v=V101.249">
@@ -9862,36 +9862,15 @@
 
         function checkGraduation(data) {
             if (!data.startDate || !data.endDate) return;
-            // V97.25: parse as LOCAL midnight. `new Date('YYYY-MM-DD')` is UTC midnight —
-            // 07:00 in Bangkok — which is exactly why this function's countdown disagreed
-            // by one with updateTimelineBar()'s. Same fix as V97.05 made there.
-            const e = (typeof schParseDay === 'function') ? schParseDay(data.endDate) : new Date(data.endDate);
-            const now = new Date();
-            const btn = document.getElementById('grad-action');
 
             // Update certificate request button
             updateCertificateButton(data);
 
-            // Logic: now >= end_date (Inclusive)
-            // V100.59: the button used to appear for anyone past endDate, whatever the
-            // score — a bypass of the gate the ⋯ menu enforces. Below the gate the slot
-            // stays hidden, same "secret mission" treatment as the ⋯ entry.
-            // V101.294 (owner): from the last day on, the request shows for everyone, whatever the score.
-            if (now >= e) {
-                btn.style.display = '';
-                // V100.61: approved outranks "sent" — same order as the ⋯ entry.
-                if (data.certApproved) btn.innerHTML = `<button type="button" onclick="window.openMyCertSheet && window.openMyCertSheet()" style="width:100%; background:none; border:none; box-shadow:none; color:#28a745; font-weight:700; cursor:pointer;"><i class="fa-solid fa-certificate"></i> Certificate ready ใบรับรองพร้อมแล้ว · ⬇️</button>`;   // V101.297: opens the ⬇️ PDF sheet
-                else if (data.certRequested) btn.innerHTML = `<span style="color:#28a745;">✅ Certificate request sent ส่งคำร้องแล้ว</span>`;
-                else btn.innerHTML = `<button onclick="requestCert()" class="btn-warning" style="width:100%"><i class="fa-solid fa-certificate"></i> Request Cert ขอใบรับรองจบ</button>`;
-            } else {
-                // V97.25: a countdown chip used to sit here — and it said the same thing as
-                // the "⏳ N days left" already on the timeline bar directly above it, with a
-                // DIFFERENT number (22710 vs 22709), so the two contradicted each other.
-                // One countdown, on the bar. This slot is now only for the graduation action,
-                // and stays out of the layout entirely while the internship is still running.
-                btn.innerHTML = '';
-                btn.style.display = 'none';
-            }
+            // V101.300 (owner): the big "Request Cert" slot under the card is gone — from the last day it repeated
+            // the day bar's 🎓 Request / ⏳ / ⬇️ PDF (certStepPaint). One way in, on the bar.
+            const btn = document.getElementById('grad-action');
+            btn.innerHTML = '';
+            btn.style.display = 'none';
         }
 
         function updateCertificateButton(userData) {
@@ -10042,33 +10021,6 @@
             } catch (error) {
                 console.error("Error sending certificate request notification:", error);
             }
-        }
-
-        async function requestCert() {
-            // V100.59: same fresh-data gate as requestCertificateFromLIFF — a stale button
-            // (score decayed since render) must not submit below the threshold.
-            const _certData = (await db.collection("users").doc(userId).get()).data() || {};
-            const _certNeed = certRequiredPoints(_certData.startDate, _certData.endDate);
-            if ((_certData.score || 0) < _certNeed && !certLastDayReached(_certData.endDate)) {
-                showToast(`⚠️ You need ${_certNeed} points before you can request a certificate · ต้องมีคะแนนถึง ${_certNeed} ก่อน หรือรอถึงวันสุดท้ายของการฝึก`);
-                checkUser();
-                return;
-            }
-            if (!confirm("Confirm certificate request?")) return;
-            await db.collection('reports').add({
-                userId,
-                displayName: userProfile.displayName,
-                pictureUrl: userProfile.pictureUrl || "",
-                subject: "🎓 ขอใบรับรองจบ",
-                message: "กดขอผ่านระบบ",
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                type: "cert_request"
-            });
-            await db.collection('users').doc(userId).update({ certRequested: true });
-            // V100.60: also notify the way the ⋯ path does (admin_notifications + kanban
-            // task) — this request used to land only in `reports`. Swallows its own errors.
-            await sendCertificateRequestToAdmin();
-            alert("Request submitted!");
         }
 
         // --- Leaderboard System (V77.8) ---

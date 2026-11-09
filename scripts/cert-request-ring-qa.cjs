@@ -41,9 +41,9 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return iso(
     assert.deepEqual([pend.text, pend.cls, pend.clickable], ['⏳', ['cert-pend'], false], 'sent: ⏳');
     const ok = await state({ score: 31.98, startDate: day(-20), endDate: day(18), certRequested: true, certApproved: true });
     assert.deepEqual([ok.text, ok.cls, ok.clickable], ['🎓✓', ['cert-ok'], true], 'approved: 🎓✓, tappable (V101.297: opens the ⬇️ PDF sheet)');
-    // the grad slot on the card: from the last day for everyone
-    const grad = await page.evaluate(([s, e]) => { checkGraduation({ score: 1, startDate: s, endDate: e }); const g = document.getElementById('grad-action'); return [g.style.display, /requestCert\(\)/.test(g.innerHTML)]; }, [day(-38), day(0)]);
-    assert.deepEqual(grad, ['', true], 'last day, 1 point: the card shows Request Cert');
+    // V101.300 (owner): no big grad slot on the card any more — the day bar's 🎓 Request is the way in, the last day included
+    const grad = await page.evaluate(([s, e]) => { checkGraduation({ score: 1, startDate: s, endDate: e }); const g = document.getElementById('grad-action'); return [g.style.display, g.innerHTML, document.querySelector('#u-tl-remaining .cs-step.ready') ? 1 : 0, typeof window.requestCert]; }, [day(-38), day(0)]);
+    assert.deepEqual(grad, ['none', '', 1, 'undefined'], 'last day, 1 point: slot hidden, 🎓 Request on the bar, requestCert gone');
     const gradBefore = await page.evaluate(([s, e]) => { checkGraduation({ score: 99, startDate: s, endDate: e }); return document.getElementById('grad-action').style.display; }, [day(-20), day(18)]);
     assert.equal(gradBefore, 'none', 'before the last day the card slot stays hidden (the ring is the way in)');
     // the ring on the month head: the button stays inside the 30px circle (it used to spill "Request Certificate" over the month)
