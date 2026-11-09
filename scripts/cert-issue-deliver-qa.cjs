@@ -60,8 +60,8 @@ const slice = (src, a, b) => { const i = src.indexOf(a), j = src.indexOf(b, i); 
         assert.deepEqual(await page.evaluate(() => calls), [['openCertModal', 'Unatt'], ['openUserHub', 'Unatt'], ['openChat', 'T1', 'Certificate Request - NATT'], ['startDeleteCard', 'T1']]);
         assert.equal(await page.$eval('#c .cr-go', b => b.disabled), true, 'user gone → 🎓 disabled');
         assert.ok(!gone.includes("U'x"), 'the uid is sanitised before it goes into onclick');
-        const rows = await page.$$eval('#b .cr-rail button', bs => [...new Set(bs.map(b => Math.round(b.getBoundingClientRect().top)))]);
-        assert.equal(rows.length, 1, 'one line of chips at 420 px, not the global 100% buttons');
+        const widths = await page.$$eval('#b .cr-rail button', bs => bs.map(b => Math.round(b.getBoundingClientRect().width)));
+        assert.ok(widths.every(w => w < 140), 'chips hug their label, not the global 100% / 48px buttons: ' + widths);   // they may wrap on a narrow card
         await page.close();
 
         // ---- 4. intern sheet ----
