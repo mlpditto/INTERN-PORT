@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.615)</title>
+    <title>Nika Admin (V102.617)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -6128,6 +6128,15 @@
             #dashboard-workspace { grid-template-columns:minmax(0,1fr); }
             #dashboard-work .kanban-board { grid-template-columns:minmax(0,1fr); }
         }
+        /* V102.617 (owner pick C): the Certificate Request card's chip rail — 🎓 Issue · 👤 Hub · 💬 Chat · 🗑 */
+        .cr-rail { margin-top:12px; display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+        .cr-rail button { width:auto; min-height:0; border:1px solid #d1d5db; background:#fff; color:#374151; border-radius:999px; padding:5px 11px; font-size:12.5px; font-weight:700; cursor:pointer; }
+        .cr-rail button:hover:not(:disabled) { background:#f8fafc; }
+        .cr-rail button:disabled { opacity:.45; cursor:default; }
+        .cr-rail .cr-go { border-color:#16a34a; color:#166534; background:#f0fdf4; }
+        .cr-rail .cr-del { margin-left:auto; border-color:#fecaca; color:#ef4444; background:#fff; }
+        .cr-done { margin-top:8px; font-size:12px; font-weight:700; color:#166534; }
+        .cr-done code { font-size:11.5px; color:#475569; background:none; }
     </style>
 
     <script>
@@ -62320,6 +62329,22 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         }
 
                         const escapedTitle = (q.title || "").replace(/'/g, "\\'");
+                        // V102.617 (owner pick C): a Certificate Request card gets a chip rail — 🎓 Issue opens the Certificate modal set to
+                        // the requester; once exported (certApproved + certNo) a ✅ line shows the number and 📄 opens the archived PDF.
+                        let crRail = '';
+                        if (q.isCertificateRequest && q.requestedBy) {
+                            const cu = usersData.find(x => x.id === q.requestedBy);
+                            const uidJs = String(q.requestedBy).replace(/[^A-Za-z0-9_-]/g, '');
+                            const issued = cu && cu.certApproved && cu.certNo ? escapeHtml(cu.certNo) : '';
+                            crRail = (issued ? `<div class="cr-done">✅ Sent · <code>${issued}</code></div>` : '')
+                                + `<div class="cr-rail">`
+                                + `<button type="button" class="cr-go" onclick="event.stopPropagation(); openCertModal('${uidJs}')" title="Open the Certificate modal for this intern — Export PDF issues it and the intern can download it in LINE"${cu ? '' : ' disabled'}>🎓 Issue</button>`
+                                + (issued ? `<button type="button" disabled data-cert-file="${issued}" onclick="event.stopPropagation()" title="Open the PDF the intern gets">📄 PDF</button><small data-file-status hidden></small>` : '')
+                                + `<button type="button" onclick="event.stopPropagation(); openUserHub('${uidJs}')" title="User Hub"${cu ? '' : ' disabled'}>👤 Hub</button>`
+                                + `<button type="button" onclick="event.stopPropagation(); openChat('${id}','${escapedTitle}')">💬 Chat</button>`
+                                + `<button type="button" class="cr-del" onclick="event.stopPropagation(); startDeleteCard('${id}')" title="Delete" aria-label="Delete">🗑</button>`
+                                + `</div>`;
+                        }
                         d.innerHTML = `
                             <div class="card-header-row" style="margin-bottom:12px;">
                                 <span class="badge" style="background:${isProj ? 'linear-gradient(135deg, #4361ee, #3a0ca3)' : 'linear-gradient(135deg, #64748b, #475569)'}; padding:4px 12px; border-radius:10px; font-size:0.7em; letter-spacing:0.5px; font-weight:800;">${isProj ? '📁 PROJECT' : '📝 TASK'}</span>
@@ -62334,15 +62359,18 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 ${imgs}
                                 <div style="background:var(--col-bg); padding:4px 8px; border-radius:8px;">${timersHtml}</div>
                             </div>
+                            ${crRail || `
                             <div style="margin-top:15px; display:flex; gap:10px;">
                                 <button class="btn-sm" style="flex:1; background:var(--primary); color:white; border:none; padding:10px; border-radius:12px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; transition:0.2s; box-shadow:0 4px 10px rgba(67,97,238,0.2);" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'" onclick="event.stopPropagation(); openChat('${id}','${escapedTitle}')">💬 Chat</button>
                                 <button class="btn-sm" style="width:42px; height:42px; padding:0; display:flex; align-items:center; justify-content:center; background:#fee2e2; color:#ef4444; border:none; border-radius:12px; cursor:pointer; font-size:1.2em; transition:0.2s;" onmouseover="this.style.background='#fecaca'" onmouseout="this.style.background='#fee2e2'" onclick="event.stopPropagation(); startDeleteCard('${id}')">🗑️</button>
                             </div>
+                            `}
                             ${act}
                         `;
                         cols[q.status].appendChild(d);
                     }
                 });
+                if (window.CertificateFiles && document.querySelector('.cr-rail [data-cert-file]')) CertificateFiles.decorate();   // V102.617: 📄 on issued Certificate Request cards
             } catch (e) { console.error("Kanban Section 1 (Side Quests) Error:", e); }
 
             // 2. Render Reflective Logs (Review/Done)

@@ -20,6 +20,7 @@ Intern: ⋯ on the profile card ▸ the 🏅 ring on the month row turns into �
 - `cv-review-two-models-qa` — 💬 Review ×2 on the imported text
 - `certificate-files-check` — private snapshots, first original preserved, upload failure
 - `cert-request-ring-qa` — 🏅 ring = request (🎓 / ⏳ / 🎓✓, fits 30px), last-day request below the gate, how-to once per device
+- `cert-issue-deliver-qa` — Certificate Request card rail (🎓 Issue · 📄 PDF · 👤 Hub · 💬 Chat · 🗑); intern 🎓✓ → sheet ⬇️ PDF via `getMyCertificate` (LINE ID token) + 📤 verify-link share
 
 ## What usually lies
 
