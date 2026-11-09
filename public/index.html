@@ -2543,6 +2543,17 @@
 
         .toast-close:hover { background: rgba(255, 255, 255, 0.35); }
 
+        /* V101.296: a toast that closes itself (the 🔥 check-in) — a lighter fill drains
+           to the left over --toast-ms, then the toast closes (owner pick C). Touch or hover
+           pauses the drain; ✕ still closes at once. */
+        #toast.show.toast-timed {
+            background: linear-gradient(#55606f, #55606f) left / 100% 100% no-repeat, #333;
+            animation: toast-fadein 0.5s, toast-drain var(--toast-ms, 10s) linear forwards;
+        }
+        #toast.show.toast-timed:active { animation-play-state: running, paused; }
+        @media (hover: hover) { #toast.show.toast-timed:hover { animation-play-state: running, paused; } }   /* not on touch: a sticky :hover would pause it for good */
+        @keyframes toast-drain { to { background-size: 0% 100%, auto; } }
+
         @keyframes toast-fadein {
             from { bottom: 0; opacity: 0; }
             to { bottom: 30px; opacity: 1; }
@@ -7097,7 +7108,20 @@
             close.onclick = () => { x.classList.remove("show"); };
             x.appendChild(msg);
             x.appendChild(close);
+            x.classList.remove("toast-timed");   // V101.296: a new toast stays until ✕ unless toastCountdown() follows
             x.classList.add("show");
+        }
+
+        // V101.296: make the toast just shown close itself after `ms`, with the drain
+        // (CSS .toast-timed). Closing rides on the drain's animationend, so pausing the
+        // drain (touch / hover) also pauses the close.
+        function toastCountdown(ms) {
+            const x = document.getElementById("toast");
+            if (!x) return;
+            x.style.setProperty("--toast-ms", ms + "ms");
+            void x.offsetWidth;   // restart the drain when a timed toast replaces another
+            x.classList.add("toast-timed");
+            x.onanimationend = e => { if (e.animationName === "toast-drain") x.classList.remove("show", "toast-timed"); };
         }
 
         // Markdown renderer for Quiz content (Phase 3, V94.04)
@@ -23290,7 +23314,7 @@
                     // feeds the streak or its +0.05 bonus; the 'activity' callers pay that
                     // themselves right after their own submit.
                     if (!isManual && schActivityDays) schActivityDays.add(todayKey);
-                    if (source === 'open') showToast(`🔥 ${result.streak} · ${['Checked in', document.body.classList.contains('lang-kr-on') ? '출석 완료' : '', document.body.classList.contains('lang-th-on') ? 'เช็คอินแล้ว' : ''].filter(Boolean).join(' · ')}`);   // V101.68: the only sign the auto check-in happened; V101.147: wording follows the language chip (EN always, + KR / TH when on)
+                    if (source === 'open') { showToast(`🔥 ${result.streak} · ${['Checked in', document.body.classList.contains('lang-kr-on') ? '출석 완료' : '', document.body.classList.contains('lang-th-on') ? 'เช็คอินแล้ว' : ''].filter(Boolean).join(' · ')}`); toastCountdown(10000); }   // V101.296: closes itself after 10 s (drain)   // V101.68: the only sign the auto check-in happened; V101.147: wording follows the language chip (EN always, + KR / TH when on)
                 }
             } catch (err) {
                 console.warn('Daily check-in transaction failed:', err);
