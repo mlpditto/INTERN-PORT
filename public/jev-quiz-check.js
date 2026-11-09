@@ -8,9 +8,6 @@
         if (f.kind === 'stale') return LANG[f.lang] + ' translation is older than this question';
         return LANG[f.lang] + (f.verdict === 'bad' ? ' translation differs' : ' translation may differ');
     }
-    function chips(list) {
-        return `<div class="jqc-qs">${list.map(q => `<button type="button" class="jqc-go" data-q="${q}">Q${q + 1}</button>`).join('')}</div>`;
-    }
     function repeat(r, i) {
         return `<li class="jqc-${r.score >= 0.8 ? 'bad' : 'look'}"><b>Q${r.q + 1}</b><span>Same fact as <b>${esc(r.title)}</b> Q${r.otherQ + 1} <small>${Number(r.score).toFixed(2)}</small></span><button type="button" class="jqc-cmp" data-i="${i}" aria-expanded="false">Compare</button></li><li class="jqc-pair" data-i="${i}" hidden><p>${esc(r.stem)}</p><p>${esc(r.otherStem)}</p></li>`;
     }
@@ -53,9 +50,26 @@
         if (typeof triggerAutoSave === 'function') triggerAutoSave();
         if (window.showToast) showToast(`🗑️ Q${i + 1} removed — press Save Quiz to keep it`);
     }
-    function row(f) {
-        const where = f.q == null ? 'Quiz' : 'Q' + (f.q + 1), go = f.q == null ? '' : `<button type="button" class="jqc-go" data-q="${f.q}">Open</button>`;
-        return `<li class="jqc-${esc(f.verdict)}"><b>${where}</b><span>${esc(label(f))}${f.score != null ? ` <small>${Number(f.score).toFixed(2)}</small>` : ''}</span>${go}</li>`;
+    // V102.619 (owner pick C): one matrix instead of one row per question × language — questions down, 💡 + each language across.
+    // ✓ ok · ≠ differs · ≈ may differ · 🕒 translation older than the question · – not checked. Tap Qn = open that question.
+    const ORDER = ['th', 'ko', 'ja', 'zh'];
+    function matrix(r, qs) {
+        const flags = r.flags || [], n = Math.max(Number(r.questions) || 0, qs.length);
+        const langs = [...new Set([...(Array.isArray(r.langs) ? r.langs : []), ...flags.filter(f => f.lang).map(f => f.lang)])].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
+        const skip = new Set(r.unchecked || []);
+        const hasOpts = i => ((qs[i] || {}).options || []).some(o => String(o == null ? '' : o).trim());
+        const marked = i => [].concat((qs[i] || {}).correct == null ? [] : qs[i].correct).length > 0;
+        const tip = f => esc(label(f) + (f.score != null ? ' · ' + Number(f.score).toFixed(2) : ''));
+        const flagCell = f => f.kind === 'stale' ? `<td class="jqc-old" title="${tip(f)}">🕒</td>` : `<td class="jqc-${f.verdict === 'bad' ? 'diff' : 'may'}" title="${tip(f)}">${f.verdict === 'bad' ? '≠' : '≈'}</td>`;
+        const none = t => `<td class="jqc-na" title="${t}">–</td>`, ok = '<td class="jqc-y">✓</td>';
+        const rows = Array.from({ length: n }, (_, i) => {
+            const key = flags.find(f => f.kind === 'key' && f.q === i);
+            const c0 = key ? flagCell(key) : skip.has(i) ? none('No explanation, not checked') : hasOpts(i) && marked(i) ? ok : none('Not a choice question');
+            const cs = langs.map(l => { const f = flags.find(x => x.lang === l && (x.q === i || (x.q == null && x.kind === 'stale'))); return f ? flagCell(f) : hasOpts(i) ? ok : none('Not a choice question'); });
+            return `<tr><th scope="row"><button type="button" class="jqc-go" data-q="${i}">Q${i + 1}</button></th>${c0}${cs.join('')}</tr>`;
+        }).join('');
+        return `<table class="jqc-m"><thead><tr><th></th><th title="Explanation vs marked answer">💡</th>${langs.map(l => `<th title="${LANG[l]}">${l.toUpperCase()}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`
+            + '<p class="jqc-key">✓ ok · ≠ differs · ≈ may differ · 🕒 older · – not checked</p>';
     }
     function open(html) {
         if (!box) { box = document.createElement('dialog'); box.id = 'jqc-box'; box.className = 'lang-no-toggle'; document.body.append(box); }
@@ -83,8 +97,7 @@
     window.jevQuizCheck = {
         goTo(i) { if (window.closeQuizReview) closeQuizReview(); quizQPageIndex = i; updateQuizPagination(); },
         async run(btn) {
-            const quizId = document.getElementById('edit-quiz-id').value;
-            if (!quizId) return open('<p class="jqc-n">Save the quiz first. Jev needs its translations.</p>');
+            const quizId = document.getElementById('edit-quiz-id').value;   // V102.619 (owner): '' = never saved — Jev still checks 💡; translations wait for Save
             const questions = getQuizFormData().questions.map(({ q, content, type, options, correct, explanation }) => ({ q, content, type, options, correct, explanation }));   // V102.557: what the admin sees, not what was last saved
             btn.disabled = true;
             busy(true);
@@ -93,15 +106,17 @@
                 if (r.enabled === false) return open('<p class="jqc-n">Jev is switched off.</p>');
                 const list = r.flags || [];
                 const repeats = repeatsShown = r.repeats || [], unchecked = r.unchecked || [], scored = list.filter(f => f.score != null).length, ok = Math.max(0, r.checked - scored);
-                const pills = `<div class="jqc-p"><i class="g">${ok} OK</i>${unchecked.length ? `<i class="a">${unchecked.length} not checked</i>` : ''}${repeats.length ? `<i class="r">${repeats.length} repeat${repeats.length > 1 ? 's' : ''}</i>` : ''}</div>`;
+                const pills = `<div class="jqc-p"><i class="g">${ok} OK</i>${unchecked.length ? `<i class="a">${unchecked.length} not checked</i>` : ''}${repeats.length ? `<i class="r">${repeats.length} repeat${repeats.length > 1 ? 's' : ''}</i>` : ''}${quizId ? '' : '<i class="a" title="Translations are checked once the quiz is saved">🌐 after Save</i>'}</div>`;
                 const clean = !list.length && !repeats.length && !unchecked.length;
                 const note = 'Jev reads the questions on screen and changes nothing. Check the book before you edit.' + (r.errors ? ` ${r.errors} could not be checked.` : '') + (r.repeatsFailed ? ' The check against other quizzes did not run.' : r.compared ? ` Compared ${r.compared} likely pairs in other quizzes.` : '');
                 open(pills + (clean ? '<p class="jqc-ok">✓ Nothing to look at</p>' : '')
-                    + (repeats.length || list.length ? `<ul class="jqc-list">${repeats.map(repeat).join('')}${list.map(row).join('')}</ul>` : '')
-                    + (unchecked.length ? `<p class="jqc-u">No explanation, not checked</p>${chips(unchecked)}` : '')
+                    + (list.length || unchecked.length ? matrix(r, questions) : '')
+                    + (repeats.length ? `<ul class="jqc-list">${repeats.map(repeat).join('')}</ul>` : '')
                     + `<p class="jqc-n">${esc(note)}</p>`);
             } catch (e) {
                 console.warn('jevCheckQuiz', e && e.message);
+                // until the V102.619 function is deployed, a never-saved quiz is refused up front (no AI call, nothing spent)
+                if (!quizId && /invalid-argument/.test(String(e && e.code))) return open('<p class="jqc-n">Save the quiz first. Jev needs its translations.</p>');
                 open('<p class="jqc-n">Could not reach Jev. Please try again.</p>');
             } finally { busy(false); btn.disabled = false; }
         }

@@ -30,7 +30,7 @@ function planCheck(quiz) {
     const questions = Array.isArray(quiz && quiz.questions) ? quiz.questions : [];
     const items = [], found = [];
     let noExplanation = 0;
-    const unchecked = [];
+    const unchecked = [], langs = [];
     questions.forEach((q, i) => {
         const options = opts(q.options), marks = (Array.isArray(q.correct) ? q.correct : []).filter(n => options[n]);
         if (!options.length || !marks.length) return;   // short answer, poll, or no key: the save check owns that
@@ -42,6 +42,7 @@ function planCheck(quiz) {
     LANGS.forEach(lang => {
         const list = quiz && quiz.translations && quiz.translations[lang] && quiz.translations[lang].questions;
         if (!Array.isArray(list)) return;
+        langs.push(lang);   // V102.619: the matrix gets one column per language the quiz has
         if (list.length !== questions.length) { found.push({ kind: 'stale', lang, q: null, verdict: 'bad' }); return; }
         list.forEach((t, i) => {
             const q = questions[i];
@@ -51,7 +52,7 @@ function planCheck(quiz) {
             items.push({ kind: 'lang', lang, q: i, state, key: hash('lang', state) });
         });
     });
-    return { items, found, noExplanation, unchecked, questions: questions.length };
+    return { items, found, noExplanation, unchecked, langs, questions: questions.length };
 }
 
 // deps: { apiKey, provider, fetch, readCache(keys) -> { key: score }, writeCache([{ key, score }]) }
@@ -83,7 +84,7 @@ async function checkQuiz(quiz, deps) {
     });
     const order = { bad: 0, look: 1, unsure: 2 };
     const flags = [...plan.found, ...results].sort((a, b) => order[a.verdict] - order[b.verdict] || (a.q == null ? -1 : a.q) - (b.q == null ? -1 : b.q));
-    return { flags, checked: plan.items.length - errors, errors, noExplanation: plan.noExplanation, unchecked: plan.unchecked, questions: plan.questions, calls: todo.length, inputTokens, provider };
+    return { flags, checked: plan.items.length - errors, errors, noExplanation: plan.noExplanation, unchecked: plan.unchecked, langs: plan.langs, questions: plan.questions, calls: todo.length, inputTokens, provider };
 }
 
 // V102.561: which questions in other quizzes are worth asking Jev about. Comparing everything is too many pairs, so a pair needs a shared word

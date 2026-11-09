@@ -20,6 +20,8 @@ Admin: Quiz Engine ▸ a quiz ▸ Review / Compare.
 - `quiz-compare-close-qa` — Compare modal closes and reopens by click / Enter / Space
 - `jev-compare-check` — Jev "same fact?" scoring: batching, cache, symmetry
 - `jev-chip-qa` — Jev chip beside each n-gram match
+- `jev-quiz-check` — Jev check engine: what is asked, thresholds, stale translations, cache, languages present, no quizId = questions on screen
+- `jev-quiz-check-qa` — Jev check box: matrix (questions × 💡 + languages), runs before the first Save (🌐 after Save), Compare side by side, inline timer
 - `quiz-cleanup-qa` — duplicate cleanup: multi-quiz marking, whole-quiz removal
 
 ## What usually lies

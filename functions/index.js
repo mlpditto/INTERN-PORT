@@ -5498,11 +5498,16 @@ exports.jevCheckQuiz = onCall({ secrets: ["OPENROUTER_API_KEY", "JEV_AI_API_KEY"
     const apiKey = jevApiKey(provider);
     if (!apiKey) throw new HttpsError("failed-precondition", "No API key configured for provider " + provider);
     const quizId = String((request.data || {}).quizId || "");
-    if (!quizId) throw new HttpsError("invalid-argument", "quizId required");
-    const snap = await db.collection("quizzes").doc(quizId).get();
-    if (!snap.exists) throw new HttpsError("not-found", "Quiz not found");
     const onScreen = (request.data || {}).questions;   // the editor's questions, unsaved edits included; the translations still come from the saved quiz
-    const quiz = Array.isArray(onScreen) ? { ...snap.data(), questions: onScreen.filter(q => q && typeof q === "object").slice(0, 200) } : snap.data();
+    const shown = Array.isArray(onScreen) ? onScreen.filter(q => q && typeof q === "object").slice(0, 200) : null;
+    // V102.619 (owner): a quiz never saved is checked too — its questions on screen, no translations yet (the page says "🌐 after Save")
+    if (!quizId && !shown) throw new HttpsError("invalid-argument", "questions required");
+    let quiz = { questions: shown };
+    if (quizId) {
+        const snap = await db.collection("quizzes").doc(quizId).get();
+        if (!snap.exists) throw new HttpsError("not-found", "Quiz not found");
+        quiz = shown ? { ...snap.data(), questions: shown } : snap.data();
+    }
     const out = await require("./jev-quiz-check").checkQuiz(quiz, {
         apiKey, provider, fetch: (url, opts) => fetch(url, opts),
         readCache: async (keys) => {
