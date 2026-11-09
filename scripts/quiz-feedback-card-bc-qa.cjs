@@ -52,7 +52,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.equal(lek.res, null, 'no approved attempt → no chip');
         assert.equal(pim.cm, 'ข้อ 4 ภาพไม่ชัด อยากให้มีเฉลยละเอียดกว่านี้'); assert.ok(/🎯 Vitamin B12/.test(pim.txt));
         assert.ok(m.every(x => Number(x.actsOp) < 0.5), 'buttons faint until hovered');
-        await page.screenshot({ path: process.env.QA_SHOT || 'qfp-card-bc.png', clip: await page.locator('#quizFeedbackPanelModal .modal-content').boundingBox() }).catch(() => {});
+        if (process.env.QA_SHOT) await page.screenshot({ path: process.env.QA_SHOT, clip: await page.locator('#quizFeedbackPanelModal .modal-content').boundingBox() }).catch(() => {});
         await page.hover('#qfp-comments > .qfp-card:nth-child(1)');
         await page.waitForTimeout(300);
         assert.equal(await page.$eval('#qfp-comments > .qfp-card:nth-child(1) .qfp-acts', e => getComputedStyle(e).opacity), '1', 'hover → full buttons');
