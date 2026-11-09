@@ -19,7 +19,7 @@ Intern: home header → tap name / photo → Info modal; Personal Info cards; Kn
 - `activity-rewards-check` — home activity reward tiles + monthly progress: 8 tiles, quiz dedup, month filter
 - `lv-card-qa` — a different card per LV, next LV in the chip tooltip, LEVEL UP popup acked by CONTINUE
 - `lv-wave-theme-qa` — LV.4+ taps the LV chip = 🌊 Ice tide theme (html.wave, users.theme + device), 🔒 below LV.4, blend with Christmas, version bottom-left
-- `birthday-confetti-qa` — 🎂 getBirthdays (today + in 3 days, nickname, no year, 🙈 hidden left out): confetti instead of snow for everyone, one toast a day, the birthday person gets gold confetti + greeting + Happy Birthday tune at the first tap; Info ▸ DOB 🙈 chip (V101.295)
+- `birthday-confetti-qa` — 🎂 getBirthdays (today + in 3 days, nickname, no year, 🙈 hidden left out): confetti instead of snow for everyone, one toast a day, the birthday person gets gold confetti + greeting + Happy Birthday looping all day from the first tap (no Christmas music that day, hold the photo = off / on); Info ▸ DOB 🙈 chip (V101.295 / V101.296)
 
 ## What usually lies
 
