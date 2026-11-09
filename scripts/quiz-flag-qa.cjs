@@ -21,7 +21,7 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
     assert.match(h, /🚩 📖 Read first · Q2 · ❌ Wrong/); assert.match(h, /🚩 Q5 · choice B/); assert.match(h, /qfpOpenFlag\(1\)/); assert.match(h, /qfpOpenFlag\(4\)/);
     assert.match(h, /first-line &lt;b&gt;/, 'quote escaped'); assert.match(h, /✍️ PGA/);
     assert.equal(A.qfpFlagsHtml({ flags: [] }), '');
-    assert.ok(admin.includes('${qfpFlagsHtml(f)}\n                        ${quizResultHtml}'), 'the card shows the flags');
+    assert.ok(/qfp-cm[^\n]*\n\s*\$\{qfpFlagsHtml\(f\)\}/.test(admin), 'the card shows the flags (V102.618: under the comment line)');
     assert.ok(admin.includes("case 'fix':      return fbNeedsFix(f) || (Array.isArray(f.flags) && f.flags.length > 0);") && admin.includes('fix: _qfpFeedbacks.filter(f => fbNeedsFix(f) || (Array.isArray(f.flags) && f.flags.length > 0)).length,'), '🐞 filter + its count include flags');
 }
 
