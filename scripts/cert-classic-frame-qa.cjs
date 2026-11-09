@@ -50,7 +50,7 @@ assert.ok(!admin.includes('cert-signature.png'), 'the scanned signature image is
         // 2. footer, both frames, every language: signature left, DATE ISSUED right
         for (const frame of ['modern', 'classic']) for (const lang of ['th', 'en', 'both', 'ko']) {
             const d = await draw(frame, lang, done);
-            const sig = at(d, 'Tipnaree Jiwtrakul'), label = d.calls.find(c => /DATE ISSUED|วันที่ออกให้/.test(c.t));
+            const sig = at(d, 'Thipnaree Jewtragool'), label = d.calls.find(c => /DATE ISSUED|วันที่ออกให้/.test(c.t));
             assert.ok(sig && sig.x < 300 && /Great Vibes/.test(sig.font), `${frame}/${lang}: the signature is the signer's name in Great Vibes, left`);
             assert.ok(at(d, 'Managing Pharmacist').x === sig.x, `${frame}/${lang}: role under the signature`);
             assert.ok(label && label.x > 450, `${frame}/${lang}: DATE ISSUED on the right`);
