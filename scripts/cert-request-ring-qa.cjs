@@ -40,7 +40,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return iso(
     const pend = await state({ score: 31.98, startDate: day(-20), endDate: day(18), certRequested: true });
     assert.deepEqual([pend.text, pend.cls, pend.clickable], ['⏳', ['cert-pend'], false], 'sent: ⏳');
     const ok = await state({ score: 31.98, startDate: day(-20), endDate: day(18), certRequested: true, certApproved: true });
-    assert.deepEqual([ok.text, ok.cls, ok.clickable], ['🎓✓', ['cert-ok'], false], 'approved: 🎓✓');
+    assert.deepEqual([ok.text, ok.cls, ok.clickable], ['🎓✓', ['cert-ok'], true], 'approved: 🎓✓, tappable (V101.297: opens the ⬇️ PDF sheet)');
     // the grad slot on the card: from the last day for everyone
     const grad = await page.evaluate(([s, e]) => { checkGraduation({ score: 1, startDate: s, endDate: e }); const g = document.getElementById('grad-action'); return [g.style.display, /requestCert\(\)/.test(g.innerHTML)]; }, [day(-38), day(0)]);
     assert.deepEqual(grad, ['', true], 'last day, 1 point: the card shows Request Cert');

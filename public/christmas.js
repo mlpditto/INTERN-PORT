@@ -7,6 +7,8 @@
     var KEY = 'xm_music', HOLD = 600, FLAKES = 26;
     var audio = null, started = false, snow = null;
     function on() { return document.documentElement.classList.contains('xm'); }
+    // V101.296 (owner): on your own birthday (html.bd-me, birthday.js) the Happy Birthday song plays all day — no Christmas music, no hold here
+    function bdMe() { return document.documentElement.classList.contains('bd-me'); }
     function wanted() { try { return localStorage.getItem(KEY) !== 'off'; } catch (e) { return true; } }
     function remember(v) { try { localStorage.setItem(KEY, v ? 'on' : 'off'); } catch (e) { /* storage blocked */ } }
     function toast(t) { if (typeof showToast === 'function') showToast(t); }
@@ -37,7 +39,7 @@
     function quizSync() {
         if (!audio) return;
         if (inQuiz()) { if (!audio.paused) { quizQuiet = true; audio.pause(); } }
-        else if (quizQuiet) { quizQuiet = false; if (started && wanted() && on()) audio.play().catch(function () { /* needs a new gesture */ }); }
+        else if (quizQuiet) { quizQuiet = false; if (started && wanted() && on() && !bdMe()) audio.play().catch(function () { /* needs a new gesture */ }); }
     }
     function watchQuiz() {
         var q = document.getElementById('quizModal');
@@ -46,7 +48,7 @@
         new MutationObserver(quizSync).observe(q, { attributes: true, attributeFilter: ['style', 'class'] });
     }
     function play() {
-        if (!on() || inQuiz()) return;
+        if (!on() || inQuiz() || bdMe()) return;
         var p = player().play(); started = true;
         if (p && p.then) p.then(showHint, function () { started = false; }); else showHint();
     }
@@ -81,7 +83,7 @@
     ['pointerdown', 'keydown', 'touchstart', 'touchend', 'click'].forEach(function (t) { document.addEventListener(t, firstGesture, { capture: true, passive: true }); });
     document.addEventListener('visibilitychange', function () {
         if (!audio) return;
-        if (document.hidden) audio.pause(); else if (started && wanted() && on() && !inQuiz()) audio.play().catch(function () { /* needs a new gesture */ });
+        if (document.hidden) audio.pause(); else if (started && wanted() && on() && !inQuiz() && !bdMe()) audio.play().catch(function () { /* needs a new gesture */ });
     });
 
     // long-press the profile photo = music off / on; the click that follows a long-press is swallowed so LINE does not open the browser
@@ -91,7 +93,7 @@
         img.dataset.xmHold = '1';
         var timer = 0, held = false;
         function start() {
-            if (!on()) return;
+            if (!on() || bdMe()) return;   // birthday.js owns the hold on your birthday
             held = false; hideHint();
             timer = setTimeout(function () {
                 held = true;
@@ -109,7 +111,7 @@
         if (on()) img.title = (img.title ? img.title + ' · ' : '') + 'Hold for music on / off';
     }
 
-    function apply() { paintSnow(); bindPhoto(); watchQuiz(); if (!on()) pause(); }
+    function apply() { paintSnow(); bindPhoto(); watchQuiz(); if (!on() || bdMe()) pause(); }
     // the theme can switch after load (app_settings/theme is read later), so follow the <html> class
     new MutationObserver(apply).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply); else apply();

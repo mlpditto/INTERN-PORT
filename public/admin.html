@@ -6128,6 +6128,15 @@
             #dashboard-workspace { grid-template-columns:minmax(0,1fr); }
             #dashboard-work .kanban-board { grid-template-columns:minmax(0,1fr); }
         }
+        /* V102.617 (owner pick C): the Certificate Request card's chip rail — 🎓 Issue · 👤 Hub · 💬 Chat · 🗑 */
+        .cr-rail { margin-top:12px; display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+        .cr-rail button { width:auto; min-height:0; border:1px solid #d1d5db; background:#fff; color:#374151; border-radius:999px; padding:5px 11px; font-size:12.5px; font-weight:700; cursor:pointer; }
+        .cr-rail button:hover:not(:disabled) { background:#f8fafc; }
+        .cr-rail button:disabled { opacity:.45; cursor:default; }
+        .cr-rail .cr-go { border-color:#16a34a; color:#166534; background:#f0fdf4; }
+        .cr-rail .cr-del { margin-left:auto; border-color:#fecaca; color:#ef4444; background:#fff; }
+        .cr-done { margin-top:8px; font-size:12px; font-weight:700; color:#166534; }
+        .cr-done code { font-size:11.5px; color:#475569; background:none; }
     </style>
 
     <script>
@@ -6145,7 +6154,7 @@
     </script>
 
     <link
-        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Montserrat:wght@400;700&family=Noto+Sans+KR:wght@400;700&family=Rajdhani:wght@600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Montserrat:wght@400;700&family=Noto+Sans+KR:wght@400;700&family=Rajdhani:wght@600;700&family=Great+Vibes&display=swap"
         rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -8740,7 +8749,7 @@
 <link rel="stylesheet" href="quiz-compare-cleanup.css?v=V100.02">
 <link rel="stylesheet" href="learning-review.css?v=V100.13">
 <link rel="stylesheet" href="delete-requests.css?v=V100.40">
-<link rel="stylesheet" href="quiz-feedback.css?v=V102.357">
+<link rel="stylesheet" href="quiz-feedback.css?v=V102.618">
 <script src="assigned-goals.js?v=V100.30"></script><link rel="stylesheet" href="assigned-goals.css?v=V100.30">
 <!-- V100.82: hub-progress-menu.js/.css retired — its only 2 items (Goals,
      Certificates) moved into the global ➕ Create menu; nothing else used this
@@ -15015,6 +15024,7 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                     <button type="button" class="cert-xchip" data-brand="wm" aria-pressed="true" onclick="toggleCertBrand('wm')">Watermark</button>
                     <button type="button" class="cert-xchip" data-brand="seal" aria-pressed="true" onclick="toggleCertBrand('seal')">Seal</button>
                     <button type="button" class="cert-xchip" data-brand="co" aria-pressed="true" onclick="toggleCertBrand('co')">Co. name</button>
+                    <button type="button" class="cert-xchip" id="cert-frame-chip" aria-pressed="false" onclick="setCertFrame(certFrame() === 'classic' ? 'modern' : 'classic')" title="🎀 Classic frame: a band in the stage colour, gold corners and a rosette that holds the QR. Off = the thin modern line. Remembered in this browser, bulk too">🎀 Classic</button>
                 </div>
                 </div><div class="cert-pv">
                 <div id="cert-preview-container"
@@ -62320,6 +62330,22 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         }
 
                         const escapedTitle = (q.title || "").replace(/'/g, "\\'");
+                        // V102.617 (owner pick C): a Certificate Request card gets a chip rail — 🎓 Issue opens the Certificate modal set to
+                        // the requester; once exported (certApproved + certNo) a ✅ line shows the number and 📄 opens the archived PDF.
+                        let crRail = '';
+                        if (q.isCertificateRequest && q.requestedBy) {
+                            const cu = usersData.find(x => x.id === q.requestedBy);
+                            const uidJs = String(q.requestedBy).replace(/[^A-Za-z0-9_-]/g, '');
+                            const issued = cu && cu.certApproved && cu.certNo ? escapeHtml(cu.certNo) : '';
+                            crRail = (issued ? `<div class="cr-done">✅ Sent · <code>${issued}</code></div>` : '')
+                                + `<div class="cr-rail">`
+                                + `<button type="button" class="cr-go" onclick="event.stopPropagation(); openCertModal('${uidJs}')" title="Open the Certificate modal for this intern — Export PDF issues it and the intern can download it in LINE"${cu ? '' : ' disabled'}>🎓 Issue</button>`
+                                + (issued ? `<button type="button" disabled data-cert-file="${issued}" onclick="event.stopPropagation()" title="Open the PDF the intern gets">📄 PDF</button><small data-file-status hidden></small>` : '')
+                                + `<button type="button" onclick="event.stopPropagation(); openUserHub('${uidJs}')" title="User Hub"${cu ? '' : ' disabled'}>👤 Hub</button>`
+                                + `<button type="button" onclick="event.stopPropagation(); openChat('${id}','${escapedTitle}')">💬 Chat</button>`
+                                + `<button type="button" class="cr-del" onclick="event.stopPropagation(); startDeleteCard('${id}')" title="Delete" aria-label="Delete">🗑</button>`
+                                + `</div>`;
+                        }
                         d.innerHTML = `
                             <div class="card-header-row" style="margin-bottom:12px;">
                                 <span class="badge" style="background:${isProj ? 'linear-gradient(135deg, #4361ee, #3a0ca3)' : 'linear-gradient(135deg, #64748b, #475569)'}; padding:4px 12px; border-radius:10px; font-size:0.7em; letter-spacing:0.5px; font-weight:800;">${isProj ? '📁 PROJECT' : '📝 TASK'}</span>
@@ -62334,15 +62360,18 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 ${imgs}
                                 <div style="background:var(--col-bg); padding:4px 8px; border-radius:8px;">${timersHtml}</div>
                             </div>
+                            ${crRail || `
                             <div style="margin-top:15px; display:flex; gap:10px;">
                                 <button class="btn-sm" style="flex:1; background:var(--primary); color:white; border:none; padding:10px; border-radius:12px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; transition:0.2s; box-shadow:0 4px 10px rgba(67,97,238,0.2);" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'" onclick="event.stopPropagation(); openChat('${id}','${escapedTitle}')">💬 Chat</button>
                                 <button class="btn-sm" style="width:42px; height:42px; padding:0; display:flex; align-items:center; justify-content:center; background:#fee2e2; color:#ef4444; border:none; border-radius:12px; cursor:pointer; font-size:1.2em; transition:0.2s;" onmouseover="this.style.background='#fecaca'" onmouseout="this.style.background='#fee2e2'" onclick="event.stopPropagation(); startDeleteCard('${id}')">🗑️</button>
                             </div>
+                            `}
                             ${act}
                         `;
                         cols[q.status].appendChild(d);
                     }
                 });
+                if (window.CertificateFiles && document.querySelector('.cr-rail [data-cert-file]')) CertificateFiles.decorate();   // V102.617: 📄 on issued Certificate Request cards
             } catch (e) { console.error("Kanban Section 1 (Side Quests) Error:", e); }
 
             // 2. Render Reflective Logs (Review/Done)
@@ -64956,6 +64985,92 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             try { localStorage.setItem('cert_prog_' + k, certProgOn(k) ? '0' : '1'); } catch (e) { /* private mode: not remembered */ }
             updateCertPreview();
         }
+        // V102.616 (owner pick B): the 🎀 Classic chip (Brand row) — off = the thin modern line; on = Classic (a band in the stage colour, maroon once
+        // completed, gold scrolls in the corners, logo top centre, a gold rosette with ribbons bottom right that holds the QR).
+        function certFrame() { try { return localStorage.getItem('cert_frame') === 'classic' ? 'classic' : 'modern'; } catch (e) { return 'modern'; } }
+        function setCertFrame(k) {
+            try { localStorage.setItem('cert_frame', k === 'classic' ? 'classic' : 'modern'); } catch (e) { /* private mode: not remembered */ }
+            updateCertPreview();
+        }
+        const CERT_CLASSIC = { red: '#7a1f2b', line: '#c9a227', ground: '#f8f3e6' };
+        // own construction: a gold scroll in each inner corner — a curl along each edge, a leaf and a dot
+        function certClassicCorner(ctx, x, y, sx, sy) {
+            ctx.save(); ctx.translate(x, y); ctx.scale(sx * 0.78, sy * 0.78);
+            ctx.strokeStyle = ctx.fillStyle = CERT_CLASSIC.line; ctx.lineCap = 'round';
+            const arm = flip => {
+                ctx.save(); if (flip) ctx.transform(0, 1, 1, 0, 0, 0);
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(6, 6); ctx.bezierCurveTo(30, 2, 62, 4, 74, 18); ctx.bezierCurveTo(82, 28, 72, 40, 62, 34); ctx.bezierCurveTo(54, 29, 60, 20, 67, 24); ctx.stroke();
+                ctx.lineWidth = 1.2;
+                ctx.beginPath(); ctx.moveTo(30, 6); ctx.bezierCurveTo(40, 14, 44, 24, 38, 30); ctx.bezierCurveTo(34, 34, 28, 30, 31, 25); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(74, 18); ctx.bezierCurveTo(92, 8, 110, 8, 126, 12); ctx.stroke();
+                ctx.beginPath(); ctx.arc(128, 12, 2, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            };
+            arm(false); arm(true);
+            ctx.beginPath(); ctx.moveTo(10, 10); ctx.quadraticCurveTo(30, 14, 30, 30); ctx.quadraticCurveTo(14, 30, 10, 10); ctx.fill();
+            ctx.beginPath(); ctx.arc(40, 40, 2.6, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+        }
+        // the band (stage colour, maroon when completed) between gold rules, and the four corner scrolls
+        function certClassicFrame(ctx, w, h, band) {
+            const g = ctx.createRadialGradient(w / 2, h / 2, h * 0.2, w / 2, h / 2, w * 0.62);
+            g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(196,164,104,0.18)');
+            ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = band;
+            ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.rect(20, 20, w - 40, h - 40); ctx.fill('evenodd');
+            ctx.strokeStyle = CERT_CLASSIC.line;
+            ctx.lineWidth = 1; ctx.strokeRect(7.5, 7.5, w - 15, h - 15);
+            ctx.lineWidth = 2.2; ctx.strokeRect(20, 20, w - 40, h - 40);
+            ctx.lineWidth = 0.8; ctx.strokeRect(27.5, 27.5, w - 55, h - 55);
+            certClassicCorner(ctx, 30, 30, 1, 1); certClassicCorner(ctx, w - 30, 30, -1, 1);
+            certClassicCorner(ctx, 30, h - 30, 1, -1); certClassicCorner(ctx, w - 30, h - 30, -1, -1);
+        }
+        // a gold rosette with two ribbon tails; MEDLIFE PLUS on the top rim, `bottom` on the lower rim; a white centre when it holds the QR
+        function certClassicRosette(ctx, cx, cy, ribbon, bottom, holdsQr) {
+            const R = 50;
+            const arcText = (text, rr, font, dir, spacing) => {
+                ctx.save(); ctx.font = font; ctx.fillStyle = '#5c430c'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                const chars = [...text], widths = chars.map(ch => ctx.measureText(ch).width + spacing), total = widths.reduce((a, b) => a + b, 0);
+                let ang = (dir === 1 ? -Math.PI / 2 : Math.PI / 2) - dir * (total / rr) / 2;
+                chars.forEach((ch, i) => { const half = widths[i] / 2 / rr; ang += dir * half; ctx.save(); ctx.translate(cx + rr * Math.cos(ang), cy + rr * Math.sin(ang)); ctx.rotate(ang + dir * Math.PI / 2); ctx.fillText(ch, 0, 0); ctx.restore(); ang += dir * half; });
+                ctx.restore();
+            };
+            ctx.save();
+            ctx.fillStyle = ribbon;
+            [[-1, 0.42], [1, 0.32]].forEach(([d, tilt]) => {
+                ctx.save(); ctx.translate(cx, cy); ctx.rotate(d * tilt);
+                ctx.beginPath(); ctx.moveTo(-14, 18); ctx.lineTo(14, 18); ctx.lineTo(14, 88); ctx.lineTo(0, 77); ctx.lineTo(-14, 88); ctx.closePath(); ctx.fill();
+                ctx.strokeStyle = 'rgba(255,215,120,0.7)'; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(-9, 22); ctx.lineTo(-9, 80); ctx.moveTo(9, 22); ctx.lineTo(9, 80); ctx.stroke();
+                ctx.restore();
+            });
+            ctx.shadowColor = 'rgba(0,0,0,0.25)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
+            const g = ctx.createRadialGradient(cx - 16, cy - 16, 4, cx, cy, R + 6);
+            g.addColorStop(0, '#fff3c4'); g.addColorStop(0.45, '#e2b94f'); g.addColorStop(1, '#9c7420');
+            ctx.fillStyle = g; ctx.beginPath();
+            for (let i = 0; i < 72; i++) { const a = i * Math.PI / 36, r = i % 2 ? R : R + 5; ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a)); }
+            ctx.closePath(); ctx.fill(); ctx.shadowColor = 'transparent';
+            ctx.strokeStyle = '#7a5a12'; ctx.lineWidth = 1;
+            [R - 4, R - 18].forEach(r => { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke(); });
+            arcText('MEDLIFE PLUS', R - 11, '700 8.5px Montserrat', 1, 1.1);
+            arcText(bottom, R - 11, '600 7.5px Montserrat', -1, 1.1);
+            if (holdsQr) { ctx.fillStyle = '#fffdf6'; ctx.beginPath(); ctx.arc(cx, cy, R - 19, 0, Math.PI * 2); ctx.fill(); }
+            else {
+                ctx.beginPath();
+                for (let i = 0; i < 10; i++) { const rr = i % 2 ? 6.5 : 15, a = -Math.PI / 2 + i * Math.PI / 5; ctx.lineTo(cx + rr * Math.cos(a), cy + rr * Math.sin(a)); }
+                ctx.closePath(); ctx.fillStyle = '#7a5a12'; ctx.fill();
+            }
+            ctx.restore();
+        }
+        // V102.616 (owner): DATE ISSUED = the day the certificate is printed, in its language + calendar
+        function certTodayISO() { return new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+        // "312 hours trained" by the issue date, from the intern's time clock ('' without hours)
+        function certHoursDoneText(hoursDone) {
+            const h = Math.floor(Number(hoursDone) || 0);
+            if (h < 1) return '';
+            return { th: `ผ่านการฝึก ${h} ชม.`, en: `${h} hours trained`, both: `${h} ชม. / ${h} hours`, ko: `${h}시간 / ${h} hours` }[certLang] || `${h} hours trained`;
+        }
         // V102.600 (owner): the gold line under the name is off unless this chip turns it on
         function certNameLineOn() { try { return localStorage.getItem('cert_name_line') === '1'; } catch (e) { return false; } }
         function toggleCertNameLine() {
@@ -65003,6 +65118,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const n = certUser ? certHeldBadges((usersData || []).find(x => x.id === certUser.uid)).length : 0;
                 bc.setAttribute('aria-pressed', String(certBadgesOn()));
                 document.querySelectorAll('#cert-brand-row [data-brand]').forEach(b => b.setAttribute('aria-pressed', String(certBrandOn(b.dataset.brand))));
+                const fc = document.getElementById('cert-frame-chip'); if (fc) fc.setAttribute('aria-pressed', String(certFrame() === 'classic'));
                 const lc = document.getElementById('cert-nameline-chip');
                 if (lc) lc.setAttribute('aria-pressed', String(certNameLineOn()));
                 bc.textContent = '🏅 Badges' + (n ? ' · ' + n : '');
@@ -65143,8 +65259,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         CERT_LOGO.src = 'assets/medlife-logo.png?v=2';
         // V96.84 Phase 2: authorized signature above the line + signer identity under
         // it. The line still prints blank for wet-ink signing if the asset is missing.
-        const CERT_SIGN = new Image();
-        CERT_SIGN.src = 'assets/cert-signature.png?v=1';
+        // V102.616 (owner pick 7): no scanned image any more — the signer's name, drawn in Great Vibes on every certificate
+        const CERT_SIGN_TEXT = 'Thipnaree Jewtragool';
         // Per owner's choice (2026-07-29): position only, no personal name printed.
         const CERT_SIGNER = { name: 'Managing Pharmacist', title: 'MEDLIFE PLUS CO.,LTD.' };
         function _certImgReady(img) {
@@ -65159,7 +65275,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // unicode-range chunks, so load exactly the characters about to be drawn
         // (the fixed strings + `extraText`, e.g. the Korean name). Never throws.
         function certLogoReady(extraText) {
-            const waits = [_certImgReady(CERT_LOGO), _certImgReady(CERT_SIGN)];
+            const waits = [_certImgReady(CERT_LOGO)];
+            if (document.fonts && document.fonts.load) waits.push(document.fonts.load('400 66px "Great Vibes"', 'Aa').catch(() => null));   // V102.616: the English name
             if (certLang === 'ko' && document.fonts && document.fonts.load) {
                 const ko = [CERT_KO.intro, CERT_KO.dateLabel, CERT_KO.scan, CERT_TEMPLATES.internship.ko,
                     CERT_TEMPLATES.bootcamp.ko, '0123456789년월일–', extraText || ''].join(' ');
@@ -65189,7 +65306,10 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // "CERTIFICATE" header (same family/weight already loaded, no new request).
             // It has no Thai or Hangul glyphs, so those names fall through FF exactly as
             // they did before this change.
-            const NAME_FF = "'Cormorant Garamond', " + FF;
+            // V102.616 (owner): the English name in Great Vibes (a script); Thai / Korean fall through to the fonts after it
+            const NAME_FF = "'Great Vibes', 'Cormorant Garamond', " + FF;
+            const classic = certFrame() === 'classic';
+            const BAND = stage ? tpl.goldDark : CERT_CLASSIC.red;   // classic: the band, ribbons, header and name ink
             // V96.82: one gold pair for every accent — subtitle, underline, ornament,
             // borders and seal previously each used a slightly different gold.
             const GOLD = tpl.gold || '#b08a1e', GOLD_DARK = tpl.goldDark || '#8f6b14';
@@ -65206,7 +65326,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // navy band anywhere now, so this is the certificate's one appearance, not a
             // print-friendly variant of it (that toggle, #1266, is retired — redundant
             // once the default itself has no heavy fill to opt out of).
-            ctx.fillStyle = "#fdfbf3";
+            ctx.fillStyle = classic ? CERT_CLASSIC.ground : "#fdfbf3";
             ctx.fillRect(0, 0, w, h);
             ctx.strokeStyle = "#eee";
             ctx.lineWidth = 1;
@@ -65241,6 +65361,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 ctx.restore();
             }
 
+            if (classic) certClassicFrame(ctx, w, h, BAND); else {
             // 3. Dotted swoosh arc + sparkle accents — the one deliberately decorative
             // flourish, confined to the bottom-left corner. A full page-spanning sweep
             // was tried first and rose through y≈150-190 exactly where the header sits,
@@ -65314,10 +65435,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             sideLine(50, 90, h - 90);
             sideLine(w - 50, 90, 300);
 
+            }
+
             // V96.79: small company logo, top-left above the header.
             if (certBrandOn('logo') && CERT_LOGO.complete && CERT_LOGO.naturalWidth) {
                 const logoH = 50, logoW = logoH * CERT_LOGO.naturalWidth / CERT_LOGO.naturalHeight;
-                ctx.drawImage(CERT_LOGO, 62, 46, logoW, logoH);
+                if (classic) { const lw = 46 * CERT_LOGO.naturalWidth / CERT_LOGO.naturalHeight; ctx.drawImage(CERT_LOGO, w / 2 - lw / 2, 44, lw, 46); }   // classic: top centre
+                else ctx.drawImage(CERT_LOGO, 62, 46, logoW, logoH);
             }
 
             // 5b. Company Seal — navy instead of gold in this redesign (the ivory ground
@@ -65331,7 +65455,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // navy disc), a gold star in the middle. Same spot, same size, same hide-at-3-awards rule.
             // V102.612 (owner: "Seal ไม่แสดงผล?"): the Brand ▸ Seal chip is the whole seal, on progress stages too
             // (there it reads IN PROGRESS, never CERTIFIED). It was skipped below 100% and the chip only hid the rim words.
-            if (awardList.length <= 2 && certBrandOn('seal')) (() => {
+            if (!classic && awardList.length <= 2 && certBrandOn('seal')) (() => {   // classic: the rosette, drawn with the QR
                 const cx = w - 92, cy = 90, r = 38;
                 const ring = (rr, lw) => { ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.strokeStyle = GOLD; ctx.lineWidth = lw; ctx.stroke(); };
                 // letters along the circle at radius rr, centred on the top (dir 1) or the bottom (dir -1), upright either way
@@ -65363,7 +65487,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // right made a centered header look off-balance). "OF ACHIEVEMENT" gets
             // flanking rule lines instead of sitting bare underneath.
             ctx.textAlign = "center";
-            ctx.fillStyle = "#0a192f";
+            ctx.fillStyle = classic ? BAND : "#0a192f";
             ctx.font = "bold 52px 'Cormorant Garamond', Georgia, serif";
             ctx.fillText(tpl.header || "CERTIFICATE", w / 2, 148);
 
@@ -65415,13 +65539,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const recipientName = thMain ? names.th : enName;
             const subName = lang === 'both' ? (names.th || '') : lang === 'ko' ? (names.ko || '') : '';
             ctx.textAlign = "center";
-            ctx.fillStyle = "#222";
+            ctx.fillStyle = classic && !thMain ? BAND : "#222";
 
             // Dynamic Font Scaling Logic (V96.82: cap 72→58 + weight bold→600 — the
             // old size read too heavy; centered on 0.40w to match the narrower band).
             // Thai is set upright: a synthetic italic on Thai script reads as broken.
-            const nameStyle = thMain ? '600' : 'italic 600';
-            let fontSize = thMain ? 52 : 58;
+            const nameStyle = thMain ? '600' : '400';   // V102.616: Great Vibes has one weight and is already slanted
+            let fontSize = thMain ? 52 : 66;
             // V100.75: was a flat 0.58. Centering (was 0.40w) let text reach further right
             // toward the badge column — caught in testing: with awards present, a long
             // name/description could run under the MVP badge's own label. Full room with
@@ -65525,109 +65649,70 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
             ctx.restore();
 
-            // 11. Dates & Signature Area
-            ctx.textAlign = "left";
-            ctx.font = `bold 14px ${FF}`;
-            ctx.fillStyle = "#0a192f";
+            // 11. V102.616 (owner): the signature on the LEFT; on the right DATE ISSUED — the day the certificate is printed, large,
+            // and under it what was trained by then (period · days · hours trained, the hours-mode line, or the progress line).
             if (stage) extra = Object.assign({}, extra, { hours: '' });   // V102.600: an unfinished stage keeps the date range
-            const dateLabel = extra.hours
-                ? { th: "ฝึกงานครบ", en: "COMPLETED", both: "ฝึกงานครบ (COMPLETED)", ko: "COMPLETED" }[lang]
-                : { th: "วันที่", en: "DATE", both: "วันที่ (DATE)", ko: CERT_KO.dateLabel }[lang];
-            if (extra.hours) { dates = extra.hours; duration = ''; }   // V102.577: no start–end, no day count
-            ctx.fillText(dateLabel, 80, 500);
-            // V100.70: duration ("49 days"), same baseline as the label so the
-            // delicate two-line date wrap (V100.63) is untouched. Skipped instead of
-            // clipped if it would run into the signature line at x=390.
-            if (stage && stage.text) {
-                // V102.600: "28 / 40 วัน (days) · 70% · Progressing" + a thin bar instead of the day count
-                const labelW = ctx.measureText(dateLabel).width;
-                let px = 10;
-                ctx.font = `400 ${px}px ${FF}`;
-                while (80 + labelW + 10 + ctx.measureText(stage.text).width > 370 && px > 7) { px -= 0.5; ctx.font = `400 ${px}px ${FF}`; }
-                ctx.fillStyle = "#666";
-                ctx.fillText(stage.text, 80 + labelW + 10, 500);
-                if (stage.since) dates = stage.since;   // V102.612 (owner pick A): start + hours trained, no end date, no bar
-                else {
-                    ctx.fillStyle = "#e2e8f0"; ctx.fillRect(80, 504, 260, 3);
-                    ctx.fillStyle = GOLD; ctx.fillRect(80, 504, 260 * Math.max(0, Math.min(100, stage.pct || 0)) / 100, 3);
-                }
-                ctx.font = `bold 14px ${FF}`;
-                duration = '';
-            }
-            if (duration) {
-                const labelW = ctx.measureText(dateLabel).width;
-                ctx.font = `400 10px ${FF}`;
-                if (80 + labelW + 10 + ctx.measureText(duration).width < 370) {
-                    ctx.fillStyle = "#888";
-                    ctx.fillText(duration, 80 + labelW + 10, 500);
-                    ctx.fillStyle = "#222";
-                }
-            }
-
-            // V96.82: shrink-to-fit — the dual-calendar date string is long and must
-            // stay inside its own column, clear of the signature line.
-            ctx.fillStyle = "#222";
-            const fitDate = (s, px, minPx) => {
-                ctx.font = `600 ${px}px ${FF}`;
-                while (ctx.measureText(s).width > 280 && px > minPx) {
-                    px -= 1;
-                    ctx.font = `600 ${px}px ${FF}`;
-                }
+            const sx = 210, dx = 540, ly = 525;
+            const rule = cx => { ctx.beginPath(); ctx.moveTo(cx - 88, ly); ctx.lineTo(cx + 88, ly); ctx.strokeStyle = classic ? CERT_CLASSIC.line : "#aaa"; ctx.lineWidth = 1; ctx.stroke(); };
+            const fit = (t, px, minPx, maxW, weight) => {
+                ctx.font = `${weight} ${px}px ${FF}`;
+                while (ctx.measureText(t).width > maxW && px > minPx) { px -= 0.5; ctx.font = `${weight} ${px}px ${FF}`; }
                 return px;
             };
-            const dateStr = dates || "Pending Registration";
-            // V100.63: the 11px floor could not hold long months in both calendars
-            // ("1 สิงหาคม 2569 – 19 กันยายน 2569 (1 August … September 2026)") inside
-            // 280px, so it ran under the signature. Below 13px, break before the
-            // "(English)" half instead and fit each line on its own.
-            const dateSplit = dateStr.indexOf(' (');
-            if (fitDate(dateStr, 16, 13) >= 13 && ctx.measureText(dateStr).width <= 280) {
-                ctx.fillText(dateStr, 80, 530);
-            } else if (dateSplit > 0) {
-                fitDate(dateStr.slice(0, dateSplit), 15, 11);
-                ctx.fillText(dateStr.slice(0, dateSplit), 80, 521);
-                fitDate(dateStr.slice(dateSplit + 1), 15, 11);
-                ctx.fillText(dateStr.slice(dateSplit + 1), 80, 539);
-            } else {
-                fitDate(dateStr, 16, 11);
-                ctx.fillText(dateStr, 80, 530);
-            }
-
             // V102.614 (owner): a progress certificate leaves out the signature block and the QR box unless ✍️ Sign / ▢ QR are on
             const showSign = !stage || stage.sign, showQr = !stage || stage.qr;
-            // V96.84: real signature sitting on the line
+            ctx.textAlign = "center";
             if (showSign) {
-            if (CERT_SIGN.complete && CERT_SIGN.naturalWidth) {
-                const sigH = 52, sigW = sigH * CERT_SIGN.naturalWidth / CERT_SIGN.naturalHeight;
-                ctx.drawImage(CERT_SIGN, 480 - sigW / 2, 524 - sigH, sigW, sigH);
-            }
-
-            // Signature Line (V96.82: shifted right, clear of the date column and of
-            // the gold curve that moved inward with the narrower navy band)
-            ctx.beginPath();
-            ctx.moveTo(390, 525);
-            ctx.lineTo(570, 525);
-            ctx.strokeStyle = "#aaa";
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // V96.84: signer name + title under the line, centered; falls back to
-            // the old Issued-by caption when no signer is configured.
-            if (CERT_SIGNER.name) {
-                ctx.textAlign = "center";
-                ctx.font = "bold 12px Montserrat";
-                ctx.fillStyle = "#333";
-                ctx.fillText(CERT_SIGNER.name, 480, 541);
-                if (CERT_SIGNER.title && certBrandOn('co')) {
-                    ctx.font = "10px Montserrat";
-                    ctx.fillStyle = "#777";
-                    ctx.fillText(CERT_SIGNER.title, 480, 555);
+                // V102.616 (owner pick 7): the signature is the signer's name in Great Vibes, navy ink, in every language
+                let spx = 36;
+                ctx.font = `400 ${spx}px 'Great Vibes', cursive`;
+                while (ctx.measureText(CERT_SIGN_TEXT).width > 190 && spx > 22) { spx -= 1; ctx.font = `400 ${spx}px 'Great Vibes', cursive`; }
+                ctx.fillStyle = "#1e3a8a";
+                ctx.fillText(CERT_SIGN_TEXT, sx, ly - 9);
+                rule(sx);
+                if (CERT_SIGNER.name) {
+                    ctx.font = "bold 12px Montserrat"; ctx.fillStyle = "#333";
+                    ctx.fillText(CERT_SIGNER.name, sx, ly + 16);
+                    if (CERT_SIGNER.title && certBrandOn('co')) { ctx.font = "10px Montserrat"; ctx.fillStyle = "#777"; ctx.fillText(CERT_SIGNER.title, sx, ly + 30); }
+                } else if (certBrandOn('co')) {
+                    ctx.font = "italic 11px Montserrat"; ctx.fillStyle = "#777"; ctx.fillText("Issued by: MEDLIFE PLUS CO.,LTD.", sx, ly + 20);
                 }
-            } else {
-                ctx.font = "italic 11px Montserrat";
-                ctx.fillStyle = "#777";
-                if (certBrandOn('co')) ctx.fillText("Issued by: MEDLIFE PLUS CO.,LTD.", 390, 545);
             }
+            // the issue date; TH (EN) that does not fit on one line goes on two
+            const issued = (extra.issuedISO || certTodayISO());
+            const issuedText = certDateText(issued, issued);
+            ctx.fillStyle = "#222";
+            const cut = issuedText.indexOf(' (');
+            if (fit(issuedText, 16, 12, 236, '600') >= 12 && ctx.measureText(issuedText).width <= 236) ctx.fillText(issuedText, dx, ly - 8);
+            else if (cut > 0) {
+                fit(issuedText.slice(0, cut), 15, 11, 236, '600'); ctx.fillText(issuedText.slice(0, cut), dx, ly - 25);
+                const en = issuedText.slice(cut + 2, issuedText.endsWith(')') ? -1 : undefined);
+                fit(en, 13, 10, 236, '600'); ctx.fillText(en, dx, ly - 8);
+            } else ctx.fillText(issuedText, dx, ly - 8);
+            const bar = stage && stage.text && !stage.since;
+            if (bar) {   // V102.600: no time-clock hours → the line under the date is the progress bar
+                ctx.fillStyle = "#e2e8f0"; ctx.fillRect(dx - 88, ly - 1, 176, 3);
+                ctx.fillStyle = GOLD; ctx.fillRect(dx - 88, ly - 1, 176 * Math.max(0, Math.min(100, stage.pct || 0)) / 100, 3);
+            } else rule(dx);
+            ctx.fillStyle = "#333";
+            fit({ th: "วันที่ออกให้", en: "DATE ISSUED", both: "วันที่ออกให้ (DATE ISSUED)", ko: "발급일 (DATE ISSUED)" }[lang], 12, 9, 236, 'bold');
+            ctx.fillText({ th: "วันที่ออกให้", en: "DATE ISSUED", both: "วันที่ออกให้ (DATE ISSUED)", ko: "발급일 (DATE ISSUED)" }[lang], dx, ly + 16);
+            // what was trained by the issue date
+            const parts = stage && stage.text ? (stage.since ? [stage.since] : [dates, stage.text])   // progress (✓ print off = the usual period below)
+                : extra.hours ? [extra.hours]
+                : [dates, duration, certHoursDoneText(extra.hoursDone)];
+            const trained = parts.filter(Boolean);
+            ctx.fillStyle = "#777";
+            if (trained.length) {
+                const one = trained.join(' · ');
+                if (fit(one, 10, 8, 280, '400') >= 8 && ctx.measureText(one).width <= 280) ctx.fillText(one, dx, ly + 30);
+                else {   // two lines, one size: the period, then days · hours
+                    const l2 = trained.slice(1).join(' · ');
+                    const px = Math.min(fit(trained[0], 10, 7, 280, '400'), l2 ? fit(l2, 10, 7, 280, '400') : 10);
+                    ctx.font = `400 ${px}px ${FF}`;
+                    ctx.fillText(trained[0], dx, ly + 28);
+                    if (l2) ctx.fillText(l2, dx, ly + 39);
+                }
             }
 
             // 12. Verify QR + Certificate No. (V96.83: replaces the old random serial
@@ -65638,12 +65723,20 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // V100.75: the white card behind the QR was there for a quiet zone against
             // the navy band; on the ivory ground the dark modules already have plenty of
             // contrast on their own, so the card is dropped (module math unchanged).
-            const cardX = w - 112, cardY = h - 134, cardS = 68, qrS = 56;
+            let sealY = h * 0.66;   // 14's award anchor (V100.67) — declared here, the classic rosette lifts it
+            // V102.616: classic + Seal on = the QR sits in the white centre of the rosette (bottom right), SCAN TO VERIFY on its rim
+            const inSeal = classic && certBrandOn('seal'), rx = w - 112, ry = h - 140;
+            if (inSeal) {
+                certClassicRosette(ctx, rx, ry, BAND, stage ? 'IN PROGRESS' : (certNo || showQr) ? 'SCAN TO VERIFY' : 'CERTIFIED', !!certNo || showQr);
+                sealY -= 64;   // special awards stack above the rosette
+            }
+            const qrS = inSeal ? 44 : 56, cardS = 68, cardX = inSeal ? rx - 6 - qrS / 2 : w - 112, cardY = inSeal ? ry - 6 - qrS / 2 : h - 134;
             if (certNo) {
                 ctx.textAlign = "left";
                 ctx.font = "bold 10px Montserrat";
                 ctx.fillStyle = "#555";
-                ctx.fillText(`Certificate No. ${certNo}`, 80, 557);
+                ctx.textAlign = "center"; ctx.font = "bold 8.5px Montserrat";
+                ctx.fillText(`Certificate No. ${certNo}`, sx, ly + 41);   // V102.616: under the signature column
                 if (typeof qrcode === 'function') {
                     try {
                         const qr = qrcode(0, 'M');
@@ -65660,14 +65753,15 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     } catch (e) { console.error('QR draw failed:', e); }
                 }
             } else if (showQr) {
+                const ph = inSeal ? qrS : 60, po = inSeal ? 6 : 4, mid = inSeal ? rx : cardX + cardS / 2;
                 ctx.fillStyle = "rgba(0,0,0,0.05)";
-                ctx.fillRect(cardX + 4, cardY + 4, 60, 60);
+                ctx.fillRect(cardX + po, cardY + po, ph, ph);
                 ctx.strokeStyle = "rgba(0,0,0,0.1)";
-                ctx.strokeRect(cardX + 4, cardY + 4, 60, 60);
+                ctx.strokeRect(cardX + po, cardY + po, ph, ph);
                 ctx.textAlign = "center";
-                ctx.font = "7px Montserrat";
+                ctx.font = `${inSeal ? 6 : 7}px Montserrat`;
                 ctx.fillStyle = "#888";
-                ctx.fillText(stage ? "Progress · no number" : "QR on export", cardX + cardS / 2, cardY + 37);
+                ctx.fillText(stage ? "Progress · no number" : "QR on export", mid, inSeal ? ry + 2 : cardY + 37);
             }
             // V100.67: say what the QR is for, in the certificate's language (also on the
             // preview, so the admin sees the real layout before exporting).
@@ -65675,11 +65769,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // ground, so it switches to the same dark grey "Certificate No." already uses.
             ctx.fillStyle = "#555";
             ctx.textAlign = "center";
-            if (lang !== 'th' && !stage) {
+            if (lang !== 'th' && !stage && !inSeal) {
                 ctx.font = "bold 7px Montserrat";
                 ctx.fillText("SCAN TO VERIFY", cardX + cardS / 2, cardY + cardS + 9);
             }
-            if (lang !== 'en' && !stage) {
+            if (lang !== 'en' && !stage && !inSeal) {
                 ctx.font = `400 6.5px ${FF}`;
                 ctx.fillText(lang === 'ko' ? CERT_KO.scan : "สแกนเพื่อตรวจสอบ", cardX + cardS / 2, cardY + cardS + (lang === 'th' ? 10 : 17));
             }
@@ -65688,7 +65782,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // every certificate regardless of awards, so it said nothing; a redesign is
             // pending. Its spot is kept as the anchor for the special awards below
             // (V100.67: 0.70h → 0.66h so the first badge clears the raised QR card).
-            const sealX = w * 0.85, sealY = h * 0.66;
+            const sealX = w * 0.85;
 
             // 14. Optional Special Award Seals (Multi-stack)
             // V100.74: badge overhaul — all 8 are one shared "medallion" now, per the
@@ -65910,7 +66004,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const since = stage && printIt && certUser ? certSinceText(document.getElementById('cert-start').value, certUser.hoursDone) : '';
             if (since) Object.assign(stage, { text: CERT_STAGES[k].name, since });
             if (stage) Object.assign(stage, { sign: certProgOn('sign'), qr: certProgOn('qr') });
-            return { hours: hrs ? certHoursText(hrs.hours, hrs.at) : '', skills, stage };
+            return { hours: hrs ? certHoursText(hrs.hours, hrs.at) : '', skills, stage, hoursDone: certUser ? certUser.hoursDone : 0 };
         }
 
         // V96.74: which wording the preview + PDF use. Chip rail, per house style.
@@ -75503,12 +75597,8 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                         pct !== null ? `${pct}%` : null,
                         pts !== null ? `+${pts} pts` : null
                     ].filter(Boolean).join(' · ');
-                    quizResultHtml = `<div style="margin-bottom:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                        <span style="font-size:0.75em; font-weight:700; color:#475569; white-space:nowrap;">📊 Quiz Result</span>
-                        <span id="qfp-res-${f.id}" onclick="this.style.filter='none'; this.nextElementSibling.style.display='none';" style="filter:blur(5px); cursor:pointer; font-size:0.82em; font-weight:800; color:#1e293b; background:#f1f5f9; padding:2px 10px; border-radius:6px; user-select:none; transition:filter 0.3s;" title="Click to show the quiz result" data-th-title="คลิกเพื่อแสดงผลสอบ">${resultText}</span>
-                        <span onclick="document.getElementById('qfp-res-${f.id}').style.filter='none'; this.style.display='none';" style="font-size:0.7em; color:#94a3b8; cursor:pointer; white-space:nowrap;">🔒 reveal</span>
-                        </details>
-                    </div>`;
+                    // V102.618 (owner pick B+C): the result is one blurred chip on the name row — tap to show; % and points in the tooltip
+                    quizResultHtml = `<span id="qfp-res-${f.id}" class="qfp-res" onclick="this.classList.add('on')" title="Quiz result ${resultText} — tap to show" data-th-title="ผลสอบ — แตะเพื่อดู">${correct}/${total}</span>`;
                 }
                 // V102.259: three rows — who · facts · actions / the comment / next topic + AI. The green "Bonus +x" badge was the QUIZ score the feedback copied (pointsEarned), so it is now 📝.
                 const sig = qfpSignal(f);
@@ -75519,7 +75609,6 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                 const credited = Number(f.addOnCredited) > 0;
                 const legacy = !credited && typeof f.adminExtraScore === 'number' && f.adminExtraScore > 0;
                 const pills = [
-                    typeof f.rating === 'number' ? mkPill('⭐ ' + f.rating + (rawComment ? '' : ' 👍'), '#f8fafc', '#475569', 'Rating ' + f.rating + '/10') : '',
                     typeof f.pointsEarned === 'number' && f.pointsEarned > 0 ? mkPill('📝 +' + f.pointsEarned.toFixed(1), '#f8fafc', '#475569', 'Quiz points this user earned on this quiz (copied when the feedback was sent). It is NOT a bonus.') : '',
                     credited ? mkPill('🎁 +' + Number(f.addOnCredited).toFixed(2), '#f8fafc', '#475569', 'Feedback add-on credited to this user') : '',
                     legacy ? mkPill('⚠️ ' + f.adminExtraScore, '#fee2e2', '#991b1b', 'A bonus of ' + f.adminExtraScore + ' was recorded before the add-on rules and never credited. Press 🎁 and save a number within the cap to credit it.', true) : '',
@@ -75529,21 +75618,23 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                         : mkPill('🕒 ' + sig.days + 'd', '#f1f5f9', '#64748b', `Feedback given ${sig.days} days ago · no add-on credited yet`, true)) : '',
                 ].filter(Boolean).join('');
                 const nt = qfpNormalizeTopic(f.nextTopic);
+                // V102.618 (owner pick B+C): one line — rating tile · name · facts · time · buttons (faint until the card is hovered); the band colours the card
+                const band = typeof f.rating !== 'number' ? 'none' : f.rating >= 8 ? 'hi' : f.rating >= 5 ? 'mid' : 'lo';
+                const rateTile = `<span class="qfp-rate" title="${typeof f.rating === 'number' ? 'Rating ' + f.rating + '/10' + (rawComment ? '' : ' · no comment') : 'No rating'}" data-th-title="${rawComment ? 'คะแนนความพึงพอใจ' : 'ให้คะแนนอย่างเดียว ไม่มีความคิดเห็น'}">${typeof f.rating === 'number' ? f.rating : '–'}${rawComment ? '' : '<i>👍</i>'}</span>`;
                 return `
-                    <div data-fb-user="${f.userId || ''}" style="background:#fff;border:1px solid #eef0f3;border-left:2px solid ${sig && sig.kind === 'ended' ? '#fca5a5' : '#f9a8d4'};border-radius:14px;padding:14px 18px;">
+                    <div data-fb-user="${f.userId || ''}" class="qfp-card qfp-band-${band}"${sig && sig.kind === 'ended' ? ' style="border-left:2px solid #fca5a5;"' : ''}>
                         <div class="qfp-card-row">
-                            <span class="qfp-card-name">${qfpEscapeHtml(f.displayName || 'Anonymous')}</span>${fbTriageChip(f)}${pills}
+                            ${rateTile}<span class="qfp-card-name">${qfpEscapeHtml(f.displayName || 'Anonymous')}</span>${fbTriageChip(f)}${quizResultHtml}${pills}
                             <span style="flex:1;"></span>
-                            <span class="qfp-meta"><span style="font-size:0.72em;color:#94a3b8;white-space:nowrap;" title="${dateStr} · time used ${mins}:${String(secs).padStart(2,'0')}">${dateShort} · ⏱ ${mins}:${String(secs).padStart(2,'0')}</span>
+                            <span class="qfp-meta"><span style="font-size:0.72em;color:#94a3b8;white-space:nowrap;" title="${dateStr} · time used ${mins}:${String(secs).padStart(2,'0')}">${dateShort} · ${mins}:${String(secs).padStart(2,'0')}</span>
                             <span class="qfp-acts">${f.userId && f.userId !== 'anon' ? mkBtn('', '📜', 'Score history and sources', `showUserScoreAudit('${f.userId}', ${qfpEscapeHtml(JSON.stringify(f.displayName || ''))})`) : ''}
                             <button id="qfp-bonus-btn-${f.id}" type="button" class="qfp-ib"${addOnOn ? '' : ' disabled'} onclick="qfpToggleBonus('${f.id}')" title="${addOnOn ? 'Credit a feedback add-on to this user (max ' + qfpAddOnCap(f) + ' — never more than the quiz points, never 1.0+; once per quiz)' : 'No add-on: needs a rating or a comment (a 10/10 with no comment does not count)'}" aria-label="Feedback add-on">🎁${adminScoreValue !== '' ? ' ' + adminScoreValue : ''}</button>
                             <button id="qfp-ai-btn-${f.id}" type="button" class="qfp-ib" onclick="runAIFeedbackScoring('${f.id}')" ${!rawComment ? 'disabled title="No comment to evaluate" data-th-title="ไม่มีข้อความให้ประเมิน"' : 'title="AI-score this comment"'} aria-label="AI score">🗡️</button>
                             <button type="button" class="qfp-ib qfp-ib-del" onclick="deleteQuizFeedbackItem('${f.id}')" title="Delete this feedback (asks to confirm)" data-th-title="ลบผลตอบรับนี้ โดยจะขอยืนยัน" aria-label="Delete feedback">🗑</button></span></span>
                         </div>
-                        ${rawComment ? `<div class="lang-no-toggle" style="margin-top:6px;font-size:0.85em;color:#475569;background:#fdf8f1;padding:8px 12px;border-radius:8px;border-left:3px solid #e7d8c4;white-space:pre-wrap;">${safeComment}</div>` : '<p title="No comment provided" data-th-title="ผู้ตอบไม่ได้กรอกความคิดเห็น" style="color:#80566a;margin:6px 0 0;font-size:0.85em;">No comment provided</p>'}
+                        ${rawComment ? `<div class="lang-no-toggle qfp-cm">${safeComment}</div>` : ''}
                         ${qfpFlagsHtml(f)}
-                        ${quizResultHtml}
-                        ${(nt || hasAiReview) ? `<div style="margin-top:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:0.82em;">${nt ? `<span class="lang-no-toggle" style="color:#6d28d9;font-weight:700;" title="Next topic requested">🎯 ${qfpEscapeHtml(nt)}</span>` : ''}<span style="flex:1;"></span>${hasAiReview ? `<span onclick="var e=document.getElementById('qfp-ai-review-${f.id}');e.style.display=e.style.display==='none'?'block':'none'" title="🗡️ ${aiScoreText} — tap to show the issue and the suggestion" style="font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;background:#e0e7ff;color:#3730a3;cursor:pointer;">🗡️ ${f.aiFeedbackScore.toFixed(1)} · 💡</span>` : ''}</div>` : ''}
+                        ${(nt || hasAiReview) ? `<div class="qfp-sub" style="margin-top:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:0.82em;">${nt ? `<span class="lang-no-toggle" style="color:#6d28d9;font-weight:700;" title="Next topic requested">🎯 ${qfpEscapeHtml(nt)}</span>` : ''}<span style="flex:1;"></span>${hasAiReview ? `<span onclick="var e=document.getElementById('qfp-ai-review-${f.id}');e.style.display=e.style.display==='none'?'block':'none'" title="🗡️ ${aiScoreText} — tap to show the issue and the suggestion" style="font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;background:#e0e7ff;color:#3730a3;cursor:pointer;">🗡️ ${f.aiFeedbackScore.toFixed(1)} · 💡</span>` : ''}</div>` : ''}
                         <div id="qfp-ai-review-${f.id}" style="margin-top:6px; font-size:0.8em; color:#334155; background:#eef2ff; border:1px solid #c7d2fe; border-radius:8px; padding:8px 10px; line-height:1.5; display:none;">
                             ${hasAiReview ? `<div><b>🗡️</b> ${aiScoreText}</div>
                             ${aiIssue ? `<div><b>Issue:</b> ${aiIssue}</div>` : ''}
