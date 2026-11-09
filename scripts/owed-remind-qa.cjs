@@ -103,7 +103,7 @@ const D = 864e5;
     assert.deepEqual(await rows(), ['journal', 'case', 'article:a1', 'article:a2'], 'weekday evening rows: ' + await rows());
     let txt = await sheetText();
     assert.match(txt, /4 things waiting for you/, txt);
-    assert.match(txt, /Journal not sent today/); assert.match(txt, /EN a1/); assert.match(txt, /Write Journal/); assert.match(txt, /Once a day/); assert.match(txt, /Sound on/);
+    assert.match(txt, /Journal not sent today/); assert.match(txt, /ไทย a1/);   /* V101.301: article titles in Thai first */ assert.match(txt, /Write Journal/); assert.match(txt, /Once a day/); assert.match(txt, /Sound on/);
     const fit = await page.evaluate(() => {
       const s = document.getElementById('ord-sheet').getBoundingClientRect();
       const small = Array.from(document.querySelectorAll('#ord-sheet button')).filter(b => b.getBoundingClientRect().height < 44).map(b => b.id || b.className);

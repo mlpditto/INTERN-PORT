@@ -38,6 +38,7 @@ const D = 864e5, BKK = 7 * 3600e3;
     await page.route('**/*', r => r.request().url().startsWith('file:') ? r.continue() : r.abort());
     await page.goto(pathToFileURL(path.resolve('public/index.html')).href, { waitUntil: 'load' });
     await page.waitForFunction(() => window.internArticles && typeof renderUnifiedHistory === 'function');
+    assert.equal(await page.evaluate(() => internArticles._S.cl), 'th', 'V101.301 (owner): an article opens in Thai'); await page.evaluate(() => { internArticles._S.cl = 'en'; });   // the checks below read the English copy
     await page.evaluate(() => {
       document.getElementById('main-app').style.setProperty('display', 'block', 'important');
       const ov = document.getElementById('loading-overlay'); if (ov) ov.style.setProperty('display', 'none', 'important');
@@ -63,10 +64,14 @@ const D = 864e5, BKK = 7 * 3600e3;
         pickToday: A._pick([live], Object.assign({}, me, { articlePopDay: A._bkkDay(now) }), now),
         pickMuted: A._pick([live], Object.assign({}, me, { articlesMuted: true }), now),
         text: [A._textOf({ title: { en: 'E', th: 'ไทย' }, body: { en: 'b', th: 'ข' } }, 'th').title, A._textOf({ title: { en: 'E', ko: 'K' }, body: { en: 'b' } }, 'ko').lang],
+        // V101.301 (owner): Thai first when the asked language is missing; a Codex pill named like the article says what it is instead of the title again
+        thFirst: A._textOf({ title: { en: 'E', th: 'ไทย' }, body: { en: 'b', th: 'ข' } }, 'ko').lang,
+        pills: (() => { const d = document.createElement('div'); d.innerHTML = A._linksHtml({ id: 'p', title: { en: 'Think Porphyria', th: 'คิดถึง Porphyria' }, dc: { publishedId: 'c', name: 'think porphyria ' }, dx: { publishedId: 'x', name: 'Acute porphyria' }, links: [{ kind: 'codex', id: 'h', label: 'คิดถึง Porphyria' }] }); return [...d.querySelectorAll('.art-link')].map(b => b.textContent); })(),
         hist: A._historyItems([live, old, art('cu', { audience: { divisions: ['CU'], groups: [] } })], Object.assign({}, me, { articleSeen: { old: { act: 'quiz', at: now - 35 * D, saved: true } } }), now).map(i => i.id + ':' + i.metadata.state + ':' + i.metadata.saved + ':' + i.noDelete)
       };
     }, { D, BKK });
     assert.deepEqual(p.kind, ['live', '', 'live', '', '', '', 'rerun', '', ''], 'kind: live · other division · group match · not started · draft · ended before me · rerun for a newer intern · rerun off · no join date: ' + p.kind);
+assert.deepEqual([p.thFirst, p.pills], ['th', ['🩺 Acute porphyria', '💊 Drug Codex', '💊 Drug Codex']], 'V101.301: Thai first; a pill that would repeat the title names its kind');
     assert.equal(p.pickLive, 'live', 'a live article goes before the re-runs');
     assert.deepEqual(p.pickOldest, ['older', 'rerun'], 're-runs come oldest first');
     assert.equal(p.pickDone, 'old', 'a read article never comes back (the next one does)');
