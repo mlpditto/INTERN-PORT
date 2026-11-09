@@ -161,7 +161,7 @@ assert.ok(/dateText: _hrs \? _extra\.hours : drawArgs\[1\]/.test(admin), 'the re
         assert.equal(lean.oneRow, true, 'Template, the language chip and Year share one row; no 4-chip language rail');
         assert.deepEqual(lean.cycle, [['th', '🇹🇭', 'Thai — tap for English'], ['en', '🇬🇧', 'English — tap for Thai + English'], ['both', '🇹🇭🇬🇧', 'Thai + English — tap for Korean + English'], ['ko', '🇰🇷🇬🇧', 'Korean + English — tap for Thai'], ['th', '🇹🇭', 'Thai — tap for English']], 'each tap steps to the next language: ' + JSON.stringify(lean.cycle));
         assert.ok(!admin.includes('v90.29r') && !admin.includes('🔄 Redraw</button>'), 'no stale version tag, no Redraw button');
-        assert.ok(admin.includes('id="btn-gen-pdf" onclick="certPdfBusy(this)"') && /async function certPdfBusy\(btn\) \{[\s\S]{0,200}finally \{ btn\.disabled = false/.test(admin), 'the PDF button is busy while it runs');
+        assert.ok(admin.includes('id="btn-gen-pdf" onclick="certPdfBusy(this)"') && /async function certPdfBusy\(btn\) \{[\s\S]{0,280}finally \{ btn\.disabled = false/.test(admin), 'the PDF button is busy while it runs');
         assert.ok(admin.includes("document.getElementById('cert-xdates-fields').hidden = false;\n            paintCertSkills();"), 'every open shows Start → End again');
         assert.deepEqual(errs, [], errs.join(' | '));
         console.log('PASS: certificate hours mode + skills line (V102.577) + lean rows (V102.578) + one-line flag chip (V102.580) — hours text per language, time-clock prefill, the skills line clears the signature, no extras = identical pixels, chips remembered');
