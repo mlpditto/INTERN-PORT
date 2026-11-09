@@ -17,7 +17,7 @@ assert.equal((html.match(/tryDailyCheckin\('open'\)/g) || []).length, 1, 'one au
 const fnSrc = slice('        async function tryDailyCheckin(source) {', '        function collectReflectiveMetrics(logs) {');
 assert.ok(fnSrc.includes("const btn = (source == null || source === 'manual') ? document.getElementById('daily-checkin-btn') : null;"), "'open' never touches the chip");
 assert.ok(fnSrc.includes("source: source === 'open' ? 'open' : (isManual ? 'manual' : 'activity')"), "checkin_logs.source = 'open'");
-assert.ok(fnSrc.includes("if (source === 'open') showToast("), 'toast only for the auto path');
+assert.ok(fnSrc.includes("if (source === 'open') { showToast("), 'toast only for the auto path');
 
 (async () => {
     // run the real function three times against a stub transaction
@@ -29,7 +29,7 @@ assert.ok(fnSrc.includes("if (source === 'open') showToast("), 'toast only for t
             document: { body: { classList: { contains: () => false } }, getElementById: id => id === 'daily-checkin-btn' ? { set disabled(v) { ctx.buttonTouched = true; }, set textContent(v) { ctx.buttonTouched = true; } } : null },
             ensureFirebaseAuthReady: async () => ({ uid: 'u1' }), requireRegistered: () => true,
             getBangkokDateTimeParts: (d) => ({ dateKey: (d ? '2026-10-07' : '2026-10-08') }),
-            renderDailyCheckinCard: () => {}, showToast: m => ctx.toasts.push(m), console,
+            renderDailyCheckinCard: () => {}, showToast: m => ctx.toasts.push(m), toastCountdown: () => {}, console,
             firebase: { firestore: { FieldValue: { serverTimestamp: () => 'ts', increment: n => ({ inc: n }) } } },
             db: { collection: name => ({ doc: id => ({ name, id }) }), runTransaction: async fn => fn({
                 get: async ref => ref.name === 'checkin_logs' ? { exists } : { exists: true, data: () => ({ checkinLastDate: '2026-10-07', checkinCurrentStreak: 4, checkinBestStreak: 9 }) },

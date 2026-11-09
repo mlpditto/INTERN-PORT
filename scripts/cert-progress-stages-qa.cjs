@@ -109,7 +109,7 @@ assert.ok(admin.includes("certStagePick = 'auto';"), 'every open starts on Auto'
         assert.ok(!['M', 'E', 'D', 'C', 'R', 'T'].some(ch => midNoSeal.calls.some(c => c.t === ch && c.y < 140)), 'Mid + Seal off: no seal');
         assert.notEqual(midNoSeal.png, mid.png, 'the Seal chip changes the progress certificate');
         await page.evaluate(() => toggleCertBrand('seal'));
-        assert.ok(has(mid, '28 / 40 วัน (days) · 70% · Progressing') && !has(mid, '40 วัน / 40 days'), 'progress line replaces the day count');
+        assert.ok(has(mid, '28 / 40 วัน (days) · 70% · Progressing') && !mid.calls.some(c => c.t.includes('40 วัน / 40 days')), 'progress line replaces the day count');
         assert.ok(!has(mid, 'SCAN TO VERIFY') && !has(mid, 'Progress · no number'), 'no scan-to-verify, no QR box on a progress certificate by default');
         // V102.614 (owner: "in progress ยังไม่ต้องมี QR กับ ลายเซ็น ให้เลือกได้"): ✍️ Sign / ▢ QR are off unless turned on; Completed keeps both
         assert.ok(!has(mid, 'Managing Pharmacist') && has(plain, 'Managing Pharmacist') && has(plain, 'QR on export'), 'progress: no signature block by default; Completed: signature + QR box');
@@ -129,9 +129,9 @@ assert.ok(admin.includes("certStagePick = 'auto';"), 'every open starts on Auto'
         const early = await draw({ hours: '', skills: [], stage: { key: 'early', text: '10 / 40 วัน (days) · 25% · In progress · early stage', pct: 25 } });
         assert.ok(has(early, 'OF PARTICIPATION · IN PROGRESS') && has(early, 'กำลังอยู่ระหว่างการฝึกงาน') && has(early, 'IN PROGRESS'), 'Early wording + watermark');
         const off = await draw({ hours: '', skills: [], stage: { key: 'mid', text: '', pct: 70 } });
-        assert.ok(has(off, '40 วัน / 40 days') && !off.calls.some(c => /70%/.test(c.t)), 'print off: the usual day count, no progress line');
+        assert.ok(off.calls.some(c => c.t.includes('40 วัน / 40 days')) && !off.calls.some(c => /70%/.test(c.t)), 'print off: the usual day count, no progress line');
         const hrsMid = await draw({ hours: '112 ชั่วโมง · 15 พฤศจิกายน 2569', skills: [], stage: { key: 'mid', text: '112 / 160 ชม. (hours) · 70% · Progressing', pct: 70 } });
-        assert.ok(has(hrsMid, 'วันที่ (DATE)') && !has(hrsMid, 'ฝึกงานครบ (COMPLETED)'), 'hours mode below 100% keeps the DATE label (not COMPLETED)');
+        assert.ok(has(hrsMid, 'วันที่ออกให้ (DATE ISSUED)') && has(hrsMid, '112 / 160 ชม. (hours) · 70% · Progressing'), 'hours mode below 100%: DATE ISSUED + the progress line');
         // V102.612 (owner pick A): time-clock hours → "เริ่ม … · ผ่านการฝึก n ชม." in place of the end date, no bar; no hours → range + bar
         const sn = await page.evaluate(() => {
             const fixed = new Date('2026-11-08T10:00:00').getTime(); Date.now = () => fixed;
@@ -156,17 +156,17 @@ assert.ok(admin.includes("certStagePick = 'auto';"), 'every open starts on Auto'
         const barAt = (extra) => page.evaluate((extra) => {
             const c = document.createElement('canvas'); c.width = CERT_BASE_WIDTH; c.height = CERT_BASE_HEIGHT;
             const ctx = c.getContext('2d'), rects = [], texts = [];
-            const fr = ctx.fillRect.bind(ctx); ctx.fillRect = (x, y, ww, hh) => { if (Math.round(y + ctx.getTransform().f) === 504 && hh === 3) rects.push(ww); return fr(x, y, ww, hh); };
+            const fr = ctx.fillRect.bind(ctx); ctx.fillRect = (x, y, ww, hh) => { if (Math.round(y + ctx.getTransform().f) === 524 && hh === 3) rects.push(ww); return fr(x, y, ww, hh); };
             const ft = ctx.fillText.bind(ctx); ctx.fillText = (t, x, y, ...r) => { texts.push(String(t)); return ft(t, x, y, ...r); };
             drawCertificate(ctx, 'Sample Intern', '19 ตุลาคม 2569 – 27 พฤศจิกายน 2569 (19 October 2026 – 27 November 2026)', [], 1, 0, 'internship', 'en', null, {}, '40 วัน / 40 days', extra);
             return { rects, texts };
         }, extra);
         const withHrs = await barAt({ hours: '', skills: [], stage: sn.both });
         assert.deepEqual(withHrs.rects, [], 'A: no progress bar');
-        assert.ok(withHrs.texts.includes('เริ่ม 19 ตุลาคม 2569 · ผ่านการฝึก 86 ชม.') && withHrs.texts.includes('(Started 19 October 2026 · 86 hours trained)'), 'A: start + hours on two lines: ' + withHrs.texts.filter(t => /2569|2026/.test(t)).join(' | '));
-        assert.ok(!withHrs.texts.some(t => /27 November|27 พฤศจิกายน/.test(t)) && withHrs.texts.includes('Progressing'), 'A: no end date, small line = stage only');
+        assert.ok(withHrs.texts.includes('เริ่ม 19 ตุลาคม 2569 · ผ่านการฝึก 86 ชม. (Started 19 October 2026 · 86 hours trained)'), 'A: start + hours under DATE ISSUED (V102.616): ' + withHrs.texts.filter(t => /2569|2026/.test(t)).join(' | '));
+        assert.ok(!withHrs.texts.some(t => /27 November|27 พฤศจิกายน/.test(t)) && withHrs.texts.includes('DATE ISSUED'), 'A: no end date');
         const noHrs = await barAt({ hours: '', skills: [], stage: { key: 'mid', text: '21 / 40 days · 52% · Progressing', pct: 52 } });
-        assert.equal(noHrs.rects.length, 2, 'no hours: the bar stays');
+        assert.equal(noHrs.rects.length, 2, 'no hours: the bar stays (V102.616: it is the line under the issue date)');
         assert.ok(noHrs.texts.some(t => /27 November 2026/.test(t)), 'no hours: the date range stays');
 
         // 4. 🏅 Badges (owner pick A): the real badge art + tier helpers, best tier first, one row under Skills, and the canvas still exports (PDF)
