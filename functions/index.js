@@ -350,6 +350,18 @@ exports.getLeaderboard = onCall(async (request) => {
     return { rows, count: rows.length };
 });
 
+// V101.295 (owner 2026-11-08): 🎂 today's and in-3-days birthdays for every signed-in intern — nickname + month-day only (no year,
+// no age), active members who have not hidden theirs (users.birthdayHidden). The intern page turns the snow into confetti for
+// everyone on a birthday and toasts "🎂 อีก 3 วัน (DD MONTH) วันเกิด USER" / "🎉 วันนี้วันเกิด USER". See functions/birthdays.js.
+exports.getBirthdays = onCall(async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
+    const bd = require('./birthdays');
+    const snap = await admin.firestore().collection('users')
+        .select('birthday', 'birthdayHidden', 'nickName', 'firstName', 'isIgnored', 'notAnInternship', 'startDate', 'endDate').get();
+    const today = bd.bangkokToday();
+    return { today, items: bd.birthdaysAround(snap.docs.map((d) => Object.assign({ id: d.id }, d.data())), today, isActiveMember) };
+});
+
 // === V94.68: server-side quiz deadline auto-shrink (capped at 50%) ===
 // Each non-practice quiz submission pulls the quiz `deadline` in by 10% of the
 // time still remaining — but never past 50% of the original window. This used
