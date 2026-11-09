@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.615)</title>
+    <title>Nika Admin (V102.618)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -8740,7 +8740,7 @@
 <link rel="stylesheet" href="quiz-compare-cleanup.css?v=V100.02">
 <link rel="stylesheet" href="learning-review.css?v=V100.13">
 <link rel="stylesheet" href="delete-requests.css?v=V100.40">
-<link rel="stylesheet" href="quiz-feedback.css?v=V102.357">
+<link rel="stylesheet" href="quiz-feedback.css?v=V102.618">
 <script src="assigned-goals.js?v=V100.30"></script><link rel="stylesheet" href="assigned-goals.css?v=V100.30">
 <!-- V100.82: hub-progress-menu.js/.css retired — its only 2 items (Goals,
      Certificates) moved into the global ➕ Create menu; nothing else used this
@@ -75503,12 +75503,8 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                         pct !== null ? `${pct}%` : null,
                         pts !== null ? `+${pts} pts` : null
                     ].filter(Boolean).join(' · ');
-                    quizResultHtml = `<div style="margin-bottom:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                        <span style="font-size:0.75em; font-weight:700; color:#475569; white-space:nowrap;">📊 Quiz Result</span>
-                        <span id="qfp-res-${f.id}" onclick="this.style.filter='none'; this.nextElementSibling.style.display='none';" style="filter:blur(5px); cursor:pointer; font-size:0.82em; font-weight:800; color:#1e293b; background:#f1f5f9; padding:2px 10px; border-radius:6px; user-select:none; transition:filter 0.3s;" title="Click to show the quiz result" data-th-title="คลิกเพื่อแสดงผลสอบ">${resultText}</span>
-                        <span onclick="document.getElementById('qfp-res-${f.id}').style.filter='none'; this.style.display='none';" style="font-size:0.7em; color:#94a3b8; cursor:pointer; white-space:nowrap;">🔒 reveal</span>
-                        </details>
-                    </div>`;
+                    // V102.618 (owner pick B+C): the result is one blurred chip on the name row — tap to show; % and points in the tooltip
+                    quizResultHtml = `<span id="qfp-res-${f.id}" class="qfp-res" onclick="this.classList.add('on')" title="Quiz result ${resultText} — tap to show" data-th-title="ผลสอบ — แตะเพื่อดู">${correct}/${total}</span>`;
                 }
                 // V102.259: three rows — who · facts · actions / the comment / next topic + AI. The green "Bonus +x" badge was the QUIZ score the feedback copied (pointsEarned), so it is now 📝.
                 const sig = qfpSignal(f);
@@ -75519,7 +75515,6 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                 const credited = Number(f.addOnCredited) > 0;
                 const legacy = !credited && typeof f.adminExtraScore === 'number' && f.adminExtraScore > 0;
                 const pills = [
-                    typeof f.rating === 'number' ? mkPill('⭐ ' + f.rating + (rawComment ? '' : ' 👍'), '#f8fafc', '#475569', 'Rating ' + f.rating + '/10') : '',
                     typeof f.pointsEarned === 'number' && f.pointsEarned > 0 ? mkPill('📝 +' + f.pointsEarned.toFixed(1), '#f8fafc', '#475569', 'Quiz points this user earned on this quiz (copied when the feedback was sent). It is NOT a bonus.') : '',
                     credited ? mkPill('🎁 +' + Number(f.addOnCredited).toFixed(2), '#f8fafc', '#475569', 'Feedback add-on credited to this user') : '',
                     legacy ? mkPill('⚠️ ' + f.adminExtraScore, '#fee2e2', '#991b1b', 'A bonus of ' + f.adminExtraScore + ' was recorded before the add-on rules and never credited. Press 🎁 and save a number within the cap to credit it.', true) : '',
@@ -75529,21 +75524,23 @@ ${JSON.stringify(items.map(c => ({ tag: c.tag, quiz: String(c.quizTitle).slice(0
                         : mkPill('🕒 ' + sig.days + 'd', '#f1f5f9', '#64748b', `Feedback given ${sig.days} days ago · no add-on credited yet`, true)) : '',
                 ].filter(Boolean).join('');
                 const nt = qfpNormalizeTopic(f.nextTopic);
+                // V102.618 (owner pick B+C): one line — rating tile · name · facts · time · buttons (faint until the card is hovered); the band colours the card
+                const band = typeof f.rating !== 'number' ? 'none' : f.rating >= 8 ? 'hi' : f.rating >= 5 ? 'mid' : 'lo';
+                const rateTile = `<span class="qfp-rate" title="${typeof f.rating === 'number' ? 'Rating ' + f.rating + '/10' + (rawComment ? '' : ' · no comment') : 'No rating'}" data-th-title="${rawComment ? 'คะแนนความพึงพอใจ' : 'ให้คะแนนอย่างเดียว ไม่มีความคิดเห็น'}">${typeof f.rating === 'number' ? f.rating : '–'}${rawComment ? '' : '<i>👍</i>'}</span>`;
                 return `
-                    <div data-fb-user="${f.userId || ''}" style="background:#fff;border:1px solid #eef0f3;border-left:2px solid ${sig && sig.kind === 'ended' ? '#fca5a5' : '#f9a8d4'};border-radius:14px;padding:14px 18px;">
+                    <div data-fb-user="${f.userId || ''}" class="qfp-card qfp-band-${band}"${sig && sig.kind === 'ended' ? ' style="border-left:2px solid #fca5a5;"' : ''}>
                         <div class="qfp-card-row">
-                            <span class="qfp-card-name">${qfpEscapeHtml(f.displayName || 'Anonymous')}</span>${fbTriageChip(f)}${pills}
+                            ${rateTile}<span class="qfp-card-name">${qfpEscapeHtml(f.displayName || 'Anonymous')}</span>${fbTriageChip(f)}${quizResultHtml}${pills}
                             <span style="flex:1;"></span>
-                            <span class="qfp-meta"><span style="font-size:0.72em;color:#94a3b8;white-space:nowrap;" title="${dateStr} · time used ${mins}:${String(secs).padStart(2,'0')}">${dateShort} · ⏱ ${mins}:${String(secs).padStart(2,'0')}</span>
+                            <span class="qfp-meta"><span style="font-size:0.72em;color:#94a3b8;white-space:nowrap;" title="${dateStr} · time used ${mins}:${String(secs).padStart(2,'0')}">${dateShort} · ${mins}:${String(secs).padStart(2,'0')}</span>
                             <span class="qfp-acts">${f.userId && f.userId !== 'anon' ? mkBtn('', '📜', 'Score history and sources', `showUserScoreAudit('${f.userId}', ${qfpEscapeHtml(JSON.stringify(f.displayName || ''))})`) : ''}
                             <button id="qfp-bonus-btn-${f.id}" type="button" class="qfp-ib"${addOnOn ? '' : ' disabled'} onclick="qfpToggleBonus('${f.id}')" title="${addOnOn ? 'Credit a feedback add-on to this user (max ' + qfpAddOnCap(f) + ' — never more than the quiz points, never 1.0+; once per quiz)' : 'No add-on: needs a rating or a comment (a 10/10 with no comment does not count)'}" aria-label="Feedback add-on">🎁${adminScoreValue !== '' ? ' ' + adminScoreValue : ''}</button>
                             <button id="qfp-ai-btn-${f.id}" type="button" class="qfp-ib" onclick="runAIFeedbackScoring('${f.id}')" ${!rawComment ? 'disabled title="No comment to evaluate" data-th-title="ไม่มีข้อความให้ประเมิน"' : 'title="AI-score this comment"'} aria-label="AI score">🗡️</button>
                             <button type="button" class="qfp-ib qfp-ib-del" onclick="deleteQuizFeedbackItem('${f.id}')" title="Delete this feedback (asks to confirm)" data-th-title="ลบผลตอบรับนี้ โดยจะขอยืนยัน" aria-label="Delete feedback">🗑</button></span></span>
                         </div>
-                        ${rawComment ? `<div class="lang-no-toggle" style="margin-top:6px;font-size:0.85em;color:#475569;background:#fdf8f1;padding:8px 12px;border-radius:8px;border-left:3px solid #e7d8c4;white-space:pre-wrap;">${safeComment}</div>` : '<p title="No comment provided" data-th-title="ผู้ตอบไม่ได้กรอกความคิดเห็น" style="color:#80566a;margin:6px 0 0;font-size:0.85em;">No comment provided</p>'}
+                        ${rawComment ? `<div class="lang-no-toggle qfp-cm">${safeComment}</div>` : ''}
                         ${qfpFlagsHtml(f)}
-                        ${quizResultHtml}
-                        ${(nt || hasAiReview) ? `<div style="margin-top:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:0.82em;">${nt ? `<span class="lang-no-toggle" style="color:#6d28d9;font-weight:700;" title="Next topic requested">🎯 ${qfpEscapeHtml(nt)}</span>` : ''}<span style="flex:1;"></span>${hasAiReview ? `<span onclick="var e=document.getElementById('qfp-ai-review-${f.id}');e.style.display=e.style.display==='none'?'block':'none'" title="🗡️ ${aiScoreText} — tap to show the issue and the suggestion" style="font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;background:#e0e7ff;color:#3730a3;cursor:pointer;">🗡️ ${f.aiFeedbackScore.toFixed(1)} · 💡</span>` : ''}</div>` : ''}
+                        ${(nt || hasAiReview) ? `<div class="qfp-sub" style="margin-top:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:0.82em;">${nt ? `<span class="lang-no-toggle" style="color:#6d28d9;font-weight:700;" title="Next topic requested">🎯 ${qfpEscapeHtml(nt)}</span>` : ''}<span style="flex:1;"></span>${hasAiReview ? `<span onclick="var e=document.getElementById('qfp-ai-review-${f.id}');e.style.display=e.style.display==='none'?'block':'none'" title="🗡️ ${aiScoreText} — tap to show the issue and the suggestion" style="font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;background:#e0e7ff;color:#3730a3;cursor:pointer;">🗡️ ${f.aiFeedbackScore.toFixed(1)} · 💡</span>` : ''}</div>` : ''}
                         <div id="qfp-ai-review-${f.id}" style="margin-top:6px; font-size:0.8em; color:#334155; background:#eef2ff; border:1px solid #c7d2fe; border-radius:8px; padding:8px 10px; line-height:1.5; display:none;">
                             ${hasAiReview ? `<div><b>🗡️</b> ${aiScoreText}</div>
                             ${aiIssue ? `<div><b>Issue:</b> ${aiIssue}</div>` : ''}
