@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.298)</title>
+    <title>Internship Portfolio (V101.299)</title>
     <link rel="stylesheet" href="nika-ask.css?v=V101.263">
     <link rel="stylesheet" href="daily-canvas.css?v=V101.266">
     <link rel="stylesheet" href="halloween.css?v=V101.249">
@@ -2586,7 +2586,7 @@
 <link rel="stylesheet" href="quiz-cover.css?v=V101.282">
 <link rel="stylesheet" href="case-insight-rail.css?v=V101.59">
 <script src="quiz-cover.js?v=V101.282"></script>
-<script src="activity-rewards.js?v=V101.84"></script><link rel="stylesheet" href="activity-rewards.css?v=V101.294">
+<script src="activity-rewards.js?v=V101.84"></script><link rel="stylesheet" href="activity-rewards.css?v=V101.299">
 <script src="peds-dosing.js?v=V101.62"></script><script src="flood-watch.js?v=V101.150"></script><script src="history-news.js?v=V101.137"></script><link rel="stylesheet" href="flood-watch.css?v=V101.148">
 </head>
 
@@ -2722,8 +2722,9 @@
                                         <span id="u-tl-label">Day 0 of 0</span>
                                         <span id="u-tl-remaining">⏳ 0 days left</span>
                                     </div>
-                                    <div style="height:5px; background:#e2e8f0; border-radius:999px; overflow:hidden;">
+                                    <div style="position:relative; height:5px; background:#e2e8f0; border-radius:999px;">
                                         <div id="u-tl-bar" style="height:100%; width:0%; background:linear-gradient(90deg,#4361ee,#7c3aed); border-radius:999px; transition:width 0.4s ease;"></div>
+                                        <span id="u-tl-pin" class="u-tl-pin" aria-hidden="true" hidden>🎓</span>
                                     </div>
                                 </div>
                                 <!-- V97.09: the "Open Schedule ›" row is gone — Schedule has one
@@ -9826,6 +9827,7 @@
                 : '';
             document.getElementById('u-tl-label').innerHTML        = `Day ${daysPassed} of ${totalDays}${paceHtml}`;
             document.getElementById('u-tl-remaining').textContent  = pct >= 100 ? '🎓 Completed' : `⏳ ${daysLeft} days left`;
+            if (typeof certStepPaint === 'function') certStepPaint();   // V101.299: once the certificate step is known it takes this label
             if (daysBg) {
                 daysBg.hidden = false;
                 daysBg.innerHTML = pct >= 100 ? '🎓' : `${daysLeft}<small>d</small>`;
@@ -9914,7 +9916,7 @@
             // V101.294 (owner pick 3): no text — the 🏅 ring keeps its place and shows 🎓 (tap = request), ⏳ (sent) or 🎓✓ (approved);
             // the words live in the title / aria-label. `.cert-ready|pend|ok` on #badge-cert draws it (activity-rewards.css).
             const ring = document.getElementById('badge-cert');
-            const setRing = st => { if (ring) ['ready', 'pend', 'ok'].forEach(k => ring.classList.toggle('cert-' + k, k === st)); };
+            const setRing = st => { if (ring) ['ready', 'pend', 'ok'].forEach(k => ring.classList.toggle('cert-' + k, k === st)); certStepPaint(st || 'need', certNeed - score); };
             const show = (html, onclick, disabled, label, st) => {
                 setRing(st);
                 item.title = label; item.setAttribute('aria-label', label);
@@ -9942,6 +9944,23 @@
                 item.innerHTML = '';
                 item.onclick = null;
             }
+        }
+
+        // V101.299 (owner pick B, less text — mockup-cert-steps.html): the day bar's right label carries the certificate step,
+        // 🏅 +n pts to go · 🎓 Request · ⏳ sent · ⬇️ PDF, with 🎓 pinned at the bar's end. The big "18d" behind the card keeps the days left.
+        let _certStep = null;
+        function certStepPaint(st, toGo) {
+            if (st) _certStep = { st, toGo: Math.max(0, Math.ceil((Number(toGo) || 0) * 10) / 10) };
+            const rem = document.getElementById('u-tl-remaining'), pin = document.getElementById('u-tl-pin');
+            if (!rem || !_certStep) return;
+            const s = _certStep.st, n = _certStep.toGo.toFixed(1);
+            const T = { need: `${n} more pts for your certificate · อีก ${n} คะแนนขอใบรับรองได้ · 수료증까지 ${n}점`, ready: 'Request your certificate · ขอใบรับรอง · 수료증 신청', pend: 'Request sent — waiting for the admin · ส่งคำขอแล้ว รอแอดมิน · 신청 완료, 관리자 확인 중', ok: 'Certificate ready — download · ใบรับรองพร้อมแล้ว ดาวน์โหลด · 수료증 다운로드' };
+            if (pin) { pin.hidden = false; pin.classList.toggle('dim', s === 'need'); }
+            rem.title = T[s];
+            if (s === 'need') { rem.textContent = '🏅 +' + n; return; }
+            const tap = s === 'ready' ? 'requestCertificateFromLIFF()' : s === 'ok' ? 'window.openMyCertSheet && window.openMyCertSheet()' : '';
+            const label = { ready: '🎓 Request', pend: '⏳', ok: '⬇️ PDF' }[s];
+            rem.innerHTML = tap ? `<button type="button" class="cs-step ${s}" onclick="${tap}" aria-label="${T[s]}">${label}</button>` : `<span class="cs-step ${s}" role="img" aria-label="${T[s]}">${label}</span>`;
         }
 
         async function requestCertificateFromLIFF() {
