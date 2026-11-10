@@ -1,80 +1,90 @@
-// V102.509 — the Read first model picker is the page's vendor-first rail, not a <select> (#1784): the REAL admin.html + ai-model-ui.js (file://, network
-// blocked, Firebase = Proxy). addQuestionUI() renders a hidden input.q-primer-model per question and binds it with bindRegistryModelInput →
-// vendor icons (.mr-vendors) then only that vendor's chips, in the Read first label row. A pick is remembered under ai_primer_model, the input's
-// value follows it, and _qPrimerDraft sends that model. Rows are independent; the next row opens on the remembered pick.
+// V102.631 (owner pick B + C; was V102.509's rail in each question's label row) — Read first, lean: the question row is the box alone (📖 in its
+// placeholder), ✨ and this question's model LOGO in its corner. The strip above the questions is always there: n/N · the model for every
+// question ▾ · ⚡ m (empty ones) · 📖 All. Tapping a row's logo opens the vendor-first rail under that box; a pick there is that question's own
+// (amber ring, not remembered); a strip pick is every question's again and is remembered (ai_primer_model). ✨ and ⚡ send each question's model.
+// The 📖 All popup has no ✨ All / model rail any more. The REAL admin.html + ai-model-ui.js (file://, network blocked, Firebase = Proxy).
+// OUTDIR=… saves a screenshot.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const admin = fs.readFileSync('public/admin.html', 'utf8');
-assert.ok(!/<select class="q-primer-model"/.test(admin), 'the Read first <select> is gone');
+assert.ok(!/<select class="q-primer-model"/.test(admin), 'no <select>');
 assert.ok(/<input type="hidden" class="q-primer-model" id="q-primer-model-/.test(admin), 'a hidden input.q-primer-model per row');
-assert.ok(admin.includes("window.bindRegistryModelInput(mi.id, 'ai_primer_model')"), 'addQuestionUI binds the row\'s input to the registry rail');
+assert.ok(!admin.includes("window.bindRegistryModelInput(mi.id, 'ai_primer_model')"), 'no rail bound in each row any more');
+assert.ok(!/class="pra-all"/.test(admin) && !/_praModelRail/.test(admin), 'the 📖 All popup has no ✨ All / model rail');
 
 (async () => {
     const browser = await chromium.launch();
     try {
         const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
         const errors = []; page.on('pageerror', e => errors.push(e.message));
-        // the Read first helpers live in the <script type="module"> that imports @google/generative-ai — stub that import so the module runs offline
         await page.route('**/*', r => r.request().url().startsWith('file:') ? r.continue() : r.fulfill({ status: 200, contentType: 'application/javascript', body: /generative-ai/.test(r.request().url()) ? 'export class GoogleGenerativeAI { getGenerativeModel() { return {}; } }' : '' }));
         await page.addInitScript(() => { window.firebase = new Proxy(function () {}, { get: () => window.firebase, apply: () => window.firebase }); });
         await page.goto(require('url').pathToFileURL(process.cwd() + '/public/admin.html').href);
-        await page.waitForFunction(() => { try { return typeof addQuestionUI === 'function' && typeof bindRegistryModelInput === 'function' && document.readyState === 'complete'; } catch (_) { return false; } });
+        await page.waitForFunction(() => { try { return typeof addQuestionUI === 'function' && typeof window._qpRowPaint === 'function' && document.readyState === 'complete'; } catch (_) { return false; } });
         await page.waitForTimeout(300);
 
         const r = await page.evaluate(async () => {
             const out = {};
             localStorage.removeItem('ai_primer_model');
             window.updateQuizPagination = () => {}; window.showToast = () => {};
+            const m = document.getElementById('quizManageModal'); m.style.display = 'flex';
             const c = document.getElementById('quiz-questions-container'); c.innerHTML = '';
-            addQuestionUI(null); addQuestionUI({ q: 'Second?', type: 'choice', options: ['a', 'b'], correct: [0] });
-            const rows = [...document.querySelectorAll('.quiz-q-item .q-primer-row')];
-            out.rows = rows.length;
-            const read = row => {
-                const input = row.querySelector('input.q-primer-model'), rail = row.querySelector('.text-ai-chips');
-                const vendors = [...rail.querySelectorAll('.mr-vendors .mr-vendor')].map(v => [v.dataset.provider, v.getAttribute('aria-pressed')]);
-                const shown = [...rail.querySelectorAll(':scope > button:not([hidden])')].map(b => [b.getAttribute('aria-label').split(' ')[0], b.dataset.value, b.classList.contains('active')]);
-                const hidden = rail.querySelectorAll(':scope > button[hidden]').length;
-                const on = rail.querySelector('.mr-vendor[aria-pressed="true"]'), first = rail.querySelector(':scope > button:not([hidden])');
-                return { value: input.value, inRow: !!row.querySelector('label .text-ai-chips'), vendors, shown, hidden, select: !!row.querySelector('select'), seated: !!on && !!first && Number(first.style.order) === Number(on.style.order) + 1 };
-            };
-            out.r1 = read(rows[0]); out.r2 = read(rows[1]);
-            // pick another vendor, then its first chip, in row 1
-            const rail1 = rows[0].querySelector('.text-ai-chips');
-            const other = [...rail1.querySelectorAll('.mr-vendor')].find(v => v.getAttribute('aria-pressed') !== 'true');
-            other.click();
-            const chip = rail1.querySelector(':scope > button:not([hidden])'); chip.click();
-            out.picked = chip.dataset.value; out.afterPick = read(rows[0]); out.remembered = localStorage.getItem('ai_primer_model'); out.row2Untouched = read(rows[1]).value;
-            // the draft sends the row's model
-            const models = []; window.callUniversalAI = async m => { models.push(m); return { text: JSON.stringify({ primer: 'Background.' }) }; };
-            rows[0].closest('.quiz-q-item').querySelector('.q-text').value = 'Which drug?';
-            await window._qPrimerDraft(rows[0].querySelector('.q-primer-ai'), 'full');
-            out.draftModel = models[0];
-            // a third row opens on the remembered pick
-            addQuestionUI(null); out.r3 = read(document.querySelectorAll('.quiz-q-item .q-primer-row')[2]).value;
+            addQuestionUI({ q: 'First?', type: 'choice', options: ['a', 'b'], correct: [0] }); addQuestionUI({ q: 'Second?', type: 'choice', options: ['a', 'b'], correct: [0] });
+            addQuestionUI({ q: 'Third?', type: 'choice', options: ['a', 'b'], correct: [0], primer: '**Term** — background.' });
+            window._qPrimerStrip();
+            const rows = () => [...document.querySelectorAll('.quiz-q-item .q-primer-row')];
+            const row = el => ({ value: el.querySelector('input.q-primer-model').value, label: !!el.querySelector('label'), rail: !el.querySelector('.qp-rail').hidden, chips: !!el.querySelector('.audit-providers'),
+                corner: [...el.querySelectorAll('.qp-act > button')].map(b => b.className.split(' ')[0]), logo: !!el.querySelector('.qp-mdl .text-ai-logo'), own: el.querySelector('.qp-mdl').classList.contains('own'),
+                ph: el.querySelector('.q-primer').placeholder.slice(0, 13) });
+            const strip = () => { const s = document.getElementById('q-primer-strip'); return { hidden: s.hidden, text: s.textContent.replace(/\s+/g, ' ').trim(), go: !!s.querySelector('.qps-go'), all: !!s.querySelector('.qps-rev') }; };
+            out.r1 = row(rows()[0]); out.strip = strip();
+            // a row pick = that question only, amber ring, not remembered
+            rows()[0].querySelector('.qp-mdl').click();
+            out.open = row(rows()[0]);
+            const rail = rows()[0].querySelector('.qp-rail');
+            [...rail.querySelectorAll('.audit-provider')].find(t => /claude/i.test(t.textContent + t.outerHTML)).click();
+            const chip = rail.querySelector('button[data-value^="claude-"]:not([hidden])'); out.picked = chip.dataset.value; chip.click();
+            out.afterPick = row(rows()[0]); out.row2 = row(rows()[1]); out.remembered = localStorage.getItem('ai_primer_model');
+            // ✨ sends the row's model; ⚡ sends each question's own
+            const models = []; window.callUniversalAI = async (mm, p) => { models.push(mm); return { text: JSON.stringify({ primer: '**X** — y.' }) }; };
+            await window._qPrimerDraft(rows()[0].querySelector('.q-primer-ai'), 'full');
+            out.one = models.slice(); models.length = 0;
+            rows()[0].querySelector('.q-primer').value = '';
+            await window._qPrimerDraftAll(document.querySelector('#q-primer-strip .qps-go'));
+            out.all = models.slice();
+            out.stripDone = strip();
+            // the strip pick = every question again, remembered
+            window._praPickModel('claude-sonnet-5-5');
+            out.afterStrip = rows().map(x => [row(x).value, row(x).own]); out.remembered2 = localStorage.getItem('ai_primer_model');
             return out;
         });
-        assert.equal(r.rows, 2);
-        for (const k of ['r1', 'r2']) {
-            const x = r[k];
-            assert.equal(x.select, false, k + ': no <select>'); assert.equal(x.inRow, true, k + ': the rail sits in the Read first label row');
-            assert.equal(x.value, 'gpt-6-luna', k + ': first time = the (normalised) toolbar model');
-            assert(x.vendors.length >= 5, k + ': vendor icons: ' + JSON.stringify(x.vendors));
-            assert.equal(x.vendors.filter(v => v[1] === 'true').length, 1, k + ': one vendor pressed');
-            const v = x.vendors.find(v => v[1] === 'true')[0];
-            assert(x.shown.length >= 1 && x.shown.every(c => c[0] === v), k + ': only that vendor\'s chips show: ' + JSON.stringify(x.shown));
-            assert.equal(x.shown.filter(c => c[2]).map(c => c[1]).join(), 'gpt-6-luna', k + ': the active chip = the input value');
-            assert(x.hidden > 0, k + ': the other chips are hidden, not removed');
-            assert.equal(x.seated, true, k + ': V102.515 — the chips sit right after the pressed icon');
+        assert.deepEqual([r.r1.label, r.r1.chips, r.r1.rail, r.r1.corner, r.r1.logo, r.r1.own, r.r1.ph], [false, false, false, ['qp-mdl', 'q-primer-ai'], true, false, '📖 Read first'], 'row: no label row, no rail, ✨ + logo in the corner: ' + JSON.stringify(r.r1));
+        assert.equal(r.r1.value, 'gpt-6-luna', 'first time = the (normalised) toolbar model');
+        assert.deepEqual([r.strip.hidden, r.strip.go, r.strip.all], [false, true, true], 'the strip: shown, ⚡ + 📖 All');
+        assert.match(r.strip.text, /📖 Read first ?1\/3 .*▾ 2 ?📖 All$/, 'n/N · model ▾ · ⚡ 2 · 📖 All: ' + r.strip.text);
+        assert.deepEqual([r.open.rail, r.open.chips], [true, true], 'the logo opens the rail under the box');
+        assert.deepEqual([r.afterPick.value, r.afterPick.own, r.afterPick.rail], [r.picked, true, false], 'a row pick: that question\'s model, amber ring, rail closes');
+        assert.deepEqual([r.row2.value, r.row2.own], ['gpt-6-luna', false], 'other rows keep the strip model');
+        assert.equal(r.remembered, null, 'a row pick is not remembered');
+        assert.deepEqual(r.one, [r.picked], '✨ sends the row\'s model');
+        assert.deepEqual(r.all, [r.picked, 'gpt-6-luna'], '⚡ drafts the 2 empty ones, each with its own model');
+        assert.match(r.stripDone.text, /3\/3 ✓/, 'all filled: n/n ✓: ' + r.stripDone.text);
+        assert.equal(r.stripDone.go, false, 'no ⚡ when nothing is empty');
+        assert.deepEqual(r.afterStrip, [['claude-sonnet-5-5', false], ['claude-sonnet-5-5', false], ['claude-sonnet-5-5', false]], 'a strip pick = every question, rings gone');
+        assert.equal(r.remembered2, 'claude-sonnet-5-5', 'the strip pick is remembered');
+        if (process.env.OUTDIR) {
+            await page.evaluate(() => { const rows = document.querySelectorAll('.quiz-q-item .q-primer-row'); rows[1].querySelector('.q-primer').value = ''; rows[0].querySelector('.q-primer-model').value = 'gemini-3.8-flash'; window._qpRowPaint(rows[0]); window._qPrimerStrip(); });
+            await page.evaluate(() => {   // the editor modal is not laid out offline: show a copy of the strip + the first two questions' Read first
+                const box = document.createElement('div'); box.id = 'rf-shot'; box.style.cssText = 'position:fixed;inset:0 auto auto 0;z-index:999999;width:760px;padding:14px;background:#fff';
+                box.append(document.getElementById('q-primer-strip').cloneNode(true));
+                [...document.querySelectorAll('.quiz-q-item .q-primer-row')].slice(0, 2).forEach((r, i) => { const q = document.createElement('div'); q.style.cssText = 'margin-top:10px;font-weight:700;font-size:14px'; q.textContent = (i + 1) + '. ' + document.querySelectorAll('.quiz-q-item .q-text')[i].value; box.append(q, r.cloneNode(true)); });
+                document.body.append(box);
+            });
+            await page.locator('#rf-shot').screenshot({ path: process.env.OUTDIR + '/rf-lean.png' });
         }
-        assert.equal(r.afterPick.value, r.picked, 'the row input follows the chip');
-        assert.equal(r.remembered, r.picked, 'the pick is remembered under ai_primer_model');
-        assert.equal(r.afterPick.shown.filter(c => c[2]).map(c => c[1]).join(), r.picked, 'the picked chip is active');
-        assert.equal(r.row2Untouched, 'gpt-6-luna', 'the other row keeps its own value');
-        assert.equal(r.draftModel, r.picked, '✨ sends the row\'s model');
-        assert.equal(r.r3, r.picked, 'a new row opens on the remembered pick');
-        const noise = e => /ServiceWorker|mermaid is not defined|reading 'auth'|db\.collection|firebase/.test(e);   // offline-only: no CDN
+        const noise = e => /ServiceWorker|mermaid is not defined|reading 'auth'|db\.collection|firebase/.test(e);
         assert.deepEqual(errors.filter(e => !noise(e)), [], 'no page errors: ' + errors);
-        console.log('PASS: Read first model = vendor-first rail per question — hidden input bound by addQuestionUI, vendor icons then that vendor\'s chips, pick remembered + sent by ✨, rows independent, no <select>');
+        console.log('PASS: Read first lean (V102.631) — row = box + ✨ + model logo in the corner; strip n/N · model · ⚡ m · 📖 All always; row pick = that question (amber, not remembered), strip pick = all + remembered; ✨/⚡ send each question\'s model; no ✨ All / rail in 📖 All');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
