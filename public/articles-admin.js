@@ -18,7 +18,7 @@
     var COVERS = ['📰', '🫁', '💊', '🧪', '🩺', '🦠', '🧊', '🌡️', '⚠️', '💡'];
     var FILTERS = [['all', 'All'], ['draft', 'Draft'], ['scheduled', 'Scheduled'], ['live', 'Live'], ['ended', 'Ended']];
     var RERUN = [['off', 'Off', 'Interns who join after it ends never get it'], ['any', 'All new interns', 'Interns who join after it ends get it too, oldest first, one a day']];
-    var MAX_BODY = 2000, MAX_TITLE = 90, SHORT_TITLE = 50, BKK = 7 * 3600e3;
+    var MAX_BODY = 2000, MAX_LONG = 6000, MAX_TITLE = 90, SHORT_TITLE = 50, BKK = 7 * 3600e3;
     var S = { list: [], loaded: false, loading: false, err: '', filter: 'all', tag: '', cur: null, lang: 'en', saving: false, del: false, pick: '', q: '', codex: null, base: '', savedAt: 0, open: {}, who: false, whoF: 'all', qs: false, qsF: 'open', qDraft: {}, qBusy: '', qErr: '', qModel: '', qGroups: {}, qChecks: {}, qAiBusy: '', qAiErr: '', model: '', modelOpen: false, aiBusy: false, aiNote: '', imgs: [] };
     var DONE = ['ok', 'quiz', 'codex', 'hist'];   // what counts as read (articles.js); 'x' = closed without reading
     // V102.430: 💬 Any Q? — interns' questions (article_questions, written by articles.js). Live; never shows who asked (authUid / userId
@@ -55,7 +55,8 @@
         if (!LANGS.some(function (l) { return String(t[l[0]] || '').trim(); })) return 'Give it a title first.';
         for (var i = 0; i < LANGS.length; i++) {
             var k = LANGS[i][0];
-            if (String(b[k] || '').length > MAX_BODY) return LANGS[i][1] + ' body is longer than ' + MAX_BODY + ' characters.';
+            var cap = a.long ? MAX_LONG : MAX_BODY;   // V102.622 (owner): ⤢ Long lets a body go past 2000
+            if (String(b[k] || '').length > cap) return LANGS[i][1] + ' body is longer than ' + cap + ' characters' + (a.long ? '.' : ' — tap ⤢ Long to allow it.');
             if (String(t[k] || '').length > MAX_TITLE) return LANGS[i][1] + ' title is longer than ' + MAX_TITLE + ' characters.';
         }
         if (!schedule) return '';
@@ -74,7 +75,7 @@
             audience: { divisions: (a.audience && a.audience.divisions || []).slice(), groups: (a.audience && a.audience.groups || []).slice() },
             links: (a.links || []).map(function (l) { return { kind: l.kind, id: l.id, label: l.label }; }),
             source: a.source && /^https?:\/\//i.test(a.source.url) ? { url: a.source.url, site: a.source.site } : null,   // V102.570: the page the draft came from
-            tags: tagsOf(a.tags), rerun: a.rerun === 'off' ? 'off' : 'any', readMin: readMin(body.en || body.th || body.ko || '')
+            tags: tagsOf(a.tags), rerun: a.rerun === 'off' ? 'off' : 'any', long: !!a.long, readMin: readMin(body.en || body.th || body.ko || '')
         };
     }
     // which script a text is mostly written in (Thai · Hangul · Latin) — catches Thai typed into the EN slot
@@ -133,12 +134,12 @@
     }
     function blank(now) {
         var w = defaultWindow(now);
-        return { id: null, title: {}, body: {}, cover: { emoji: '📰' }, status: 'draft', startAt: w.start, endAt: w.end, audience: { divisions: [], groups: [] }, links: [], source: null, tags: [], rerun: 'any' };
+        return { id: null, title: {}, body: {}, cover: { emoji: '📰' }, status: 'draft', startAt: w.start, endAt: w.end, audience: { divisions: [], groups: [] }, links: [], source: null, tags: [], rerun: 'any', long: false };
     }
     function fromDoc(id, d) {
         return { id: id, title: Object.assign({}, d.title), body: Object.assign({}, d.body), cover: Object.assign({ emoji: '📰' }, d.cover), status: d.status === 'scheduled' ? 'scheduled' : 'draft',
             startAt: msOf(d.startAt), endAt: msOf(d.endAt), audience: { divisions: ((d.audience || {}).divisions || []).slice(), groups: ((d.audience || {}).groups || []).slice() },
-            links: (d.links || []).slice(), tags: tagsOf(d.tags), rerun: d.rerun === 'off' ? 'off' : 'any', createdAt: msOf(d.createdAt), source: d.source || null, dx: d.dx || null, dc: d.dc || null };   // V102.374: dc = the Drug Codex twin of dx   // V102.371: dx = {draftId, publishedId, name} once sent to the Disease Codex
+            links: (d.links || []).slice(), tags: tagsOf(d.tags), rerun: d.rerun === 'off' ? 'off' : 'any', long: !!d.long, createdAt: msOf(d.createdAt), source: d.source || null, dx: d.dx || null, dc: d.dc || null };   // V102.374: dc = the Drug Codex twin of dx   // V102.371: dx = {draftId, publishedId, name} once sent to the Disease Codex
     }
 
     // ---- data
@@ -285,7 +286,8 @@
             '.art-tb button{min-height:0;margin:0;width:28px;height:26px;padding:0;border:0;border-radius:6px;background:transparent;color:#475569;font-weight:800;cursor:pointer}.art-tb button:hover{background:#e2e8f0}' +
             '.art-img{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;margin:6px 0;padding:5px 8px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc;font-size:12px;color:#475569}.art-img .th{position:relative;flex:none;width:40px;height:40px}.art-img img{width:40px;height:40px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0}.art-img .x{position:absolute;top:-5px;right:-5px;width:18px;height:18px;min-height:0;border-radius:50%;border:1px solid #fff;background:#475569;color:#fff;cursor:pointer;padding:0;font-size:9px;line-height:1;display:grid;place-items:center}.art-img .t{flex:1 1 150px;min-width:0}' +
             '.art-ta{display:block;width:100%;box-sizing:border-box;border:0;margin:0;padding:10px 12px;font:12.5px/1.55 ui-monospace,Consolas,monospace;color:#334155;min-height:160px;resize:vertical}' +
-            '.art-ft{display:flex;gap:6px;padding:4px 10px;border-top:1px solid #e2e8f0;background:#fcfcfd;font-size:11.5px;color:#94a3b8}.art-ft .over{color:#dc2626;font-weight:800}' +
+            '.art-ft{display:flex;gap:6px;padding:4px 10px;border-top:1px solid #e2e8f0;background:#fcfcfd;font-size:11.5px;color:#94a3b8}.art-ft .over{color:#dc2626;font-weight:800}.art-ft .long{color:#b45309;font-weight:800}#art-count{margin-left:auto}' +
+            '.art-ft .art-long{min-height:0;padding:1px 8px;border-radius:999px;border:1px dashed #f59e0b;background:#fff;color:#92400e;font-size:11px;font-weight:800;cursor:pointer;margin-left:auto}.art-ft .art-long[aria-pressed=true]{border-style:solid;background:#fef3c7}.art-ft .art-long:not([hidden])+#art-count{margin-left:6px}' +
             '.art-dt{border:1px solid #e2e8f0;border-radius:9px;padding:5px 8px;font:inherit;font-size:12.5px;font-weight:700;color:#334155;margin:0;width:auto}' +
             '.art-lk{display:inline-flex;align-items:center;gap:5px;padding:4px 6px 4px 10px;border-radius:999px;font-size:12px;font-weight:700;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe}.art-lk.codex{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}' +
             '.art-lk button{min-height:0;margin:0;width:20px;height:20px;padding:0;border:0;border-radius:50%;background:transparent;color:inherit;cursor:pointer}.art-add{border-style:dashed!important}' +
@@ -460,6 +462,17 @@
     // V102.511 (owner): a draft is a short STORY (up to MAX_BODY); when the material does not fit, the model ends episode 1 with a
     // "➡️ Next: …" line and ✨ Episode 2 starts the next article from the same source (title gets " (2)"; the earlier episodes go in the prompt).
     function epNextOf(t) { var m = String(t || '').match(/^➡️\s*Next:\s*(.+)$/m); return m ? m[1].trim() : ''; }
+    // V102.622 (owner: "ไม่มีให้กด ep 3"): the ✨ Episode source lived only in memory after a ✨ draft, so a saved / reopened episode lost the
+    // button. Any body with a "➡️ Next:" line now offers it; without the remembered source it drafts from the title, the saved source
+    // link (read again) and this episode's text.
+    function epSrcOf(a) {
+        if (!a) return null;
+        var L = S.lang, nx = epNextOf((a.body || {})[L]);
+        if (!nx) return null;
+        if (S.epSrc && S.epSrc.a === a && S.epSrc.L === L) return S.epSrc;
+        var base = String((a.title || {})[L] || (a.title || {}).en || '').replace(/\s*\(\d+\)\s*$/, '').trim();
+        return { a: a, L: L, topic: base, notes: a.source && a.source.url ? a.source.url : '', next: nx, n: epNum((a.title || {})[L]), prev: [] };
+    }
     function epNum(t) { return Number((String(t || '').match(/\((\d+)\)\s*$/) || [])[1]) || 1; }
     function imgOk(a) { return imgList(a).length > 0; }
     function visionModel() { var m = ''; try { m = localStorage.getItem('ai_default_codex_vision_model') || ''; } catch (e) { /* none */ } return m || 'gemini-3.8-flash'; }
@@ -669,7 +682,9 @@
             '<div class="art-md"><div class="art-tb"><button type="button" title="Bold" onclick="Articles.wrap(\'**\',\'**\')">B</button><button type="button" title="Italic" onclick="Articles.wrap(\'*\',\'*\')"><i>I</i></button><button type="button" title="Strikethrough" onclick="Articles.wrap(\'~~\',\'~~\')"><s>S</s></button>' +
             '<button type="button" title="Bullet list" onclick="Articles.wrap(\'\\n- \',\'\')">•</button><button type="button" title="Numbered list" onclick="Articles.wrap(\'\\n1. \',\'\')">1.</button><button type="button" title="Link" onclick="Articles.wrap(\'[\',\'](https://)\')">🔗</button>' + aiHtml(a) + '</div>' +
             '<textarea class="art-ta" id="art-bodyta" onpaste="Articles.paste(event)" ondragover="Articles.dragOver(event)" ondrop="Articles.drop(event)" placeholder="' + bodyPh(a) + '" oninput="Articles.text(\'body\',this.value)">' + esc(b) + '</textarea>' +
-            '<div class="art-ft">' + (S.aiNote ? '<span class="ai">' + esc(S.aiNote) + '</span>' : '<span>Markdown</span>') + (S.epSrc && S.epSrc.a === a && epNextOf(b) ? '<button type="button" class="art-ep" onclick="Articles.episode()"' + (S.aiBusy ? ' disabled' : '') + ' title="The story did not fit in one read — save this episode, then draft the next one as a new article from the same source">✨ Episode ' + (S.epSrc.n + 1) + '</button>' : '') + '<span id="art-count" style="margin-left:auto"' + (b.length > MAX_BODY ? ' class="over"' : '') + '>' + b.length + ' / ' + MAX_BODY + ' · ~' + readMin(b) + ' min</span></div></div>',
+            '<div class="art-ft">' + (S.aiNote ? '<span class="ai">' + esc(S.aiNote) + '</span>' : '<span>Markdown</span>') + (epSrcOf(a) ? '<button type="button" class="art-ep" onclick="Articles.episode()"' + (S.aiBusy ? ' disabled' : '') + ' title="The story did not fit in one read — save this episode, then draft the next one as a new article from the same source">✨ Episode ' + (epSrcOf(a).n + 1) + '</button>' : '') +
+                '<button type="button" class="art-long" id="art-long" aria-pressed="' + !!a.long + '" onclick="Articles.long()"' + (b.length > MAX_BODY || a.long ? '' : ' hidden') + ' title="Let this article go past ' + MAX_BODY + ' characters (up to ' + MAX_LONG + ') · ยาวเกิน ' + MAX_BODY + ' ได้ · ' + MAX_BODY + '자 초과 허용">⤢ Long</button>' +
+                '<span id="art-count"' + countCls(a, b) + '>' + countText(b) + '</span></div></div>',
             pasteHtml(a),
             '<div id="art-warn">' + hintHtml() + (mm ? '<div class="art-warn" role="status">⚠️ This looks like ' + NAME[mm] + ', not ' + NAME[L] + (((a.title || {})[mm] || (a.body || {})[mm]) ? '' : '<button type="button" onclick="Articles.moveLang(\'' + L + '\',\'' + mm + '\')">Move to ' + mm.toUpperCase() + '</button>') + '</div>' : '') + '</div>',
             tagsFieldHtml(a),   // V102.382
@@ -890,10 +905,13 @@
     }
     function pvMore() { S.pvMore = !S.pvMore; var pv = document.querySelector('#art-body .art-pv'); if (pv) pv.outerHTML = previewHtml(); fitPv(); }
     // typing repaints only the preview + counter, so the caret stays where it is
+    function countText(b) { return b.length + ' / ' + MAX_BODY + ' · ~' + readMin(b) + ' min'; }
+    function countCls(a, b) { return b.length > MAX_BODY ? (a.long ? ' class="long"' : ' class="over"') : ''; }
     function paintLive() {
         var a = S.cur; if (!a) return;
         var b = (a.body || {})[S.lang] || '', c = document.getElementById('art-count');
-        if (c) { c.textContent = b.length + ' / ' + MAX_BODY + ' · ~' + readMin(b) + ' min'; c.className = b.length > MAX_BODY ? 'over' : ''; }
+        if (c) { c.textContent = countText(b); c.className = b.length > MAX_BODY ? (a.long ? 'long' : 'over') : ''; }
+        var lg = document.getElementById('art-long'); if (lg) lg.hidden = !(b.length > MAX_BODY || a.long);
         var pv = document.querySelector('#art-body .art-pv'); if (pv) pv.outerHTML = previewHtml();
         fitPv();
         var sl = document.getElementById('art-stl'); if (sl) sl.outerHTML = statusLine(a, Date.now());
@@ -1020,7 +1038,7 @@
         modelPick: function () { S.modelOpen = !S.modelOpen; render(); },
         // V102.511: ✨ Episode n+1 — the saved episode stays; a NEW article (same cover / audience / tags / pictures, title "… (n+1)") is drafted from the same source
         episode: function () {
-            var a = S.cur, src = S.epSrc; if (!a || S.aiBusy || !src || src.a !== a) return Promise.resolve();
+            var a = S.cur, src = epSrcOf(a); if (!a || S.aiBusy || !src) return Promise.resolve();
             if (!a.id || JSON.stringify(a) !== S.base) { S.err = '✨ Save this episode first (💾 or 📅), then start the next one.'; render(); return Promise.resolve(); }
             var L = src.L, n = src.n + 1, base = String(a.title[L] || a.title.en || '').replace(/\s*\(\d+\)\s*$/, '').trim();
             var imgs = imgList(a).map(function (m) { return Object.assign({}, m); }), prevBody = String(a.body[L] || '');
@@ -1031,6 +1049,8 @@
             render();
             return api.ai();
         },
+        // V102.622 (owner): ⤢ Long — this article may go past MAX_BODY (saved as long: true); tap again for the 2000 limit
+        long: function () { var a = S.cur; if (!a) return; a.long = !a.long; S.err = ''; render(); },
         model: function (id) { S.model = id; S.modelOpen = false; try { localStorage.setItem('articleDraftModel', id); } catch (e) { /* none */ } render(); },
         // ✨ fills the editor only — the admin reads it and saves; never published by the AI
         ai: function () {

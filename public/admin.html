@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.621)</title>
+    <title>Nika Admin (V102.622)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -8777,7 +8777,7 @@
 <script src="quiz-cover.js?v=V102.592"></script>
 <script src="clip-captions.js?v=V102.366"></script>
 <script src="holidays-admin.js?v=V102.330"></script>
-<script src="articles-admin.js?v=V102.612"></script>
+<script src="articles-admin.js?v=V102.622"></script>
 <link rel="stylesheet" href="quiz-qimage.css?v=V102.523">
 <script src="quiz-qimage.js?v=V102.592"></script>
 <link rel="stylesheet" href="quiz-more-popover.css?v=V100.47">
@@ -14873,6 +14873,9 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                     #certModal .cert-xprint:empty { display:none; }
                     #certModal .cert-xchip, #certModal .cert-xaward { width:auto; min-height:32px; margin:0; padding:4px 12px; border:1.5px solid #e2e8f0; border-radius:999px; background:#fff; color:#475569; font-size:0.85em; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px; }
                     #certModal .cert-xchip[aria-pressed="true"] { background:#4361ee; border-color:#4361ee; color:#fff; }
+                    #certModal .cert-xchip[data-auto] { border:1.5px dashed #4361ee; color:#4361ee; }   /* V102.622: the stage Auto picks */
+                    #certModal.cl-a .cert-side .cert-xchip[data-auto] { border-style:dashed !important; border-color:#0e7490 !important; color:#0e7490 !important; }
+                    #certModal.cl-b .cert-side .cert-xchip[data-auto] { border-style:dashed !important; border-color:#facc15 !important; color:#fde68a !important; }
                     #certModal .cert-skill[aria-pressed="true"], #certModal .cert-xaward:has(input:checked) { background:#fdf6e3; border-color:#b08a1e; color:#8f6b14; }
                     #certModal .cert-xaward input { display:none; }
                     #certModal .cert-xsub { font-weight:600; opacity:0.7; }
@@ -15051,7 +15054,6 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                     <button type="button" class="cert-xchip" data-brand="wm" aria-pressed="true" onclick="toggleCertBrand('wm')">Watermark</button>
                     <button type="button" class="cert-xchip" data-brand="seal" aria-pressed="true" onclick="toggleCertBrand('seal')">Seal</button>
                     <button type="button" class="cert-xchip" data-brand="co" aria-pressed="true" onclick="toggleCertBrand('co')">Co. name</button>
-                    <button type="button" class="cert-xchip" id="cert-frame-chip" aria-pressed="false" onclick="setCertFrame(certFrame() === 'classic' ? 'modern' : 'classic')" title="🎀 Classic frame: a band in the stage colour, gold corners and a rosette that holds the QR. Off = the thin modern line. Remembered in this browser, bulk too">🎀 Classic</button>
                 </div>
                 </div><div class="cert-pv">
                 <div id="cert-preview-container"
@@ -65021,12 +65023,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
         // V102.616 (owner pick B): the 🎀 Classic chip (Brand row) — off = the thin modern line; on = Classic (a band in the stage colour, maroon once
         // completed, gold scrolls in the corners, logo top centre, a gold rosette with ribbons bottom right that holds the QR).
-        function certFrame() { try { return localStorage.getItem('cert_frame') === 'classic' ? 'classic' : 'modern'; } catch (e) { return 'modern'; } }
-        function setCertFrame(k) {
-            try { localStorage.setItem('cert_frame', k === 'classic' ? 'classic' : 'modern'); } catch (e) { /* private mode: not remembered */ }
-            updateCertPreview();
-        }
-        const CERT_CLASSIC = { red: '#7a1f2b', line: '#c9a227', ground: '#f8f3e6' };
+        // V102.622 (owner): the frame follows the window's layout — 🌊 Wada = a thin wave line, ⚡ Naru = Classic (the 🎀 chip is gone)
+        function certFrame() { return certLayout() === 'b' ? 'classic' : 'modern'; }
+        const CERT_CLASSIC = { red: '#7a1f2b', line: '#c9a227', ground: '#f8f3e6', band: '#1e1b4b' };   // V102.622: band = Deco navy (owner)
         // own construction: a gold scroll in each inner corner — a curl along each edge, a leaf and a dot
         function certClassicCorner(ctx, x, y, sx, sy) {
             ctx.save(); ctx.translate(x, y); ctx.scale(sx * 0.78, sy * 0.78);
@@ -65047,16 +65046,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             ctx.restore();
         }
         // the band (stage colour, maroon when completed) between gold rules, and the four corner scrolls
-        function certClassicFrame(ctx, w, h, band) {
+        function certClassicFrame(ctx, w, h) {
             const g = ctx.createRadialGradient(w / 2, h / 2, h * 0.2, w / 2, h / 2, w * 0.62);
             g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(196,164,104,0.18)');
             ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
-            ctx.fillStyle = band;
-            ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.rect(20, 20, w - 40, h - 40); ctx.fill('evenodd');
+            // V102.622 (owner): the edge is always Deco navy, faded, with a soft shadow on its inner side; the stage colour stays on the ribbons and ink
+            ctx.save(); ctx.fillStyle = CERT_CLASSIC.band; ctx.globalAlpha = 0.55; ctx.shadowColor = 'rgba(30,27,75,0.45)'; ctx.shadowBlur = 8;
+            ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.rect(10, 10, w - 20, h - 20); ctx.fill('evenodd'); ctx.restore();   // 10px band (owner: thinner)
             ctx.strokeStyle = CERT_CLASSIC.line;
-            ctx.lineWidth = 1; ctx.strokeRect(7.5, 7.5, w - 15, h - 15);
-            ctx.lineWidth = 2.2; ctx.strokeRect(20, 20, w - 40, h - 40);
-            ctx.lineWidth = 0.8; ctx.strokeRect(27.5, 27.5, w - 55, h - 55);
+            ctx.lineWidth = 0.8; ctx.strokeRect(4.5, 4.5, w - 9, h - 9);
+            ctx.lineWidth = 1.6; ctx.strokeRect(14, 14, w - 28, h - 28);
+            ctx.lineWidth = 0.8; ctx.strokeRect(20.5, 20.5, w - 41, h - 41);
             certClassicCorner(ctx, 30, 30, 1, 1); certClassicCorner(ctx, w - 30, 30, -1, 1);
             certClassicCorner(ctx, 30, h - 30, 1, -1); certClassicCorner(ctx, w - 30, h - 30, -1, -1);
         }
@@ -65152,7 +65152,6 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const n = certUser ? certHeldBadges((usersData || []).find(x => x.id === certUser.uid)).length : 0;
                 bc.setAttribute('aria-pressed', String(certBadgesOn()));
                 document.querySelectorAll('#cert-brand-row [data-brand]').forEach(b => b.setAttribute('aria-pressed', String(certBrandOn(b.dataset.brand))));
-                const fc = document.getElementById('cert-frame-chip'); if (fc) fc.setAttribute('aria-pressed', String(certFrame() === 'classic'));
                 const lc = document.getElementById('cert-nameline-chip');
                 if (lc) lc.setAttribute('aria-pressed', String(certNameLineOn()));
                 bc.textContent = '🏅 Badges' + (n ? ' · ' + n : '');
@@ -65162,7 +65161,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             prow.querySelectorAll('[data-prog]').forEach(b => { b.setAttribute('aria-pressed', String(certProgOn(b.dataset.prog))); b.hidden = k === 'done'; });
             row.querySelectorAll('[data-stage]').forEach(b => {
                 b.setAttribute('aria-pressed', String(b.dataset.stage === certStagePick));
-                if (b.dataset.stage === 'auto') b.textContent = certStagePick === 'auto' ? 'Auto · ' + CERT_STAGE_LABEL[k] : 'Auto';
+                // V102.622 (owner): Auto no longer repeats the stage in its own text — the chip Auto picks gets a dashed ring instead
+                b.toggleAttribute('data-auto', certStagePick === 'auto' && b.dataset.stage === k);
             });
             if (p) {
                 document.getElementById('cert-pbar-fill').style.width = p.pct + '%';
@@ -65196,6 +65196,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const cur = certLayout();
             m.classList.toggle('cl-a', cur === 'a'); m.classList.toggle('cl-b', cur === 'b');
             m.querySelectorAll('.cert-lay [data-lay]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lay === cur)));
+            if (k && m.style.display !== 'none' && typeof updateCertPreview === 'function') updateCertPreview();   // V102.622: the frame follows the layout
         }
         // ============ V96.83 Phase 3: Certificate Registry ============
         // Real running numbers live in Firestore `certificates/{no}` with the counter
@@ -65395,80 +65396,24 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 ctx.restore();
             }
 
-            if (classic) certClassicFrame(ctx, w, h, BAND); else {
-            // 3. Dotted swoosh arc + sparkle accents — the one deliberately decorative
-            // flourish, confined to the bottom-left corner. A full page-spanning sweep
-            // was tried first and rose through y≈150-190 exactly where the header sits,
-            // cutting across "OF ACHIEVEMENT" — this shorter one stays clear of it.
-            const sparkle = (x, y, s) => {
-                ctx.save(); ctx.translate(x, y); ctx.fillStyle = GOLD;
-                ctx.beginPath();
-                ctx.moveTo(0, -s); ctx.quadraticCurveTo(s * .15, -s * .15, s, 0);
-                ctx.quadraticCurveTo(s * .15, s * .15, 0, s);
-                ctx.quadraticCurveTo(-s * .15, s * .15, -s, 0);
-                ctx.quadraticCurveTo(-s * .15, -s * .15, 0, -s);
-                ctx.closePath(); ctx.fill(); ctx.restore();
+            if (classic) certClassicFrame(ctx, w, h); else {
+            // V102.622 (owner pick B, "shadow, thin, not tall"): 🌊 Wada's frame — a soft low wave along the top and bottom edges in the
+            // stage colour, a thin double rounded line, small rings at the corners. Replaces the thin line + L corners + arc + side lines.
+            const wave = (y0, dir) => {
+                ctx.save(); ctx.fillStyle = GOLD; ctx.globalAlpha = 0.16; ctx.shadowColor = GOLD; ctx.shadowBlur = 8;
+                ctx.beginPath(); const edge = dir > 0 ? 0 : h; ctx.moveTo(0, edge);
+                for (let x = 0; x <= w; x += 4) ctx.lineTo(x, y0 + dir * (2.5 + 2.5 * Math.sin(x / 38)));
+                ctx.lineTo(w, edge); ctx.closePath(); ctx.fill(); ctx.restore();
             };
-            ctx.save();
-            ctx.strokeStyle = 'rgba(176,138,30,0.5)';
-            ctx.lineWidth = 1;
-            ctx.setLineDash([1, 5]);
-            ctx.beginPath();
-            ctx.moveTo(50, 420);
-            ctx.bezierCurveTo(60, 320, 120, 260, 210, 250);
-            ctx.stroke();
-            ctx.setLineDash([]);
-            ctx.restore();
-            sparkle(50, 420, 6);
-            sparkle(210, 250, 4);
-
-            // 4. Thin single-line border + small corner brackets (own construction: an L
-            // each corner with a small rotated diamond at the bend) — replaces the old
-            // double frame now there is no navy band for a heavier frame to sit against.
-            const frame = (x, y, fw, fh, r) => {
-                ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(x, y, fw, fh, r); else ctx.rect(x, y, fw, fh);
-                ctx.stroke();
-            };
-            ctx.strokeStyle = GOLD;
-            ctx.lineWidth = 1;
-            frame(28, 28, w - 56, h - 56, 6);
-            const corner = (x, y, sx, sy) => {
-                ctx.save();
-                ctx.strokeStyle = GOLD;
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                ctx.moveTo(x, y + 22 * sy);
-                ctx.lineTo(x, y);
-                ctx.lineTo(x + 22 * sx, y);
-                ctx.stroke();
-                ctx.translate(x + 6 * sx, y + 6 * sy);
-                ctx.rotate(Math.PI / 4);
-                ctx.fillStyle = GOLD;
-                ctx.fillRect(-3, -3, 6, 6);
-                ctx.restore();
-            };
-            corner(16, 16, 1, 1);
-            corner(w - 16, 16, -1, 1);
-            corner(16, h - 16, 1, -1);
-            corner(w - 16, h - 16, -1, -1);
-
-            // 5. Thin decorative-only side margins — no tagline text (dropped per the
-            // owner's call), just a hairline + two small dots. The right one is
-            // shortened to stop above where the award medallions start (0.66h, section
-            // 14 below) — tried full-height first and it ran straight through every
-            // badge's center, since both sat at the same x.
-            const sideLine = (x, yTop, yBot) => {
-                ctx.strokeStyle = 'rgba(176,138,30,0.35)';
-                ctx.lineWidth = 1;
-                ctx.beginPath(); ctx.moveTo(x, yTop); ctx.lineTo(x, yBot); ctx.stroke();
-                ctx.fillStyle = GOLD;
-                ctx.beginPath(); ctx.arc(x, yTop, 2, 0, Math.PI * 2); ctx.fill();
-                ctx.beginPath(); ctx.arc(x, yBot, 2, 0, Math.PI * 2); ctx.fill();
-            };
-            sideLine(50, 90, h - 90);
-            sideLine(w - 50, 90, 300);
-
+            wave(4, 1); wave(h - 4, -1);
+            const rr = (x, y, fw, fh, r) => { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, fw, fh, r); else ctx.rect(x, y, fw, fh); ctx.stroke(); };
+            ctx.strokeStyle = GOLD; ctx.lineWidth = 1; rr(26, 26, w - 52, h - 52, 12);
+            ctx.save(); ctx.globalAlpha = 0.4; ctx.lineWidth = 0.7; rr(31, 31, w - 62, h - 62, 9); ctx.restore();
+            [[26, 26], [w - 26, 26], [26, h - 26], [w - 26, h - 26]].forEach(([x, y]) => {
+                ctx.fillStyle = '#fdfbf3'; ctx.beginPath(); ctx.arc(x, y, 5.5, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = GOLD; ctx.lineWidth = 1; ctx.stroke();
+                ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
+            });
             }
 
             // V96.79: small company logo, top-left above the header.

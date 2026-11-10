@@ -22,26 +22,26 @@ assert.ok(!admin.includes('cert-signature.png'), 'the scanned signature image is
             "\nvar usersData = [{ id: 'U1' }];\nwindow.updateCertPreview = () => paintCertStage();" });
         assert.deepEqual(errs, []);
 
-        // 1. the chip: off by default, toggles, remembered, painted
+        // 1. V102.622 (owner): no 🎀 chip — the frame follows the layout: 🌊 Wada (a) = the thin wave line, ⚡ Naru (b) = Classic
         const chip = await page.evaluate(() => {
-            localStorage.removeItem('cert_frame');
             document.getElementById('cert-start').value = '2026-10-19'; document.getElementById('cert-end').value = '2026-11-27';
-            const b = document.getElementById('cert-frame-chip'), out = [certFrame()];
-            b.click(); out.push(certFrame(), localStorage.getItem('cert_frame'), b.getAttribute('aria-pressed'));
-            b.click(); out.push(certFrame(), b.getAttribute('aria-pressed'));
+            const out = [!!document.getElementById('cert-frame-chip'), typeof setCertFrame];
+            localStorage.removeItem('cert_layout'); out.push(certFrame());
+            localStorage.setItem('cert_layout', 'b'); out.push(certFrame());
+            localStorage.setItem('cert_layout', 'a'); out.push(certFrame());
             return out;
         });
-        assert.deepEqual(chip, ['modern', 'classic', 'classic', 'true', 'modern', 'false'], 'the 🎀 Classic chip toggles and is remembered');
+        assert.deepEqual(chip, [false, 'undefined', 'modern', 'classic', 'modern'], 'the frame follows the layout (Wada by default)');
 
         const draw = (frame, lang, extra, certNo) => page.evaluate(({ frame, lang, extra, certNo }) => {
-            localStorage.setItem('cert_frame', frame); certLang = lang;
+            localStorage.setItem('cert_layout', frame === 'classic' ? 'b' : 'a'); certLang = lang;
             const c = document.createElement('canvas'); c.width = CERT_BASE_WIDTH; c.height = CERT_BASE_HEIGHT;
             const ctx = c.getContext('2d'), calls = [];
             const ft = ctx.fillText.bind(ctx);
             ctx.fillText = (t, x, y, ...r) => { const m = ctx.getTransform(); calls.push({ t: String(t), x: Math.round(x + m.e), y: Math.round(y + m.f), font: ctx.font }); return ft(t, x, y, ...r); };
             drawCertificate(ctx, 'Sample Intern', certDateText('2026-10-19', '2026-11-27'), [], 1, 0, 'internship', lang, certNo || null, { th: 'ชื่อ ตัวอย่าง' }, certDurationText(40), extra);
             const px = (x, y) => [...ctx.getImageData(x, y, 1, 1).data.slice(0, 3)];
-            return { calls, band: px(10, 300), corner: px(70, 300) };
+            return { calls, band: px(2, 300), corner: px(70, 300) };
         }, { frame, lang, extra, certNo });
         const at = (d, t) => d.calls.find(c => c.t === t);
         const done = { hours: '', skills: [], stage: null, hoursDone: 312, issuedISO: '2026-11-09' };
@@ -64,9 +64,9 @@ assert.ok(!admin.includes('cert-signature.png'), 'the scanned signature image is
 
         // 3. classic: band colour by stage, no foil seal top-right, the rosette bottom right holds the QR
         const cDone = await draw('classic', 'en', done), cMid = await draw('classic', 'en', mid), mDone = await draw('modern', 'en', done);
-        assert.deepEqual(cDone.band, [122, 31, 43], 'classic completed: maroon band');
-        assert.deepEqual(cMid.band, [15, 118, 110], 'classic Mid: the band takes the stage colour');
-        assert.notDeepEqual(mDone.band, [122, 31, 43], 'modern: no band');
+        assert.deepEqual(cDone.band, [107, 102, 124], 'classic completed: the Deco navy band, faded (V102.622)');
+        assert.deepEqual(cMid.band, [107, 102, 124], 'classic Mid: the same navy band, the stage colour stays on the ribbons and ink');
+        assert.notDeepEqual(mDone.band, [107, 102, 124], 'Wada wave: no band');
         const rimTop = d => d.calls.filter(c => c.y < 140 && c.x > 700 && c.t.length === 1).length;
         assert.ok(rimTop(mDone) > 5 && rimTop(cDone) === 0, 'classic: no foil seal top-right (modern keeps it)');
         const rim = d => d.calls.filter(c => c.y > 400 && c.x > 660 && c.t.length === 1 && c.t !== ' ').map(c => c.t).join('');
@@ -77,6 +77,6 @@ assert.ok(!admin.includes('cert-signature.png'), 'the scanned signature image is
         const real = await draw('classic', 'en', done, 'MLP-2026-0001-ABCD');
         assert.ok(at(real, 'Certificate No. MLP-2026-0001-ABCD').x < 300, 'the certificate number sits under the signature column');
         assert.deepEqual(errs, []);
-        console.log('PASS: 🎀 Classic chip (V102.616) — remembered; signature (Great Vibes) left + DATE ISSUED (today, period · days · hours) right in both frames and all 4 languages; classic band by stage, no top seal, rosette holds the QR');
+        console.log('PASS: frame follows the layout (V102.622: 🌊 Wada wave · ⚡ Naru Classic, navy band); signature (Great Vibes) left + DATE ISSUED (today, period · days · hours) right in both frames and all 4 languages; classic band by stage, no top seal, rosette holds the QR');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
