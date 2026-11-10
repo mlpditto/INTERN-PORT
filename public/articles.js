@@ -207,6 +207,16 @@
             '#art-sheet .aq-f{display:flex;align-items:center;gap:8px;margin-top:10px}#art-sheet .aq-f span{flex:1;font:400 12px/1.3 Kanit,sans-serif;color:#94a3b8}#art-sheet .aq-f .anyq{animation:none}#art-sheet .aq-f .anyq::after{display:none}#art-sheet .aq-f .anyq:disabled{background:#c7d2fe;box-shadow:none;cursor:default}' +
             '#art-sheet .aq-e{margin:8px 0 0;font:600 12.5px/1.4 Kanit,sans-serif;color:#b91c1c}#art-sheet .aq-e:empty{display:none}' +
             '@media (prefers-reduced-motion: reduce){#art-sheet .anyq{animation:none}}' +
+            // V101.306 🌞 Ask Nika about this article
+            '#art-sheet .bm.nkb{background:linear-gradient(135deg,#fff7ed,#fde68a)}#art-sheet .bm.nkb[aria-pressed="true"]{box-shadow:inset 0 0 0 2px #f59e0b}' +
+            '#art-sheet .art-nk{margin:4px 0 8px;padding:10px 0 0;border-top:1.5px dashed #fcd34d}#art-sheet .nk-c{display:flex;flex-wrap:wrap;gap:6px}' +
+            '#art-sheet .nk-c button{min-height:0;margin:0;width:auto;border:1px solid #fcd34d;background:#fffbeb;color:#92400e;font:700 12.5px/1 Kanit,sans-serif;padding:8px 11px;border-radius:999px;cursor:pointer}' +
+            '#art-sheet .nk-c button[aria-pressed="true"]{background:#f59e0b;border-color:#f59e0b;color:#fff}#art-sheet .nk-c button:disabled{opacity:.6;cursor:default}' +
+            '#art-sheet .nk-i{display:flex;gap:6px;margin-top:8px}#art-sheet .nk-i input{flex:1;min-width:0;margin:0;border:1.5px solid #e2e8f0;border-radius:12px;padding:9px 11px;font:400 16px/1.3 Kanit,sans-serif}' +
+            '#art-sheet .nk-i button{width:auto;min-height:0;margin:0;border:0;border-radius:12px;background:#4361ee;color:#fff;padding:0 14px;font:800 13px/1 Kanit,sans-serif;cursor:pointer}' +
+            '#art-sheet .nk-a{font:400 13.5px/1.55 Kanit,sans-serif;color:#334155;margin-top:8px}#art-sheet .nk-a ul{margin:0;padding-left:18px}#art-sheet .nk-a p{margin:0 0 4px}' +
+            '#art-sheet .nk-w,#art-sheet .nk-n{margin:8px 0 0;font:600 13px/1.4 Kanit,sans-serif;color:#64748b}#art-sheet .nk-l{margin:6px 0 0;text-align:right;font:400 11.5px/1 Kanit,sans-serif;color:#94a3b8}' +
+            '@media (max-width:400px){#art-sheet .foot{gap:4px}#art-sheet .bm{width:32px}#art-sheet .more{padding:12px 0}#art-sheet .ok{padding:0 12px}}' +
 
             '.art-hist .art-md{font-size:13.5px;line-height:1.55}.art-hist .art-md p{margin:0 0 6px}.art-hist .art-md.art-clamp{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:6;overflow:hidden}' +
             '.art-hist .art-more-h{display:inline-block;width:auto;min-height:0;margin:2px 0 6px;padding:2px 0;border:0;background:none;box-shadow:none;color:#4361ee;font:700 13px/1 Kanit,sans-serif;cursor:pointer}.art-hist .art-more-h[hidden]{display:none}' +
@@ -304,6 +314,58 @@
         }
         S.clipT = setTimeout(next, ms);
     }
+    // V101.306 (owner pick 1A): 🌞 in the footer asks Nika about THIS article (askNika with articleId = searched in it only), answered in the sheet
+    var NKT = {
+        en: { nk: 'Ask Nika about this article', sum: '📝 Summary', key: '🎯 Key points', own: '❓ Ask', ph: 'Ask about this article', go: 'Ask', wait: 'Reading the article…',
+            none: 'Not in this article', left: function (n) { return n + ' questions left today'; }, pause: 'Nika is paused during your quiz', limit: "That's all for today — back tomorrow",
+            busy: 'Nika is busy — try again in a minute', fail: 'Could not reach Nika. Try again.',
+            qSum: function (x) { return 'Summarize "' + x + '" in 3 short points'; }, qKey: function (x) { return '"' + x + '": what should I remember or monitor?'; } },
+        th: { nk: 'ถาม Nika เรื่องบทความนี้', sum: '📝 สรุป 3 บรรทัด', key: '🎯 ต้องจำอะไร', own: '❓ ถามเอง', ph: 'ถามเรื่องในบทความนี้', go: 'ถาม', wait: 'กำลังอ่านบทความ…',
+            none: 'ไม่มีในบทความนี้', left: function (n) { return 'เหลือ ' + n + ' คำถามวันนี้'; }, pause: 'Nika พักระหว่างทำ Quiz', limit: 'วันนี้ครบแล้ว พรุ่งนี้กลับมาใหม่',
+            busy: 'Nika ไม่ว่าง ลองใหม่อีกสักครู่', fail: 'ติดต่อ Nika ไม่ได้ ลองใหม่อีกครั้ง',
+            qSum: function (x) { return 'สรุป "' + x + '" เป็น 3 ข้อสั้นๆ'; }, qKey: function (x) { return '"' + x + '": ต้องจำหรือ monitor อะไรบ้าง'; } },
+        ko: { nk: '이 기사에 대해 Nika에게 질문', sum: '📝 3줄 요약', key: '🎯 핵심', own: '❓ 질문', ph: '이 기사에 대해 질문', go: '질문', wait: '기사를 읽는 중…',
+            none: '이 기사에는 없어요', left: function (n) { return '오늘 ' + n + '개 남음'; }, pause: '퀴즈 중에는 Nika가 쉬어요', limit: '오늘은 끝 — 내일 다시',
+            busy: 'Nika가 바빠요. 잠시 후 다시', fail: 'Nika에 연결하지 못했어요. 다시 시도하세요.',
+            qSum: function (x) { return '"' + x + '"을(를) 3가지로 요약'; }, qKey: function (x) { return '"' + x + '": 꼭 기억하거나 모니터링할 것은?'; } }
+    };
+    function nkBold(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); }
+    function nkAnswer(text) {
+        var html = '', open = false;
+        String(text || '').split('\n').map(function (l) { return l.trim(); }).filter(Boolean).forEach(function (l) {
+            var m = /^[*\-•]\s+(.*)$/.exec(l);
+            if (m && !open) { html += '<ul>'; open = true; }
+            if (!m && open) { html += '</ul>'; open = false; }
+            html += m ? '<li>' + nkBold(m[1]) + '</li>' : '<p>' + nkBold(l) + '</p>';
+        });
+        return html + (open ? '</ul>' : '');
+    }
+    function nkHtml() {
+        var k = S.nk, w = NKT[S.lang] || NKT.en, r = k.r || {}, out = '';
+        if (k.busy) out = '<p class="nk-w" role="status">' + esc(w.wait) + '</p>';
+        else if (k.err) out = '<p class="nk-n">⚠️ ' + esc(w.fail) + '</p>';
+        else if (r.paused) out = '<p class="nk-n">⏸ ' + esc(w.pause) + '</p>';
+        else if (r.limit) out = '<p class="nk-n">🌙 ' + esc(w.limit) + '</p>';
+        else if (r.busy) out = '<p class="nk-n">☕ ' + esc(w.busy) + '</p>';
+        else if (r.notFound) out = '<p class="nk-n">❔ ' + esc(w.none) + '</p>';
+        else if (r.answer) out = '<div class="nk-a">' + nkAnswer(r.answer) + '</div>';
+        return '<div class="art-nk" id="art-nk"><div class="nk-c" role="group" aria-label="' + esc(w.nk) + '">' + ['sum', 'key', 'own'].map(function (x) {
+            return '<button type="button" data-k="' + x + '" aria-pressed="' + (k.k === x) + '"' + (k.busy ? ' disabled' : '') + ' onclick="internArticles.nkAsk(\'' + x + '\')">' + esc(w[x]) + '</button>';
+        }).join('') + '</div>' +
+            (k.k === 'own' ? '<div class="nk-i"><input id="art-nk-q" maxlength="250" placeholder="' + esc(w.ph) + '" aria-label="' + esc(w.ph) + '" value="' + esc(k.text || '') + '" oninput="internArticles.nkType(this.value)" onkeydown="if(event.key===\'Enter\')internArticles.nkSend()"><button type="button" onclick="internArticles.nkSend()"' + (k.busy ? ' disabled' : '') + '>' + esc(w.go) + '</button></div>' : '') +
+            out + (k.left != null ? '<p class="nk-l">' + esc(w.left(k.left)) + '</p>' : '') + '</div>';
+    }
+    function nkCall(question) {
+        var c = S.cur, k = S.nk; if (!c || !k || k.busy) return Promise.resolve(false);
+        if (typeof requireRegistered === 'function' && !requireRegistered()) return Promise.resolve(false);
+        k.busy = true; k.err = false; k.r = null; render();
+        var ready = typeof ensureFirebaseAuthReady === 'function' ? ensureFirebaseAuthReady(10000) : Promise.resolve();
+        return Promise.resolve(ready).then(function () {
+            return firebase.functions().httpsCallable('askNika')({ question: question.slice(0, 300), articleId: c.a.id });
+        }).then(function (res) { var r = (res && res.data) || {}; k.r = r; if (r.left != null) k.left = r.left; return true; })
+            .catch(function (e) { console.warn('article nika:', e && e.message); k.err = true; return false; })
+            .then(function (ok) { k.busy = false; if (S.nk === k && S.cur === c) render(); return ok; });
+    }
     function md(text) { return typeof window.renderMd === 'function' ? window.renderMd(text) : esc(text).replace(/\n/g, '<br>'); }
     function render() {
         var c = S.cur, a = c.a, tx = textOf(a, S.lang), t = T[S.lang] || T.en, have = langs(a), saved = !!((me().articleSeen || {})[a.id] || {}).saved;
@@ -315,10 +377,11 @@
             (have.length > 1 ? langBtn(have, tx.lang, 'internArticles.lang()') : '') +
             '<button type="button" class="x" onclick="internArticles.close(\'x\')" aria-label="' + t.close + '">✕</button></div>' +
             '<h3 id="art-title">' + esc(tx.title) + '</h3><div class="art-md' + (S.more ? '' : ' clamp') + '" id="art-text">' + md(tx.body) + '</div>' +
-            srcHtml(a, S.lang) + linksHtml(a) +
+            srcHtml(a, S.lang) + linksHtml(a) + (S.nk ? nkHtml() : '') +
             '<div class="foot"><button type="button" class="bm" onclick="internArticles.save()" aria-pressed="' + saved + '" title="' + (saved ? t.saved : t.save) + '" aria-label="' + (saved ? t.saved : t.save) + '">🔖</button>' +
             '<button type="button" class="bm mute" onclick="internArticles.mute()" title="' + t.mute + '" aria-label="' + t.mute + '">🔕</button>' +
             (S.got ? '' : histBtn(t)) +   // V101.269: not in the 7 s ✓ Read · 💬 moment (the sheet closes itself; that row is full)
+            '<button type="button" class="bm nkb" onclick="internArticles.nika()" aria-pressed="' + !!S.nk + '" title="' + esc((NKT[S.lang] || NKT.en).nk) + '" aria-label="' + esc((NKT[S.lang] || NKT.en).nk) + '">🌞</button>' +
             '<button type="button" class="more" id="art-more" onclick="internArticles.toggleMore()">' + (S.more ? t.less + ' ▴' : t.more + ' ▾') + '</button>' +
             (S.got ? '<span class="rd">✓ ' + t.read + '</span><button type="button" class="anyq" onclick="internArticles.anyQ()">💬 ' + t.anyq + '</button>'
                 : '<button type="button" class="ok" onclick="internArticles.gotIt()">👍 ' + t.got + '</button>') + '</div>';
@@ -385,7 +448,7 @@
     }
     function show(c) {
         css();
-        S.cur = c; S.lang = S.cl; S.more = false; S.got = false; S.ask = null; S.clip = clipFor(c.a, S.cl);
+        S.cur = c; S.lang = S.cl; S.more = false; S.got = false; S.ask = null; S.nk = null; S.clip = clipFor(c.a, S.cl);
         var back = document.createElement('div'); back.id = 'art-back'; back.onclick = function () { close('x'); };
         var sh = document.createElement('div'); sh.id = 'art-sheet'; sh.className = 'lang-no-toggle'; sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-modal', 'true'); sh.setAttribute('aria-labelledby', 'art-title');
         document.body.appendChild(back); document.body.appendChild(sh);
@@ -400,7 +463,7 @@
     function onKey(e) { if (e.key === 'Escape') close('x'); }
     function close(act) {
         var c = S.cur; if (!c) return Promise.resolve();
-        S.cur = null; clearTimeout(S.gotTimer); S.got = false; S.ask = null; if (S.clip) { S.clip = null; clipStopSpeak(); }
+        S.cur = null; clearTimeout(S.gotTimer); S.got = false; S.ask = null; S.nk = null; if (S.clip) { S.clip = null; clipStopSpeak(); }
         ['art-back', 'art-sheet'].forEach(function (id) { var el = document.getElementById(id); if (el) el.remove(); });
         document.removeEventListener('keydown', onKey);
         var p = act === 'x' ? (isDone((me().articleSeen || {})[c.a.id]) ? Promise.resolve() : setSeen(c.a.id, { act: 'x' })) : markRead(c.a.id, act);
@@ -628,6 +691,17 @@
         owed: function () { return owed(S.list, me(), Date.now()); },
         detailHtml: detailHtml, pillHtml: pillHtml, discHtml: discHtml, listen: listen, stopListen: stopListen, close: close, histLang: histLang,
         gotIt: gotIt, anyQ: anyQ, askSend: askSend,
+        // V101.306 🌞 Ask Nika about this article: 🌞 opens / closes the strip; 📝 and 🎯 ask at once, ❓ opens a one-line box
+        nika: function () { if (!S.cur) return; S.nk = S.nk ? null : { k: '', text: '', busy: false, err: false, r: null, left: null }; render(); var b = document.querySelector('#art-nk .nk-c button'); if (b) b.focus(); },
+        nkAsk: function (x) {
+            var k = S.nk, c = S.cur; if (!k || !c || k.busy) return Promise.resolve(false);
+            var w = NKT[S.lang] || NKT.en, title = String(textOf(c.a, S.lang).title || '').slice(0, 200);
+            k.k = x;
+            if (x === 'own') { k.r = null; k.err = false; render(); var i = document.getElementById('art-nk-q'); if (i) i.focus(); return Promise.resolve(true); }
+            return nkCall(x === 'sum' ? w.qSum(title) : w.qKey(title));
+        },
+        nkType: function (v) { if (S.nk) S.nk.text = v; },
+        nkSend: function () { var k = S.nk, q = k ? String(k.text || '').trim() : ''; if (!k || q.length < 3) return Promise.resolve(false); return nkCall(q); },
         askLang: function () { if (!S.ask || S.ask.busy) return; S.lang = LORDER[(LORDER.indexOf(S.lang) + 1) % LORDER.length]; render(); },
         askKind: function (k) { if (!S.ask || S.ask.busy) return; S.ask.kind = k; render(); },
         lang: function (l) { var a = S.cur && S.cur.a, have = a ? langs(a) : []; S.lang = l || (have.length ? nextLang(have, textOf(a, S.lang).lang) : S.lang); render(); },
