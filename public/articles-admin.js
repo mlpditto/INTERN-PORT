@@ -66,17 +66,29 @@
         return '';
     }
     // The Firestore document (dates as Date → Timestamp). Empty languages are left out, so "missing" = no key.
+    // V102.625 (owner pick C · admin A): 🎬 Clip = a chat-story script per language, kept on the article; every number must come from the article
+    var CLIP_MAX = 12, CLIP_LEN = 160, CLIP_W = ['q', 'rx', 'key'];
+    function clipOf(c) {
+        var out = {};
+        LANGS.forEach(function (l) {
+            var ls = ((c || {})[l[0]] || []).map(function (x) { return { w: CLIP_W.indexOf(x && x.w) >= 0 ? x.w : 'rx', t: String((x && x.t) || '').trim().slice(0, CLIP_LEN) }; }).filter(function (x) { return x.t; }).slice(0, CLIP_MAX);
+            if (ls.length) out[l[0]] = ls;
+        });
+        return Object.keys(out).length ? out : null;
+    }
     function toDoc(a, st) {
         var pick = function (o) { var r = {}; LANGS.forEach(function (l) { var v = String((o || {})[l[0]] || '').trim(); if (v) r[l[0]] = v; }); return r; };
         var body = pick(a.body);
-        return {
+        var o = {
             title: pick(a.title), body: body, cover: { emoji: (a.cover && a.cover.emoji) || '📰' }, status: st,
             startAt: new Date(msOf(a.startAt)), endAt: new Date(msOf(a.endAt)),
             audience: { divisions: (a.audience && a.audience.divisions || []).slice(), groups: (a.audience && a.audience.groups || []).slice() },
             links: (a.links || []).map(function (l) { return { kind: l.kind, id: l.id, label: l.label }; }),
             source: a.source && /^https?:\/\//i.test(a.source.url) ? { url: a.source.url, site: a.source.site } : null,   // V102.570: the page the draft came from
             tags: tagsOf(a.tags), rerun: a.rerun === 'off' ? 'off' : 'any', long: !!a.long, readMin: readMin(body.en || body.th || body.ko || '')
-        };
+        }, c = clipOf(a.clip);
+        if (c) o.clip = c;
+        return o;
     }
     // which script a text is mostly written in (Thai · Hangul · Latin) — catches Thai typed into the EN slot
     function scriptOf(t) {
@@ -134,12 +146,12 @@
     }
     function blank(now) {
         var w = defaultWindow(now);
-        return { id: null, title: {}, body: {}, cover: { emoji: '📰' }, status: 'draft', startAt: w.start, endAt: w.end, audience: { divisions: [], groups: [] }, links: [], source: null, tags: [], rerun: 'any', long: false };
+        return { id: null, title: {}, body: {}, cover: { emoji: '📰' }, status: 'draft', startAt: w.start, endAt: w.end, audience: { divisions: [], groups: [] }, links: [], source: null, tags: [], rerun: 'any', long: false, clip: {} };
     }
     function fromDoc(id, d) {
         return { id: id, title: Object.assign({}, d.title), body: Object.assign({}, d.body), cover: Object.assign({ emoji: '📰' }, d.cover), status: d.status === 'scheduled' ? 'scheduled' : 'draft',
             startAt: msOf(d.startAt), endAt: msOf(d.endAt), audience: { divisions: ((d.audience || {}).divisions || []).slice(), groups: ((d.audience || {}).groups || []).slice() },
-            links: (d.links || []).slice(), tags: tagsOf(d.tags), rerun: d.rerun === 'off' ? 'off' : 'any', long: !!d.long, createdAt: msOf(d.createdAt), source: d.source || null, dx: d.dx || null, dc: d.dc || null };   // V102.374: dc = the Drug Codex twin of dx   // V102.371: dx = {draftId, publishedId, name} once sent to the Disease Codex
+            links: (d.links || []).slice(), tags: tagsOf(d.tags), rerun: d.rerun === 'off' ? 'off' : 'any', long: !!d.long, clip: JSON.parse(JSON.stringify(clipOf(d.clip) || {})), createdAt: msOf(d.createdAt), source: d.source || null, dx: d.dx || null, dc: d.dc || null };   // V102.374: dc = the Drug Codex twin of dx   // V102.371: dx = {draftId, publishedId, name} once sent to the Disease Codex
     }
 
     // ---- data
@@ -165,12 +177,13 @@
         var st = schedule ? 'scheduled' : 'draft', err = validate(a, schedule);
         if (err) { S.err = err; render(); return Promise.resolve(); }
         var doc = toDoc(a, st), ts = firebase.firestore.FieldValue.serverTimestamp();
+        if (a.id && !doc.clip && S.clipWas === a.id) doc.clip = firebase.firestore.FieldValue.delete();   // V102.625: the clip it had is gone (every line removed)
         doc.updatedAt = ts; doc.updatedBy = editorEmail();
         S.saving = true; S.err = ''; render();
         var p = a.id ? db.collection('articles').doc(a.id).update(doc) : (doc.createdAt = ts, doc.createdBy = doc.updatedBy, db.collection('articles').add(doc));
         return p.then(function (ref) {
             if (!a.id && ref) a.id = ref.id;
-            a.status = st; S.base = JSON.stringify(a); S.savedAt = Date.now(); S.savedVia = schedule ? 'p' : 's';   // V102.474: the pressed button turns green until the next edit
+            a.status = st; S.clipWas = clipOf(a.clip) ? a.id : ''; S.base = JSON.stringify(a); S.savedAt = Date.now(); S.savedVia = schedule ? 'p' : 's';   // V102.474: the pressed button turns green until the next edit
             var i = S.list.findIndex(function (x) { return x.id === a.id; });
             var copy = fromDoc(a.id, Object.assign({}, doc, { startAt: a.startAt, endAt: a.endAt, dx: a.dx, dc: a.dc }));
             if (i >= 0) S.list[i] = copy; else S.list.push(copy);
@@ -341,6 +354,22 @@
             '.art-sec[open]>summary>span:not(.chev){visibility:hidden}.art-bkk{font-size:11px;font-weight:800;color:#94a3b8}' +
             '.art-c.need{position:relative;box-shadow:0 0 0 2px #fca5a5}.art-c.need::after{content:"";position:absolute;top:-4px;right:-4px;width:9px;height:9px;border-radius:50%;background:#dc2626;border:2px solid #fff}' +
             '.art-btns .art-tag-add{min-height:0!important;width:auto!important;margin:0 0 0 6px!important;padding:4px 10px!important;border-radius:999px!important;border:1.5px dashed #cbd5e1!important;background:#fff!important;color:#64748b!important;font-size:12px!important;font-weight:800}' +
+            // V102.625 🎬 Clip composer (the preview column)
+            '.art-tb .art-ai .clp{border:1.5px solid #c4b5fd!important;background:#f5f3ff!important;color:#5b21b6!important;border-radius:8px}.art-tb .art-ai .clp[aria-pressed=true]{background:#5b21b6!important;color:#fff!important}' +
+            '.clp-x{margin-left:auto;min-height:0!important;width:auto!important;padding:0 6px!important;border:0!important;background:none!important;color:#94a3b8;font-size:15px;cursor:pointer}' +
+            '.clp-phone{position:relative;width:236px;height:420px;margin:0 auto;border-radius:24px;border:6px solid #1e293b;background:#e9edf5;overflow:hidden;box-sizing:border-box;padding:24px 10px 26px}' +
+            '.clp-prog{position:absolute;top:8px;left:10px;right:10px;display:flex;gap:3px}.clp-prog i{flex:1;height:3px;border-radius:2px;background:#cbd5e1}.clp-prog i.on{background:#4361ee}' +
+            '.clp-chat{display:flex;flex-direction:column;gap:6px;height:100%;overflow:hidden;justify-content:flex-end}.clp-who{font-size:9.5px;font-weight:800;color:#64748b;margin:2px 4px 0}.clp-who.rx{align-self:flex-end}' +
+            '.clp-m{max-width:82%;padding:7px 10px;border-radius:14px;font-size:12.5px;line-height:1.35;font-weight:600;animation:clpIn .25s ease}.clp-m.q{align-self:flex-start;background:#fff;color:#1e293b;border-bottom-left-radius:4px}.clp-m.rx{align-self:flex-end;background:#4361ee;color:#fff;border-bottom-right-radius:4px}' +
+            '.clp-key{align-self:center;background:#fef3c7;color:#92400e;border-radius:999px;padding:5px 11px;font-size:12px;font-weight:800;text-align:center;animation:clpIn .25s ease}.clp-m.now,.clp-key.now{box-shadow:0 0 0 2px #facc15}@keyframes clpIn{from{opacity:0;transform:translateY(6px)}}' +
+            '.clp-empty{height:100%;display:grid;place-items:center;text-align:center;font-size:12px;color:#64748b;font-weight:600;line-height:1.6}.clp-brand{position:absolute;bottom:7px;left:0;right:0;text-align:center;font-size:9.5px;font-weight:800;letter-spacing:.08em;color:#4361ee}' +
+            '.clp-ctl{display:flex;gap:6px;justify-content:center}.clp-ctl button{min-height:0!important;width:auto!important;margin:0!important;padding:5px 12px!important;border-radius:10px;font-weight:800;font-size:12.5px;cursor:pointer}' +
+            '.clp-go{border:0;background:#4361ee;color:#fff}.clp-go:disabled{opacity:.45}.clp-ai{border:1.5px solid #fde68a;background:#fffbeb;color:#92400e}' +
+            '.clp-lines{display:flex;flex-direction:column;gap:5px}.clp-l{display:flex;align-items:center;gap:5px;border:1.5px solid #e2e8f0;border-radius:10px;padding:3px 5px;background:#fff}.clp-l.bad{border-color:#f59e0b;background:#fffbeb}' +
+            '.clp-l input{flex:1;min-width:0;border:0;outline:0;font:inherit;font-size:12.5px;font-weight:600;color:#1e293b;background:transparent;padding:3px 2px;margin:0}' +
+            '.clp-w,.clp-d{min-height:0!important;width:26px!important;height:26px;margin:0!important;padding:0!important;border:0!important;background:#f1f5f9!important;border-radius:7px;font-size:13px;cursor:pointer;flex:none}.clp-d{background:none!important;color:#94a3b8;font-size:12px}.clp-bad{cursor:help}' +
+            '.clp-add{min-height:0!important;width:auto!important;align-self:flex-start;margin:0!important;padding:3px 10px!important;border:1.5px dashed #cbd5e1;border-radius:999px;background:#fff;color:#64748b;font-size:12px;font-weight:800;cursor:pointer}' +
+            '.clp-note{font-size:11px;color:#94a3b8;text-align:center}' +
             '.art-wl{max-height:56vh;overflow:auto}.art-ai{margin-left:auto;display:inline-flex;align-items:center;gap:4px}.art-tb .art-ai button{width:auto;padding:0 9px;font-size:12px;white-space:nowrap}.art-sug{display:flex;align-items:center;gap:8px;margin:-2px 0 8px;padding:6px 10px;border:1px solid #c7d2fe;border-radius:10px;background:#eef2ff;color:#3730a3;font:600 12.5px/1.35 Kanit,sans-serif}.art-sug b{flex:1;min-width:0;font-weight:800;overflow-wrap:anywhere}.art-sug span{color:#818cf8;font-size:11px;white-space:nowrap}.art-sug button{width:auto;min-height:0;margin:0;padding:3px 10px;border:1px solid #6366f1;border-radius:999px;background:#fff;color:#3730a3;font:800 12px Kanit,sans-serif;cursor:pointer}.art-sug button.no{border-color:#c7d2fe;color:#64748b}.art-ai .lk{font:700 11px/1.2 Kanit,sans-serif;color:#4f46e5;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:4px 9px;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}.art-tb .art-ai .go{background:#fef3c7;color:#92400e}.art-tb .art-ai .cpy{padding:0 7px;border:1px solid #e2e8f0;background:#fff;font-size:13px}.art-tb .art-ai .cpy.ok{background:#dcfce7;border-color:#86efac;color:#166534;font-weight:900}.art-tb .art-ai .go:disabled{opacity:.6}.art-tb .art-ai .mdl{color:#64748b;font-weight:700}.art-tb .art-ai .mdl{color:#fff;background:#1e293b;border-radius:8px;display:inline-flex;align-items:center;gap:5px;padding:0 9px 0 7px}.art-tb .art-ai .mdl:hover{background:#0f172a}.art-tb .art-ai .mdl i{font-style:normal;font-size:9px;color:#94a3b8}.art-ai .mdl .text-ai-logo{margin:0;width:15px;height:15px;vertical-align:0}.art-ai .mdl .text-ai-logo[data-owner="openai"]{background-image:url(assets/logos/openai-blossom-white.svg)}.art-ai .mdl .text-ai-logo[data-owner="grok"],.art-ai .mdl .text-ai-logo[data-owner="ollama"]{filter:none}.art-tb{flex-wrap:wrap}.art-ai.open{max-width:100%;overflow-x:auto;scrollbar-width:none}.art-ai .art-mrail{padding:0;border:0;background:transparent;display:inline-flex;align-items:center}.art-ai .art-mrail .audit-providers{padding-right:4px;margin-right:2px}.art-ai .art-mrail .audit-provider{width:26px;height:26px;border-radius:7px}.art-ai .art-mrail .text-ai-chips>button{padding:0 9px;height:26px;border-radius:8px;background:#fff;border:1px solid #e2e8f0;color:#475569;font-weight:800}.art-ai .art-mrail .text-ai-chips>button[aria-pressed="true"]{display:none}' +
             '.art-mrail{padding:6px 8px;border-bottom:1px solid #e2e8f0;background:#fcfcfd}.art-mrail .audit-model-row{margin:0;padding:0;border:0;gap:6px;flex-wrap:nowrap;overflow-x:auto}.art-mrail .audit-providers{flex-wrap:nowrap;gap:4px;padding-right:6px;border-right:1px solid #e2e8f0}.art-mrail .text-ai-chips{display:flex;flex-wrap:nowrap;gap:4px}.art-mrail .text-ai-chips>button[hidden]{display:none!important}.art-mrail .audit-provider{width:30px;height:30px;min-height:0;margin:0;padding:0;border:1px solid transparent;border-radius:8px;background:transparent;box-shadow:none;display:grid;place-items:center;cursor:pointer}.art-mrail .audit-provider[aria-pressed="true"]{background:#eef2ff;border-color:#c7d2fe}.art-mrail .text-ai-chips>button{min-height:0;margin:0;padding:4px 10px;font-size:12px}' +   // V102.341: only the picked vendor's models show (the shared rail marks the rest [hidden]); one line
             '.art-ft .ai{color:#b45309;font-weight:700}' +
@@ -649,7 +678,7 @@
     function aiHtml(a) {
         var tr = aiMode(a) === 'translate', lk = !tr && imgOk(a) ? [] : aiLinks(a);
         if (S.modelOpen) return '<span class="art-ai open"><span class="art-mrail">' + modelRail() + '</span>' + mdlHtml() + '</span>';
-        return '<span class="art-ai">' + (lk.length && !S.aiBusy ? '<span class="lk" title="' + esc(lk.map(domainOf).join(', ')) + ' — the page is read first, the draft is written from it">🔗 ' + esc(domainOf(lk[0])) + (lk.length > 1 ? ' +' + (lk.length - 1) : '') + ' · read first</span>' : '') + '<button type="button" class="cpy" onclick="Articles.copyAll(this)" title="Copy the title + body (' + S.lang.toUpperCase() + ', as it is in the boxes now)&#10;คัดลอกหัวข้อ + เนื้อหา" aria-label="Copy title and body">📋</button>' + '<button type="button" class="go" onclick="Articles.ai()"' + (S.aiBusy ? ' disabled' : '') + ' title="' + (tr ? 'Translate the ' + trFrom(a).toUpperCase() + ' version into ' + S.lang.toUpperCase() + ' (fills the editor — check, then save)' : lk.length ? 'Read the link' + (lk.length > 1 ? 's' : '') + ', then draft the body in ' + S.lang.toUpperCase() + ' from the page text (fills the editor — check, then save)' : 'Draft the body from the title in ' + S.lang.toUpperCase() + ' (fills the editor — check, then save)') + '">' + (S.aiBusy ? aiBusyLabel() : tr ? '✨ From ' + trFrom(a).toUpperCase() : lk.length ? '✨ Draft from 🔗' : '✨ Draft') + '</button>' +
+        return '<span class="art-ai">' + (lk.length && !S.aiBusy ? '<span class="lk" title="' + esc(lk.map(domainOf).join(', ')) + ' — the page is read first, the draft is written from it">🔗 ' + esc(domainOf(lk[0])) + (lk.length > 1 ? ' +' + (lk.length - 1) : '') + ' · read first</span>' : '') + '<button type="button" class="clp" onclick="Articles.clip()" aria-pressed="' + !!S.clipOpen + '" title="🎬 Clip — a short chat story from this article (the preview column turns into the clip)">🎬 Clip</button>' + '<button type="button" class="cpy" onclick="Articles.copyAll(this)" title="Copy the title + body (' + S.lang.toUpperCase() + ', as it is in the boxes now)&#10;คัดลอกหัวข้อ + เนื้อหา" aria-label="Copy title and body">📋</button>' + '<button type="button" class="go" onclick="Articles.ai()"' + (S.aiBusy ? ' disabled' : '') + ' title="' + (tr ? 'Translate the ' + trFrom(a).toUpperCase() + ' version into ' + S.lang.toUpperCase() + ' (fills the editor — check, then save)' : lk.length ? 'Read the link' + (lk.length > 1 ? 's' : '') + ', then draft the body in ' + S.lang.toUpperCase() + ' from the page text (fills the editor — check, then save)' : 'Draft the body from the title in ' + S.lang.toUpperCase() + ' (fills the editor — check, then save)') + '">' + (S.aiBusy ? aiBusyLabel() : tr ? '✨ From ' + trFrom(a).toUpperCase() : lk.length ? '✨ Draft from 🔗' : '✨ Draft') + '</button>' +
             mdlHtml() + '</span>';
     }
     // V102.521 (owner's pick D): the model trigger IS the chosen chip — dark, with the vendor logo, like the picked chip in every rail. Tap it and the
@@ -717,6 +746,7 @@
         return '<div class="art-ed" data-status="' + st + '">' + lines.join('') + '</div>';
     }
     function previewHtml() {
+        if (S.clipOpen) return clipHtml();
         var a = S.cur, L = S.lang, t = (a.title || {})[L] || (a.title || {}).en || '', b = (a.body || {})[L] || (a.body || {}).en || '';
         var md = typeof window.renderMd === 'function' ? window.renderMd(b) : esc(b);
         var st = status(a, Date.now());
@@ -728,6 +758,51 @@
             (a.source ? '<div class="src">Source: <u>' + esc(a.source.site) + ' ↗</u></div>' : '') +
             ((a.links || []).length ? '<div class="lks">' + a.links.map(function (l) { return '<span>' + (l.kind === 'quiz' ? '🧪 ' : '💊 ') + esc(l.label) + (l.kind === 'quiz' ? ' · 🪙 +1' : '') + '</span>'; }).join('') + '</div>' : '') +
             '<div style="display:flex;gap:5px;align-items:center;margin-top:6px"><span class="gb">🔖</span><span class="gb">🔕</span><button type="button" class="rm" id="art-pv-more" onclick="Articles.pvMore()" aria-expanded="' + !!S.pvMore + '">' + (S.pvMore ? 'Show less ▴' : 'Read more ▾') + '</button><span class="ok2">👍 Got it</span></div></div></div>' + statsHtml(a) + '</div>';
+    }
+    // ---- 🎬 Clip composer (V102.625)
+    var CLIP_WHO = { q: ['🙋', 'Asks'], rx: ['🧑‍⚕️', 'Pharmacist'], key: ['💡', 'Key point'] };
+    function clipLines(a) { a.clip = a.clip || {}; return a.clip[S.lang] || (a.clip[S.lang] = []); }
+    function clipNums(t) { return String(t || '').match(/\d+(?:[.,]\d+)?/g) || []; }
+    // a number the article never says (any language) → ⚠️ on that line
+    function clipBad(a, t) { var all = LANGS.map(function (l) { return ((a.body || {})[l[0]] || '') + ' ' + ((a.title || {})[l[0]] || ''); }).join(' '); return clipNums(t).filter(function (n) { return all.indexOf(n) < 0; }); }
+    function clipSecs(ls) { return ls.reduce(function (s, x) { return s + 1 + Math.ceil(x.t.length / 14); }, 0); }
+    function clipChatHtml(ls, upto) {
+        var n = upto == null ? ls.length : upto + 1;
+        return '<div class="clp-chat">' + ls.slice(0, n).map(function (x, i) {
+            var who = CLIP_WHO[x.w] || CLIP_WHO.rx, last = upto != null && i === upto ? ' now' : '';
+            if (x.w === 'key') return '<div class="clp-key' + last + '">💡 ' + esc(x.t) + '</div>';
+            return (i === 0 || ls[i - 1].w !== x.w ? '<span class="clp-who ' + x.w + '">' + who[0] + ' ' + who[1] + '</span>' : '') + '<div class="clp-m ' + x.w + last + '">' + esc(x.t) + '</div>';
+        }).join('') + '</div>';
+    }
+    function clipHtml() {
+        var a = S.cur, ls = clipLines(a), up = S.clipStep;
+        return '<div class="art-pv art-clip"><div class="art-pvh">🎬 Clip <span style="font-weight:600;color:#94a3b8">' + S.lang.toUpperCase() + (ls.length ? ' · ' + ls.length + ' lines · ~' + clipSecs(ls) + ' s' : '') + '</span>' +
+            '<button type="button" class="clp-x" onclick="Articles.clip()" aria-label="Back to the preview" title="Back to the 📱 preview">✕</button></div>' +
+            '<div class="clp-phone"><div class="clp-prog">' + ls.map(function (x, i) { return '<i' + (up == null || i <= up ? ' class="on"' : '') + '></i>'; }).join('') + '</div>' +
+            (ls.length ? clipChatHtml(ls, up) : '<div class="clp-empty">✨ Script turns this article into a short chat:<br>🙋 asks · 🧑‍⚕️ answers · 💡 the key point</div>') + '<span class="clp-brand">MEDLIFE PLUS</span></div>' +
+            '<div class="clp-ctl">' + (S.clipPlaying ? '<button type="button" class="clp-go" onclick="Articles.clipStop()">■ Stop</button>' : '<button type="button" class="clp-go" onclick="Articles.clipPlay()"' + (ls.length ? '' : ' disabled') + ' title="Plays the chat and reads each line aloud with this computer\'s voice">▶ Play</button>') +
+            '<button type="button" class="clp-ai" onclick="Articles.clipScript()"' + (S.clipBusy ? ' disabled' : '') + ' title="Write the chat from the ' + S.lang.toUpperCase() + ' article with ' + esc(modelName(modelId())) + ' (replaces these lines — check, then save)">' + (S.clipBusy ? '✨ ' + Math.floor((Date.now() - (S.clipT0 || Date.now())) / 1000) + ' s' : ls.length ? '✨ Re-script' : '✨ Script') + '</button></div>' +
+            (S.clipErr ? '<div class="art-err" role="alert">⚠️ ' + esc(S.clipErr) + '</div>' : '') +
+            '<div class="clp-lines">' + ls.map(function (x, i) {
+                var bad = clipBad(a, x.t), who = CLIP_WHO[x.w] || CLIP_WHO.rx;
+                return '<div class="clp-l' + (bad.length ? ' bad' : '') + '"><button type="button" class="clp-w" onclick="Articles.clipWho(' + i + ')" title="' + who[1] + ' — tap to switch (🙋 → 🧑‍⚕️ → 💡)">' + who[0] + '</button>' +
+                    '<input type="text" maxlength="' + CLIP_LEN + '" value="' + esc(x.t) + '" aria-label="Line ' + (i + 1) + '" oninput="Articles.clipText(' + i + ', this.value)">' +
+                    (bad.length ? '<span class="clp-bad" title="Not in the article: ' + esc(bad.join(', ')) + ' — check the number">⚠️</span>' : '') +
+                    '<button type="button" class="clp-d" onclick="Articles.clipDrop(' + i + ')" aria-label="Remove line ' + (i + 1) + '">✕</button></div>';
+            }).join('') + (ls.length < CLIP_MAX ? '<button type="button" class="clp-add" onclick="Articles.clipAdd()">＋ line</button>' : '') + '</div>' +
+            '<div class="clp-note">Kept with the article — 💾 Save draft / 📅 Schedule saves it too</div></div>';
+    }
+    function clipPaint() { var pv = document.querySelector('#art-body .art-pv'); if (pv) pv.outerHTML = previewHtml(); var sl = document.getElementById('art-stl'); if (sl) sl.outerHTML = statusLine(S.cur, Date.now()); var bt = document.getElementById('art-btns'); if (bt) bt.outerHTML = btnsHtml(S.cur); }
+    function clipStopNow() { S.clipPlaying = false; S.clipStep = null; clearTimeout(S.clipTimer); if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch (e) { /* nothing speaking */ } } }
+    function clipPrompt(a, L) {
+        var NAME = { en: 'English', th: 'Thai', ko: 'Korean' }, t = (a.title || {})[L] || a.title.en || '', b = (a.body || {})[L] || a.body.en || '';
+        return 'Turn this short article for pharmacy interns into a CHAT STORY for a 30-second vertical clip, in ' + NAME[L] + '.\n' +
+            'Write 5 to 8 lines, one per line, each starting with a speaker tag:\n' +
+            'Q: the customer / patient (asks)\nRX: the pharmacist (answers)\nKEY: the one key point to remember (1 or 2 of these)\n' +
+            'Rules: line 1 is a Q that hooks (the real question from the story). Keep each line short (under 60 characters; under 45 for Thai or Korean). ' +
+            'Copy every number, dose, strength and drug name EXACTLY as the article writes it — never add a number the article does not say. ' +
+            'The last line is RX pointing to the full story in the app. No markdown, no emoji at the start, nothing else.\n\n' +
+            'TITLE: ' + t + '\nARTICLE:\n' + b;
     }
     // 👥 read counts under the preview (published articles only)
     function statsHtml(a) {
@@ -947,11 +1022,11 @@
         render();
         if (!S.loaded) load();
     }
-    function close() { var m = document.getElementById('articlesModal'); if (m) { m.style.display = 'none'; m.style.removeProperty('z-index'); } S.pick = ''; S.del = false; }
+    function close() { clipStopNow(); var m = document.getElementById('articlesModal'); if (m) { m.style.display = 'none'; m.style.removeProperty('z-index'); } S.pick = ''; S.del = false; }
     function edit(id) {
         var a = id ? S.list.find(function (x) { return x.id === id; }) : null;
         S.cur = a ? fromDoc(a.id, Object.assign({}, a)) : blank(Date.now());
-        S.imgs = []; S.paste = null; S.tagOpen = false; S.linksShow = false; S.lang = 'en'; S.err = ''; S.del = false; S.pick = ''; S.base = JSON.stringify(S.cur); S.savedAt = 0; S.hint = null; S.titleSug = null; S.hintOff = S.hintOff || {}; S.open = secOpen(); S.who = false; S.whoF = 'all'; S.qs = false; S.qsF = 'open'; S.qErr = ''; S.qAiErr = ''; S.aiNote = ''; S.modelOpen = false; S.pvMore = false;
+        S.imgs = []; S.paste = null; S.tagOpen = false; S.linksShow = false; clipStopNow(); S.clipErr = ''; S.clipWas = S.cur.id && clipOf(S.cur.clip) ? S.cur.id : ''; S.lang = 'en'; S.err = ''; S.del = false; S.pick = ''; S.base = JSON.stringify(S.cur); S.savedAt = 0; S.hint = null; S.titleSug = null; S.hintOff = S.hintOff || {}; S.open = secOpen(); S.who = false; S.whoF = 'all'; S.qs = false; S.qsF = 'open'; S.qErr = ''; S.qAiErr = ''; S.aiNote = ''; S.modelOpen = false; S.pvMore = false;
         render();
     }
     var api = {
@@ -1261,6 +1336,44 @@
         },
         // V102.399: 🔗 Quiz chip → the Links section opens on the quiz picker
         quizPick: function () { S.open.links = true; S.linksShow = true; S.pick = 'quiz'; S.q = ''; render(); },
+        // V102.625 🎬 Clip
+        clip: function () { clipStopNow(); S.clipOpen = !S.clipOpen; S.clipErr = ''; render(); },
+        clipWho: function (i) { var l = clipLines(S.cur)[i]; if (!l) return; l.w = CLIP_W[(CLIP_W.indexOf(l.w) + 1) % CLIP_W.length]; clipPaint(); },
+        clipText: function (i, v) { var l = clipLines(S.cur)[i]; if (!l) return; l.t = String(v || '').slice(0, CLIP_LEN);
+            var ch = document.querySelector('#art-body .clp-chat'); if (ch) ch.outerHTML = clipChatHtml(clipLines(S.cur).filter(function (x) { return x.t.trim(); }), null);
+            var sl = document.getElementById('art-stl'); if (sl) sl.outerHTML = statusLine(S.cur, Date.now()); },
+        clipDrop: function (i) { clipLines(S.cur).splice(i, 1); clipPaint(); },
+        clipAdd: function () { var ls = clipLines(S.cur); if (ls.length >= CLIP_MAX) return; ls.push({ w: ls.length && ls[ls.length - 1].w === 'q' ? 'rx' : 'q', t: '' }); clipPaint(); var ins = document.querySelectorAll('#art-body .clp-l input'); if (ins.length) ins[ins.length - 1].focus(); },
+        clipScript: function () {
+            var a = S.cur, L = S.lang; if (!a || S.clipBusy) return Promise.resolve();
+            if (!String((a.body || {})[L] || a.body.en || '').trim()) { S.clipErr = 'Write the article first — the clip is made from its body.'; clipPaint(); return Promise.resolve(); }
+            if (typeof window.callUniversalAI !== 'function') { S.clipErr = 'AI is not available on this page.'; clipPaint(); return Promise.resolve(); }
+            clipStopNow(); S.clipBusy = true; S.clipErr = ''; S.clipT0 = Date.now(); clipPaint();
+            var tick = setInterval(function () { var g = document.querySelector('#art-body .clp-ai'); if (g && S.clipBusy) g.textContent = '✨ ' + Math.floor((Date.now() - S.clipT0) / 1000) + ' s'; }, 1000);
+            return window.callUniversalAI(modelId(), clipPrompt(a, L), false, null, '', { feature: 'article_clip' }).then(function (r) {
+                var resp = r && r.resp !== undefined ? r.resp : r, txt = String(resp && typeof resp === 'object' ? (resp.text || resp.outputText || resp.response || '') : (resp || ''));
+                var ls = txt.split(/\n+/).map(function (x) { var m = x.match(/^[\s\-*•_]*(Q|RX|KEY)\s*\**\s*[:：]\s*\**\s*(.+)$/i); return m ? { w: m[1].toLowerCase() === 'q' ? 'q' : m[1].toLowerCase() === 'key' ? 'key' : 'rx', t: m[2].replace(/\*\*/g, '').trim().slice(0, CLIP_LEN) } : null; }).filter(Boolean).slice(0, CLIP_MAX);
+                if (!ls.length) throw new Error('the model sent no Q: / RX: / KEY: lines — try ✨ again or another model. It said: ' + txt.slice(0, 80));
+                if (S.cur === a) { a.clip = a.clip || {}; a.clip[L] = ls; }
+            }).catch(function (e) { S.clipErr = '✨ ' + (e && e.message || e); })
+              .then(function () { clearInterval(tick); S.clipBusy = false; if (S.cur === a) clipPaint(); });
+        },
+        clipPlay: function () {
+            var ls = clipLines(S.cur).filter(function (x) { return x.t.trim(); }); if (!ls.length) return;
+            clipStopNow(); S.clipPlaying = true; S.clipStep = 0; clipPaint();
+            var synth = window.speechSynthesis, BCP = { en: 'en-US', th: 'th-TH', ko: 'ko-KR' }[S.lang] || 'en-US', run = function (i) {
+                if (!S.clipPlaying) return;
+                if (i >= ls.length) { S.clipTimer = setTimeout(function () { clipStopNow(); clipPaint(); }, 900); return; }
+                S.clipStep = i; clipPaint();
+                var next = function () { if (S.clipPlaying) run(i + 1); }, ms = 900 + ls[i].t.length * 55;
+                if (synth && window.SpeechSynthesisUtterance) {
+                    try { var u = new SpeechSynthesisUtterance(ls[i].t); u.lang = BCP; u.pitch = ls[i].w === 'q' ? 1.25 : 0.95; u.rate = 1.02; u.onend = next; u.onerror = next; synth.speak(u); S.clipTimer = setTimeout(next, ms + 4000); return; } catch (e) { /* no voice: timed */ }
+                }
+                S.clipTimer = setTimeout(next, ms);
+            };
+            run(0);
+        },
+        clipStop: function () { clipStopNow(); clipPaint(); },
         tagOpen: function () { S.tagOpen = true; render(); var el = document.getElementById('art-tag-in'); if (el) el.focus(); },
         // V102.374: the hint after Save
         hintLink: function () { var a = S.cur, h = S.hint; if (!a || !h) return; S.hint = null; a.links.push({ kind: 'disease', id: h.id, label: h.label }); save(a.status === 'scheduled'); },
