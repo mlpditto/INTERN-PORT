@@ -1,4 +1,4 @@
-// V102.628 (owner pick 2A) — admin 📰 Articles: ❔ n in the header = questions interns asked Nika that the library could not answer (nika_questions
+// V102.630 (owner pick 2A) — admin 📰 Articles: ❔ n in the header = questions interns asked Nika that the library could not answer (nika_questions
 // notFound, 30 days, no names in the log). Alike questions count once (×n, newest wording), most asked first; ✨ Draft = a new article titled with the
 // question in its language; 🙈 hides it (app_settings/nika_gaps). The REAL admin.html + articles-admin.js, a stub Firestore. OUTDIR=… saves a shot.
 const assert = require('node:assert/strict');
@@ -57,6 +57,6 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         });
         assert.deepEqual(h, { ok: true, writes: [['app_settings', 'nika_gaps', { hidden: { 'sglt2i stop before surgery': true } }, { merge: true }]], chip: '❔ 1', rows: 1 }, JSON.stringify(h));
         assert.deepEqual(errors.filter(e => /gap|nika/i.test(e)), [], 'no ❔ errors (the offline admin page has its own noise): ' + errors);
-        console.log('PASS: Articles ❔ Nika gaps (V102.628) — not-found questions, 30 days, alike ×n, most asked first; ✨ Draft titles a new article in its language; 🙈 hides (app_settings/nika_gaps)');
+        console.log('PASS: Articles ❔ Nika gaps (V102.630) — not-found questions, 30 days, alike ×n, most asked first; ✨ Draft titles a new article in its language; 🙈 hides (app_settings/nika_gaps)');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

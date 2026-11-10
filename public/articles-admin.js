@@ -277,7 +277,7 @@
             '.art-rail{display:inline-flex;gap:3px;background:#f1f5f9;border-radius:999px;padding:3px;flex-wrap:wrap}.art-rail button{min-height:0;margin:0;width:auto;border:0;background:transparent;padding:5px 11px;border-radius:999px;font-size:12.5px;font-weight:700;color:#475569;cursor:pointer}' +
             '.art-rail button b{opacity:.65;margin-left:4px}.art-rail button.on{background:#4361ee;color:#fff}' +
             '.art-new{margin:0 0 0 6px!important;width:auto!important;min-height:0!important;background:#4361ee;color:#fff;border:0;border-radius:12px;padding:8px 14px;font-weight:800;cursor:pointer}' +
-            // V102.628 ❔ Nika gaps
+            // V102.630 ❔ Nika gaps
             '.art-gap{margin:0 0 0 auto!important;width:auto!important;min-height:0!important;background:#fff7ed;color:#9a3412;border:1px solid #fdba74;border-radius:999px;padding:6px 12px;font-weight:800;cursor:pointer}.art-gap[aria-expanded="true"]{background:#f59e0b;color:#fff;border-color:#f59e0b}' +
             '.art-gaps{border:1px solid #fdba74;background:#fffbeb;border-radius:12px;padding:4px 10px;margin:-4px 0 12px;max-height:260px;overflow:auto}' +
             '.art-gp{display:flex;align-items:center;gap:8px;min-height:40px;border-bottom:1px solid #fde68a}.art-gp:last-child{border-bottom:0}.art-gp .n{flex:none;min-width:30px;text-align:center;background:#fee2e2;color:#991b1b;border-radius:999px;font:700 12px/22px Kanit,sans-serif}' +
@@ -1002,7 +1002,7 @@
             }).join('') : '<div class="art-empty">Nobody here.</div>') + '</div>' +
             '<div class="art-btns" style="position:static;margin:8px 0 0;padding:8px 0 0"><button type="button" onclick="Articles.csv()">⬇ CSV</button></div></div>';
     }
-    // V102.628 (owner pick 2A): ❔ n = what interns asked Nika that the library could not answer (nika_questions, notFound; the log never says who),
+    // V102.630 (owner pick 2A): ❔ n = what interns asked Nika that the library could not answer (nika_questions, notFound; the log never says who),
     // last 30 days, alike questions counted once (×n). ✨ Draft = a new article with the question as its title; 🙈 hides it (app_settings/nika_gaps).
     var G = { list: [], hidden: {}, loaded: false, open: false };
     function gapKey(q) { return String(q || '').toLowerCase().replace(/[\s?？!！.。,，:;"'“”‘’()\-–—]+/g, ' ').trim(); }

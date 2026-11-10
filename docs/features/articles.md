@@ -16,7 +16,7 @@ Admin: Dashboard ▸ 📰 Articles. Intern: the daily popup, History row, Codex 
 - `articles-clip-intern-qa` — intern popup opens on the 🎬 clip (V101.302, pick C): muted + captions one line at a time, tap = phone voice, ⌃ / ✕ / swipe up = the text, TH → EN fallback, no clip = as before
 - `articles-clip-voice-qa` — 🎬 Clip ▶ Play with the AI voice (V102.626): Gemini TTS per line (🙋 Kore · 🧑‍⚕️/💡 Puck), cached on replay, failed line → computer voice + note, no key = computer voice
 - `articles-nika-qa` — 🌞 in the intern sheet footer (V101.306): Nika answers from THIS article only (askNika + articleId), 📝 Summary · 🎯 Key points · ❓ Ask, not in this article, paused / limit / busy, fits 360 px
-- `articles-nika-gaps-qa` — admin ❔ n (V102.628): questions Nika could not answer (30 days, ×n alike), ✨ Draft = new article titled with the question, 🙈 hide (app_settings/nika_gaps)
+- `articles-nika-gaps-qa` — admin ❔ n (V102.630): questions Nika could not answer (30 days, ×n alike), ✨ Draft = new article titled with the question, 🙈 hide (app_settings/nika_gaps)
 - `articles-copy-qa` — 📋 left of ✨ Draft copies title + body as typed (V102.605)
 - `articles-editor-hints-qa` — empty TH/KO body says interns see 🇬🇧 · ✨ From EN; Saved n h / d ago; When & who remembers open/folded per browser (V102.606)
 - `articles-share-qa` — History row: language pill after the title; Source line `· 📤 LINE f` (FB only with a link); +0.1 score once per article; only the tapped icon turns wave blue; admin sees 📤 n (V101.291 / V102.612)

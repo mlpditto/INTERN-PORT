@@ -87,7 +87,7 @@ const measure = page => page.evaluate(() => {
         {
             const fn = (head) => { const i = admin.indexOf(head); let d = 0; for (let j = admin.indexOf('{', i); ; j++) { if (admin[j] === '{') d++; else if (admin[j] === '}' && --d === 0) return admin.slice(i, j + 1); } };
             const run = new Function('saveResult', `const calls = []; const document = { getElementById: id => ({ id }) };
-                async function saveUserDates() { calls.push('save'); return saveResult; } async function certPdfBusy(b) { calls.push('pdf:' + b.id); }
+                async function saveUserDates() { calls.push('save'); return saveResult; } async function certPdfBusy(b) { calls.push('pdf:' + b.id); } function getCurrentCertificateExtra() { return { stage: null }; } const certUser = { uid: 'U1' };
                 ${fn('async function certApprove(btn)')} return certApprove({ disabled: false }).then(() => calls);`);
             assert.deepEqual(await run(true), ['save', 'pdf:btn-gen-pdf'], 'Approve: save then PDF');
             assert.deepEqual(await run(undefined), ['save'], 'a save that stopped (alert / cancel) issues nothing');
