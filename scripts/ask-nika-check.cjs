@@ -73,6 +73,9 @@ const fresh = () => { DB = { user_auth_links: { anon1: { effectiveUserId: 'U1' }
       assert.equal(said('จากแหล่งข้อมูลที่ให้มา ยานี้ใช้ได้, ระวังไต'), 'ระวังไต');
       assert.equal(said('Warfarin, based on the sources, needs INR checks.'), 'Warfarin, based on the sources, needs INR checks.'); }
     assert.match(N.requestBody('q').answerGenerationSpec.promptSpec.preamble, /never mention the sources/);
+    // V101.306 asked from an article: that article only; a bad id is ignored, never pasted into the filter
+    assert.equal(N.requestBody('q', 'Ab_1-x').searchSpec.searchParams.filter, 'audience: ANY("intern") AND kind: ANY("article") AND sourceId: ANY("Ab_1-x")');
+    assert.equal(N.requestBody('q', 'x") OR audience: ANY("admin').searchSpec.searchParams.filter, 'audience: ANY("intern")');
     for (const none of [{ answer: { answerText: 'NOT_IN_LIBRARY' } }, { answer: { answerText: '' } }, { answer: { answerText: 'x', answerSkippedReasons: ['OUT_OF_DOMAIN_QUERY_IGNORED'] } }, { answer: { answerText: 'Unsourced claim', references: [] } }]) {
         assert.equal(N.parseAnswer(none).notFound, true, JSON.stringify(none));
     }
@@ -80,6 +83,9 @@ const fresh = () => { DB = { user_auth_links: { anon1: { effectiveUserId: 'U1' }
     r = await ask({ question: 'Dose of zzq?' });
     assert.equal(r.notFound, true); assert.equal(r.left, N.DAILY - 2, 'a real search still counts');
     assert.equal(Object.values(DB.nika_questions)[1].notFound, true);
+    { const n0 = posted.length; await ask({ question: 'Summarize it', articleId: 'Art9' });
+      assert.match(posted[n0].b.searchSpec.searchParams.filter, /sourceId: ANY\("Art9"\)/);
+      assert.ok(Object.values(DB.nika_questions).some(l => l.articleId === 'Art9' && l.question === 'Summarize it'), 'the log keeps which article'); }
 
     // busy: not counted, nothing logged
     fresh();

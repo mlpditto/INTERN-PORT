@@ -277,6 +277,12 @@
             '.art-rail{display:inline-flex;gap:3px;background:#f1f5f9;border-radius:999px;padding:3px;flex-wrap:wrap}.art-rail button{min-height:0;margin:0;width:auto;border:0;background:transparent;padding:5px 11px;border-radius:999px;font-size:12.5px;font-weight:700;color:#475569;cursor:pointer}' +
             '.art-rail button b{opacity:.65;margin-left:4px}.art-rail button.on{background:#4361ee;color:#fff}' +
             '.art-new{margin:0 0 0 6px!important;width:auto!important;min-height:0!important;background:#4361ee;color:#fff;border:0;border-radius:12px;padding:8px 14px;font-weight:800;cursor:pointer}' +
+            // V102.630 ❔ Nika gaps
+            '.art-gap{margin:0 0 0 auto!important;width:auto!important;min-height:0!important;background:#fff7ed;color:#9a3412;border:1px solid #fdba74;border-radius:999px;padding:6px 12px;font-weight:800;cursor:pointer}.art-gap[aria-expanded="true"]{background:#f59e0b;color:#fff;border-color:#f59e0b}' +
+            '.art-gaps{border:1px solid #fdba74;background:#fffbeb;border-radius:12px;padding:4px 10px;margin:-4px 0 12px;max-height:260px;overflow:auto}' +
+            '.art-gp{display:flex;align-items:center;gap:8px;min-height:40px;border-bottom:1px solid #fde68a}.art-gp:last-child{border-bottom:0}.art-gp .n{flex:none;min-width:30px;text-align:center;background:#fee2e2;color:#991b1b;border-radius:999px;font:700 12px/22px Kanit,sans-serif}' +
+            '.art-gp .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.art-gp .w{flex:none;font-size:11.5px;color:#94a3b8}' +
+            '.art-gp button{width:auto!important;min-height:0!important;margin:0!important;flex:none;border:0;border-radius:10px;cursor:pointer;font-weight:700;font-size:12px;padding:5px 10px}.art-gp .dr{background:#eef2ff;color:#3730a3}.art-gp .hd{background:none;padding:5px 4px}' +
             '.art-tr-all.art-da-all{margin-left:8px!important;background:#fff7ed!important;color:#c2410c!important;border-color:#fdba74!important}' +
             '.art-tr-all{margin:0 0 0 auto!important;width:auto!important;min-height:0!important;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;border-radius:12px;padding:8px 12px;font-weight:800;cursor:pointer;white-space:nowrap}.art-tr-all:disabled{opacity:.6;cursor:not-allowed}.art-tr-all.busy{background:#fef3c7;color:#92400e;border-color:#fde68a}' +
             '.art-g{display:grid;grid-template-columns:300px minmax(0,1fr) 290px;gap:14px;align-items:start}@media(max-width:1100px){.art-g{grid-template-columns:260px minmax(0,1fr)}.art-g>.art-pv{display:none}}@media(max-width:760px){.art-g{grid-template-columns:1fr}}' +
@@ -996,6 +1002,43 @@
             }).join('') : '<div class="art-empty">Nobody here.</div>') + '</div>' +
             '<div class="art-btns" style="position:static;margin:8px 0 0;padding:8px 0 0"><button type="button" onclick="Articles.csv()">⬇ CSV</button></div></div>';
     }
+    // V102.630 (owner pick 2A): ❔ n = what interns asked Nika that the library could not answer (nika_questions, notFound; the log never says who),
+    // last 30 days, alike questions counted once (×n). ✨ Draft = a new article with the question as its title; 🙈 hides it (app_settings/nika_gaps).
+    var G = { list: [], hidden: {}, loaded: false, open: false };
+    function gapKey(q) { return String(q || '').toLowerCase().replace(/[\s?？!！.。,，:;"'“”‘’()\-–—]+/g, ' ').trim(); }
+    function gapRows(docs, hidden, now) {
+        var by = {};
+        docs.forEach(function (d) {
+            var at = msOf(d.at) || 0, k = gapKey(d.question);
+            if (!d.notFound || !k || hidden[k] || (at && now - at > 30 * 86400e3)) return;
+            var g = by[k] || (by[k] = { key: k, q: String(d.question || '').trim(), n: 0, at: 0 });
+            g.n++; if (at >= g.at) { g.at = at; g.q = String(d.question || '').trim(); }
+        });
+        return Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return b.n - a.n || b.at - a.at; });
+    }
+    function loadGaps() {
+        if (G.loaded || typeof db === 'undefined' || !db || typeof db.collection !== 'function') return Promise.resolve();
+        G.loaded = true;
+        return Promise.resolve().then(function () { return Promise.all([
+            db.collection('nika_questions').orderBy('at', 'desc').limit(500).get(),
+            db.collection('app_settings').doc('nika_gaps').get().catch(function () { return null; })
+        ]); }).then(function (r) {
+            G.hidden = (r[1] && r[1].exists && (r[1].data() || {}).hidden) || {};
+            G.docs = r[0].docs.map(function (d) { return d.data() || {}; });
+            G.list = gapRows(G.docs, G.hidden, Date.now());
+            render();
+        }).catch(function (e) { G.loaded = false; console.warn('[articles] nika gaps:', e && e.message); });
+    }
+    function agoStr(ms) { var h = Math.max(0, Math.round((Date.now() - ms) / 3600e3)); return !ms ? '' : h < 24 ? h + ' h' : Math.round(h / 24) + ' d'; }
+    function gapChip() { return G.list.length ? '<button type="button" class="art-gap" aria-expanded="' + G.open + '" onclick="Articles.gaps()" title="Asked Nika, not in the library yet (30 days)">❔ ' + G.list.length + '</button>' : ''; }
+    function gapsHtml() {
+        if (!G.open || !G.list.length) return '';
+        return '<div class="art-gaps" id="art-gaps">' + G.list.slice(0, 30).map(function (g, i) {
+            return '<div class="art-gp"><span class="n">×' + g.n + '</span><span class="t" title="' + esc(g.q) + '">' + esc(g.q) + '</span><span class="w">' + agoStr(g.at) + '</span>' +
+                '<button type="button" class="dr" onclick="Articles.gapDraft(' + i + ')" title="New article with this as its title">✨ Draft</button>' +
+                '<button type="button" class="hd" onclick="Articles.gapHide(' + i + ')" title="Hide" aria-label="Hide">🙈</button></div>';
+        }).join('') + '</div>';
+    }
     function render() {
         var host = document.getElementById('art-body'); if (!host) return;
         var now = Date.now(), counts = { all: 0 };
@@ -1003,7 +1046,7 @@
         var list = sorted(now);
         var head = '<div class="art-h"><h2>📰 Articles</h2><div class="art-rail" role="group" aria-label="Filter by status">' + FILTERS.map(function (f) {
             return '<button type="button" class="' + (S.filter === f[0] ? 'on' : '') + '" aria-pressed="' + (S.filter === f[0]) + '" data-filter="' + f[0] + '" onclick="Articles.filter(\'' + f[0] + '\')">' + f[1] + '<b>' + (counts[f[0]] || 0) + '</b></button>';
-        }).join('') + '</div>' + (S.tag ? '<button type="button" class="art-tagf" onclick="Articles.tag(\'\')" title="Showing only this tag — tap to clear">🏷 ' + esc(S.tag) + ' ✕</button>' : '') + trAllHtml() + daAllHtml() + '<button type="button" class="art-new" onclick="Articles.edit(null)">＋ New</button></div>';
+        }).join('') + '</div>' + (S.tag ? '<button type="button" class="art-tagf" onclick="Articles.tag(\'\')" title="Showing only this tag — tap to clear">🏷 ' + esc(S.tag) + ' ✕</button>' : '') + trAllHtml() + daAllHtml() + gapChip() + '<button type="button" class="art-new" onclick="Articles.edit(null)">＋ New</button></div>' + gapsHtml();
         var left = '<div class="art-list">' + (S.loading && !S.loaded ? '<div class="art-empty">Loading…</div>' : list.length ? list.map(function (a) { return rowHtml(a, now); }).join('') : '<div class="art-empty">' + (S.list.length ? 'Nothing here.' : 'No articles yet — ＋ New') + '</div>') + '</div>';
         var mid = S.cur ? editorHtml(now) : '<div class="art-empty">' + (S.err && !S.loaded ? '⚠️ ' + esc(S.err) : 'Pick an article, or ＋ New.') + '</div>';
         host.innerHTML = head + '<div class="art-g">' + left + (S.cur && S.who ? whoHtml(S.cur) : S.cur && S.qs ? qsHtml(S.cur) : mid + (S.cur ? previewHtml() : '<div class="art-pv"></div>')) + '</div>';
@@ -1038,7 +1081,7 @@
 
     // ---- actions
     function open() {
-        css(); shell().style.display = 'block'; listenQs();
+        css(); shell().style.display = 'block'; listenQs(); loadGaps();
         render();
         if (!S.loaded) load();
     }
@@ -1062,6 +1105,19 @@
             });
         },
         filter: function (f) { S.filter = f; render(); },
+        _gapRows: gapRows, _G: G,
+        gaps: function () { G.open = !G.open; render(); },
+        gapDraft: function (i) {
+            var g = G.list[i]; if (!g) return;
+            var l = /[\u0E00-\u0E7F]/.test(g.q) ? 'th' : /[\uAC00-\uD7AF]/.test(g.q) ? 'ko' : 'en';
+            G.open = false; edit(null); S.cur.title[l] = g.q.slice(0, 200); S.lang = l; S.base = ''; render();
+        },
+        gapHide: function (i) {
+            var g = G.list[i]; if (!g) return Promise.resolve(false);
+            G.hidden[g.key] = true; G.list.splice(i, 1); render();
+            var f = {}; f[g.key] = true;
+            return db.collection('app_settings').doc('nika_gaps').set({ hidden: f }, { merge: true }).then(function () { return true; }, function (e) { console.warn('[articles] hide gap:', e && e.message); return false; });
+        },
         // V102.382: 🏷 tags
         tag: function (t) { t = normTag(t); S.tag = S.tag === t ? '' : t; render(); },
         addTag: function (v) { var a = S.cur; if (!a) return; a.tags = tagsOf((a.tags || []).concat(String(v || '').split(','))); render(); var i = document.getElementById('art-tag-in'); if (i) i.focus(); },
