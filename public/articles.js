@@ -13,6 +13,12 @@
     'use strict';
     var BKK = 7 * 3600e3, DONE = ['ok', 'quiz', 'codex', 'hist'];
     var S = { list: null, loading: false, armed: false, tries: 0, cur: null, cl: 'th', lang: 'en', more: false, sig: '', qs: [], qsUnsub: null };
+    // V101.302 (owner pick C): 🎬 an article with a clip opens on it — the chat plays muted with its own captions; tap = sound, ✕ / ⌃ / swipe up = the text
+    var CLIPT = {
+        en: { sound: 'Tap for sound', read: 'Swipe up to read', skip: 'Read the article', rx: 'Pharmacist', q: 'Asks' },
+        th: { sound: 'แตะเพื่อฟังเสียง', read: 'ปัดขึ้นเพื่ออ่าน', skip: 'อ่านบทความ', rx: 'เภสัชกร', q: 'ถาม' },
+        ko: { sound: '탭하면 소리', read: '위로 밀어 읽기', skip: '기사 읽기', rx: '약사', q: '질문' }
+    };
     var T = {
         en: { source: 'Source', kicker: 'Article', min: 'min', more: 'Read more', less: 'Show less', got: 'Got it', save: 'Save', saved: 'Saved', mute: 'Don’t pop up articles', hist: 'All articles in History', rerun: 'For new interns', close: 'Close',
             read: 'Read', anyq: 'Any Q?', askSub: 'Goes to the article’s author · your name is not shown', ask: 'A question', wrong: 'Wrong / out of date', add: 'Please add',
@@ -209,6 +215,20 @@
             // V101.213: the intern's 💬 questions under the article in History, the admin's reply as a green bubble
             '.art-qa{margin:10px 0 2px;padding-top:8px;border-top:1px dashed #e2e8f0;font:400 13px/1.45 Kanit,sans-serif;color:#334155}.art-qa>b{display:block;font-weight:800;font-size:12.5px;color:#4338ca;margin-bottom:4px}' +
             '.art-qa .q{padding:5px 0;overflow-wrap:anywhere}.art-qa .q small{display:block;color:#94a3b8;font-size:11.5px}.art-qa .r{margin-top:4px;background:#ecfdf5;color:#065f46;border-radius:4px 12px 12px 12px;padding:5px 10px;white-space:pre-wrap}';
+        // V101.302 🎬 the clip view (chat story)
+        s.textContent += '#art-sheet .clp-in{display:flex;flex-direction:column;height:min(68vh,560px);margin:-4px -8px 0;background:#e9edf5;border-radius:16px;padding:10px 10px 8px;box-sizing:border-box;position:relative}' +
+            '#art-sheet .clp-top{display:flex;align-items:center;gap:8px}#art-sheet .clp-t{flex:1;min-width:0;font:800 13px/1.3 Kanit,sans-serif;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+            '#art-sheet .clp-snd{flex:none;width:auto;min-height:0;margin:0;padding:6px 11px;border:0;border-radius:999px;background:rgba(15,23,42,.72);color:#fff;font:800 12px/1 Kanit,sans-serif;cursor:pointer}#art-sheet .clp-snd[aria-pressed="true"]{background:#4361ee}' +
+            '#art-sheet .clp-prog{display:flex;gap:3px;margin:8px 2px 6px}#art-sheet .clp-prog i{flex:1;height:3px;border-radius:2px;background:#cbd5e1}#art-sheet .clp-prog i.on{background:#4361ee}' +
+            '#art-sheet .clp-chat{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;gap:7px;overflow:hidden;cursor:pointer}' +
+            '#art-sheet .clp-who{font:800 11px/1 Kanit,sans-serif;color:#64748b;margin:4px 6px 0}#art-sheet .clp-who.rx{align-self:flex-end}' +
+            '#art-sheet .clp-m{max-width:82%;padding:9px 13px;border-radius:16px;font:600 15px/1.4 Kanit,sans-serif;overflow-wrap:anywhere}' +
+            '#art-sheet .clp-m.q{align-self:flex-start;background:#fff;color:#1e293b;border-bottom-left-radius:4px}#art-sheet .clp-m.rx{align-self:flex-end;background:#4361ee;color:#fff;border-bottom-right-radius:4px}' +
+            '#art-sheet .clp-key{align-self:center;max-width:90%;background:#fef3c7;color:#92400e;border-radius:999px;padding:7px 14px;font:800 14px/1.35 Kanit,sans-serif;text-align:center}#art-sheet .clp-in .fresh{animation:clpIn .28s ease-out}' +
+            '#art-sheet .clp-m.now,#art-sheet .clp-key.now{box-shadow:0 0 0 2px #facc15}@keyframes clpIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}' +
+            '#art-sheet .clp-read{align-self:center;width:auto;min-height:0;margin:8px 0 0;padding:8px 16px;border:0;border-radius:999px;background:#fff;color:#4361ee;font:800 13px/1 Kanit,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(15,23,42,.12)}' +
+            '#art-sheet .clp-read.end{background:#4361ee;color:#fff;animation:clpNudge 1.4s ease-in-out infinite}@keyframes clpNudge{50%{transform:translateY(-4px)}}' +
+            '@media (prefers-reduced-motion: reduce){#art-sheet .clp-in .fresh,#art-sheet .clp-read.end{animation:none}}';
         document.head.appendChild(s);
     }
     function busy() {
@@ -241,10 +261,54 @@
         var n = historyItems(S.list, me(), Date.now(), S.qs).length;
         return '<button type="button" class="bm hist" onclick="internArticles.toHistory()" title="' + t.hist + '" aria-label="' + t.hist + ' (' + n + ')">📰' + (n > 1 ? '<i>' + n + '</i>' : '') + '</button>';
     }
+    // the clip in the reading language, else EN, else any; null when the article has none
+    function clipFor(a, L) {
+        var c = (a && a.clip) || {}, ok = function (k) { return Array.isArray(c[k]) && c[k].some(function (x) { return x && String(x.t || '').trim(); }); };
+        var lang = ok(L) ? L : ok('en') ? 'en' : ['th', 'ko'].filter(ok)[0];
+        return lang ? { lang: lang, lines: c[lang].filter(function (x) { return x && String(x.t || '').trim(); }).slice(0, 12), i: 0, sound: false, done: false } : null;
+    }
+    function clipStopSpeak() { clearTimeout(S.clipT); S.clipN = (S.clipN || 0) + 1; if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch (e) { /* nothing speaking */ } } }
+    function renderClip(sh) {
+        var k = S.clip, w = CLIPT[k.lang] || CLIPT.en, a = S.cur.a, tx = textOf(a, k.lang);
+        sh.innerHTML = '<div class="clp-in" id="art-clip"><div class="clp-top"><span class="clp-t" id="art-title">' + esc((a.cover && a.cover.emoji) || '📰') + ' ' + esc(tx.title) + '</span>' +
+            '<button type="button" class="clp-snd" onclick="internArticles.clipSound()" aria-pressed="' + k.sound + '" aria-label="' + esc(w.sound) + '">' + (k.sound ? '🔊' : '🔇 ' + esc(w.sound)) + '</button>' +
+            '<button type="button" class="x" onclick="internArticles.clipSkip()" aria-label="' + esc(w.skip) + '" title="' + esc(w.skip) + '">✕</button></div>' +
+            '<div class="clp-prog">' + k.lines.map(function (x, i) { return '<i' + (i <= k.i ? ' class="on"' : '') + '></i>'; }).join('') + '</div>' +
+            '<div class="clp-chat" onclick="internArticles.clipSound()">' + k.lines.slice(0, k.i + 1).map(function (x, i, all) {
+                var now = i === k.i && !k.done ? ' now fresh' : '';
+                if (x.w === 'key') return '<div class="clp-key' + now + '">💡 ' + esc(x.t) + '</div>';
+                var w2 = x.w === 'q' ? 'q' : 'rx';
+                return (i === 0 || all[i - 1].w !== x.w ? '<span class="clp-who ' + w2 + '">' + (w2 === 'q' ? '🙋 ' + esc(w.q) : '🧑‍⚕️ ' + esc(w.rx)) + '</span>' : '') + '<div class="clp-m ' + w2 + now + '">' + esc(x.t) + '</div>';
+            }).join('') + '</div>' +
+            '<button type="button" class="clp-read' + (k.done ? ' end' : '') + '" onclick="internArticles.clipSkip()">⌃ ' + esc(k.done ? w.skip : w.read) + '</button></div>';
+        var el = document.getElementById('art-clip'), y0 = null;
+        if (el) {
+            el.addEventListener('touchstart', function (e) { y0 = e.touches && e.touches[0] ? e.touches[0].clientY : null; }, { passive: true });
+            el.addEventListener('touchend', function (e) { var t = e.changedTouches && e.changedTouches[0]; if (y0 != null && t && y0 - t.clientY > 40) api.clipSkip(); y0 = null; }, { passive: true });
+        }
+    }
+    // one line at a time: the voice's end (sound on) or a reading-time timer (muted) moves on; the last line stays with "⌃ Read the article"
+    function clipStep() {
+        var k = S.clip; if (!k) return;
+        clipStopSpeak(); var n = S.clipN;
+        render();
+        var x = k.lines[k.i]; if (!x) return;
+        var fired = false, next = function () { if (fired || S.clip !== k || S.clipN !== n) return; fired = true; clearTimeout(S.clipT); if (k.i < k.lines.length - 1) { k.i++; clipStep(); } else { k.done = true; render(); } };
+        var ms = 1100 + String(x.t).length * 60, synth = window.speechSynthesis;
+        if (k.sound && synth && window.SpeechSynthesisUtterance) {
+            try {
+                var u = new SpeechSynthesisUtterance(x.t); u.lang = { en: 'en-US', th: 'th-TH', ko: 'ko-KR' }[k.lang] || 'en-US'; u.pitch = x.w === 'q' ? 1.2 : 0.95;
+                u.onend = function () { S.clipT = setTimeout(next, 250); }; u.onerror = next;
+                synth.speak(u); S.clipT = setTimeout(next, ms + 5000); return;
+            } catch (e) { /* no voice: timed */ }
+        }
+        S.clipT = setTimeout(next, ms);
+    }
     function md(text) { return typeof window.renderMd === 'function' ? window.renderMd(text) : esc(text).replace(/\n/g, '<br>'); }
     function render() {
         var c = S.cur, a = c.a, tx = textOf(a, S.lang), t = T[S.lang] || T.en, have = langs(a), saved = !!((me().articleSeen || {})[a.id] || {}).saved;
         var sh = document.getElementById('art-sheet'); if (!sh) return;
+        if (S.clip) return renderClip(sh);
         if (S.ask) return renderAsk(sh, t);
         var info = (c.kind === 'rerun' ? '🔁 ' + t.rerun : t.kicker) + ' · ' + (a.readMin || 1) + ' ' + t.min;
         sh.innerHTML = '<div class="band"><span class="cov" title="' + esc(info) + '" aria-label="' + esc(info) + '">' + esc((a.cover && a.cover.emoji) || '📰') + (c.kind === 'rerun' ? '<small>🔁</small>' : '') + '</span>' +
@@ -321,11 +385,11 @@
     }
     function show(c) {
         css();
-        S.cur = c; S.lang = S.cl; S.more = false; S.got = false; S.ask = null;
+        S.cur = c; S.lang = S.cl; S.more = false; S.got = false; S.ask = null; S.clip = clipFor(c.a, S.cl);
         var back = document.createElement('div'); back.id = 'art-back'; back.onclick = function () { close('x'); };
         var sh = document.createElement('div'); sh.id = 'art-sheet'; sh.className = 'lang-no-toggle'; sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-modal', 'true'); sh.setAttribute('aria-labelledby', 'art-title');
         document.body.appendChild(back); document.body.appendChild(sh);
-        render();
+        if (S.clip) clipStep(); else render();
         document.addEventListener('keydown', onKey);
         var today = bkkDay(Date.now());
         if (window.myUserDoc) window.myUserDoc.articlePopDay = today;
@@ -336,7 +400,7 @@
     function onKey(e) { if (e.key === 'Escape') close('x'); }
     function close(act) {
         var c = S.cur; if (!c) return Promise.resolve();
-        S.cur = null; clearTimeout(S.gotTimer); S.got = false; S.ask = null;
+        S.cur = null; clearTimeout(S.gotTimer); S.got = false; S.ask = null; if (S.clip) { S.clip = null; clipStopSpeak(); }
         ['art-back', 'art-sheet'].forEach(function (id) { var el = document.getElementById(id); if (el) el.remove(); });
         document.removeEventListener('keydown', onKey);
         var p = act === 'x' ? (isDone((me().articleSeen || {})[c.a.id]) ? Promise.resolve() : setSeen(c.a.id, { act: 'x' })) : markRead(c.a.id, act);
@@ -553,7 +617,7 @@
         var pill = row.querySelector('.hl-pill'); if (pill) pill.outerHTML = pillHtml({ metadata: { state: 'read', saved: !!(s && s.saved) } });
     });
 
-    window.internArticles = {
+    var api = window.internArticles = {
         // called from the users/{uid} snapshot in index.html
         onUserDoc: function () {
             if (!S.armed) { S.armed = true; if (!blocked()) setTimeout(function () { load(); listenMine(); }, 2500); }
@@ -568,6 +632,9 @@
         askKind: function (k) { if (!S.ask || S.ask.busy) return; S.ask.kind = k; render(); },
         lang: function (l) { var a = S.cur && S.cur.a, have = a ? langs(a) : []; S.lang = l || (have.length ? nextLang(have, textOf(a, S.lang).lang) : S.lang); render(); },
         toggleMore: function () { S.more = !S.more; render(); },
+        // V101.302 🎬 clip: tap = sound on / off (from the top once it has ended); ✕ / ⌃ / swipe up = the article text
+        clipSound: function () { var k = S.clip; if (!k) return; k.sound = !k.sound; if (k.sound && k.done) { k.i = 0; k.done = false; } if (k.sound || !k.done) clipStep(); else { clipStopSpeak(); render(); } },
+        clipSkip: function () { if (!S.clip) return; S.clip = null; clipStopSpeak(); render(); var ok = document.querySelector('#art-sheet .ok'); if (ok) ok.focus(); },
         // V101.269: close the sheet (not read: it stays in History as closed) → Work ▸ History with the 📰 chip on, like the ?tab=history deep link
         toHistory: function () {
             close('x');
@@ -616,6 +683,6 @@
             if (S.cur) close('codex'); else markRead(articleId, 'codex');
             if (typeof dxOpenLinkedDrug === 'function') dxOpenLinkedDrug(drugId);
         },
-        _S: S, _pick: pick, _owed: owed, _kindOf: kindOf, _audienceOk: audienceOk, _historyItems: historyItems, _textOf: textOf, _linksHtml: linksHtml, _bkkDay: bkkDay, _isDone: isDone, _later: later, _show: show, _award: awardQuizBeri
+        _S: S, _clipFor: clipFor, _pick: pick, _owed: owed, _kindOf: kindOf, _audienceOk: audienceOk, _historyItems: historyItems, _textOf: textOf, _linksHtml: linksHtml, _bkkDay: bkkDay, _isDone: isDone, _later: later, _show: show, _award: awardQuizBeri
     };
 })();
