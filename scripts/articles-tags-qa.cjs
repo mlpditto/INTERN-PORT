@@ -62,8 +62,8 @@ assert.ok(fs.readFileSync('docs/features/articles.md', 'utf8').includes('`articl
       out.saved = [upd && upd[1], upd && upd[2].tags, JSON.stringify(Articles._toDoc(S.cur, 'draft').tags)];
       // the cap: 8
       Articles.addTag('t1,t2,t3,t4,t5,t6,t7,t8,t9'); out.cap = [S.cur.tags.length, !!q('#art-tag-in'), (field().querySelector('.art-ml:last-child') || {}).textContent];
-      // a new article starts with no tags and the field present
-      Articles.edit(null); out.blank = [S.cur.tags, !!q('#art-tag-in')];
+      // a new article starts with no tags: no field, a 🏷 + chip by 🗑 (V102.624) that opens it
+      Articles.edit(null); out.blank = [S.cur.tags, !!q('#art-tag-in'), !!q('#art-btns .art-tag-add')]; Articles.tagOpen(); out.blank.push(!!q('#art-tag-in'), document.activeElement && document.activeElement.id, !!q('#art-btns .art-tag-add'));
       return out;
     });
     assert.deepEqual(r.norm, [['infection', 'fever', 'red flag', 'tropical'], [], ['x', 'a very long tag name tha', 'd', 'e', 'f', 'g', 'h', 'i']], 'tags normalise: lowercase, trimmed, de-duplicated, # dropped, ≤ 24 chars, ≤ 8: ' + JSON.stringify(r.norm));
@@ -76,7 +76,7 @@ assert.ok(fs.readFileSync('docs/features/articles.md', 'utf8').includes('`articl
     assert.deepEqual(r.dropped, ['fever', 'red flag', 'tropical', 'mosquito', 'dengue'], '✕ drops one');
     assert.deepEqual(r.saved, ['a1', ['fever', 'red flag', 'tropical', 'mosquito', 'dengue'], '["fever","red flag","tropical","mosquito","dengue"]'], 'Save writes tags[] and toDoc carries them: ' + JSON.stringify(r.saved));
     assert.deepEqual(r.cap, [8, false, 'max 8'], 'at 8 the input gives way to "max 8": ' + JSON.stringify(r.cap));
-    assert.deepEqual(r.blank, [[], true], 'a new article: no tags, field present');
+    assert.deepEqual(r.blank, [[], false, true, true, 'art-tag-in', false], 'a new article: no tags, 🏷 + opens the field (focused)');
     assert.deepEqual(errors, [], 'no page errors: ' + errors.join(' | '));
     console.log('PASS: 🏷 Articles tags — normalised tags[], editor chip field with suggestions, row chips (3 + n), tap-to-filter with head chip + counts, Save');
   } finally { await browser.close(); }

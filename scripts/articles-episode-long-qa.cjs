@@ -39,7 +39,7 @@ const EP2 = '👦 The next day, the older brother walks in scratching his arm.\n
         // 1 · reopened saved episode 2 → ✨ Episode 3, and it drafts a NEW article "(3)" with episode 2 in the prompt
         assert.ok(!(await page.evaluate(() => Articles._S.epSrc)), 'no remembered source (a fresh open)');
         assert.equal(await chip().count(), 1, 'the footer offers the next episode');
-        assert.equal((await chip().innerText()).trim(), '✨ Episode 3');
+        assert.equal((await chip().innerText()).trim(), '✨ Ep 3');
         await chip().click(); await page.waitForFunction(() => !Articles._S.aiBusy);
         const r = await page.evaluate(() => ({ title: Articles._S.cur.title.en, id: Articles._S.cur.id, prompt: window.__ai[0] || '', body: Articles._S.cur.body.en }));
         assert.equal(r.title, 'Topical corticosteroids (3)'); assert.equal(r.id, null, 'a new article');
@@ -59,7 +59,7 @@ const EP2 = '👦 The next day, the older brother walks in scratching his arm.\n
         const st = () => page.evaluate(() => { const l = document.getElementById('art-long'), c = document.getElementById('art-count');
             return { long: l ? (l.hidden ? 'hidden' : l.getAttribute('aria-pressed')) : 'none', cls: c.className, err: Articles._validate(Articles._S.cur, false), doc: Articles._toDoc(Articles._S.cur, 'draft').long }; });
         await fill(1900);
-        assert.deepEqual(await st(), { long: 'hidden', cls: '', err: '', doc: false }, 'under the limit: no ⤢ Long');
+        assert.deepEqual(await st(), { long: 'hidden', cls: 'near', err: '', doc: false }, 'under the limit: no ⤢ Long (V102.624: amber from 1800)');
         await fill(2094);
         let s = await st();
         assert.equal(s.long, 'false'); assert.equal(s.cls, 'over'); assert.match(s.err, /EN body is longer than 2000 characters — tap ⤢ Long/);

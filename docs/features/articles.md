@@ -11,6 +11,7 @@ Admin: Dashboard ▸ 📰 Articles. Intern: the daily popup, History row, Codex 
 - `articles-admin-qa` — list, editor blend, read counts, 👥 who read + CSV, ✨ draft / translate
 - `articles-story-draft-qa` — ✨ Draft = a short story (scene → decision → practice, ≤ 2000 hard limit, V102.511); a "➡️ Next:" line → ✨ Episode 2 chip, refused until saved, then a NEW article "(2)" from the same source with the earlier episode in the prompt
 - `articles-episode-long-qa` — a reopened episode with a "➡️ Next:" line still offers ✨ Episode n+1 (V102.622); ⤢ Long lets a body pass 2000 (amber count, `long: true`, ceiling 6000)
+- `articles-editor-lean-qa` — lean editor (V102.624, picks 1A 2A 3A 4C 5B 6A 7A 8C): one-line rows, −n count / amber / no banner, one-line footer, softer formatting, cover + 🩺 💊 🔗 in the title box, Links via 🔗, BKK + 🔁 chip + 🏷 +, EN red dot
 - `articles-copy-qa` — 📋 left of ✨ Draft copies title + body as typed (V102.605)
 - `articles-editor-hints-qa` — empty TH/KO body says interns see 🇬🇧 · ✨ From EN; Saved n h / d ago; When & who remembers open/folded per browser (V102.606)
 - `articles-share-qa` — History row: language pill after the title; Source line `· 📤 LINE f` (FB only with a link); +0.1 score once per article; only the tapped icon turns wave blue; admin sees 📤 n (V101.291 / V102.612)

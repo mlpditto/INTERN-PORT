@@ -49,7 +49,7 @@ const EP2 = '👶 Under one month old the story changes...\n\n✅ **Cefotaxime +
         assert.equal(r.body, EP1, 'the story replaces the notes'); assert.equal(r.title, 'Enoki mushrooms and meningitis', 'a typed title is kept'); assert.equal(r.err, '');
         assert.deepEqual(r.ep, { n: 1, next: 'neonates, the 48–72 h step-up and how long to treat', prev: 0 }, 'the "➡️ Next:" line is remembered as the hand-off');
         assert.match(r.note, /the story continues: save, then ✨ Episode 2$/, 'the note says what to do next');
-        assert.equal(await chip().count(), 1); assert.equal((await chip().innerText()).trim(), '✨ Episode 2', 'the footer offers episode 2');
+        assert.equal(await chip().count(), 1); assert.equal((await chip().innerText()).trim(), '✨ Ep 2', 'the footer offers episode 2 (V102.624: ✨ Ep n)');
 
         // 2 · unsaved → the chip refuses and says so; nothing drafted
         await page.evaluate(() => Articles.episode()); await page.waitForTimeout(80);

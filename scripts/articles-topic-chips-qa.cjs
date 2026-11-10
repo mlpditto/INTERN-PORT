@@ -84,22 +84,22 @@ assert.ok(/match \/disease_codex_drafts\/\{draftId\} \{[\s\S]*?allow create: if 
       return out;
     });
     assert.deepEqual(r.flags, [['🇬🇧', 'English', 'Required to schedule'], ['🇹🇭', 'Thai', 'Thai version'], ['🇰🇷', 'Korean', 'Empty — interns see EN']].map((x, i) => i === 2 ? [x[0], x[1], x[2]] : x).slice(0, 3).map((x, i) => i === 2 ? ['🇰🇷 → 🇬🇧', 'Korean', 'Empty — interns see EN'] : x), 'flags (the letters live in aria-label / title): ' + JSON.stringify(r.flags));
-    assert.deepEqual(r.rowFlags, [['🇬🇧', 'EN'], ['🇹🇭', 'TH — not written yet'], ['🇰🇷', 'KO — not written yet']], 'the list rows too (a missing language says so): ' + JSON.stringify(r.rowFlags));
-    assert.deepEqual(r.row0, [['🩺 Disease', '💊 Drug', '🔗 Quiz'], 'art-xr', ['', '', '']], 'the chip row sits right under the title: ' + JSON.stringify(r.row0));
+    assert.deepEqual(r.rowFlags.slice(0, 2), [['🇹🇭', 'TH — not written yet'], ['🇰🇷', 'KO — not written yet']], 'the list rows show only the missing languages, faded (V102.624): ' + JSON.stringify(r.rowFlags));
+    assert.deepEqual(r.row0, [['🩺', '💊', '🔗'], 'art-xr', ['', '', '']], 'V102.624: 🩺 💊 🔗 icons at the end of the title box: ' + JSON.stringify(r.row0));
     assert.deepEqual(r.dxDraft, ['disease_codex_drafts', 'pending', 'admin1', 'a@x.test', 'a1', 'Myofascial Pain Syndrome (MPS) 💡', 'Myofascial Pain Syndrome', 'กลุ่มอาการปวดกล้ามเนื้อและพังผืด', ['MPS'], false, true, 'TS', '', true], 'an EMPTY draft with just the topic: ' + JSON.stringify(r.dxDraft));
     assert.deepEqual(r.dxArt, ['update', 'articles', 'a1', { dx: { draftId: 'd9', publishedId: '', name: 'Myofascial Pain Syndrome' } }], 'the article remembers it');
-    assert.deepEqual(r.after.slice(0, 5), ['🩺 Draft', 'ring', { draftId: 'd9', publishedId: '', name: 'Myofascial Pain Syndrome' }, true, 'd9'], 'amber ring "Draft", not dirty: ' + JSON.stringify(r.after));
+    assert.deepEqual(r.after.slice(0, 5), ['🩺', 'ring', { draftId: 'd9', publishedId: '', name: 'Myofascial Pain Syndrome' }, true, 'd9'], 'amber ring "Draft", not dirty: ' + JSON.stringify(r.after));
     assert.match(r.after[5], /Pending Drafts.*Poneglyph/); assert.equal(r.after[6], 0, 'no AI call');
     assert.deepEqual(r.linked, [1, ['drafts'], 0, 'none'], 'a ringed chip opens Pending Drafts, writes nothing: ' + JSON.stringify(r.linked));
-    assert.deepEqual(r.pubChip, ['🩺 In Codex', 'ring ok'], 'green when published'); assert.deepEqual(r.pubOpen, ['pub1'], 'published → the entry opens');
+    assert.deepEqual(r.pubChip, ['🩺', 'ring ok'], 'green when published'); assert.deepEqual(r.pubOpen, ['pub1'], 'published → the entry opens');
     assert.deepEqual(r.dirtySend.map(x => x.slice(0, 2).join('/') + ':' + x[2]), ['update/articles:scheduled', 'add/disease_codex_drafts:Dengue fever', 'update/articles:dx'], 'saves first (stays scheduled), then the draft, then the link: ' + JSON.stringify(r.dirtySend));
     assert.deepEqual(r.dup, ['⚠️ 🩺 "Hypertension" is already in the Codex (id x1) — open it there instead.', 0, false], 'a duplicate is refused, nothing written, the chip is usable again: ' + JSON.stringify(r.dup));
     assert.deepEqual(r.dcDraft, ['drug_codex_drafts', 'pending', 'Metformin', ['Glucophage', 'Glumet'], false, true, 'a3'], '💊: generic name + brand names: ' + JSON.stringify(r.dcDraft));
     assert.deepEqual(r.dcArt.slice(0, 3), ['update', 'articles', 'a3']); assert.equal(r.dcArt[3].dc.draftId, 'd9');
-    assert.deepEqual(r.dcChip, ['💊 Draft', 'ring']);
+    assert.deepEqual(r.dcChip, ['💊', 'ring']);
     assert.deepEqual(r.quiz, [true, 'quiz', true], '🔗 opens the quiz picker: ' + JSON.stringify(r.quiz));
     assert.equal(r.ai, 0, 'the AI is never called');
     assert.deepEqual(errors, [], 'no page errors: ' + errors.join(' | '));
-    console.log('PASS: Articles editor — flags for EN / TH / KO, 🩺 💊 🔗 chips under the title; one click files an EMPTY Disease / Drug Codex draft (name, aliases, TH name; no AI), saves first, rings amber → green, opens the entry when ringed, refuses a duplicate');
+    console.log('PASS: Articles editor — flags for EN / TH / KO, 🩺 💊 🔗 icons in the title box (V102.624); one click files an EMPTY Disease / Drug Codex draft (name, aliases, TH name; no AI), saves first, rings amber → green, opens the entry when ringed, refuses a duplicate');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
