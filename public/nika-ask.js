@@ -43,15 +43,47 @@
     function paintLeft() { const el = q('.nk-left'); if (el) el.textContent = left == null ? '' : t().left(left); }
     function note(icon, head, sub) { return `<div class="nk-pause"><span>${icon}</span><b>${esc(head)}</b><small>${esc(sub)}</small></div>`; }
     function setForm(on) { q('.nk-form').hidden = !on; }
+    // V101.305 (owner): the chips follow the intern's own quizzes: questions answered wrong, newest quiz first, only in quizzes
+    // already passed (score > 0, the same rule that opens the answer key in View Answers), so no key leaks. Else the samples.
+    const strip = s => String(s == null ? '' : s).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    const when = a => { const x = a && a.timestamp; return x ? (x.toMillis ? x.toMillis() : (x.seconds || 0) * 1000) : 0; };
+    function wrongChips() {
+        const out = [], seen = {};
+        try {
+            if (typeof quizAttemptsCache === 'undefined' || typeof quizzesCache === 'undefined' || typeof computeAttemptScore !== 'function') return out;
+            Object.values(quizAttemptsCache).filter(a => a && Array.isArray(a.answers) && !a.isPractice && !a.isPoll).sort((a, b) => when(b) - when(a)).forEach(a => {
+                let quiz = quizzesCache.find(x => x.id === a.quizId);
+                if (quiz && typeof quizForAttempt === 'function') quiz = quizForAttempt(quiz, a, quizzesCache) || quiz;
+                if (!quiz || quiz.isPoll || !(computeAttemptScore(a, quiz.totalPoints) > 0)) return;
+                (quiz.questions || []).forEach((qq, i) => {
+                    const type = qq.type || 'choice';
+                    if (out.length >= 3 || (type !== 'choice' && type !== 'flashcard') || qq.correct == null || Array.isArray(qq.correct) || !Array.isArray(qq.options)) return;
+                    if (a.answers[i] == qq.correct) return;
+                    const stem = strip(qq.q), key = strip(qq.options[qq.correct]);
+                    if (stem.length < 3 || !key || seen[stem]) return;
+                    seen[stem] = 1;
+                    out.push({ wrong: true, label: stem, ask: (stem + ' → ' + key).slice(0, 300) });
+                });
+            });
+        } catch (e) { console.warn('nika chips', e && e.message); }
+        return out;
+    }
+    let chips = [];
+    function paintChips() {
+        const box = q('.nk-chips'); if (!box) return;
+        chips = wrongChips();
+        CHIPS.forEach(c => { if (chips.length < 3) chips.push({ label: c, ask: c }); });
+        box.innerHTML = chips.map((c, i) => `<button type="button" class="nk-chip${c.wrong ? ' nk-wrong' : ''}" data-i="${i}" title="${esc(c.label)}">${c.wrong ? '❌ ' : ''}${esc(c.label)}</button>`).join('');
+        box.querySelectorAll('.nk-chip').forEach(b => { b.onclick = () => { const c = chips[+b.dataset.i]; q('#nk-question').value = c.ask; ask(c.ask); }; });
+    }
 
     function shell() {
         const x = t();
         pane().innerHTML = `<div class="nk-body lang-no-toggle"><div class="nk-form"><div class="nk-box"><textarea id="nk-question" rows="2" maxlength="300" placeholder="${esc(x.ph)}" aria-label="${esc(x.ph)}"></textarea><button type="button" class="nk-go">${esc(x.ask)}</button></div>
-            <div class="nk-chips">${CHIPS.map(c => `<button type="button" class="nk-chip">${esc(c)}</button>`).join('')}</div></div>
+            <div class="nk-chips"></div></div>
             <div class="nk-links">${LINKS.map((l, i) => `<button type="button" class="nk-link" data-i="${i}" title="${esc(l.by)} · ${esc(l.url)}">${l.e} ${esc(document.body.classList.contains('lang-th-on') ? l.th : l.en)} <span aria-hidden="true">↗</span></button>`).join('')}</div>
             <div class="nk-out" aria-live="polite"></div><div class="nk-safe">${esc(x.safe)}</div><div class="nk-left"></div></div>`;
         q('.nk-go').onclick = () => ask(q('#nk-question').value);
-        pane().querySelectorAll('.nk-chip').forEach(c => { c.onclick = () => { q('#nk-question').value = c.textContent; ask(c.textContent); }; });
         pane().querySelectorAll('.nk-link').forEach(b => { b.onclick = () => openOut(LINKS[+b.dataset.i].url); });
     }
     function paused() { setForm(false); q('.nk-out').innerHTML = note('⏸', t().pause, t().pauseSub); }
@@ -107,11 +139,12 @@
     }
 
     window.nikaAsk = {
-        _links: LINKS, _openOut: openOut,
+        _links: LINKS, _openOut: openOut, _wrongChips: wrongChips,
         async show() {
             const card = document.getElementById('dd-codex-card');
             card.classList.remove('nk-sun'); void card.offsetWidth; card.classList.add('nk-sun');
             if (!pane().firstElementChild) shell();
+            paintChips();
             try {
                 if (typeof ensureFirebaseAuthReady === 'function') await ensureFirebaseAuthReady(10000);
                 const r = await call({ peek: true });
