@@ -45,11 +45,12 @@ assert.ok(admin.includes("certStagePick = 'auto';"), 'every open starts on Auto'
         const m = await page.evaluate(() => {
             const fixed = new Date('2026-11-15T10:00:00').getTime(); Date.now = () => fixed;
             certStagePick = 'auto'; paintCertStage();
-            const out = { auto: document.querySelector('[data-stage="auto"]').textContent, text: document.getElementById('cert-progress-text').textContent,
+            const ring = () => [...document.querySelectorAll('#cert-stage-row [data-auto]')].map(x => x.dataset.stage);   // V102.622: the chip Auto picks
+            const out = { auto: [document.querySelector('[data-stage="auto"]').textContent, ring()], text: document.getElementById('cert-progress-text').textContent,
                 bar: document.getElementById('cert-pbar-fill').style.width, badge: document.getElementById('cert-stage-badge').textContent,
                 split: !document.getElementById('cert-split-en').hidden, extra: getCurrentCertificateExtra().stage };
             setCertStage('near');
-            out.manual = [getCurrentCertificateExtra().stage.key, document.querySelector('[data-stage="near"]').getAttribute('aria-pressed'), document.querySelector('[data-stage="auto"]').textContent];
+            out.manual = [getCurrentCertificateExtra().stage.key, document.querySelector('[data-stage="near"]').getAttribute('aria-pressed'), document.querySelector('[data-stage="auto"]').textContent, ring()];
             setCertStage('done'); out.done = getCurrentCertificateExtra().stage;
             setCertStage('auto');
             document.getElementById('cert-progress-print').checked = false; out.noPrint = getCurrentCertificateExtra().stage;
@@ -62,9 +63,9 @@ assert.ok(admin.includes("certStagePick = 'auto';"), 'every open starts on Auto'
             return out;
         });
         assert.deepEqual(m, {
-            auto: 'Auto · 🟢 Mid', text: '28 / 40 วัน · 70%', bar: '70%', badge: '🟢 Mid', split: true,
+            auto: ['Auto', ['mid']], text: '28 / 40 วัน · 70%', bar: '70%', badge: '🟢 Mid', split: true,
             extra: { key: 'mid', text: '28 / 40 วัน (days) · 70% · Progressing', pct: 70, sign: false, qr: false },
-            manual: ['near', 'true', 'Auto'], done: null,
+            manual: ['near', 'true', 'Auto', []], done: null,
             noPrint: { key: 'mid', text: '', pct: 70, sign: false, qr: false }, splitAfter: false,
             hours: ['112 / 160 ชม. · 70%', 'mid'], camp: [true, null]
         });
