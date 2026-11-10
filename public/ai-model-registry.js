@@ -203,6 +203,24 @@ window.AI_MODEL_REGISTRY = {
       "rollout": "trial-only-defaults-unchanged"
     },
     {
+      "id": "claude-fable-5-2",
+      "label": "Claude Fable 5.2",
+      "provider": "anthropic",
+      "adapter": "messages",
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text",
+        "json"
+      ],
+      "selectable": true,
+      "access": "verified-2026-11-10",
+      "validation": "pending-live-probe",
+      "rollout": "trial-only-defaults-unchanged"
+    },
+    {
       "id": "claude-fable-5-1",
       "label": "Claude Fable 5.1",
       "provider": "anthropic",
@@ -215,7 +233,7 @@ window.AI_MODEL_REGISTRY = {
         "text",
         "json"
       ],
-      "selectable": true,
+      "selectable": false,
       "access": "verified-2026-09-11",
       "validation": "text-json-vision-pass",
       "rollout": "trial-only-defaults-unchanged"

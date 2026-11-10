@@ -58,7 +58,8 @@ async function runModernAI({ model, prompt, isJson, visionData, generationOption
         // inside the same call; bio / reasoning_extraction / general_harms still come back as a
         // refusal, which the finish-reason check below reports. No `thinking` field: omitted =
         // adaptive thinking, which at effort low skips thinking on most simple requests.
-        const fallback = model === 'claude-sonnet-5-5';
+        // V102.627: Claude Fable 5.2 (replaces Fable 5.1) gets the same server-side fallback — a declined request re-runs inside the same call
+        const fallback = model === 'claude-sonnet-5-5' || model === 'claude-fable-5-2';
         ({ data } = await post('https://api.anthropic.com/v1/messages', {
             model, max_tokens: max, output_config: { effort: 'low' }, messages: [{ role: 'user', content }],
             ...(fallback ? { fallbacks: 'default' } : {})
