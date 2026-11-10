@@ -22,6 +22,7 @@ Intern: ⋯ on the profile card ▸ the 🏅 ring on the month row turns into �
 - `cert-request-ring-qa` — 🏅 ring = request (🎓 / ⏳ / 🎓✓, fits 30px), last-day request below the gate (V101.300: on the bar, no big grad slot), how-to once per device
 - `cert-step-bar-qa` — V101.299 day bar right label = cert step (🏅 +n · 🎓 Request · ⏳ · ⬇️ PDF), 🎓 pin at the bar end, survives a date redraw
 - `cert-classic-frame-qa` — the frame follows the layout: 🌊 Wada = thin wave line, ⚡ Naru = Classic (navy band, rosette holds the QR); signature (Great Vibes) left + DATE ISSUED (today · period · hours) right, both frames, 4 languages
+- `cert-name-row-qa` — Name row pick A (V102.623): one row, icons in the boxes, 🖨️ = print box, ✂️ → editable First / Last + ✓ Save (no confirm), Thai in EN = amber + ⚠️, both layouts
 - `cert-issue-deliver-qa` — Certificate Request card rail (🎓 Issue · 📄 PDF · 👤 Hub · 💬 Chat · 🗑); intern 🎓✓ → sheet ⬇️ PDF via `getMyCertificate` (LINE ID token) + 📤 verify-link share
 
 ## What usually lies
