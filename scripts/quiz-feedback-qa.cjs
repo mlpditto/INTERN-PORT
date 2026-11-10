@@ -50,7 +50,7 @@ const modalEnd = html.indexOf('        <!-- V92.95: Score Audit Modal',modalStar
         assert.equal(await page.locator('#qfp-ai-btn').isVisible(),false);
         assert.ok(await page.locator('.qfp-insight').evaluate(e=>e.getBoundingClientRect().height)<60,'empty AI Insight stays one slim row');
         assert.deepEqual(await page.locator('#default-qfp-model option').evaluateAll(es=>es.map(e=>e.value)),ids);
-        for (const saved of ['', 'gpt-4o-mini', 'unknown-model', 'gpt-6-astra', 'claude-fable-5-1']) {
+        for (const saved of ['', 'gpt-4o-mini', 'unknown-model', 'gpt-6-astra', 'claude-fable-5-2']) {
             await page.evaluate(saved=>{localStorage.setItem('ai_default_qfp_model',saved);delete document.getElementById('default-qfp-model').dataset.registryReady;initRegistryModelSelectors();},saved);
             const expected=ids.includes(saved)?saved:'gpt-6-luna';
             assert.equal(await page.locator('#default-qfp-model').inputValue(),expected);

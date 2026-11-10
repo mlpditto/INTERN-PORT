@@ -40,7 +40,7 @@ const BODY = '<div id="a"><input type="hidden" id="research-model-select" value=
             assert.equal(await a.locator('[data-value][aria-pressed="true"]').count(), 1);
             // an outside change of the value moves the vendor tab with it
             await page.evaluate(() => { const i = document.getElementById('research-model-select'); i.value = 'claude-opus-5-5'; i.dispatchEvent(new Event('change')); });
-            assert.deepEqual((await shown(a)).sort(), ['claude-haiku-5-5', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-fable-5-1'].sort(), 'follows the value');
+            assert.deepEqual((await shown(a)).sort(), ['claude-haiku-5-5', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-fable-5-2'].sort(), 'follows the value');
 
             // a rail whose row already has its own provider tabs keeps its layout (no second tab bar)
             assert.equal(await page.locator('[data-model-input="lp-ai-model"]').count(), 1, 'the tabbed row still gets its rail');
