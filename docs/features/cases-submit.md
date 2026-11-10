@@ -10,6 +10,7 @@ Intern: the ＋ sunset tab on the right edge ▸ Submit New. Home ▸ My Cases.
 
 - `fab-edge-tab-qa` — the ＋ is a sunset tab on the right edge, above the Safari bar
 - `submit-new-lean-qa` — Submit New lean: chips, pinned Submit, one-row Case form
+- `case-kidney-qa` — 🫘 Kidney tile (V101.304): icons-only tiles (short word when open), Thai-CKD score (age · SBP · waist · DM +3), kit rules (criterion / ≥7 / 3–6 + modifier), strip result, saved as `kidney` only when touched
 - `submit-product-launcher-qa` — the Product launcher opens the in-modal Product pane
 - `submit-event-qa` — new invites start private (invite-ticket.js)
 - `case-studio-ui-check` — Case studio UI (Playwright)

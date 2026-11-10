@@ -254,7 +254,7 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
             caseExtrasReset(); o.afterReset = [caseExtrasCollect(), $('u-opt-adr').hidden, $('u-opt-adr-score').querySelector('em').textContent, $('u-opt-adr-drug').value, document.querySelector('.u-opt-tile[data-opt="adr"] .u-opt-n').hidden];
             return o;
         });
-        assert.deepEqual(adr.tiles, ['meds', 'labs', 'rights', 'appt', 'adr'], 'five tiles, ⚠️ ADR last; 📋 Daily log moved to the footer');
+        assert.deepEqual(adr.tiles, ['meds', 'labs', 'rights', 'appt', 'adr', 'kidney'], 'six tiles (V101.304: + 🫘 Kidney last); 📋 Daily log moved to the footer');
         assert.ok(adr.hidden0 && !adr.hidden1 && adr.rows === 10, 'the ADR block folds open with the 10 Naranjo questions');
         assert.ok(adr.oneLine.every(x => x[1] <= x[2] + 1 && x[3] < 24), 'every question fits one line on the phone: ' + JSON.stringify(adr.oneLine));
         assert.deepEqual(adr.default, ['0', 'doubtful', 'uuuuuuuuuu'], 'every answer starts at ? (0) → 0 Doubtful');
