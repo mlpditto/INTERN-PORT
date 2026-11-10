@@ -13,6 +13,8 @@ Admin: Dashboard ▸ 📰 Articles. Intern: the daily popup, History row, Codex 
 - `articles-episode-long-qa` — a reopened episode with a "➡️ Next:" line still offers ✨ Episode n+1 (V102.622); ⤢ Long lets a body pass 2000 (amber count, `long: true`, ceiling 6000)
 - `articles-editor-lean-qa` — lean editor (V102.624, picks 1A 2A 3A 4C 5B 6A 7A 8C): one-line rows, −n count / amber / no banner, one-line footer, softer formatting, cover + 🩺 💊 🔗 in the title box, Links via 🔗, BKK + 🔁 chip + 🏷 +, EN red dot
 - `articles-clip-qa` — 🎬 Clip composer (V102.625, look C chat story · admin A): preview column → chat clip, ✨ Q/RX/KEY script, invented numbers ⚠️, edit / speaker / add / remove, ▶ Play, saved with the article
+- `articles-clip-intern-qa` — intern popup opens on the 🎬 clip (V101.302, pick C): muted + captions one line at a time, tap = phone voice, ⌃ / ✕ / swipe up = the text, TH → EN fallback, no clip = as before
+- `articles-clip-voice-qa` — 🎬 Clip ▶ Play with the AI voice (V102.626): Gemini TTS per line (🙋 Kore · 🧑‍⚕️/💡 Puck), cached on replay, failed line → computer voice + note, no key = computer voice
 - `articles-copy-qa` — 📋 left of ✨ Draft copies title + body as typed (V102.605)
 - `articles-editor-hints-qa` — empty TH/KO body says interns see 🇬🇧 · ✨ From EN; Saved n h / d ago; When & who remembers open/folded per browser (V102.606)
 - `articles-share-qa` — History row: language pill after the title; Source line `· 📤 LINE f` (FB only with a link); +0.1 score once per article; only the tapped icon turns wave blue; admin sees 📤 n (V101.291 / V102.612)
