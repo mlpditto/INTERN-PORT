@@ -1,3 +1,4 @@
+// V101.304: + 🫘 Kidney — who gets a microalbumin kit + the Thai-CKD Risk Score + the strip result; saved as `kidney` only when touched. Tiles show icons; the open one shows its short word.
 // V101.257: Daily log AI (Typhoon, the only provider open to interns): ✨ splits the told case into the EMPTY case fields, 🔍 lists what Plan / Assessment miss. AI never writes Plan or Assessment; patient name + HN are masked before sending; the story itself is not saved.
 // V101.256: + 📋 Daily log — the fields of the faculty reflective daily log table; saved as one `dailyLog` field with only what is filled in. Plan and Assessment are the intern's own writing.
 // V101.204: + ⚠️ ADR / Naranjo — suspected drug + reaction, the 10 Naranjo questions as Yes / No / ? chips (? = 0), live score + category; saved as `adr` only when something was answered or typed.
@@ -27,6 +28,21 @@
     var AI_PROXY = 'https://us-central1-intern-port-edfa7.cloudfunctions.net/callAIProxy', AI_MODEL = 'typhoon-v2.5-30b-a3b-instruct';
     var AI_KEYS = ['pt', 'cc', 'hpi', 'pmh', 'ud', 'mh', 'all', 'drps'];
     var adr = NARANJO.map(function () { return 'u'; });
+    // 🫘 Thai-CKD Risk Score (Rama / Nephrology Society of Thailand): age 45–54 +2, ≥ 55 +4 · SBP <120 0 … ≥160 +5 · DM +3 · waist over +2.
+    // A kit when any criterion chip is on, or the score is ≥ 7, or 3–6 with a modifier (KDIGO 2024 risk factors; CPA Thailand screening rule).
+    var KD_PTS = { age: [0, 2, 4], sbp: [0, 1, 2, 3, 4, 5], waist: [0, 2] }, KD_CRIT = ['hr', 'dm', 'ht', 'nsaid', 'nephro'], KD_MODS = ['bmi', 'family', 'smoke', 'lipid', 'gout'], KD_RES = ['nd', 'neg', 'pos'];
+    var kd = { crit: {}, mods: {}, age: -1, sbp: -1, waist: -1, result: '' };
+    function kdScore() { var s = 0; ['age', 'sbp', 'waist'].forEach(function (k) { if (kd[k] >= 0) s += KD_PTS[k][kd[k]]; }); return s + (kd.crit.dm ? 3 : 0); }
+    function kdRows() { return ['age', 'sbp', 'waist'].filter(function (k) { return kd[k] >= 0; }).length; }
+    function kdBand(s) { return s <= 2 ? '<5%' : s <= 6 ? '5–10%' : s <= 9 ? '10–20%' : '>20%'; }
+    function kdOn(o) { return Object.keys(o).filter(function (k) { return o[k]; }); }
+    // true = a kit · false = no kit (all three rows answered) · null = not decided yet
+    function kdKit() {
+        var s = kdScore();
+        if (kdOn(kd.crit).length || s >= 7 || (s >= 3 && kdOn(kd.mods).length)) return true;
+        return kdRows() === 3 ? false : null;
+    }
+    function kdFilled() { return !!(kdOn(kd.crit).length || kdRows() || kd.result); }
     var KINDS = {
         meds: { box: 'u-opt-meds', a: ['Drug name', 'ชื่อยา'], b: ['Dose · frequency', 'ขนาด · ความถี่'], add: 'Add drug' },
         labs: { box: 'u-opt-labs', a: ['Test', 'รายการตรวจ'], b: ['Result', 'ผล'], add: 'Add result' }
@@ -148,16 +164,30 @@
             show(['Could not check right now · ตรวจไม่ได้ตอนนี้ 지금은 확인할 수 없습니다'], 'err');
         }).then(function () { btn.disabled = false; });
     }
+    function kdPaint() {
+        var box = $('u-opt-kidney'); if (!box) return;
+        var s = kdScore(), kit = kdKit();
+        box.querySelectorAll('[data-c]').forEach(function (c) { c.setAttribute('aria-pressed', String(!!kd.crit[c.dataset.c])); });
+        box.querySelectorAll('[data-m]').forEach(function (c) { c.setAttribute('aria-pressed', String(!!kd.mods[c.dataset.m])); });
+        box.querySelectorAll('.u-kd-seg').forEach(function (g) { g.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', String(+b.dataset.v === kd[g.dataset.s])); }); });
+        box.querySelectorAll('[data-r]').forEach(function (c) { c.setAttribute('aria-pressed', String(c.dataset.r === kd.result)); });
+        box.querySelector('.u-kd-mod').hidden = !(s >= 3 && s <= 6);
+        var v = $('u-kd-verdict'), shown = kdRows() || kd.crit.dm;
+        v.dataset.kit = kit === true ? 'yes' : kit === false ? 'no' : '';
+        v.querySelector('em').textContent = shown ? String(s) : '–';
+        v.querySelector('.pct').textContent = shown ? kdBand(s) : '';
+        v.querySelector('.kit').textContent = kit === true ? '✅ Kit' : kit === false ? '— No kit' : '';
+    }
     function adrFilled() { return !!(trimTo(($('u-opt-adr-drug') || {}).value, LIM.drug) || trimTo(($('u-opt-adr-rx') || {}).value, LIM.rx) || adr.some(function (a) { return a !== 'u'; })); }
 
     // badges + "has data" look on each tile
     function paint() {
-        var counts = { meds: filledRows('meds').length, labs: filledRows('labs').length, rights: rights ? 1 : 0, appt: apptFilled() ? 1 : 0, adr: adrFilled() ? 1 : 0, log: dlFilled() ? 1 : 0 };
+        var counts = { meds: filledRows('meds').length, labs: filledRows('labs').length, rights: rights ? 1 : 0, appt: apptFilled() ? 1 : 0, adr: adrFilled() ? 1 : 0, kidney: kdFilled() ? 1 : 0, log: dlFilled() ? 1 : 0 };
         var score = adrScore(), level = adrLevel(score);
         document.querySelectorAll('#u-case-opt .u-opt-tile, #u-foot-case [data-opt]').forEach(function (t) {
             var k = t.dataset.opt, n = counts[k] || 0, b = t.querySelector('.u-opt-n');
             t.classList.toggle('has', n > 0);
-            if (b) { b.hidden = !n; b.textContent = k === 'meds' || k === 'labs' ? String(n) : k === 'adr' ? String(score) : '✓'; }
+            if (b) { b.hidden = !n; b.textContent = k === 'meds' || k === 'labs' ? String(n) : k === 'adr' ? String(score) : k === 'kidney' && (kdRows() || kd.crit.dm) ? String(kdScore()) : '✓'; }
         });
         var other = $('u-opt-rights-other');
         if (other) other.hidden = rights !== 'other';
@@ -166,6 +196,7 @@
         document.querySelectorAll('#u-opt-adr .u-nq button').forEach(function (c) { c.setAttribute('aria-pressed', String(adr[+c.dataset.q] === c.dataset.a)); });
         var bar = $('u-opt-adr-score');
         if (bar) { bar.dataset.lv = level; bar.querySelector('em').textContent = String(score); bar.querySelector('.lv').textContent = ADR_LEVELS[level]; }
+        kdPaint();
         var dl = $('u-opt-adr-list');
         if (dl) dl.innerHTML = filledRows('meds').map(function (p) { return p[0]; }).filter(Boolean).map(function (n) { return '<option value="' + n.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '"></option>'; }).join('');
     }
@@ -233,6 +264,11 @@
         });
         ['u-opt-appt-date', 'u-opt-appt-place', 'u-opt-rights-other', 'u-opt-adr-drug', 'u-opt-adr-rx'].forEach(function (id) { var e = $(id); if (e) e.addEventListener('input', paint); });
         wrap.querySelectorAll('#u-opt-adr .u-nq button').forEach(function (c) { c.addEventListener('click', function () { adr[+c.dataset.q] = c.dataset.a; paint(); }); });
+        // 🫘 a second tap clears a pick
+        wrap.querySelectorAll('#u-opt-kidney [data-c]').forEach(function (c) { c.addEventListener('click', function () { kd.crit[c.dataset.c] = !kd.crit[c.dataset.c]; paint(); }); });
+        wrap.querySelectorAll('#u-opt-kidney [data-m]').forEach(function (c) { c.addEventListener('click', function () { kd.mods[c.dataset.m] = !kd.mods[c.dataset.m]; paint(); }); });
+        wrap.querySelectorAll('#u-opt-kidney .u-kd-seg button').forEach(function (b) { b.addEventListener('click', function () { var k = b.parentNode.dataset.s, v = +b.dataset.v; kd[k] = kd[k] === v ? -1 : v; paint(); }); });
+        wrap.querySelectorAll('#u-opt-kidney [data-r]').forEach(function (c) { c.addEventListener('click', function () { kd.result = kd.result === c.dataset.r ? '' : c.dataset.r; paint(); }); });
         paint();
     }
 
@@ -262,6 +298,15 @@
             out.adr.score = score;
             out.adr.category = adrLevel(score);
         }
+        if (kdFilled()) {
+            var ks = kdScore(), kk = kdKit(), mods = kdOn(kd.mods), kv = { crit: KD_CRIT.filter(function (c) { return kd.crit[c]; }) };
+            ['age', 'sbp', 'waist'].forEach(function (k) { if (kd[k] >= 0) kv[k] = kd[k]; });
+            if (kdRows() || kd.crit.dm) { kv.score = ks; kv.band = kdBand(ks); }
+            if (mods.length && ks >= 3 && ks <= 6) kv.mods = KD_MODS.filter(function (m) { return kd.mods[m]; });
+            if (kk !== null) kv.kit = kk;
+            if (KD_RES.indexOf(kd.result) >= 0) kv.result = kd.result;
+            out.kidney = kv;
+        }
         if (dlFilled()) {
             out.dailyLog = {};
             DAILY_LOG.forEach(function (r) { var v = dlValue(r); if (v) out.dailyLog[r[0]] = v; });
@@ -272,7 +317,7 @@
     var CASE_HELP = {
         en: { title: '🩺 How to send a case', close: 'Close help', steps: [
             ['1 · Required', 'Case No. (HN) and at least one Disease System. Tap several systems if the case needs them: the first one you tap is the main system.'],
-            ['2 · Optional', 'Patient name, symptoms and the five tiles (Medications, Lab results, Rights, Appointment, ADR). Open only what you have; skip the rest.'],
+            ['2 · Optional', 'Patient name, symptoms and the six tiles (Medications, Lab results, Rights, Appointment, ADR, 🫘 Kidney screening). Open only what you have; skip the rest.'],
             ['3 · Daily log', 'For your instructor\'s table. Tell the case in your own words, without the name or HN → ✨ Split into the table fills the empty boxes → check every box, AI can be wrong.'],
             ['4 · Plan + Assessment', 'Write these yourself: they are your thinking. 🔍 What am I missing lists the gaps and never writes for you.'],
             ['5 · PDF', 'Optional. Cover the patient name, HN, ID number and address on every page first. Gemini reads the file for the admin after you send it.'],
@@ -280,7 +325,7 @@
         ], note: '🔒 Never put a patient name or HN in the story. Crop anything that identifies the patient from photos.' },
         th: { title: '🩺 วิธีส่งเคส', close: 'ปิดคำแนะนำ', steps: [
             ['1 · ต้องกรอก', 'Case No. (HN) และ Disease System อย่างน้อย 1 ระบบ เลือกได้หลายระบบถ้าเคสเกี่ยวข้อง ระบบแรกที่แตะคือระบบหลัก'],
-            ['2 · ไม่บังคับ', 'ชื่อผู้ป่วย อาการ และ 5 ช่อง (ยา ผลแล็บ สิทธิการรักษา นัดหมาย ADR) เปิดเฉพาะที่มีข้อมูล ที่เหลือข้ามได้'],
+            ['2 · ไม่บังคับ', 'ชื่อผู้ป่วย อาการ และ 6 ช่อง (ยา ผลแล็บ สิทธิการรักษา นัดหมาย ADR 🫘 คัดกรองไต) เปิดเฉพาะที่มีข้อมูล ที่เหลือข้ามได้'],
             ['3 · Daily log', 'สำหรับตารางส่งอาจารย์ เล่าเคสด้วยคำของตัวเอง ไม่ต้องใส่ชื่อหรือ HN → กด ✨ แยกลงตาราง ระบบจะเติมช่องที่ว่าง → ตรวจทุกช่อง เพราะ AI อาจผิดได้'],
             ['4 · Plan + Assessment', 'เขียนเอง เพราะเป็นความคิดของคุณ ปุ่ม 🔍 ตรวจว่าขาดอะไร จะบอกสิ่งที่ยังขาด แต่ไม่เขียนให้'],
             ['5 · PDF', 'ไม่บังคับ ปิดชื่อผู้ป่วย, HN, เลขบัตร และที่อยู่ทุกหน้าก่อนแนบ Gemini จะอ่านไฟล์ให้ admin หลังคุณส่ง'],
@@ -288,7 +333,7 @@
         ], note: '🔒 ห้ามใส่ชื่อหรือ HN ของผู้ป่วยในเรื่องเล่า และครอปส่วนที่ระบุตัวผู้ป่วยออกจากรูป' },
         ko: { title: '🩺 케이스 제출 방법', close: '도움말 닫기', steps: [
             ['1 · 필수', 'Case No. (HN)와 Disease System 1개 이상. 여러 계통을 선택할 수 있으며 처음 누른 계통이 주 계통입니다.'],
-            ['2 · 선택', '환자 이름, 증상, 5개 항목(약물, 검사 결과, 권리, 예약, ADR). 있는 내용만 열고 나머지는 건너뛰세요.'],
+            ['2 · 선택', '환자 이름, 증상, 6개 항목(약물, 검사 결과, 권리, 예약, ADR, 🫘 신장 선별). 있는 내용만 열고 나머지는 건너뛰세요.'],
             ['3 · Daily log', '지도교수 제출용 표입니다. 이름이나 HN 없이 케이스를 직접 설명 → ✨ 표로 나누기가 빈칸을 채움 → AI가 틀릴 수 있으니 모든 칸을 확인하세요.'],
             ['4 · Plan + Assessment', '본인의 사고이므로 직접 작성하세요. 🔍 빠진 내용 확인은 부족한 점만 알려 주고 대신 쓰지 않습니다.'],
             ['5 · PDF', '선택 사항입니다. 먼저 모든 페이지의 환자 이름, HN, 신분증 번호, 주소를 가리세요. 제출 후 Gemini가 관리자를 위해 파일을 읽습니다.'],
@@ -309,6 +354,7 @@
     window.caseExtrasReset = function () {
         rights = '';
         adr = NARANJO.map(function () { return 'u'; });
+        kd = { crit: {}, mods: {}, age: -1, sbp: -1, waist: -1, result: '' };
         Object.keys(KINDS).forEach(function (k) { var list = $(KINDS[k].box) && $(KINDS[k].box).querySelector('.u-opt-rows'); if (list) list.innerHTML = ''; });
         ['u-opt-appt-date', 'u-opt-appt-place', 'u-opt-rights-other', 'u-opt-adr-drug', 'u-opt-adr-rx'].forEach(function (id) { var e = $(id); if (e) e.value = ''; });
         DAILY_LOG.forEach(function (r) { var e = $('u-dl-' + r[0]); if (e) { e.value = ''; e.classList.remove('ai'); } });
