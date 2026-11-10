@@ -369,7 +369,7 @@
             '.clp-l input{flex:1;min-width:0;border:0;outline:0;font:inherit;font-size:12.5px;font-weight:600;color:#1e293b;background:transparent;padding:3px 2px;margin:0}' +
             '.clp-w,.clp-d{min-height:0!important;width:26px!important;height:26px;margin:0!important;padding:0!important;border:0!important;background:#f1f5f9!important;border-radius:7px;font-size:13px;cursor:pointer;flex:none}.clp-d{background:none!important;color:#94a3b8;font-size:12px}.clp-bad{cursor:help}' +
             '.clp-add{min-height:0!important;width:auto!important;align-self:flex-start;margin:0!important;padding:3px 10px!important;border:1.5px dashed #cbd5e1;border-radius:999px;background:#fff;color:#64748b;font-size:12px;font-weight:800;cursor:pointer}' +
-            '.clp-note{font-size:11px;color:#94a3b8;text-align:center}' +
+            '.clp-note{font-size:11px;color:#94a3b8;text-align:center}.clp-verr{color:#b45309;font-weight:700}' +
             '.art-wl{max-height:56vh;overflow:auto}.art-ai{margin-left:auto;display:inline-flex;align-items:center;gap:4px}.art-tb .art-ai button{width:auto;padding:0 9px;font-size:12px;white-space:nowrap}.art-sug{display:flex;align-items:center;gap:8px;margin:-2px 0 8px;padding:6px 10px;border:1px solid #c7d2fe;border-radius:10px;background:#eef2ff;color:#3730a3;font:600 12.5px/1.35 Kanit,sans-serif}.art-sug b{flex:1;min-width:0;font-weight:800;overflow-wrap:anywhere}.art-sug span{color:#818cf8;font-size:11px;white-space:nowrap}.art-sug button{width:auto;min-height:0;margin:0;padding:3px 10px;border:1px solid #6366f1;border-radius:999px;background:#fff;color:#3730a3;font:800 12px Kanit,sans-serif;cursor:pointer}.art-sug button.no{border-color:#c7d2fe;color:#64748b}.art-ai .lk{font:700 11px/1.2 Kanit,sans-serif;color:#4f46e5;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:4px 9px;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}.art-tb .art-ai .go{background:#fef3c7;color:#92400e}.art-tb .art-ai .cpy{padding:0 7px;border:1px solid #e2e8f0;background:#fff;font-size:13px}.art-tb .art-ai .cpy.ok{background:#dcfce7;border-color:#86efac;color:#166534;font-weight:900}.art-tb .art-ai .go:disabled{opacity:.6}.art-tb .art-ai .mdl{color:#64748b;font-weight:700}.art-tb .art-ai .mdl{color:#fff;background:#1e293b;border-radius:8px;display:inline-flex;align-items:center;gap:5px;padding:0 9px 0 7px}.art-tb .art-ai .mdl:hover{background:#0f172a}.art-tb .art-ai .mdl i{font-style:normal;font-size:9px;color:#94a3b8}.art-ai .mdl .text-ai-logo{margin:0;width:15px;height:15px;vertical-align:0}.art-ai .mdl .text-ai-logo[data-owner="openai"]{background-image:url(assets/logos/openai-blossom-white.svg)}.art-ai .mdl .text-ai-logo[data-owner="grok"],.art-ai .mdl .text-ai-logo[data-owner="ollama"]{filter:none}.art-tb{flex-wrap:wrap}.art-ai.open{max-width:100%;overflow-x:auto;scrollbar-width:none}.art-ai .art-mrail{padding:0;border:0;background:transparent;display:inline-flex;align-items:center}.art-ai .art-mrail .audit-providers{padding-right:4px;margin-right:2px}.art-ai .art-mrail .audit-provider{width:26px;height:26px;border-radius:7px}.art-ai .art-mrail .text-ai-chips>button{padding:0 9px;height:26px;border-radius:8px;background:#fff;border:1px solid #e2e8f0;color:#475569;font-weight:800}.art-ai .art-mrail .text-ai-chips>button[aria-pressed="true"]{display:none}' +
             '.art-mrail{padding:6px 8px;border-bottom:1px solid #e2e8f0;background:#fcfcfd}.art-mrail .audit-model-row{margin:0;padding:0;border:0;gap:6px;flex-wrap:nowrap;overflow-x:auto}.art-mrail .audit-providers{flex-wrap:nowrap;gap:4px;padding-right:6px;border-right:1px solid #e2e8f0}.art-mrail .text-ai-chips{display:flex;flex-wrap:nowrap;gap:4px}.art-mrail .text-ai-chips>button[hidden]{display:none!important}.art-mrail .audit-provider{width:30px;height:30px;min-height:0;margin:0;padding:0;border:1px solid transparent;border-radius:8px;background:transparent;box-shadow:none;display:grid;place-items:center;cursor:pointer}.art-mrail .audit-provider[aria-pressed="true"]{background:#eef2ff;border-color:#c7d2fe}.art-mrail .text-ai-chips>button{min-height:0;margin:0;padding:4px 10px;font-size:12px}' +   // V102.341: only the picked vendor's models show (the shared rail marks the rest [hidden]); one line
             '.art-ft .ai{color:#b45309;font-weight:700}' +
@@ -790,10 +790,30 @@
                     (bad.length ? '<span class="clp-bad" title="Not in the article: ' + esc(bad.join(', ')) + ' — check the number">⚠️</span>' : '') +
                     '<button type="button" class="clp-d" onclick="Articles.clipDrop(' + i + ')" aria-label="Remove line ' + (i + 1) + '">✕</button></div>';
             }).join('') + (ls.length < CLIP_MAX ? '<button type="button" class="clp-add" onclick="Articles.clipAdd()">＋ line</button>' : '') + '</div>' +
-            '<div class="clp-note">Kept with the article — 💾 Save draft / 📅 Schedule saves it too</div></div>';
+            '<div class="clp-note">' + (S.clipVoiceErr ? '<span class="clp-verr">' + esc(S.clipVoiceErr) + '</span><br>' : '') + (clipAiOk() ? '🔊 AI voice (Gemini TTS) · ' : '💻 This computer\'s voice — add a Gemini key for the AI voice · ') + 'kept with the article — 💾 Save draft / 📅 Schedule saves it too</div></div>';
     }
     function clipPaint() { var pv = document.querySelector('#art-body .art-pv'); if (pv) pv.outerHTML = previewHtml(); var sl = document.getElementById('art-stl'); if (sl) sl.outerHTML = statusLine(S.cur, Date.now()); var bt = document.getElementById('art-btns'); if (bt) bt.outerHTML = btnsHtml(S.cur); }
-    function clipStopNow() { S.clipPlaying = false; S.clipStep = null; clearTimeout(S.clipTimer); if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch (e) { /* nothing speaking */ } } }
+    function clipStopNow() { S.clipPlaying = false; S.clipStep = null; S.clipRun = (S.clipRun || 0) + 1; clearTimeout(S.clipTimer); if (S.clipAu) { try { S.clipAu.pause(); } catch (e) { /* gone */ } S.clipAu = null; } if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch (e) { /* nothing speaking */ } } }
+    // V102.626 (owner: "ยังไม่มีเสียงไทย" — Chrome on Windows has no Thai voice): 🔊 the AI voice, Gemini TTS through the Laboon path (same key, same
+    // Interactions request), one request per line, cached by language + speaker + text; 🙋 Kore · 🧑‍⚕️ / 💡 Puck. No key or a failed line → this computer's voice.
+    var CLIP_TTS = 'gemini-3.8-flash-tts', CLIP_VOICE = { q: 'Kore', rx: 'Puck', key: 'Puck' }, CLIP_STYLE = { th: 'Natural Thai, warm and clear, like a short pharmacy chat.', en: 'Warm, clear and conversational.', ko: 'Natural Korean, warm and clear.' };
+    var clipAudio = {};
+    function clipKeyOf() { try { return window.GEMINI_API_KEY || localStorage.getItem('ai_gemini_key') || ''; } catch (e) { return window.GEMINI_API_KEY || ''; } }
+    function clipAiOk() { return !!clipKeyOf() && typeof window.laboonGeminiTtsBody === 'function' && typeof window.laboonGeminiTtsAudio === 'function'; }
+    function clipVoice(L, x) {
+        var id = L + '|' + x.w + '|' + x.t; if (clipAudio[id]) return clipAudio[id];
+        var body = window.laboonGeminiTtsBody(CLIP_TTS, x.t, { style: CLIP_STYLE[L] || CLIP_STYLE.en, voice: CLIP_VOICE[x.w] || 'Puck' });
+        var pr = fetch('https://generativelanguage.googleapis.com/v1beta/interactions', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': clipKeyOf() }, body: JSON.stringify(body) })
+            .then(function (r) { return r.json().then(function (d) {
+                if (!r.ok) throw new Error((d && d.error && d.error.message) || 'Gemini ' + r.status);
+                var a = window.laboonGeminiTtsAudio(d); if (!a) throw new Error('no audio came back');
+                var bin = atob(a.data), u8 = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+                var pay = typeof window.resolveTtsAudioPayload === 'function' ? window.resolveTtsAudioPayload(u8, a.mimeType) : { blob: new Blob([u8], { type: a.mimeType || 'audio/wav' }) };
+                return URL.createObjectURL(pay.blob);
+            }); });
+        clipAudio[id] = pr; pr.catch(function () { delete clipAudio[id]; });
+        return pr;
+    }
     function clipPrompt(a, L) {
         var NAME = { en: 'English', th: 'Thai', ko: 'Korean' }, t = (a.title || {})[L] || a.title.en || '', b = (a.body || {})[L] || a.body.en || '';
         return 'Turn this short article for pharmacy interns into a CHAT STORY for a 30-second vertical clip, in ' + NAME[L] + '.\n' +
@@ -1360,16 +1380,31 @@
         },
         clipPlay: function () {
             var ls = clipLines(S.cur).filter(function (x) { return x.t.trim(); }); if (!ls.length) return;
-            clipStopNow(); S.clipPlaying = true; S.clipStep = 0; clipPaint();
-            var synth = window.speechSynthesis, BCP = { en: 'en-US', th: 'th-TH', ko: 'ko-KR' }[S.lang] || 'en-US', run = function (i) {
-                if (!S.clipPlaying) return;
-                if (i >= ls.length) { S.clipTimer = setTimeout(function () { clipStopNow(); clipPaint(); }, 900); return; }
+            clipStopNow(); S.clipPlaying = true; S.clipStep = 0; S.clipVoiceErr = '';
+            var L = S.lang, ai = clipAiOk(), runId = S.clipRun;
+            if (ai) ls.forEach(function (x) { clipVoice(L, x).catch(function () { /* that line falls back */ }); });   // every line at once: line 1 starts as soon as it is back
+            clipPaint();
+            var synth = window.speechSynthesis, BCP = { en: 'en-US', th: 'th-TH', ko: 'ko-KR' }[L] || 'en-US', run = function (i) {
+                if (!S.clipPlaying || S.clipRun !== runId) return;
+                if (i >= ls.length) { S.clipTimer = setTimeout(function () { if (S.clipRun === runId) { clipStopNow(); clipPaint(); } }, 900); return; }
                 S.clipStep = i; clipPaint();
-                var next = function () { if (S.clipPlaying) run(i + 1); }, ms = 900 + ls[i].t.length * 55;
-                if (synth && window.SpeechSynthesisUtterance) {
-                    try { var u = new SpeechSynthesisUtterance(ls[i].t); u.lang = BCP; u.pitch = ls[i].w === 'q' ? 1.25 : 0.95; u.rate = 1.02; u.onend = next; u.onerror = next; synth.speak(u); S.clipTimer = setTimeout(next, ms + 4000); return; } catch (e) { /* no voice: timed */ }
-                }
-                S.clipTimer = setTimeout(next, ms);
+                var fired = false, next = function () { if (fired || !S.clipPlaying || S.clipRun !== runId) return; fired = true; clearTimeout(S.clipTimer); run(i + 1); }, ms = 900 + ls[i].t.length * 55;
+                var local = function () {
+                    if (synth && window.SpeechSynthesisUtterance) {
+                        try { var u = new SpeechSynthesisUtterance(ls[i].t); u.lang = BCP; u.pitch = ls[i].w === 'q' ? 1.25 : 0.95; u.rate = 1.02; u.onend = next; u.onerror = next; synth.speak(u); S.clipTimer = setTimeout(next, ms + 4000); return; } catch (e) { /* no voice: timed */ }
+                    }
+                    S.clipTimer = setTimeout(next, ms);
+                };
+                if (!ai) return local();
+                clipVoice(L, ls[i]).then(function (url) {
+                    if (!S.clipPlaying || S.clipRun !== runId || fired) return;
+                    var au = S.clipAu = new Audio(url); au.onended = function () { S.clipTimer = setTimeout(next, 250); }; au.onerror = next;
+                    var pl = au.play(); if (pl && pl.catch) pl.catch(next);
+                    S.clipTimer = setTimeout(next, ms + 15000);
+                }).catch(function (e) {
+                    if (!S.clipPlaying || S.clipRun !== runId || fired) return;
+                    S.clipVoiceErr = '🔊 AI voice: ' + (e && e.message || e) + ' — this computer\'s voice instead'; clipPaint(); local();
+                });
             };
             run(0);
         },
