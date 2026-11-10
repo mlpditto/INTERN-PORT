@@ -41,12 +41,12 @@ const DOT_BG = 'rgb(66, 133, 244)';
             document.querySelector('.quiz-q-item').style.display = 'block';
         });
         await page.waitForTimeout(200);
-        const pick = id => page.evaluate(id => { const mi = document.querySelector('.quiz-q-item .q-primer-model'); mi.value = id; window.syncRegistryModelSelect(mi.id); }, id);
+        const pick = id => page.evaluate(id => { const mi = document.querySelector('.quiz-q-item .q-primer-model'); mi.value = id; window._qpRowPaint(mi.closest('.q-primer-row')); }, id);   // V102.631: the row's model = its corner logo
         await pick('gemini-3.8-flash');
-        assert.equal(await pseudo('.quiz-q-item .q-primer-ai:not(.q-primer-review)', '::after'), DOT_BG, 'Read first ✨ carries the blue dot with a Gemini pick');
-        assert.equal(await pseudo('.quiz-q-item .q-primer-review', '::after'), 'none', '📖 All never does (no AI call)');
+        assert.equal(await pseudo('.quiz-q-item .q-primer-ai', '::after'), DOT_BG, 'Read first ✨ carries the blue dot with a Gemini pick');
+        assert.equal(await page.locator('.quiz-q-item .q-primer-review').count(), 0, 'V102.631: 📖 All lives in the strip, not the row');
         await pick('gpt-6-luna');
-        assert.equal(await pseudo('.quiz-q-item .q-primer-ai:not(.q-primer-review)', '::after'), 'none', '…and loses it with a GPT pick');
+        assert.equal(await pseudo('.quiz-q-item .q-primer-ai', '::after'), 'none', '…and loses it with a GPT pick');
 
         // ① + ② ✨ Scene: the Nano Banana chip has the dot, the others not; Generate follows the pick
         await page.evaluate(() => { document.querySelector('.quiz-q-item [onclick^="QuizQImage.toggle"]').click(); });

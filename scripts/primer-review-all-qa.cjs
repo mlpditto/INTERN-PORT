@@ -11,7 +11,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const admin = fs.readFileSync('public/admin.html', 'utf8');
-assert.ok(/class="q-primer-ai q-primer-review" onclick="_qPrimerReviewAll\(\)"[^>]*data-th-title="[^"]*Read first[^"]*"[^>]*data-kr-title="[^"]*Read first[^"]*"[^>]*aria-label="Review all Read first">📖 All<\/button>/.test(admin), '📖 All button with EN / TH / KO tooltips');
+assert.ok(/class="qps-rev" onclick="_qPrimerReviewAll\(\)"[^>]*data-th-title="[^"]*Read first[^"]*"[^>]*data-kr-title="[^"]*Read first[^"]*">📖 All<\/button>/.test(admin), 'V102.631: in the strip — ' + '📖 All button with EN / TH / KO tooltips');
 
 const Q = (q, primer) => ({ q, type: 'choice', options: ['a', 'b'], correct: [0], primer });
 const P1 = '**ความรู้พื้นฐาน**\nEstetrol is a native estrogen.\n\n**ศัพท์สำคัญ**\n- **Estetrol (E4)** — a native estrogen made by the fetal liver\n- **SHBG** — sex hormone-binding globulin';
@@ -43,10 +43,10 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
         }, [P1, P2, P3, Q.toString()]);
 
         // the button
-        const b = page.locator('.quiz-q-item .q-primer-review').first();
-        assert.deepEqual(await b.evaluate(x => [x.previousElementSibling.textContent.trim(), x.closest('label').querySelectorAll('.q-primer-ai').length]), ['✨', 2], 'V102.524 (owner, option 1): the row is ✨ then 📖 All — two buttons');
-        await page.evaluate(() => { const it = document.querySelectorAll('.quiz-q-item')[0]; it.style.display = 'block'; });
-        await page.evaluate(() => document.querySelector('.quiz-q-item .q-primer-review').click());
+        // V102.631 (owner pick B + C): 📖 All lives in the strip above the questions, not in each row
+        assert.equal(await page.locator('.quiz-q-item .q-primer-review').count(), 0, 'no 📖 All in the rows');
+        await page.evaluate(() => { const it = document.querySelectorAll('.quiz-q-item')[0]; it.style.display = 'block'; _qPrimerStrip(); });
+        await page.evaluate(() => document.querySelector('#q-primer-strip .qps-rev').click());
         const ov = page.locator('#praOverlay');
         assert.equal(await ov.count(), 1, 'the popup opens');
 
@@ -67,7 +67,7 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
         assert.equal(await ov.locator('.pra-card .pra-ed').evaluateAll(es => es.every(e => getComputedStyle(e).display === 'none')), true, 'no box is open');
         assert.equal(await ov.locator('.pra-terms').evaluate(t => t.classList.contains('lang-no-toggle')), true, 'the 🔁 chips carry user terms — never hidden by the EN/TH toggle');
         // V102.517: some questions still empty → a strip above the cards with ✨ All
-        assert.match((await ov.locator('.pra-strip').innerText()).replace(/\s+/g, ' ').trim(), /^⚪ 1 of 4 empty ✨ All/, 'the strip counts the empty ones');
+        assert.match((await ov.locator('.pra-strip').innerText()).replace(/\s+/g, ' ').trim(), /^⚪ 1 of 4 empty · ⚡ in the strip$/, 'the strip counts the empty ones');
         assert.equal(await ov.locator('.pra-none').count(), 0, 'no empty state while some have a Read first');
         assert.equal(await ov.locator('.pra-chip[data-f="dup"]').isDisabled(), false, 'Repeated only is live when something repeats');
         assert.ok(!cards[0].marks.some(m => /ศัพท์สำคัญ|ความรู้พื้นฐาน/.test(m)), 'bold headings are not terms');
@@ -144,7 +144,7 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
         await strip.locator('.qps-go').evaluate(b => b.click());
         for (let n = 0; n < 3; n++) { await page.waitForFunction(() => window.__gate.length > 0); await page.evaluate(() => window.__gate.shift()()); }
         await page.waitForFunction(() => document.querySelector('#q-primer-strip.ok'));
-        assert.equal((await strip.locator('b').innerText()).trim(), '📖 4/4 ✓'); assert.equal(await page.evaluate(() => __confirms), 0, 'no browser confirm');
+        assert.equal((await strip.locator('.qps-n').innerText()).trim(), '4/4 ✓'); assert.equal(await page.evaluate(() => __confirms), 0, 'no browser confirm');
         await strip.locator('.qps-rev').evaluate(b => b.click());
         assert.equal(await page.locator('#praOverlay .pra-card').count(), 4, 'Review opens the cards'); await page.evaluate(() => _praClose());
         // V102.517 compact: ✎ is icon-only with the question in its label; two columns at ≥ 900 px, one below

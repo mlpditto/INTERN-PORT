@@ -6,18 +6,14 @@ const assert = require('node:assert/strict');
 const admin = fs.readFileSync('public/admin.html', 'utf8');
 assert.match(admin, /<title>Nika Admin \(V102\.(?:37[6-9]|3[89]\d|[4-9]\d\d)\)<\/title>/, 'admin V102.376+');
 
-const start = admin.indexOf('<div class="q-primer-row"');
+// V102.631 (owner pick B + C): no label row at all — "📖 Read first" opens the placeholder; the long hint is the box's title; ✨ + the model logo sit in the corner
+const start = admin.indexOf('<div class="q-primer-row qp-b">');
 assert.ok(start > 0, 'the READ FIRST box is still there');
-const box = admin.slice(start, admin.indexOf('</textarea>', start));
-const label = box.slice(box.indexOf('<label'), box.indexOf('</label>'));
-const labelHead = label.slice(0, label.indexOf('<span style="margin-left:auto'));      // the part before the right-hand controls
-
-assert.ok(/fa-book-open[^]*<\/i>\s*Read first\s*$/.test(labelHead), 'the label is icon + "Read first" and nothing else before the controls: ' + labelHead.slice(-120));
-assert.ok(!/own page before the timer/.test(label), 'the aside is gone from the label');
-assert.ok(label.includes('${window._qPrimerModelSelect()}') && label.includes('_qPrimerDraft(this, \'full\')') && label.includes('_qPrimerReviewAll()') && !label.includes('\'terms\'') && !label.includes('_qPrimerDraftAll(this)'), 'V102.524: model select + ✨ + 📖 All — ☰ moved into the panel after a draft, ✨ All into the popup');
-
-const ph = (box.match(/<textarea class="q-primer" placeholder="([^"]*)"/) || [])[1] || '';
-for (const need of ['Background or vocabulary the learner needs before answering', 'own page before the timer starts', 'kept in the review', 'Markdown', 'Do not give away the answer', '(optional)'])
-    assert.ok(ph.includes(need), 'placeholder carries: ' + need + ' — ' + ph);
-assert.ok(ph.length < 220, 'placeholder stays one sentence-ish: ' + ph.length);
-console.log('PASS: READ FIRST head is one lean label; the own-page / review / markdown hint moved into the placeholder with the Background hint');
+const box = admin.slice(start, admin.indexOf('<div class="qp-rail"', start));
+assert.ok(!/<label/.test(box), 'no label row');
+const ph = (box.match(/<textarea class="q-primer"[^>]*placeholder="([^"]*)"/) || [])[1] || '', tip = (box.match(/<textarea class="q-primer"[^>]*title="([^"]*)"/) || [])[1] || '';
+assert.ok(ph.startsWith('📖 Read first') && ph.includes('Markdown') && ph.includes('(optional)') && ph.length < 100, 'short placeholder: ' + ph);
+for (const need of ['Background or vocabulary the learner needs before answering', 'own page before the timer starts', 'kept in the review', 'Markdown', 'Do not give away the answer'])
+    assert.ok(tip.includes(need), 'the title carries: ' + need + ' — ' + tip);
+assert.ok(/<span class="qp-act">\$\{window\._qPrimerModelSelect\(\)\}<button type="button" class="qp-mdl" onclick="_qpRowModel\(this\)"[^>]*><\/button><button type="button" class="q-primer-ai" onclick="_qPrimerDraft\(this, 'full'\)"/.test(box), 'corner: model logo, then ✨');
+console.log('PASS: READ FIRST box (V102.631) — no label row; 📖 short placeholder, the full hint in its title; model logo + ✨ in the corner');
