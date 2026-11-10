@@ -21,7 +21,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
             window.db = { collection: name => ({ get: async () => ({ docs: [] }), add: async v => { window.__writes.push(['add', v]); return { id: 'n' + (++n) }; }, doc: id => ({ update: async v => { window.__writes.push(['update', id, v]); }, delete: async () => {} }) }) };
             db = window.db; const S = Articles._S; S.list = []; S.loaded = true; S.loading = false; Articles.open(); Articles.edit(null);
         });
-        const btns = () => page.evaluate(() => [...document.querySelectorAll('#art-btns button')].map(b => [b.textContent.trim(), b.classList.contains('ok'), getComputedStyle(b).backgroundColor]));
+        const btns = () => page.evaluate(() => [...document.querySelectorAll('#art-btns button:not(.art-tag-add)')].map(b => [b.textContent.trim(), b.classList.contains('ok'), getComputedStyle(b).backgroundColor]));
         const set = (id, v) => page.evaluate(([i, x]) => { const e = document.getElementById(i); e.value = x; e.dispatchEvent(new Event('input')); }, [id, v]);
 
         // 0 · before any save nothing is green

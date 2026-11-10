@@ -30,7 +30,7 @@ assert.ok(idx.includes('id="dx-detail-articles"') && idx.includes('function dxPa
       window.db = { collection: coll => ({ get: async () => { reads.push(coll); return { docs: coll === 'disease_codex' ? [{ id: 'h1', data: () => ({ diseaseName: 'Hordeolum', thaiName: 'กุ้งยิง' }) }, { id: 'n1', data: () => ({ diseaseName: 'Neuropathic Pain' }) }, { id: 'bad', data: () => ({}) }] : [] }; }, doc: id => ({ update: async () => {} }) }) };
       const S = Articles._S; S.loaded = true; S.loading = false;
       S.list = [{ id: 'a2', title: { en: 'Hordeolum: the 3-day rule' }, body: { en: 'Warm compress.' }, cover: { emoji: '📰' }, status: 'scheduled', startAt: Date.now() + 864e5, endAt: Date.now() + 8 * 864e5, audience: { divisions: [], groups: [] }, links: [], rerun: 'any' }];
-      Articles.open(); Articles.edit('a2'); S.open = { links: true }; Articles.sec && Articles.sec('links', true);
+      Articles.open(); Articles.edit('a2'); S.open = { links: true }; Articles.sec && Articles.sec('links', true); S.linksShow = true; Articles.lang('en');   // V102.624: the Links fold opens from 🔗
       const out = {};
       out.chips = qa('.art-c.art-add').map(b => b.textContent.trim());
       Articles.openPick('disease'); await wait(50);

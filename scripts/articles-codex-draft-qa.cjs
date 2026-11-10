@@ -40,7 +40,7 @@ assert.ok(/match \/disease_codex_drafts\/\{draftId\} \{[\s\S]*?allow create: if 
       S.list = [Object.assign({ id: 'a1', title: { en: 'Acromegaly: Spotting the Subtle Signs 🔍', th: 'อะโครเมกาลี' } }, base), Object.assign({ id: 'a2', title: { en: 'Dengue (part 2)' } }, base)];
       const out = {};
       Articles.open(); Articles.edit('a1');
-      const chipTxt = () => (qa('.art-c.art-add').find(b => /🩺|Drafting/.test(b.textContent)) || {}).textContent;
+      const chipTxt = () => { if (!q('.art-c.art-add')) Articles.quizPick(); return (qa('.art-c.art-add').find(b => /🩺|Drafting/.test(b.textContent)) || {}).textContent; };   // V102.624: the Links fold opens from 🔗
       out.chip0 = chipTxt();
       // 1. unsaved edit → refused
       S.cur.title.en = 'Acromegaly: edited'; Articles.toCodex(); out.dirty = [(q('.art-err') || {}).textContent, writes.length];

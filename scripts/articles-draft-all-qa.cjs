@@ -51,7 +51,7 @@ assert.ok(aj.includes("var DA = { busy: false, stop: false, prog: '' };") && aj.
       let during = null; const p = Articles.draftAll(); await wait(5); during = [btn().textContent.replace(/\s+/g, ' ').trim(), btn().classList.contains('busy')]; await p;
       out.run = [calls.slice(), during, S.list[0].dx, S.list[3].dx || null, toasts[toasts.length - 1], btn().textContent.replace(/\s+/g, ' ').trim(), Articles._daJobs().map(a => a.id)];
       // the open editor follows: a1 drafted while open → its chip says pending, not dirty
-      S.list[0].dx = null; Articles.edit('a1'); const p2 = Articles.draftAll(); await p2;
+      S.list[0].dx = null; Articles.edit('a1'); S.linksShow = true; const p2 = Articles.draftAll(); await p2;
       out.editor = [S.cur.dx && S.cur.dx.draftId, JSON.stringify(S.cur) === S.base, (qa('.art-c.art-add').find(b => /🩺/.test(b.textContent)) || {}).textContent];
       Articles.open();
       // press again while running = stop after the current one
