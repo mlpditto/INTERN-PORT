@@ -13,6 +13,12 @@
             busy: 'Nika ไม่ว่าง', busySub: 'ลองใหม่อีกครั้งในอีกสักครู่ คำถามนี้ไม่ถูกนับ', fail: 'ติดต่อ Nika ไม่ได้ ลองใหม่อีกครั้ง', sources: 'แหล่งที่มา' }
     };
     const CHIPS = ['Amlodipine: what to monitor?', 'Atorvastatin side effects', 'Agomelatine mechanism'];
+    // V101.303 (owner): one-click tools outside the app — open in the phone's browser (LINE: external window), never inside Nika's answer
+    const LINKS = [{ e: '🫘', url: 'https://cpa-microalbuminurea.netlify.app/', en: 'Kidney risk screening', th: 'คัดกรองความเสี่ยงโรคไต', ko: '신장 위험 선별', by: 'สมาคมเภสัชกรรมชุมชน (ประเทศไทย)' }];
+    function openOut(url) {
+        if (window.liff && typeof liff.isInClient === 'function' && liff.isInClient() && liff.openWindow) { liff.openWindow({ url: url, external: true }); return; }
+        const w = window.open(url, '_blank', 'noopener'); if (!w) location.href = url;
+    }
     const DAILY = 10;
     const t = () => TEXT[document.body.classList.contains('lang-th-on') ? 'th' : 'en'];
     const call = data => firebase.functions().httpsCallable('askNika')(data).then(r => r.data || {});
@@ -42,9 +48,11 @@
         const x = t();
         pane().innerHTML = `<div class="nk-body lang-no-toggle"><div class="nk-form"><div class="nk-box"><textarea id="nk-question" rows="2" maxlength="300" placeholder="${esc(x.ph)}" aria-label="${esc(x.ph)}"></textarea><button type="button" class="nk-go">${esc(x.ask)}</button></div>
             <div class="nk-chips">${CHIPS.map(c => `<button type="button" class="nk-chip">${esc(c)}</button>`).join('')}</div></div>
+            <div class="nk-links">${LINKS.map((l, i) => `<button type="button" class="nk-link" data-i="${i}" title="${esc(l.by)} · ${esc(l.url)}">${l.e} ${esc(document.body.classList.contains('lang-th-on') ? l.th : l.en)} <span aria-hidden="true">↗</span></button>`).join('')}</div>
             <div class="nk-out" aria-live="polite"></div><div class="nk-safe">${esc(x.safe)}</div><div class="nk-left"></div></div>`;
         q('.nk-go').onclick = () => ask(q('#nk-question').value);
         pane().querySelectorAll('.nk-chip').forEach(c => { c.onclick = () => { q('#nk-question').value = c.textContent; ask(c.textContent); }; });
+        pane().querySelectorAll('.nk-link').forEach(b => { b.onclick = () => openOut(LINKS[+b.dataset.i].url); });
     }
     function paused() { setForm(false); q('.nk-out').innerHTML = note('⏸', t().pause, t().pauseSub); }
     function limited() { setForm(false); left = 0; q('.nk-out').innerHTML = note('🌙', t().limit, t().limitSub(DAILY)); paintLeft(); }
@@ -99,6 +107,7 @@
     }
 
     window.nikaAsk = {
+        _links: LINKS, _openOut: openOut,
         async show() {
             const card = document.getElementById('dd-codex-card');
             card.classList.remove('nk-sun'); void card.offsetWidth; card.classList.add('nk-sun');

@@ -13,6 +13,7 @@ Intern: home ▸ DD Codex; Poneglyph ▸ My Path; Submit New ▸ ⋯ ▸ Drug / 
 - `drug-page-lean-qa` — Drug entry: TH ⌄ | ✨ pill, full-width chips, sticky folding head, lit rail, dosing lines
 - `disease-page-lean-qa` — Disease entry gets the same lean head (codexLeanHead)
 - `drug-submit-lean-qa` — Drug + Disease submit forms: one header row, hidden empty preview
+- `nika-links-qa` — 🌞 Nika tab: 🫘 Kidney risk screening one-click link (V101.303), TH/EN label, new tab in a browser / LINE external window, stays while Nika is paused
 - `codex-image-fill-check` — "Fill from image" dd* helpers with a DOM stub + storage.rules wiring
 - `codex-vision-shared-check` — shared CodexVision contract + admin "Re-extract from image"
 

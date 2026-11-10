@@ -18,7 +18,7 @@
         // V102.61: Sonnet 5.5 replaces Sonnet 5 (same price, $2/$10 per MTok); saved Sonnet 5 picks move to it.
         { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', short: 'Sonnet 5.5', hint: 'Claude สำหรับงานเขียนและวิเคราะห์' },
         { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', short: 'Opus 5.5', hint: 'Claude รุ่นใหญ่ ถูกกว่า Fable สำหรับงานวิเคราะห์ที่ซับซ้อน' },
-        { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', short: 'Fable 5.1', hint: 'Claude สำหรับงานที่ต้องการรายละเอียดมากขึ้น' },
+        { id: 'claude-fable-5-2', label: 'Claude Fable 5.2', short: 'Fable 5.2', hint: 'Claude สำหรับงานที่ต้องการรายละเอียดมากขึ้น' },
         { id: 'or/qwen/qwen3.8-flash', label: 'Qwen 3.8 Flash', short: 'Qwen Flash 3.8', hint: 'Qwen รุ่นประหยัด ภาษาไทยดี ผ่าน OpenRouter' },
         // V102.518: Qwen 3.8 Omni Flash (OpenRouter 2026-09-21, $0.15/$0.47 per MTok, 1M ctx, text + image + audio + video in) — the cheap multimodal chip
         { id: 'or/qwen/qwen3.8-omni-flash', label: 'Qwen 3.8 Omni Flash', short: 'Qwen Omni Flash 3.8', hint: 'Qwen รุ่น Omni รับภาพ เสียง และวิดีโอ ราคาประหยัด ผ่าน OpenRouter · Qwen 3.8 Omni Flash, 이미지·오디오·비디오 입력, 저렴한 요금, OpenRouter 경유' },
@@ -61,7 +61,7 @@
     window.isTextOnlyAIModel = id => /^(or\/deepseek\/deepseek-v4-pro|ol\/)/.test(String(id || ''));   // V102.76: + local Ollama (text only here)
     // V101.64: GPT-6 Luna/Sol replace 5.6, DeepSeek V4 Pro moves to its 0813 GA snapshot — saved picks move to their successor, not to the default.
     // V102.61: Claude Sonnet 5 → Sonnet 5.5.
-    const RETIRED_TEXT_AI_MODELS = { 'gpt-5.6-luna': 'gpt-6-luna', 'gpt-5.6-sol': 'gpt-6.1-sol', 'or/deepseek/deepseek-v4-pro': 'or/deepseek/deepseek-v4-pro-0813', 'claude-sonnet-5': 'claude-sonnet-5-5',
+    const RETIRED_TEXT_AI_MODELS = { 'gpt-5.6-luna': 'gpt-6-luna', 'gpt-5.6-sol': 'gpt-6.1-sol', 'or/deepseek/deepseek-v4-pro': 'or/deepseek/deepseek-v4-pro-0813', 'claude-sonnet-5': 'claude-sonnet-5-5', 'claude-fable-5-1': 'claude-fable-5-2',
         'claude-haiku-4-5': 'claude-haiku-5-5', 'gpt-6-sol': 'gpt-6.1-sol', 'or/deepseek/deepseek-v4.1-flash': 'or/deepseek/deepseek-v4.1-flash-1017',
         'gpt-5.6-terra': 'gpt-6.1-terra' };   // V102.516: Terra 5.6 → 6.1   // V102.365: Haiku 4.5 → 5.5 · Sol 6 → 6.1 · DeepSeek Flash → the 1017 snapshot
     window.normalizeTextAIModel = value => { value = RETIRED_TEXT_AI_MODELS[value] || value; return models.some(m => m.id === value) ? value : 'gpt-6-luna'; };
