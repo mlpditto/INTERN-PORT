@@ -21,3 +21,4 @@ Intern: home ▸ DD Codex; Poneglyph ▸ My Path; Submit New ▸ ⋯ ▸ Drug / 
 - `dcRenderDetail` runs while the modal is hidden, so every height is 0 on the first pass; `codexLeanHead.start()` re-measures on a rAF — assert after it, and give the fixture enough sections to scroll.
 - The scroll listener must read `body._dcPlace`, not a closure from the first render (stale closure measured a detached rail).
 - The scroll-spy marks the topmost section with > 24 px visible; "most visible" picks Discussion on short bodies.
+- `nika-links-qa` — 🌞 Nika tab: 🫘 Kidney risk screening one-click link (V101.303), TH/EN label, new tab in a browser / LINE external window, stays while Nika is paused
