@@ -41,5 +41,18 @@ const code = admin.slice(i, j);
     writes.length = 0;
     await ctx.markCertApproved('U2', 'MLP-2');
     assert.deepEqual(writes, [], 'no request on the user → nothing (as before)');
-    console.log('PASS: Certificate Approve moves the intern\'s Certificate Request card(s) to Done (doneAt), leaves other cards / interns alone; revoke moves nothing');
+    // V102.629: ✅ Approve on a progress stage (Early / Mid / Near) — no number, but the request card still goes to Done; the final certificate path is unchanged
+    { const k = admin.indexOf('        async function certApprove(btn) {'), e = admin.indexOf('\n        }\n', k) + 11;
+      const calls = [];
+      const c2 = { console, certUser: { uid: 'U1' }, document: { getElementById: () => ({}) }, saveUserDates: async () => true, stage: null,
+          certPdfBusy: async () => calls.push('pdf'), certRequestTasksDone: async u => calls.push('done:' + u), showToast: t => calls.push('toast') };
+      c2.getCurrentCertificateExtra = () => ({ stage: c2.stage });
+      vm.createContext(c2); vm.runInContext(admin.slice(k, e) + '\nthis.certApprove = certApprove;', c2);
+      c2.stage = { key: 'near' }; await c2.certApprove({});
+      assert.deepEqual(calls, ['pdf', 'done:U1', 'toast'], 'progress: PDF, then the card → Done');
+      calls.length = 0; c2.stage = null; await c2.certApprove({});
+      assert.deepEqual(calls, ['pdf'], 'final: only the PDF here (markCertApproved closes the card)');
+      calls.length = 0; c2.saveUserDates = async () => false; c2.stage = { key: 'mid' }; await c2.certApprove({});
+      assert.deepEqual(calls, [], 'not saved: nothing'); }
+    console.log('PASS: Certificate Approve moves the intern\'s Certificate Request card(s) to Done (doneAt), leaves other cards / interns alone; revoke moves nothing; a progress-stage Approve closes the card too (V102.629)');
 })().catch(e => { console.error(e); process.exit(1); });
