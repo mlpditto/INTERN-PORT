@@ -12,11 +12,13 @@ const PREAMBLE = `Answer in the language of the question. Use at most 5 short bu
 
 // V101.306 (owner pick 1A): asked from an open article = searched in that article only (kind + sourceId are indexable in the store's schema)
 const ARTICLE_ID = /^[A-Za-z0-9_-]{1,80}$/;
-function requestBody(question, articleId) {
+// V101.308 (owner pick C): the 🇬🇧 → 🇹🇭 → 🇰🇷 chip under an answer asks the same question again in that language
+const LANG = { en: 'English', th: 'Thai', ko: 'Korean' };
+function requestBody(question, articleId, lang) {
     const only = articleId && ARTICLE_ID.test(articleId) ? ` AND kind: ANY("article") AND sourceId: ANY("${articleId}")` : '';
     return {
         query: { text: question },
-        answerGenerationSpec: { includeCitations: true, ignoreAdversarialQuery: true, ignoreLowRelevantContent: true, promptSpec: { preamble: PREAMBLE } },
+        answerGenerationSpec: { includeCitations: true, ignoreAdversarialQuery: true, ignoreLowRelevantContent: true, promptSpec: { preamble: Object.prototype.hasOwnProperty.call(LANG, lang) ? PREAMBLE.replace('Answer in the language of the question.', `Answer in ${LANG[lang]}.`) : PREAMBLE } },
         searchSpec: { searchParams: { maxReturnResults: 5, filter: 'audience: ANY("intern")' + only } }
     };
 }
@@ -90,6 +92,7 @@ async function handle(request, deps) {
     const question = String(data.question || '').trim();
     if (question.length < MIN_Q || question.length > MAX_Q) throw new HttpsError('invalid-argument', `Ask in ${MIN_Q}-${MAX_Q} characters`);
     const articleId = typeof data.articleId === 'string' && ARTICLE_ID.test(data.articleId) ? data.articleId : null;
+    const lang = Object.prototype.hasOwnProperty.call(LANG, data.lang) ? data.lang : null;
 
     const left = await db.runTransaction(async tx => {
         const u = await tx.get(usage), n = (u.exists && Number(u.data().count)) || 0;
@@ -101,7 +104,7 @@ async function handle(request, deps) {
 
     let out;
     try {
-        out = parseAnswer(await deps.post(ANSWER_URL, requestBody(question, articleId), await deps.token()));
+        out = parseAnswer(await deps.post(ANSWER_URL, requestBody(question, articleId, lang), await deps.token()));
     } catch (e) {
         console.warn('[askNika]', (e.response && e.response.status) || e.message);
         await usage.set({ count: FieldValue.increment(-1) }, { merge: true });
