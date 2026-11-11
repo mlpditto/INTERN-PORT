@@ -32,7 +32,7 @@ assert.ok(!/class="pra-all"/.test(admin) && !/_praModelRail/.test(admin), 'the �
             const c = document.getElementById('quiz-questions-container'); c.innerHTML = '';
             addQuestionUI({ q: 'First?', type: 'choice', options: ['a', 'b'], correct: [0] }); addQuestionUI({ q: 'Second?', type: 'choice', options: ['a', 'b'], correct: [0] });
             addQuestionUI({ q: 'Third?', type: 'choice', options: ['a', 'b'], correct: [0], primer: '**Term** — background.' });
-            window._qPrimerStrip();
+            window._qPrimerStrip(); out.chip = document.getElementById('qe-rf-chip').textContent.replace(/\s+/g, ' ').trim(); window._qPrimerReviewAll();   // V102.633: the strip lives in the 📖 window
             const rows = () => [...document.querySelectorAll('.quiz-q-item .q-primer-row')];
             const row = el => ({ value: el.querySelector('input.q-primer-model').value, label: !!el.querySelector('label'), rail: !el.querySelector('.qp-rail').hidden, chips: !!el.querySelector('.audit-providers'),
                 corner: [...el.querySelectorAll('.qp-act > button')].map(b => b.className.split(' ')[0]), logo: !!el.querySelector('.qp-mdl .text-ai-logo'), own: el.querySelector('.qp-mdl').classList.contains('own'),
@@ -61,8 +61,9 @@ assert.ok(!/class="pra-all"/.test(admin) && !/_praModelRail/.test(admin), 'the �
         });
         assert.deepEqual([r.r1.label, r.r1.chips, r.r1.rail, r.r1.corner, r.r1.logo, r.r1.own, r.r1.ph], [false, false, false, ['qp-mdl', 'q-primer-ai'], true, false, '📖 Read first'], 'row: no label row, no rail, ✨ + logo in the corner: ' + JSON.stringify(r.r1));
         assert.equal(r.r1.value, 'gpt-6-luna', 'first time = the (normalised) toolbar model');
-        assert.deepEqual([r.strip.hidden, r.strip.go, r.strip.all], [false, true, true], 'the strip: shown, ⚡ + 📖 All');
-        assert.match(r.strip.text, /📖 Read first ?1\/3 .*▾ 2 ?📖 All$/, 'n/N · model ▾ · ⚡ 2 · 📖 All: ' + r.strip.text);
+        assert.deepEqual([r.strip.hidden, r.strip.go, r.strip.all], [false, true, false], 'the strip in the window: shown, ⚡, no 📖 All');
+        assert.match(r.strip.text, /📖 Read first ?1\/3 .*▾ 2$/, 'n/N · model ▾ · ⚡ 2 (no 📖 All — it is that window): ' + r.strip.text);
+        assert.equal(r.chip, '📖 1/3 · 2', 'the chip beside Review');
         assert.deepEqual([r.open.rail, r.open.chips], [true, true], 'the logo opens the rail under the box');
         assert.deepEqual([r.afterPick.value, r.afterPick.own, r.afterPick.rail], [r.picked, true, false], 'a row pick: that question\'s model, amber ring, rail closes');
         assert.deepEqual([r.row2.value, r.row2.own], ['gpt-6-luna', false], 'other rows keep the strip model');
@@ -85,6 +86,6 @@ assert.ok(!/class="pra-all"/.test(admin) && !/_praModelRail/.test(admin), 'the �
         }
         const noise = e => /ServiceWorker|mermaid is not defined|reading 'auth'|db\.collection|firebase/.test(e);
         assert.deepEqual(errors.filter(e => !noise(e)), [], 'no page errors: ' + errors);
-        console.log('PASS: Read first lean (V102.631) — row = box + ✨ + model logo in the corner; strip n/N · model · ⚡ m · 📖 All always; row pick = that question (amber, not remembered), strip pick = all + remembered; ✨/⚡ send each question\'s model; no ✨ All / rail in 📖 All');
+        console.log('PASS: Read first lean (V102.631) — row = box + ✨ + model logo in the corner; strip n/N · model · ⚡ m in the 📖 window (V102.633), 📖 n/N chip beside Review; row pick = that question (amber, not remembered), strip pick = all + remembered; ✨/⚡ send each question\'s model; no ✨ All / rail in 📖 All');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

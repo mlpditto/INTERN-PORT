@@ -11,7 +11,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const admin = fs.readFileSync('public/admin.html', 'utf8');
-assert.ok(/class="qps-rev" onclick="_qPrimerReviewAll\(\)"[^>]*data-th-title="[^"]*Read first[^"]*"[^>]*data-kr-title="[^"]*Read first[^"]*">📖 All<\/button>/.test(admin), 'V102.631: in the strip — ' + '📖 All button with EN / TH / KO tooltips');
+assert.ok(!/class="qps-rev"/.test(admin) && /id="qe-rf-chip" class="qe-rf lang-no-toggle" hidden onclick="_qPrimerReviewAll\(\)"/.test(admin), 'V102.633 (owner pick C): 📖 n/N chip beside 🛡 Review opens the window; the strip has no 📖 All of its own');
 
 const Q = (q, primer) => ({ q, type: 'choice', options: ['a', 'b'], correct: [0], primer });
 const P1 = '**ความรู้พื้นฐาน**\nEstetrol is a native estrogen.\n\n**ศัพท์สำคัญ**\n- **Estetrol (E4)** — a native estrogen made by the fetal liver\n- **SHBG** — sex hormone-binding globulin';
@@ -43,10 +43,11 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
         }, [P1, P2, P3, Q.toString()]);
 
         // the button
-        // V102.631 (owner pick B + C): 📖 All lives in the strip above the questions, not in each row
+        // V102.633 (owner pick C): the 📖 n/N chip beside 🛡 Review opens the window; nothing in the rows
         assert.equal(await page.locator('.quiz-q-item .q-primer-review').count(), 0, 'no 📖 All in the rows');
         await page.evaluate(() => { const it = document.querySelectorAll('.quiz-q-item')[0]; it.style.display = 'block'; _qPrimerStrip(); });
-        await page.evaluate(() => document.querySelector('#q-primer-strip .qps-rev').click());
+        assert.deepEqual(await page.evaluate(() => { const c = document.getElementById('qe-rf-chip'); return [c.hidden, c.textContent.replace(/\s+/g, ' ').trim(), c.classList.contains('ok'), document.getElementById('q-primer-strip').hidden]; }), [false, '📖 3/4 · 1', false, true], 'chip 📖 3/4 · ⚡ 1 beside Review; the strip is not in the editor');
+        await page.evaluate(() => document.getElementById('qe-rf-chip').click());
         const ov = page.locator('#praOverlay');
         assert.equal(await ov.count(), 1, 'the popup opens');
 
@@ -63,11 +64,11 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
         assert.equal(cards[1].pillTitle, '1 term repeated · 1 line identical', 'V102.517: the breakdown lives in the pill tooltip');
         // V102.520: every card starts closed as a one-line strip of its terms (unique ones grey, repeated amber); the empty one says what to do
         assert.deepEqual(cards.map(c => [c.terms, c.open, c.noToggle]), [[2, false, true], [3, false, true], [3, false, true], [0, false, true]], 'closed strips: ' + JSON.stringify(cards.map(c => [c.terms, c.open])));
-        assert.equal((await ov.locator('.pra-card[data-q="3"] .pra-t.hint').innerText()).trim(), '✨ All or write it here');
+        assert.equal((await ov.locator('.pra-card[data-q="3"] .pra-t.hint').innerText()).trim(), '⚡ above or write it here');
         assert.equal(await ov.locator('.pra-card .pra-ed').evaluateAll(es => es.every(e => getComputedStyle(e).display === 'none')), true, 'no box is open');
         assert.equal(await ov.locator('.pra-terms').evaluate(t => t.classList.contains('lang-no-toggle')), true, 'the 🔁 chips carry user terms — never hidden by the EN/TH toggle');
-        // V102.517: some questions still empty → a strip above the cards with ✨ All
-        assert.match((await ov.locator('.pra-strip').innerText()).replace(/\s+/g, ' ').trim(), /^⚪ 1 of 4 empty · ⚡ in the strip$/, 'the strip counts the empty ones');
+        // V102.633: the strip (n/N · model · ⚡ m) sits under the window's header
+        assert.deepEqual(await ov.evaluate(o => { const s = o.querySelector('#q-primer-strip'); return s && [s.hidden, s.parentElement.className, s.querySelector('.qps-n').textContent, s.querySelector('.qps-go').textContent.trim(), !!s.querySelector('.qps-model'), o.querySelectorAll('.pra-strip').length]; }), [false, 'pra', '3/4', '1', true, 0], 'the strip is in the window');
         assert.equal(await ov.locator('.pra-none').count(), 0, 'no empty state while some have a Read first');
         assert.equal(await ov.locator('.pra-chip[data-f="dup"]').isDisabled(), false, 'Repeated only is live when something repeats');
         assert.ok(!cards[0].marks.some(m => /ศัพท์สำคัญ|ความรู้พื้นฐาน/.test(m)), 'bold headings are not terms');
@@ -118,10 +119,11 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
         { const g = await page.locator('#praOverlay .pra-card[data-q="0"]').evaluate(c => { const r = c.getBoundingClientRect(), go = c.querySelector('.pra-go').getBoundingClientRect(), pill = c.querySelector('.pra-pill').getBoundingClientRect(), stem = c.querySelector('.pra-stem'); return { fits: go.right <= r.right + 0.5 && pill.width > 10 && go.width > 10, clipped: stem.scrollWidth > stem.clientWidth }; });
           assert.equal(g.fits, true, 'pill + ✎ stay inside the card at 390 px'); assert.equal(g.clipped, true, 'the long stem is the one that gives way'); }
         await page.evaluate(() => _praClose()); await page.setViewportSize({ width: 1200, height: 900 });
-        // V102.573 (owner's pick A): nothing written yet → the strip above the questions, no popup and no browser confirm
+        // V102.633: closing parks the strip again; nothing written yet → the window still opens, the strip on top (⚡ 4), no cards, no browser confirm
+        assert.equal(await page.evaluate(() => document.getElementById('q-primer-strip').parentElement.id), 'q-primer-strip-home', 'closing parks the strip');
         await page.evaluate(() => { document.querySelectorAll('.quiz-q-item .q-primer').forEach(t => { t.value = ''; }); window.__confirms = 0; window.confirm = () => { window.__confirms++; return false; }; _qPrimerStrip(); _qPrimerReviewAll(); });
-        assert.equal(await page.locator('#praOverlay').count(), 0, 'no popup while nothing is written');
-        const strip = page.locator('#q-primer-strip');
+        assert.deepEqual([await page.locator('#praOverlay').count(), await page.locator('#praOverlay .pra-card').count()], [1, 0], 'the window, no cards yet');
+        const strip = page.locator('#praOverlay #q-primer-strip');
         assert.equal((await strip.locator('.qps-go').innerText()).trim(), '4'); assert.equal(await strip.locator('.qps-go').getAttribute('aria-label'), 'Draft Read first for 4 questions');
         {
             await strip.locator('.qps-model').evaluate(b => b.click());
@@ -139,14 +141,14 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
         assert.match((await strip.locator('.qps-go').innerText()).trim(), /^■ 1\/4 · \d+ s$/);
         await strip.locator('.qps-go').evaluate(b => b.click());
         await page.evaluate(() => window.__gate.shift()());
-        await page.waitForFunction(() => document.querySelector('#q-primer-strip .qps-model'));
+        await page.waitForFunction(() => document.querySelector('#praOverlay #q-primer-strip .qps-model'));
         assert.equal((await strip.locator('.qps-go').innerText()).trim(), '3', 'stopped: three left');
         await strip.locator('.qps-go').evaluate(b => b.click());
         for (let n = 0; n < 3; n++) { await page.waitForFunction(() => window.__gate.length > 0); await page.evaluate(() => window.__gate.shift()()); }
-        await page.waitForFunction(() => document.querySelector('#q-primer-strip.ok'));
+        await page.waitForFunction(() => document.querySelector('#praOverlay #q-primer-strip.ok'));
         assert.equal((await strip.locator('.qps-n').innerText()).trim(), '4/4 ✓'); assert.equal(await page.evaluate(() => __confirms), 0, 'no browser confirm');
-        await strip.locator('.qps-rev').evaluate(b => b.click());
-        assert.equal(await page.locator('#praOverlay .pra-card').count(), 4, 'Review opens the cards'); await page.evaluate(() => _praClose());
+        assert.equal(await page.locator('#praOverlay .pra-card').count(), 4, 'the window fills with the cards after the run'); await page.evaluate(() => _praClose());
+        assert.deepEqual(await page.evaluate(() => { const c = document.getElementById('qe-rf-chip'); return [c.textContent.trim(), c.classList.contains('ok')]; }), ['📖 4/4 ✓', true], 'the chip goes green');
         // V102.517 compact: ✎ is icon-only with the question in its label; two columns at ≥ 900 px, one below
         await page.evaluate(() => { document.querySelectorAll('.quiz-q-item .q-primer')[0].value = '**A** x'; _qPrimerReviewAll(); });
         assert.deepEqual(await page.locator('#praOverlay .pra-card[data-q="0"] .pra-go').evaluate(b => [b.textContent.trim(), b.getAttribute('aria-label')]), ['✎', 'Edit Q1'], 'icon-only ✎ with an accessible name');

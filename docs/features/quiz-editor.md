@@ -21,7 +21,7 @@ Admin: Quiz Engine ▸ Edit / ＋ New quiz.
 - `quiz-cover-ref-qa` — 🧬 reference strip: ≤ 2 ticked covers
 - `quiz-primer-ai-qa` — ✨ Read first draft never sends the correct answer
 - `primer-model-rail-qa` — Read first lean (V102.631, owner pick B + C): the row = the box + ✨ + this question's model logo in its corner (rail opens on tap, amber = its own model, not remembered); the strip above = n/N · model for all (remembered) · ⚡ m · 📖 All; ✨ / ⚡ send each question's model; the 📖 All popup has no ✨ All / rail. Was V102.509's rail per row
-- `primer-review-all-qa` — 📖 All (V102.512): every question's Read first in one popup, local duplicate check (bold terms with bracket aliases, identical lines), Repeated-only filter, term chips, ✎ Qn jumps the pager and focuses the box, Esc closes; V102.519: compact header (4 Q · 🔤 · ⚠️ in n Q · ≡), pills ⚪ / ⚠️ n / ✅, strip for empty ones + ✨ All, all-empty state, two columns when wide, cards never widen
+- `primer-review-all-qa` — 📖 All (V102.512; V102.633 owner pick C: Read first is part of Review — the toolbar keeps a 📖 n/N (· ⚡ m) chip beside 🛡 Review, the strip (n/N · model · ⚡) lives in this window and parks when it closes, the Review rail has 📖 n/N too): every question's Read first in one popup, local duplicate check (bold terms with bracket aliases, identical lines), Repeated-only filter, term chips, ✎ Qn jumps the pager and focuses the box, Esc closes; V102.519: compact header (4 Q · 🔤 · ⚠️ in n Q · ≡), pills ⚪ / ⚠️ n / ✅, strip for empty ones + ✨ All, all-empty state, two columns when wide, cards never widen
 - `quiz-system-select-check` — every CASE_SYSTEMS key has an intern icon + select option
 
 ## What usually lies

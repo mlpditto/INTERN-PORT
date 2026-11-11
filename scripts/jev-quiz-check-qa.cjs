@@ -25,7 +25,7 @@ const ADMIN = pathToFileURL(path.resolve('public/admin.html')).href;
       const btn = () => page.evaluate(() => { document.getElementById('edit-quiz-id').value = window.__id || ''; window.jevQuizCheck.run(window.__jevBtn); });
       const box = () => page.locator('#jqc-box').innerText();
 
-      { const html = require('node:fs').readFileSync('public/admin.html', 'utf8'); assert.ok(html.includes('id="jev-quiz-check" class="review-tab" aria-label="Jev check" onclick="jevQuizCheck.run(this)"') && html.includes('${items}${jev}</div>'), 'V102.558: a tab beside Scorecard and Rewrites'); assert.equal(await page.locator('#jev-quiz-check').count(), 0, 'no longer in the editor toolbar'); }
+      { const html = require('node:fs').readFileSync('public/admin.html', 'utf8'); assert.ok(html.includes('id="jev-quiz-check" class="review-tab" aria-label="Jev check" onclick="jevQuizCheck.run(this)"') && html.includes('${items}${jev}'), 'V102.558: a tab beside Scorecard and Rewrites'); assert.equal(await page.locator('#jev-quiz-check').count(), 0, 'no longer in the editor toolbar'); }
       // V102.619 (owner): a never-saved quiz runs too — 💡 is checked, translations wait for Save
       await page.evaluate(() => { window.__reply = { enabled: true, questions: 1, checked: 1, errors: 0, noExplanation: 0, flags: [], langs: [] }; });
       await btn(); await page.waitForTimeout(100);
