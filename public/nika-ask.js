@@ -68,18 +68,32 @@
         } catch (e) { console.warn('nika chips', e && e.message); }
         return out;
     }
+    // V101.307 💭 think questions (nika-think.js): 🌅 today's card on top, or the 💭 one tapped in the chip row
+    const NT = () => window.NikaThink;
+    let thinkItem = null;
+    function paintThink() {
+        const box = q('.nk-think'); if (!box || !NT()) return;
+        const item = thinkItem || NT().today();
+        box.innerHTML = item ? NT().cardHtml(item, { close: !!thinkItem }) : '';
+        if (item) NT().bind(box, item, () => { paintThink(); paintChips(); }, () => { thinkItem = null; paintThink(); });
+    }
     let chips = [];
     function paintChips() {
         const box = q('.nk-chips'); if (!box) return;
         chips = wrongChips();
+        if (NT()) NT().chips().forEach(it => { if (!thinkItem || thinkItem.id !== it.id) chips.push({ think: it, label: it.q }); });
         CHIPS.forEach(c => { if (chips.length < 3) chips.push({ label: c, ask: c }); });
-        box.innerHTML = chips.map((c, i) => `<button type="button" class="nk-chip${c.wrong ? ' nk-wrong' : ''}" data-i="${i}" title="${esc(c.label)}">${c.wrong ? '❌ ' : ''}${esc(c.label)}</button>`).join('');
-        box.querySelectorAll('.nk-chip').forEach(b => { b.onclick = () => { const c = chips[+b.dataset.i]; q('#nk-question').value = c.ask; ask(c.ask); }; });
+        box.innerHTML = chips.map((c, i) => `<button type="button" class="nk-chip${c.wrong ? ' nk-wrong' : c.think ? ' nk-think-c' : ''}" data-i="${i}" title="${esc(c.label)}">${c.wrong ? '❌ ' : c.think ? '💭 ' : ''}${esc(c.label)}</button>`).join('');
+        box.querySelectorAll('.nk-chip').forEach(b => { b.onclick = () => {
+            const c = chips[+b.dataset.i];
+            if (c.think) { thinkItem = c.think; paintThink(); paintChips(); const card = q('.nk-think'); if (card && card.scrollIntoView) card.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); return; }
+            q('#nk-question').value = c.ask; ask(c.ask);
+        }; });
     }
 
     function shell() {
         const x = t();
-        pane().innerHTML = `<div class="nk-body lang-no-toggle"><div class="nk-form"><div class="nk-box"><textarea id="nk-question" rows="2" maxlength="300" placeholder="${esc(x.ph)}" aria-label="${esc(x.ph)}"></textarea><button type="button" class="nk-go">${esc(x.ask)}</button></div>
+        pane().innerHTML = `<div class="nk-body lang-no-toggle"><div class="nk-think"></div><div class="nk-form"><div class="nk-box"><textarea id="nk-question" rows="2" maxlength="300" placeholder="${esc(x.ph)}" aria-label="${esc(x.ph)}"></textarea><button type="button" class="nk-go">${esc(x.ask)}</button></div>
             <div class="nk-chips"></div></div>
             <div class="nk-links">${LINKS.map((l, i) => `<button type="button" class="nk-link" data-i="${i}" title="${esc(l.by)} · ${esc(l.url)}">${l.e} ${esc(document.body.classList.contains('lang-th-on') ? l.th : l.en)} <span aria-hidden="true">↗</span></button>`).join('')}</div>
             <div class="nk-out" aria-live="polite"></div><div class="nk-safe">${esc(x.safe)}</div><div class="nk-left"></div></div>`;
@@ -139,12 +153,13 @@
     }
 
     window.nikaAsk = {
-        _links: LINKS, _openOut: openOut, _wrongChips: wrongChips,
+        _links: LINKS, _openOut: openOut, _wrongChips: wrongChips, _paintThink: paintThink,
         async show() {
             const card = document.getElementById('dd-codex-card');
             card.classList.remove('nk-sun'); void card.offsetWidth; card.classList.add('nk-sun');
             if (!pane().firstElementChild) shell();
-            paintChips();
+            paintChips(); paintThink();
+            if (NT()) NT().load().then(() => { paintThink(); paintChips(); });
             try {
                 if (typeof ensureFirebaseAuthReady === 'function') await ensureFirebaseAuthReady(10000);
                 const r = await call({ peek: true });

@@ -1046,7 +1046,7 @@
         var list = sorted(now);
         var head = '<div class="art-h"><h2>📰 Articles</h2><div class="art-rail" role="group" aria-label="Filter by status">' + FILTERS.map(function (f) {
             return '<button type="button" class="' + (S.filter === f[0] ? 'on' : '') + '" aria-pressed="' + (S.filter === f[0]) + '" data-filter="' + f[0] + '" onclick="Articles.filter(\'' + f[0] + '\')">' + f[1] + '<b>' + (counts[f[0]] || 0) + '</b></button>';
-        }).join('') + '</div>' + (S.tag ? '<button type="button" class="art-tagf" onclick="Articles.tag(\'\')" title="Showing only this tag — tap to clear">🏷 ' + esc(S.tag) + ' ✕</button>' : '') + trAllHtml() + daAllHtml() + gapChip() + '<button type="button" class="art-new" onclick="Articles.edit(null)">＋ New</button></div>' + gapsHtml();
+        }).join('') + '</div>' + (S.tag ? '<button type="button" class="art-tagf" onclick="Articles.tag(\'\')" title="Showing only this tag — tap to clear">🏷 ' + esc(S.tag) + ' ✕</button>' : '') + trAllHtml() + daAllHtml() + gapChip() + (window.NikaThinkAdmin ? NikaThinkAdmin.chip() : '') + '<button type="button" class="art-new" onclick="Articles.edit(null)">＋ New</button></div>' + gapsHtml() + (window.NikaThinkAdmin ? NikaThinkAdmin.panel() : '');   // V102.632 💭 think questions (nika-think-admin.js)
         var left = '<div class="art-list">' + (S.loading && !S.loaded ? '<div class="art-empty">Loading…</div>' : list.length ? list.map(function (a) { return rowHtml(a, now); }).join('') : '<div class="art-empty">' + (S.list.length ? 'Nothing here.' : 'No articles yet — ＋ New') + '</div>') + '</div>';
         var mid = S.cur ? editorHtml(now) : '<div class="art-empty">' + (S.err && !S.loaded ? '⚠️ ' + esc(S.err) : 'Pick an article, or ＋ New.') + '</div>';
         host.innerHTML = head + '<div class="art-g">' + left + (S.cur && S.who ? whoHtml(S.cur) : S.cur && S.qs ? qsHtml(S.cur) : mid + (S.cur ? previewHtml() : '<div class="art-pv"></div>')) + '</div>';
@@ -1082,6 +1082,7 @@
     // ---- actions
     function open() {
         css(); shell().style.display = 'block'; listenQs(); loadGaps();
+        if (window.NikaThinkAdmin) NikaThinkAdmin.attach({ render: render, cur: function () { return S.cur; }, title: title, body: function (a) { return bodyOf(a, 'en') || bodyOf(a, 'th'); }, ai: aiJson });
         render();
         if (!S.loaded) load();
     }
