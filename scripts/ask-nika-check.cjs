@@ -76,6 +76,11 @@ const fresh = () => { DB = { user_auth_links: { anon1: { effectiveUserId: 'U1' }
     // V101.306 asked from an article: that article only; a bad id is ignored, never pasted into the filter
     assert.equal(N.requestBody('q', 'Ab_1-x').searchSpec.searchParams.filter, 'audience: ANY("intern") AND kind: ANY("article") AND sourceId: ANY("Ab_1-x")');
     assert.equal(N.requestBody('q', 'x") OR audience: ANY("admin').searchSpec.searchParams.filter, 'audience: ANY("intern")');
+    // V101.308: the language chip — a known code names the language, anything else keeps "the language of the question"
+    assert.match(N.requestBody('q', null, 'th').answerGenerationSpec.promptSpec.preamble, /^Answer in Thai\. /);
+    assert.match(N.requestBody('q', null, 'ko').answerGenerationSpec.promptSpec.preamble, /^Answer in Korean\. /);
+    assert.match(N.requestBody('q', null, 'xx').answerGenerationSpec.promptSpec.preamble, /^Answer in the language of the question\./);
+    assert.match(N.requestBody('q', null, '__proto__').answerGenerationSpec.promptSpec.preamble, /^Answer in the language of the question\./);
     for (const none of [{ answer: { answerText: 'NOT_IN_LIBRARY' } }, { answer: { answerText: '' } }, { answer: { answerText: 'x', answerSkippedReasons: ['OUT_OF_DOMAIN_QUERY_IGNORED'] } }, { answer: { answerText: 'Unsourced claim', references: [] } }]) {
         assert.equal(N.parseAnswer(none).notFound, true, JSON.stringify(none));
     }

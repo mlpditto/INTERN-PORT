@@ -34,11 +34,11 @@ async function open(browser, peek, thai) {
 (async () => {
     const browser = await chromium.launch();
     try {
-        // 1. English, a browser: the link sits under the chips, opens a new tab
+        // 1. English, a browser: the link sits at the end of the chip row (V101.308: 🫘 ↗ only, the name in the tooltip), opens a new tab
         let { page, ctx, errors } = await open(browser, { left: 10, paused: false }, false);
         const l = await page.evaluate(() => { const b = document.querySelector('#nika-section-content .nk-link'), r = b.getBoundingClientRect();
-            return { text: b.textContent.trim(), title: b.title, h: Math.round(r.height), inForm: !!b.closest('.nk-form'), afterChips: !!(document.querySelector('.nk-chips').compareDocumentPosition(b) & 4) }; });
-        assert.deepEqual(l, { text: '🫘 Kidney risk screening ↗', title: 'สมาคมเภสัชกรรมชุมชน (ประเทศไทย) · ' + URL_, h: 36, inForm: false, afterChips: true }, 'one-click link under the chips: ' + JSON.stringify(l));
+            return { text: b.textContent.trim(), title: b.title, h: Math.round(r.height), inForm: !!b.closest('.nk-form'), afterChips: !!(document.querySelector('.nk-chips').compareDocumentPosition(b) & 4), row: !!b.closest('.nk-row') }; });
+        assert.deepEqual(l, { text: '🫘 ↗', title: 'Kidney risk screening · สมาคมเภสัชกรรมชุมชน (ประเทศไทย)', h: 36, inForm: false, afterChips: true, row: true }, 'one-click link at the end of the chip row: ' + JSON.stringify(l));
         await page.click('.nk-link');
         assert.deepEqual(await page.evaluate(() => window.__open), [[URL_, '_blank', 'noopener']], 'a browser: new tab');
         if (process.env.OUTDIR) await page.locator('#dd-codex-card').screenshot({ path: process.env.OUTDIR + '/nika-link.png' });
@@ -48,12 +48,12 @@ async function open(browser, peek, thai) {
         // 2. Thai, inside LINE: liff.openWindow external; still there while Nika is paused for a quiz
         ({ page, ctx, errors } = await open(browser, { left: 4, paused: true }, true));
         await page.evaluate(() => { window.__liff = []; window.liff = { isInClient: () => true, openWindow: o => window.__liff.push(o) }; });
-        const s = await page.evaluate(() => ({ text: document.querySelector('.nk-link').textContent.trim(), form: document.querySelector('.nk-form').hidden, paused: !!document.querySelector('.nk-out .nk-pause') }));
-        assert.deepEqual(s, { text: '🫘 คัดกรองความเสี่ยงโรคไต ↗', form: true, paused: true }, 'Thai label; the form hides while paused, the link stays: ' + JSON.stringify(s));
+        const s = await page.evaluate(() => { const b = document.querySelector('.nk-link'); return { label: b.getAttribute('aria-label'), form: document.querySelector('.nk-form').hidden, paused: !!document.querySelector('.nk-out .nk-pause'), shown: b.getBoundingClientRect().height > 0, chips: document.querySelector('.nk-chips .nk-chip') ? document.querySelector('.nk-chips .nk-chip').getBoundingClientRect().height : 0 }; });
+        assert.deepEqual(s, { label: 'คัดกรองความเสี่ยงโรคไต', form: true, paused: true, shown: true, chips: 0 }, 'Thai label; the form + question chips hide while paused, the link stays: ' + JSON.stringify(s));
         await page.click('.nk-link');
         assert.deepEqual(await page.evaluate(() => [window.__liff, window.__open]), [[{ url: URL_, external: true }], []], 'LINE: opens outside the app');
         assert.deepEqual(errors.filter(e => !/firebase.(firestore|auth) is not a function/.test(e)), [], 'no Nika errors: ' + errors);
         await ctx.close();
-        console.log('PASS: Nika one-click link (V101.303) — 🫘 Kidney risk screening under the chips (TH/EN), new tab in a browser, liff.openWindow external in LINE, stays while Nika is paused');
+        console.log('PASS: Nika one-click link (V101.303 · V101.308 🫘 ↗ in the chip row) — label in the tooltip (TH/EN), new tab in a browser, liff.openWindow external in LINE, stays while Nika is paused');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

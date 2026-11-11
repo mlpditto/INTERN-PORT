@@ -5,13 +5,17 @@
             none: 'Not in our library yet', noneSub: 'Nika only answers from Codex and Articles, so it will not guess.', search: '🔎 Search Drugs',
             safe: '🛟 For learning only. Check with your preceptor before using it on a patient. Do not type patient names or HN.',
             pause: 'Paused during your quiz', pauseSub: 'Nika opens again when you finish.', limit: "That's all for today", limitSub: n => `${n} questions a day. Back tomorrow. Codex and Articles stay open.`,
-            busy: 'Nika is busy', busySub: 'Please try again in a minute. This question was not counted.', fail: 'Could not reach Nika. Please try again.', sources: 'Sources' },
+            busy: 'Nika is busy', busySub: 'Please try again in a minute. This question was not counted.', fail: 'Could not reach Nika. Please try again.', sources: 'Sources', noId: 'no patient names / HN', copy: 'Copy the answer', copied: 'Copied', again: 'New question', inLang: l => `Answer in ${l}` },
         th: { ph: 'ถามเรื่องยา โรค หรือบทความ', ask: 'ถาม', left: n => `เหลือ ${n} คำถามวันนี้`, wait: 'กำลังค้นในคลัง…',
             none: 'ยังไม่มีในคลัง', noneSub: 'Nika ตอบจาก Codex และ Articles เท่านั้น จึงจะไม่เดา', search: '🔎 ค้นใน Drugs',
             safe: '🛟 ใช้เพื่อการเรียนเท่านั้น ปรึกษา preceptor ก่อนใช้กับผู้ป่วย และห้ามพิมพ์ชื่อผู้ป่วยหรือ HN',
             pause: 'พักระหว่างทำ Quiz', pauseSub: 'Nika จะเปิดอีกครั้งเมื่อทำเสร็จ', limit: 'วันนี้ครบแล้ว', limitSub: n => `ถามได้วันละ ${n} คำถาม พรุ่งนี้กลับมาใหม่ Codex และ Articles ยังเปิดอยู่`,
-            busy: 'Nika ไม่ว่าง', busySub: 'ลองใหม่อีกครั้งในอีกสักครู่ คำถามนี้ไม่ถูกนับ', fail: 'ติดต่อ Nika ไม่ได้ ลองใหม่อีกครั้ง', sources: 'แหล่งที่มา' }
+            busy: 'Nika ไม่ว่าง', busySub: 'ลองใหม่อีกครั้งในอีกสักครู่ คำถามนี้ไม่ถูกนับ', fail: 'ติดต่อ Nika ไม่ได้ ลองใหม่อีกครั้ง', sources: 'แหล่งที่มา', noId: 'ห้ามใส่ชื่อ / HN', copy: 'คัดลอกคำตอบ', copied: 'คัดลอกแล้ว', again: 'ถามข้อใหม่', inLang: l => `ตอบเป็นภาษา${l}` }
     };
+    // V101.308 (owner pick C): one flag chip under an answer — 🇬🇧 → 🇹🇭 → 🇰🇷, the same question again in that language (askNika lang)
+    const LANGS = ['en', 'th', 'ko'], FLAG = { en: '🇬🇧', th: '🇹🇭', ko: '🇰🇷' }, LNAME = { en: { en: 'English', th: 'อังกฤษ' }, th: { en: 'Thai', th: 'ไทย' }, ko: { en: 'Korean', th: 'เกาหลี' } };
+    const langOf = s => /[\u0E00-\u0E7F]/.test(s) ? 'th' : /[\uAC00-\uD7AF]/.test(s) ? 'ko' : 'en';
+    const isTh = () => document.body.classList.contains('lang-th-on');
     const CHIPS = ['Amlodipine: what to monitor?', 'Atorvastatin side effects', 'Agomelatine mechanism'];
     // V101.303 (owner): one-click tools outside the app — open in the phone's browser (LINE: external window), never inside Nika's answer
     const LINKS = [{ e: '🫘', url: 'https://cpa-microalbuminurea.netlify.app/', en: 'Kidney risk screening', th: 'คัดกรองความเสี่ยงโรคไต', ko: '신장 위험 선별', by: 'สมาคมเภสัชกรรมชุมชน (ประเทศไทย)' }];
@@ -40,9 +44,26 @@
     }
     const pane = () => document.getElementById('nika-section-content');
     const q = sel => pane().querySelector(sel);
-    function paintLeft() { const el = q('.nk-left'); if (el) el.textContent = left == null ? '' : t().left(left); }
+    // V101.308: the count left = a badge on the Nika tab (one place), its sentence in the tab's title
+    function paintLeft() {
+        const tab = document.querySelector('.nk-tab'); if (!tab) return;
+        let b = tab.querySelector('.nk-n'); if (!b) { b = document.createElement('i'); b.className = 'nk-n'; b.setAttribute('aria-hidden', 'true'); tab.appendChild(b); }
+        b.hidden = left == null; b.textContent = left == null ? '' : String(left);
+        tab.title = 'Nika' + (left == null ? '' : ' · ' + t().left(left));
+        tab.setAttribute('aria-label', tab.title);
+    }
+    // V101.308 (owner): LV.5+ sees the new Nika picture; the first time, the icon flashes once and a toast says so
+    const LV5 = 5, LV5_KEY = 'nika_lv5_seen';
+    function paintIcon() {
+        const img = document.querySelector('.nk-tab img'); if (!img) return;
+        const up = (Number(window.lvNow) || 0) >= LV5, src = up ? 'nika-lv5.png' : 'nika-lv1.png';   // V101.308: both are the owner's pictures
+        if (img.getAttribute('src') === src) return;
+        img.setAttribute('src', src);
+        let seen = true; try { seen = !!localStorage.getItem(LV5_KEY); if (up && !seen) localStorage.setItem(LV5_KEY, '1'); } catch (e) { /* blocked */ }
+        if (up && !seen) { const tab = img.closest('.nk-tab'); tab.classList.remove('nk-up'); void tab.offsetWidth; tab.classList.add('nk-up'); if (typeof showToast === 'function') showToast('🌞 Nika LV.5 ✨'); }
+    }
     function note(icon, head, sub) { return `<div class="nk-pause"><span>${icon}</span><b>${esc(head)}</b><small>${esc(sub)}</small></div>`; }
-    function setForm(on) { q('.nk-form').hidden = !on; }
+    function setForm(on) { q('.nk-form').hidden = !on; pane().classList.toggle('nk-off', !on); }
     // V101.305 (owner): the chips follow the intern's own quizzes: questions answered wrong, newest quiz first, only in quizzes
     // already passed (score > 0, the same rule that opens the answer key in View Answers), so no key leaks. Else the samples.
     const strip = s => String(s == null ? '' : s).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -92,27 +113,58 @@
     }
 
     function shell() {
-        const x = t();
-        pane().innerHTML = `<div class="nk-body lang-no-toggle"><div class="nk-think"></div><div class="nk-form"><div class="nk-box"><textarea id="nk-question" rows="2" maxlength="300" placeholder="${esc(x.ph)}" aria-label="${esc(x.ph)}"></textarea><button type="button" class="nk-go">${esc(x.ask)}</button></div>
-            <div class="nk-chips"></div></div>
-            <div class="nk-links">${LINKS.map((l, i) => `<button type="button" class="nk-link" data-i="${i}" title="${esc(l.by)} · ${esc(l.url)}">${l.e} ${esc(document.body.classList.contains('lang-th-on') ? l.th : l.en)} <span aria-hidden="true">↗</span></button>`).join('')}</div>
-            <div class="nk-out" aria-live="polite"></div><div class="nk-safe">${esc(x.safe)}</div><div class="nk-left"></div></div>`;
+        const x = t(), ph = x.ph + ' · 🛟 ' + x.noId;
+        pane().innerHTML = `<div class="nk-body lang-no-toggle"><div class="nk-think"></div><div class="nk-form"><div class="nk-box"><textarea id="nk-question" rows="2" maxlength="300" placeholder="${esc(ph)}" aria-label="${esc(x.ph)}" title="${esc(x.safe)}"></textarea><button type="button" class="nk-go" aria-label="${esc(x.ask)}" title="${esc(x.ask)}">➤</button></div></div>
+            <div class="nk-row"><div class="nk-chips"></div><div class="nk-links">${LINKS.map((l, i) => `<button type="button" class="nk-link" data-i="${i}" title="${esc(isTh() ? l.th : l.en)} · ${esc(l.by)}" aria-label="${esc(isTh() ? l.th : l.en)}">${l.e} <span aria-hidden="true">↗</span></button>`).join('')}</div></div>
+            <div class="nk-out" aria-live="polite"></div></div>`;
         q('.nk-go').onclick = () => ask(q('#nk-question').value);
         pane().querySelectorAll('.nk-link').forEach(b => { b.onclick = () => openOut(LINKS[+b.dataset.i].url); });
     }
     function paused() { setForm(false); q('.nk-out').innerHTML = note('⏸', t().pause, t().pauseSub); }
     function limited() { setForm(false); left = 0; q('.nk-out').innerHTML = note('🌙', t().limit, t().limitSub(DAILY)); paintLeft(); }
 
+    // V101.308 (owner pick C): with an answer the chips step aside (↺ brings them back); sources = icon + number (the title in the tooltip);
+    // 📋 copies the answer in one tap (✓ for a moment); the flag asks the same question in the next language (kept, so a second tap is free)
+    let last = null;
+    function tools(lang) {
+        const x = t(), nx = LANGS[(LANGS.indexOf(lang) + 1) % LANGS.length], ln = LNAME[nx][isTh() ? 'th' : 'en'];
+        return `<span class="nk-sp"></span><button type="button" class="nk-tool nk-lang" title="${esc(x.inLang(ln))}" aria-label="${esc(x.inLang(ln))}">${FLAG[lang]}</button>` +
+            (last && last.r && !last.r.notFound ? `<button type="button" class="nk-tool nk-copy" title="${esc(x.copy)}" aria-label="${esc(x.copy)}">📋</button>` : '') +
+            `<button type="button" class="nk-tool nk-new" title="${esc(x.again)}" aria-label="${esc(x.again)}">↺</button>`;
+    }
+    function plain(text) { return String(text).split('\n').map(l => l.trim()).filter(Boolean).map(l => l.replace(/^[*\-•]\s+/, '• ').replace(/\*\*(.+?)\*\*/g, '$1')).join('\n'); }
+    function copyText(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(() => true, () => false);
+        const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select();
+        let ok = false; try { ok = document.execCommand('copy'); } catch (e) { /* no clipboard */ }
+        ta.remove(); return Promise.resolve(ok);
+    }
+    function wireTools() {
+        const x = t();
+        const lb = q('.nk-lang'); if (lb) lb.onclick = () => {
+            const nx = LANGS[(LANGS.indexOf(last.lang) + 1) % LANGS.length];
+            if (last.byLang[nx]) { last.lang = nx; last.r = last.byLang[nx]; paintAnswer(last.r, last.question); } else ask(last.question, nx);
+        };
+        const cb = q('.nk-copy'); if (cb) cb.onclick = () => copyText(plain(last.r.answer)).then(ok => {
+            if (!ok) return;
+            cb.textContent = '✓'; cb.classList.add('ok'); cb.title = x.copied;
+            setTimeout(() => { if (cb.isConnected) { cb.textContent = '📋'; cb.classList.remove('ok'); cb.title = x.copy; } }, 1500);
+        });
+        const nb = q('.nk-new'); if (nb) nb.onclick = () => { last = null; q('.nk-out').innerHTML = ''; pane().classList.remove('nk-has-a'); const ta = q('#nk-question'); if (ta) ta.focus(); };
+    }
     function paintAnswer(r, question) {
         const out = q('.nk-out'), x = t(), asked = `<div class="nk-q">${esc(question)}</div>`;
+        pane().classList.add('nk-has-a');
         if (r.notFound) {
-            out.innerHTML = `${asked}<div class="nk-none"><b>❔ ${esc(x.none)}</b><span>${esc(x.noneSub)}</span></div><div class="nk-src"><button type="button" class="nk-search">${esc(x.search)}</button></div>`;
+            out.innerHTML = `${asked}<div class="nk-none"><b>❔ ${esc(x.none)}</b><span>${esc(x.noneSub)}</span></div><div class="nk-src"><button type="button" class="nk-search">${esc(x.search)}</button>${tools(last.lang)}</div>`;
             q('.nk-search').onclick = () => ddSwitchType('drug');
+            wireTools();
             return;
         }
         out.innerHTML = asked + answerHtml(r.answer) + `<div class="nk-src" aria-label="${esc(x.sources)}">` + (r.sources || []).map((s, i) =>
-            `<button type="button" class="nk-s" data-kind="${esc(s.kind)}" data-id="${esc(s.id)}"><b>${i + 1}</b> ${ICON[s.kind] || ''} ${esc(s.title)}</button>`).join('') + '</div>';
+            `<button type="button" class="nk-s" data-kind="${esc(s.kind)}" data-id="${esc(s.id)}" title="${esc(s.title)}" aria-label="${i + 1}. ${esc(s.title)}">${ICON[s.kind] || ''}<b>${i + 1}</b></button>`).join('') + tools(last.lang) + '</div>';
         pane().querySelectorAll('.nk-s').forEach(b => { b.onclick = () => openSource(b.dataset.kind, b.dataset.id); });
+        wireTools();
     }
 
     // The Codex entry opens on top, so the answer is still here when it closes.
@@ -133,18 +185,23 @@
         whenListed(() => dxState.codex || [], id, dxOpenDetail);
     }
 
-    async function ask(text) {
+    async function ask(text, lang) {
         const question = String(text || '').trim(), x = t();
         if (busy || question.length < 3) { if (!busy) q('#nk-question').focus(); return; }
         busy = true; q('.nk-go').disabled = true;
         q('.nk-out').innerHTML = `<div class="nk-q">${esc(question)}</div><div class="nk-wait" role="status">${esc(x.wait)}</div>`;
         try {
-            const r = await call({ question });
+            const r = await call(lang ? { question, lang } : { question });
             if (r.left != null) left = r.left;
             if (r.paused) paused();
             else if (r.limit) limited();
             else if (r.busy) q('.nk-out').innerHTML = note('☕', x.busy, x.busySub);
-            else { paintAnswer(r, question); q('#nk-question').value = ''; }
+            else {
+                const l = lang || langOf(question);
+                if (!last || last.question !== question) last = { question, byLang: {} };
+                last.lang = l; last.r = r; last.byLang[l] = r;
+                paintAnswer(r, question); q('#nk-question').value = '';
+            }
         } catch (e) {
             console.warn('askNika', e && e.message);
             q('.nk-out').innerHTML = note('⚠️', x.fail, '');
@@ -153,12 +210,12 @@
     }
 
     window.nikaAsk = {
-        _links: LINKS, _openOut: openOut, _wrongChips: wrongChips, _paintThink: paintThink,
+        _links: LINKS, _openOut: openOut, _wrongChips: wrongChips, _paintThink: paintThink, _plain: plain, icon: paintIcon,
         async show() {
             const card = document.getElementById('dd-codex-card');
             card.classList.remove('nk-sun'); void card.offsetWidth; card.classList.add('nk-sun');
             if (!pane().firstElementChild) shell();
-            paintChips(); paintThink();
+            paintChips(); paintThink(); paintIcon();
             if (NT()) NT().load().then(() => { paintThink(); paintChips(); });
             try {
                 if (typeof ensureFirebaseAuthReady === 'function') await ensureFirebaseAuthReady(10000);

@@ -53,7 +53,7 @@ const SAMPLES = ['Amlodipine: what to monitor?', 'Atorvastatin side effects', 'A
         await nika();
         assert.deepEqual(await ch(), ['W:❌ Amlodipine: the most common side effect?', 'W:❌ Warfarin antidote?', SAMPLES[0]],
             'wrong answers from the passed quiz only (HTML stripped, multi-answer skipped), then a sample');
-        const fit = await page.evaluate(() => { const b = document.querySelector('.nk-chip.nk-wrong'), r = b.getBoundingClientRect(), box = document.querySelector('.nk-chips').getBoundingClientRect();
+        const fit = await page.evaluate(() => { const b = document.querySelector('.nk-chip.nk-wrong'), r = b.getBoundingClientRect(), box = document.querySelector('.nk-row').getBoundingClientRect();   // V101.308: .nk-chips is display: contents inside .nk-row
             return { title: b.title, oneLine: r.height < 40, inside: r.right <= box.right + 1 }; });
         assert.deepEqual(fit, { title: 'Amlodipine: the most common side effect?', oneLine: true, inside: true }, 'one line, cut inside the row, full stem in the title: ' + JSON.stringify(fit));
         if (process.env.OUTDIR) await page.locator('#dd-codex-card').screenshot({ path: process.env.OUTDIR + '/nika-chips.png' });
