@@ -15,6 +15,7 @@ Intern: home ▸ DD Codex; Poneglyph ▸ My Path; Submit New ▸ ⋯ ▸ Drug / 
 - `drug-submit-lean-qa` — Drug + Disease submit forms: one header row, hidden empty preview
 - `nika-links-qa` — 🌞 Nika tab: 🫘 Kidney risk screening one-click link (V101.303), TH/EN label, new tab in a browser / LINE external window, stays while Nika is paused
 - `nika-chips-qa` — 🌞 Nika chips follow the intern (V101.305): ❌ questions answered wrong in passed quizzes only (score > 0), newest first, ≤ 3, tap asks stem → key; samples fill the rest
+- `nika-think-qa` — 💭 think questions (V101.307): 🌅 the day's question on top of Nika with 🔥 n days in a row, 💭 general ones as purple chips (tap → card ✕), 📰 the article's box after Got it (sheet stays); one answer = nika_think_answers/{qid}_{authUid}; the admin's 👍 / reply show on the card. Rules: `rules-nika-think.emu.cjs` (emulator, not CI)
 - `codex-image-fill-check` — "Fill from image" dd* helpers with a DOM stub + storage.rules wiring
 - `codex-vision-shared-check` — shared CodexVision contract + admin "Re-extract from image"
 

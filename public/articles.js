@@ -384,7 +384,9 @@
             '<button type="button" class="bm nkb" onclick="internArticles.nika()" aria-pressed="' + !!S.nk + '" title="' + esc((NKT[S.lang] || NKT.en).nk) + '" aria-label="' + esc((NKT[S.lang] || NKT.en).nk) + '">🌞</button>' +
             '<button type="button" class="more" id="art-more" onclick="internArticles.toggleMore()">' + (S.more ? t.less + ' ▴' : t.more + ' ▾') + '</button>' +
             (S.got ? '<span class="rd">✓ ' + t.read + '</span><button type="button" class="anyq" onclick="internArticles.anyQ()">💬 ' + t.anyq + '</button>'
-                : '<button type="button" class="ok" onclick="internArticles.gotIt()">👍 ' + t.got + '</button>') + '</div>';
+                : '<button type="button" class="ok" onclick="internArticles.gotIt()">👍 ' + t.got + '</button>') + '</div>' +
+            (S.think && window.NikaThink ? NikaThink.cardHtml(S.think) : '');   // V101.307 💭 the admin's think question for this article, after Got it
+        if (S.think && window.NikaThink) NikaThink.bind(sh, S.think, function () { if (S.cur === c) render(); });
         // a short body needs no "Read more"
         var el = document.getElementById('art-text'), mb = document.getElementById('art-more');
         if (el && mb && !S.more && el.scrollHeight <= el.clientHeight + 2) mb.style.visibility = 'hidden';
@@ -413,9 +415,10 @@
         var c = S.cur; if (!c || S.got) return;
         S.got = true;
         markRead(c.a.id, 'ok');
+        S.think = (window.NikaThink && NikaThink.forArticle(c.a.id)) || null;
         render();
         var b = document.querySelector('#art-sheet .anyq'); if (b) b.focus();
-        S.gotTimer = setTimeout(function () { if (S.cur === c && !S.ask) close('ok'); }, ANYQ_MS);
+        if (!S.think) S.gotTimer = setTimeout(function () { if (S.cur === c && !S.ask) close('ok'); }, ANYQ_MS);
     }
     function anyQ() {
         if (!S.cur) return;
@@ -448,10 +451,11 @@
     }
     function show(c) {
         css();
-        S.cur = c; S.lang = S.cl; S.more = false; S.got = false; S.ask = null; S.nk = null; S.clip = clipFor(c.a, S.cl);
+        S.cur = c; S.lang = S.cl; S.more = false; S.got = false; S.ask = null; S.nk = null; S.think = null; S.clip = clipFor(c.a, S.cl);
         var back = document.createElement('div'); back.id = 'art-back'; back.onclick = function () { close('x'); };
         var sh = document.createElement('div'); sh.id = 'art-sheet'; sh.className = 'lang-no-toggle'; sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-modal', 'true'); sh.setAttribute('aria-labelledby', 'art-title');
         document.body.appendChild(back); document.body.appendChild(sh);
+        if (window.NikaThink) NikaThink.load();   // V101.307: ready for 💭 after Got it
         if (S.clip) clipStep(); else render();
         document.addEventListener('keydown', onKey);
         var today = bkkDay(Date.now());
@@ -463,7 +467,7 @@
     function onKey(e) { if (e.key === 'Escape') close('x'); }
     function close(act) {
         var c = S.cur; if (!c) return Promise.resolve();
-        S.cur = null; clearTimeout(S.gotTimer); S.got = false; S.ask = null; S.nk = null; if (S.clip) { S.clip = null; clipStopSpeak(); }
+        S.cur = null; clearTimeout(S.gotTimer); S.got = false; S.ask = null; S.nk = null; S.think = null; if (S.clip) { S.clip = null; clipStopSpeak(); }
         ['art-back', 'art-sheet'].forEach(function (id) { var el = document.getElementById(id); if (el) el.remove(); });
         document.removeEventListener('keydown', onKey);
         var p = act === 'x' ? (isDone((me().articleSeen || {})[c.a.id]) ? Promise.resolve() : setSeen(c.a.id, { act: 'x' })) : markRead(c.a.id, act);
