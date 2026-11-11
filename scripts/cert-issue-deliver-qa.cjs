@@ -1,4 +1,4 @@
-// V102.617 / V101.297 (owner pick C + 1): Certificate Request card → chip rail (🎓 Issue · 📄 PDF · 👤 Hub · 💬 Chat · 🗑);
+// V102.617 / V101.297 (owner pick C + 1) · V102.634 (owner pick E): Certificate Request card → one row (🎓 name = Hub · ⏳/✅ · 🎓/✓/📥 · ⋯ 📄 💬 🗑);
 // intern 🎓✓ → sheet with ⬇️ PDF (getMyCertificate, LINE ID token) + 📤 Share (verify link only).
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -36,32 +36,43 @@ const slice = (src, a, b) => { const i = src.indexOf(a), j = src.indexOf(b, i); 
     assert.ok(order.every((v, i) => v > 0 && (i === 0 || v > order[i - 1])), 'auth → LINE token → user doc → owner → cert checks → URL: ' + order);
     assert.ok(fn.includes("bucket('intern-port-edfa7.firebasestorage.app')"), 'the real bucket');
 
-    // ---- 3. admin card rail ----
-    assert.ok(Number((/<title>Nika Admin \(V102\.(\d+)\)/.exec(admin) || [])[1]) >= 617, 'admin V102.617 or later');
-    const railSrc = slice(admin, "                        let crRail = '';", '                        d.innerHTML = `');
-    const railCss = slice(admin, '        .cr-rail {', '    </style>');
-    const render = (q, users) => { const ctx = { q, id: 'T1', escapedTitle: 'Certificate Request - NATT', usersData: users, escapeHtml: s => String(s).replace(/</g, '&lt;') }; vm.runInNewContext(railSrc + '\nthis.out = crRail;', ctx); return ctx.out; };
-    assert.equal(render({ isCertificateRequest: false }, []), '', 'other cards keep their 💬 Chat button');
-    const pending = render({ isCertificateRequest: true, requestedBy: 'Unatt' }, [{ id: 'Unatt' }]);
-    const issued = render({ isCertificateRequest: true, requestedBy: 'Unatt' }, [{ id: 'Unatt', certApproved: true, certNo: 'MLP-2026-0042-ABCD' }]);
-    const gone = render({ isCertificateRequest: true, requestedBy: "U'x" }, []);
-    assert.ok(admin.includes('${crRail || `'), 'rail replaces the old button row only when set');
+    // ---- 3. admin card: V102.634 (owner pick E) ONE row per intern — 🎓 name (= Hub) · status pill · next step · ⋯ (📄 💬 🗑) ----
+    assert.ok(Number((/<title>Nika Admin \(V102\.(\d+)\)/.exec(admin) || [])[1]) >= 634, 'admin V102.634 or later');
+    const rowSrc = slice(admin, "                        let crRow = '';", '                        if (crRow) {');
+    const rowCss = slice(admin, '        /* V102.634 (owner pick E)', '    </style>');
+    assert.ok(!/cr-rail|crRail/.test(admin), 'the old chip rail is gone');
+    const DAY = 864e5;
+    const render = (q, users) => { const ctx = { q, id: 'T1', escapedTitle: 'Certificate Request - NATT', usersData: users, Date, String, Math,
+        escapeHtml: s => String(s).replace(/</g, '&lt;'), escapeKanbanText: s => String(s).replace(/</g, '&lt;') }; vm.runInNewContext(rowSrc + '\nthis.out = crRow;', ctx); return ctx.out; };
+    const ago = d => ({ toMillis: () => Date.now() - d * DAY - 60e3 });
+    assert.equal(render({ isCertificateRequest: false }, []), '', 'other cards keep their full layout');
+    const pending = render({ isCertificateRequest: true, requestedBy: 'Unatt', status: 'Backlog', createdAt: ago(3), title: 'Certificate Request - NATT' }, [{ id: 'Unatt', displayName: 'NATT' }]);
+    const issued = render({ isCertificateRequest: true, requestedBy: 'Unatt', status: 'In Progress', createdAt: ago(5) }, [{ id: 'Unatt', displayName: 'NATT', certApproved: true, certNo: 'MLP-2026-0042-ABCD' }]);
+    const done = render({ isCertificateRequest: true, requestedBy: 'Unatt', status: 'Done', createdAt: ago(9) }, [{ id: 'Unatt', displayName: 'NATT' }]);
+    const gone = render({ isCertificateRequest: true, requestedBy: "U'x", status: 'Backlog', title: 'Certificate Request - PIM' }, []);
     const browser = await chromium.launch();
     try {
         const page = await browser.newPage({ viewport: { width: 520, height: 400 } });
-        await page.setContent(`<meta charset="utf-8"><style>button{width:100%;min-height:48px}${railCss}</style><div id="a" style="width:420px">${pending}</div><div id="b" style="width:420px">${issued}</div><div id="c">${gone}</div>`);
-        await page.evaluate(() => { window.calls = []; ['openCertModal', 'openUserHub', 'openChat', 'startDeleteCard'].forEach(n => window[n] = (...a) => calls.push([n, ...a])); });
-        const labels = s => page.$$eval(s + ' .cr-rail button', bs => bs.map(b => b.textContent.trim()));
-        assert.deepEqual(await labels('#a'), ['🎓 Issue', '👤 Hub', '💬 Chat', '🗑']);
-        assert.deepEqual(await labels('#b'), ['🎓 Issue', '📄 PDF', '👤 Hub', '💬 Chat', '🗑']);
-        assert.equal(await page.$eval('#b .cr-done', e => e.textContent), '✅ Sent · MLP-2026-0042-ABCD');
-        assert.equal(await page.$('#a .cr-done'), null, 'no ✅ line before it is issued');
-        for (const t of ['🎓 Issue', '👤 Hub', '💬 Chat', '🗑']) await page.click(`#a .cr-rail button:has-text("${t}")`);
-        assert.deepEqual(await page.evaluate(() => calls), [['openCertModal', 'Unatt'], ['openUserHub', 'Unatt'], ['openChat', 'T1', 'Certificate Request - NATT'], ['startDeleteCard', 'T1']]);
-        assert.equal(await page.$eval('#c .cr-go', b => b.disabled), true, 'user gone → 🎓 disabled');
+        const card = h => `<div class="kanban-card cr1-card" style="width:280px;border:1px solid #ddd;margin:6px">${h}</div>`;
+        await page.setContent(`<meta charset="utf-8"><style>:root{--text-main:#1e293b}button{width:100%;min-height:48px}${rowCss}</style><div id="a">${card(pending)}</div><div id="b">${card(issued)}</div><div id="d">${card(done)}</div><div id="c">${card(gone)}</div>`);
+        await page.evaluate(() => { window.calls = []; ['openCertModal', 'openUserHub', 'openChat', 'startDeleteCard', 'crCardDone', 'archiveSQ'].forEach(n => window[n] = (...a) => calls.push([n, ...a])); });
+        const row = s => page.$eval(s + ' .cr1', r => [...r.children].filter(x => getComputedStyle(x).display !== 'none').map(x => (x.textContent || '').trim()).filter(Boolean));
+        assert.deepEqual(await row('#a'), ['🎓 NATT', '⏳ 3d', '🎓', '⋯'], 'waiting: name · ⏳ 3d · 🎓 · ⋯');
+        assert.deepEqual(await row('#b'), ['🎓 NATT', '✅ 0042', '✓', '⋯'], 'issued: ✅ the running number (full one in the tooltip) · ✓');
+        assert.deepEqual(await row('#d'), ['🎓 NATT', '📥', '⋯'], 'Done: 📥 archive');
+        assert.ok(await page.$eval('#a .cr1-card, #a .kanban-card', c => c.getBoundingClientRect().height < 52), 'one row');
+        await page.click('#a .cr1-nm'); await page.click('#a .cr1-b.go'); await page.click('#b .cr1-b.ok'); await page.click('#d .cr1-b');
+        assert.equal(await page.$eval('#a .cr1-x', x => getComputedStyle(x).display), 'none', '💬 🗑 wait under ⋯');
+        await page.click('#a .more');
+        assert.deepEqual(await page.$$eval('#a .cr1-x button', bs => bs.map(b => b.textContent)), ['💬', '🗑']);
+        await page.click('#a .cr1-x button[aria-label="Chat"]'); await page.click('#a .cr1-x .del');
+        assert.deepEqual(await page.evaluate(() => calls), [['openUserHub', 'Unatt'], ['openCertModal', 'Unatt'], ['crCardDone', 'T1'], ['archiveSQ', 'T1'], ['openChat', 'T1', 'Certificate Request - NATT'], ['startDeleteCard', 'T1']]);
+        assert.equal(await page.$eval('#b .cr1-p', p => p.title), 'Sent · MLP-2026-0042-ABCD');
+        assert.ok(await page.$eval('#b .cr1-nm', b => b.scrollWidth <= b.clientWidth + 1), 'the name still fits');
+        assert.equal(await page.$eval('#b .cr1-x [data-cert-file]', b => b.dataset.certFile), 'MLP-2026-0042-ABCD', '📄 PDF under ⋯ once issued');
+        assert.deepEqual(await page.$eval('#c .cr1', r => [r.querySelector('.cr1-nm').textContent.trim(), r.querySelector('.cr1-nm').disabled, r.querySelector('.go').disabled]), ['🎓 PIM', true, true], 'user gone → name from the title, 🎓 disabled');
         assert.ok(!gone.includes("U'x"), 'the uid is sanitised before it goes into onclick');
-        const widths = await page.$$eval('#b .cr-rail button', bs => bs.map(b => Math.round(b.getBoundingClientRect().width)));
-        assert.ok(widths.every(w => w < 140), 'chips hug their label, not the global 100% / 48px buttons: ' + widths);   // they may wrap on a narrow card
+        if (process.env.OUTDIR) await page.screenshot({ path: process.env.OUTDIR + '/cert-card-e.png', clip: { x: 0, y: 0, width: 300, height: 230 } });
         await page.close();
 
         // ---- 4. intern sheet ----
@@ -106,6 +117,6 @@ const slice = (src, a, b) => { const i = src.indexOf(a), j = src.indexOf(b, i); 
         assert.deepEqual(await p2.evaluate(() => log), [['toast', '📱 Open in LINE to download · เปิดใน LINE เพื่อดาวน์โหลด']], 'outside LINE: no call');
         await p2.click('#certSheet .cs-x');
         assert.equal(await p2.$('#certSheet'), null, '✕ closes');
-        console.log('PASS: cert issue + deliver (C + 1) — getMyCertificate helpers (LINE token, owner, valid cert, newest certificate-files/ path) and order; Certificate Request rail 🎓 Issue · 📄 PDF · 👤 Hub · 💬 Chat · 🗑 on one line with ✅ number once issued; 🎓✓ sheet ⬇️ opens the PDF outside LINE, 📤 shares only the verify link, errors → toasts');
+        console.log('PASS: cert issue + deliver (C + 1) — getMyCertificate helpers (LINE token, owner, valid cert, newest certificate-files/ path) and order; Certificate Request card = one row (🎓 name = Hub · ⏳ n d / ✅ number · 🎓 / ✓ / 📥 · ⋯ 📄 💬 🗑); 🎓✓ sheet ⬇️ opens the PDF outside LINE, 📤 shares only the verify link, errors → toasts');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
