@@ -56,7 +56,7 @@
     const LV5 = 5, LV5_KEY = 'nika_lv5_seen';
     function paintIcon() {
         const img = document.querySelector('.nk-tab img'); if (!img) return;
-        const up = (Number(window.lvNow) || 0) >= LV5, src = up ? 'nika-lv5.png' : 'nika-icon.svg';
+        const up = (Number(window.lvNow) || 0) >= LV5, src = up ? 'nika-lv5.png' : 'nika-lv1.png';   // V101.308: both are the owner's pictures
         if (img.getAttribute('src') === src) return;
         img.setAttribute('src', src);
         let seen = true; try { seen = !!localStorage.getItem(LV5_KEY); if (up && !seen) localStorage.setItem(LV5_KEY, '1'); } catch (e) { /* blocked */ }
