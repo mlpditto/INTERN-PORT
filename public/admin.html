@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.633)</title>
+    <title>Nika Admin (V102.634)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -6158,15 +6158,17 @@
             #dashboard-workspace { grid-template-columns:minmax(0,1fr); }
             #dashboard-work .kanban-board { grid-template-columns:minmax(0,1fr); }
         }
-        /* V102.617 (owner pick C): the Certificate Request card's chip rail — 🎓 Issue · 👤 Hub · 💬 Chat · 🗑 */
-        .cr-rail { margin-top:12px; display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
-        .cr-rail button { width:auto; min-height:0; border:1px solid #d1d5db; background:#fff; color:#374151; border-radius:999px; padding:5px 11px; font-size:12.5px; font-weight:700; cursor:pointer; }
-        .cr-rail button:hover:not(:disabled) { background:#f8fafc; }
-        .cr-rail button:disabled { opacity:.45; cursor:default; }
-        .cr-rail .cr-go { border-color:#16a34a; color:#166534; background:#f0fdf4; }
-        .cr-rail .cr-del { margin-left:auto; border-color:#fecaca; color:#ef4444; background:#fff; }
-        .cr-done { margin-top:8px; font-size:12px; font-weight:700; color:#166534; }
-        .cr-done code { font-size:11.5px; color:#475569; background:none; }
+        /* V102.634 (owner pick E): a Certificate Request card = one row — 🎓 name (= Hub) · status pill · next step · ⋯ (📄 💬 🗑) */
+        .kanban-card.cr1-card { padding:8px 10px; }
+        .cr1 { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+        .cr1-nm { flex:1 1 0; min-width:0; width:auto; min-height:0; margin:0; padding:4px 2px; border:0; background:none; color:var(--text-main); font-weight:800; font-size:0.95em; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+        .cr1-nm:hover:not(:disabled) { text-decoration:underline; }
+        .cr1-p { flex:none; padding:2px 8px; border-radius:999px; font-size:11.5px; font-weight:800; white-space:nowrap; }
+        .cr1-p.ok { background:#dcfce7; color:#166534; } .cr1-p.wait { background:#fef3c7; color:#92400e; }
+        .cr1-b { flex:none; width:32px; height:30px; min-height:0; margin:0; padding:0; border:1px solid #e2e8f0; border-radius:9px; background:#fff; color:#374151; font-size:14px; line-height:1; display:inline-grid; place-items:center; cursor:pointer; }
+        .cr1-b.go { background:#4361ee; border-color:#4361ee; } .cr1-b.ok { background:#16a34a; border-color:#16a34a; color:#fff; font-weight:900; }
+        .cr1-b.del { border-color:#fecaca; color:#ef4444; } .cr1-b:disabled { opacity:.45; cursor:default; }
+        .cr1-x { display:none; gap:4px; flex-basis:100%; justify-content:flex-end; } .cr1.open .cr1-x { display:flex; } .cr1.open .more { background:#f1f5f9; }
     </style>
 
     <script>
@@ -62438,22 +62440,27 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         }
 
                         const escapedTitle = (q.title || "").replace(/'/g, "\\'");
-                        // V102.617 (owner pick C): a Certificate Request card gets a chip rail — 🎓 Issue opens the Certificate modal set to
-                        // the requester; once exported (certApproved + certNo) a ✅ line shows the number and 📄 opens the archived PDF.
-                        let crRail = '';
+                        // V102.634 (owner pick E, mockup-cert-card-lean): a Certificate Request card = ONE row per intern — tap the name = User Hub;
+                        // the right side says where it stands (⏳ n d waiting · ✅ number once the final one is out) and holds the one next step:
+                        // 🎓 = open the Certificate modal, ✓ = close the card once issued, 📥 = archive when Done; ⋯ shows 📄 💬 🗑.
+                        let crRow = '';
                         if (q.isCertificateRequest && q.requestedBy) {
                             const cu = usersData.find(x => x.id === q.requestedBy);
                             const uidJs = String(q.requestedBy).replace(/[^A-Za-z0-9_-]/g, '');
                             const issued = cu && cu.certApproved && cu.certNo ? escapeHtml(cu.certNo) : '';
-                            crRail = (issued ? `<div class="cr-done">✅ Sent · <code>${issued}</code></div>` : '')
-                                + `<div class="cr-rail">`
-                                + `<button type="button" class="cr-go" onclick="event.stopPropagation(); openCertModal('${uidJs}')" title="Open the Certificate modal for this intern — Export PDF issues it and the intern can download it in LINE"${cu ? '' : ' disabled'}>🎓 Issue</button>`
-                                + (issued ? `<button type="button" disabled data-cert-file="${issued}" onclick="event.stopPropagation()" title="Open the PDF the intern gets">📄 PDF</button><small data-file-status hidden></small>` : '')
-                                + `<button type="button" onclick="event.stopPropagation(); openUserHub('${uidJs}')" title="User Hub"${cu ? '' : ' disabled'}>👤 Hub</button>`
-                                + `<button type="button" onclick="event.stopPropagation(); openChat('${id}','${escapedTitle}')">💬 Chat</button>`
-                                + `<button type="button" class="cr-del" onclick="event.stopPropagation(); startDeleteCard('${id}')" title="Delete" aria-label="Delete">🗑</button>`
-                                + `</div>`;
+                            const who = escapeKanbanText((cu && (cu.displayName || cu.fullName)) || String(q.title || '').replace(/^Certificate Request\s*-\s*/i, '') || 'Intern');
+                            const made = q.createdAt ? (q.createdAt.toMillis ? q.createdAt.toMillis() : new Date(q.createdAt).getTime()) : 0, days = made ? Math.floor((Date.now() - made) / 864e5) : 0;
+                            const pill = issued ? `<span class="cr1-p ok" title="Sent · ${issued}">✅ ${issued.split('-')[2] || issued}</span>` : q.status !== 'Done' && days > 0 ? `<span class="cr1-p wait" title="Waiting ${days} d">⏳ ${days}d</span>` : '';
+                            const go = q.status === 'Done' ? `<button type="button" class="cr1-b" onclick="event.stopPropagation(); archiveSQ('${id}')" title="Archive" aria-label="Archive">📥</button>`
+                                : issued ? `<button type="button" class="cr1-b ok" onclick="event.stopPropagation(); crCardDone('${id}')" title="Issued — close this card" aria-label="Close this card">✓</button>`
+                                : `<button type="button" class="cr1-b go" onclick="event.stopPropagation(); openCertModal('${uidJs}')" title="Open the Certificate modal for this intern — Approve issues it"${cu ? '' : ' disabled'} aria-label="Issue certificate">🎓</button>`;
+                            crRow = `<div class="cr1"><button type="button" class="cr1-nm" onclick="event.stopPropagation(); openUserHub('${uidJs}')" title="User Hub"${cu ? '' : ' disabled'}>🎓 ${who}</button>${pill}${go}`
+                                + `<button type="button" class="cr1-b more" onclick="event.stopPropagation(); this.parentElement.classList.toggle('open')" title="More" aria-label="More">⋯</button>`
+                                + `<span class="cr1-x">` + (issued ? `<button type="button" class="cr1-b" disabled data-cert-file="${issued}" onclick="event.stopPropagation()" title="Open the PDF the intern gets" aria-label="PDF">📄</button><small data-file-status hidden></small>` : '')
+                                + `<button type="button" class="cr1-b" onclick="event.stopPropagation(); openChat('${id}','${escapedTitle}')" title="Chat" aria-label="Chat">💬</button>`
+                                + `<button type="button" class="cr1-b del" onclick="event.stopPropagation(); startDeleteCard('${id}')" title="Delete" aria-label="Delete">🗑</button></span></div>`;
                         }
+                        if (crRow) { d.classList.add('cr1-card'); d.innerHTML = crRow; cols[q.status].appendChild(d); return; }
                         d.innerHTML = `
                             <div class="card-header-row" style="margin-bottom:12px;">
                                 <span class="badge" style="background:${isProj ? 'linear-gradient(135deg, #4361ee, #3a0ca3)' : 'linear-gradient(135deg, #64748b, #475569)'}; padding:4px 12px; border-radius:10px; font-size:0.7em; letter-spacing:0.5px; font-weight:800;">${isProj ? '📁 PROJECT' : '📝 TASK'}</span>
@@ -62468,7 +62475,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                                 ${imgs}
                                 <div style="background:var(--col-bg); padding:4px 8px; border-radius:8px;">${timersHtml}</div>
                             </div>
-                            ${crRail || `
+                            ${`
                             <div style="margin-top:15px; display:flex; gap:10px;">
                                 <button class="btn-sm" style="flex:1; background:var(--primary); color:white; border:none; padding:10px; border-radius:12px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; transition:0.2s; box-shadow:0 4px 10px rgba(67,97,238,0.2);" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'" onclick="event.stopPropagation(); openChat('${id}','${escapedTitle}')">💬 Chat</button>
                                 <button class="btn-sm" style="width:42px; height:42px; padding:0; display:flex; align-items:center; justify-content:center; background:#fee2e2; color:#ef4444; border:none; border-radius:12px; cursor:pointer; font-size:1.2em; transition:0.2s;" onmouseover="this.style.background='#fecaca'" onmouseout="this.style.background='#fee2e2'" onclick="event.stopPropagation(); startDeleteCard('${id}')">🗑️</button>
@@ -62479,7 +62486,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         cols[q.status].appendChild(d);
                     }
                 });
-                if (window.CertificateFiles && document.querySelector('.cr-rail [data-cert-file]')) CertificateFiles.decorate();   // V102.617: 📄 on issued Certificate Request cards
+                if (window.CertificateFiles && document.querySelector('.cr1 [data-cert-file]')) CertificateFiles.decorate();   // V102.617: 📄 on issued Certificate Request cards (V102.634: under ⋯)
             } catch (e) { console.error("Kanban Section 1 (Side Quests) Error:", e); }
 
             // 2. Render Reflective Logs (Review/Done)
@@ -63853,6 +63860,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         async function moveCard(id, dir) { const q = sideQuestsCache[id]; const f = ['Backlog', 'Doing', 'Review', 'Done']; const c = f.indexOf(q.status); let n = q.status; if (dir === 'next' && c < 3) n = f[c + 1]; if (dir === 'prev' && c > 0) n = f[c - 1]; if (n !== q.status) { const u = { status: n }; if (n === 'Done') u.doneAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection("side_quests").doc(id).update(u); } }
         
         async function giveScore(id) { const q = sideQuestsCache[id]; if (!q) return; const s = prompt("Score:", "0.5"); if (!s) return; const n = prompt("Note:", q.title); const b = db.batch(); q.assigneeIds.forEach(u => { b.update(db.collection("users").doc(u), { score: firebase.firestore.FieldValue.increment(parseFloat(s)) }); b.set(db.collection("checkin_logs").doc(), { userId: u, type: 'manual', amount: parseFloat(s), note: n, timestamp: firebase.firestore.FieldValue.serverTimestamp() }) }); b.update(db.collection("side_quests").doc(id), { status: 'Done', isScored: true, archiveScore: parseFloat(s), doneAt: firebase.firestore.FieldValue.serverTimestamp() }); await b.commit(); showToast("Scored!"); }
+        // V102.634: ✓ on an issued Certificate Request card = the card moves to Done (the board repaints from the snapshot)
+        window.crCardDone = function (id) {
+            return db.collection('side_quests').doc(id).update({ status: 'Done', doneAt: firebase.firestore.FieldValue.serverTimestamp() })
+                .then(() => showToast('✓ Done')).catch(e => { console.error('Certificate card → Done:', e); showToast('Not saved: ' + ((e && e.message) || 'error')); });
+        };
         async function archiveSQ(id) { if (confirm("Archive?")) await db.collection("side_quests").doc(id).update({ status: 'Archived' }); }
         async function archiveClosedQuest(id) { await db.collection("quests").doc(id).update({ isArchivedKanban: true }); drawKanban(); }
         function toggleKanbanArchive() { showArchivedKanban = !showArchivedKanban; const btn = document.getElementById('btn-kanban-archive'); if (btn) { btn.style.background = showArchivedKanban ? '#4361ee' : ''; btn.style.color = showArchivedKanban ? 'white' : ''; } drawKanban(); }
