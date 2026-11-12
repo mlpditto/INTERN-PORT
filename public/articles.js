@@ -183,8 +183,14 @@
             '#art-sheet .x{width:34px;height:34px;min-height:0;margin:0;padding:0;border:0;border-radius:50%;background:#f1f5f9;color:#64748b;font-size:15px;cursor:pointer;flex:none}' +
             '#art-sheet .lng,.art-hist .lng{min-height:0;margin:0;width:auto;border:1px solid #c7d2fe;background:#eef2ff;color:#4361ee;font:800 11px/1 Kanit,sans-serif;padding:6px 10px;border-radius:999px;cursor:pointer}' +
             '#art-sheet h3{font:800 19px/1.3 Kanit,sans-serif;color:#1e293b;margin:6px 0 8px;word-break:keep-all;overflow-wrap:anywhere}' +
-            '.art-md{font:400 14.5px/1.6 Kanit,sans-serif;color:#334155;word-break:keep-all;overflow-wrap:anywhere}.art-md p,.art-md ul,.art-md ol{margin:0 0 8px}.art-md ul,.art-md ol{padding-left:20px}.art-md a{color:#4361ee}' +
-            '#art-sheet .art-md.clamp{max-height:6.4em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 65%,transparent);mask-image:linear-gradient(#000 65%,transparent)}' +   // 4 lines × 1.6; line-clamp left half a line showing when the body has several paragraphs
+            '.art-md{font:400 14.5px/1.6 Kanit,sans-serif;color:#334155;word-break:keep-all;overflow-wrap:anywhere}.art-md p,.art-md ul,.art-md ol{margin:0 0 8px}' +
+            // V101.310 (pick A): the popup reads bigger with more air; callout boxes; compare cards; bold = semi-bold
+            '#art-sheet .art-md{font-size:15.5px;line-height:1.78}#art-sheet .art-md p,#art-sheet .art-md ul,#art-sheet .art-md ol{margin:0 0 12px}.art-md strong,.art-md b{font-weight:600;color:#0f172a}' +
+            '.art-co{display:flex;gap:8px;padding:9px 11px;border-radius:12px;margin:0 0 10px;line-height:1.65}.art-co .i{flex:none;font-size:1.05em;line-height:1.55}.art-co .t{flex:1;min-width:0}' +
+            '.art-co.c-tip{background:#fffbeb}.art-co.c-warn{background:#fef2f2}.art-co.c-ok{background:#f0fdf4}.art-co.c-next{background:#f8fafc;color:#475569}' +   // c- prefix: #art-sheet .ok is the Got-it button
+            '.art-cmp{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;margin:0 0 12px}.art-cmp>div{border:1px solid #e2e8f0;border-radius:12px;padding:7px 9px;font-size:.88em;line-height:1.5}.art-cmp b{display:block;font-weight:600;color:#0f172a;margin-bottom:2px}' +
+            '.art-md ul,.art-md ol{padding-left:20px}.art-md a{color:#4361ee}' +
+            '#art-sheet .art-md.clamp{max-height:7.1em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 65%,transparent);mask-image:linear-gradient(#000 65%,transparent)}' +   // 4 lines × 1.6; line-clamp left half a line showing when the body has several paragraphs
             '#art-sheet .more{min-height:0;margin:0 0 0 auto;width:auto;border:0;background:none;font:700 13px/1 Kanit,sans-serif;color:#4361ee;padding:12px 4px;cursor:pointer;white-space:nowrap}' +
             '.art-src{margin:0 0 10px;font:400 12.5px/1.4 Kanit,sans-serif;color:#64748b}.art-src button{display:inline;width:auto;min-height:0;margin:0;padding:4px 2px;border:0;background:none;box-shadow:none;color:#4361ee;font:600 12.5px/1.4 Kanit,sans-serif;text-decoration:underline;cursor:pointer}' +
             '.art-links{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 12px}.art-link{min-height:0;margin:0;width:auto;display:inline-flex;align-items:center;gap:6px;font:600 12.5px/1 Kanit,sans-serif;padding:8px 11px;border-radius:999px;border:1px solid #c7d2fe;background:#eef2ff;color:#3730a3;cursor:pointer}' +
@@ -366,7 +372,43 @@
             .catch(function (e) { console.warn('article nika:', e && e.message); k.err = true; return false; })
             .then(function (ok) { k.busy = false; if (S.nk === k && S.cur === c) render(); return ok; });
     }
-    function md(text) { return typeof window.renderMd === 'function' ? window.renderMd(text) : esc(text).replace(/\n/g, '<br>'); }
+    // V101.310 (owner pick A, mockup-article-readable): easier to read, nothing to rewrite —
+    //  · a line that starts with 💡 ⚠️ ✅ ➡️ becomes its own soft box of that colour (the emoji in its own column);
+    //  · a list whose every item is "**name**: text" (2–4 items, e.g. ointment / cream / lotion) becomes cards side by side;
+    //  · the type is bigger with more air (CSS below). The author's words are not changed.
+    var CALLOUT = { '💡': 'c-tip', '⚠️': 'c-warn', '⚠': 'c-warn', '✅': 'c-ok', '➡️': 'c-next', '➡': 'c-next' };
+    var CALLOUT_RE = /^\s*(💡|⚠️|⚠|✅|➡️|➡)\uFE0F?\s*/;
+    function readable(html) {
+        if (typeof document === 'undefined') return html;
+        var box = document.createElement('div'); box.innerHTML = html;
+        box.querySelectorAll('p').forEach(function (p) {
+            var m = (p.textContent || '').match(CALLOUT_RE); if (!m) return;
+            var first = p.firstChild; if (!first || first.nodeType !== 3) return;
+            first.textContent = first.textContent.replace(CALLOUT_RE, '');
+            var div = document.createElement('div'); div.className = 'art-co ' + CALLOUT[m[1]];
+            var ic = document.createElement('span'); ic.className = 'i'; ic.setAttribute('aria-hidden', 'true'); ic.textContent = m[1];
+            var tx = document.createElement('span'); tx.className = 't'; while (p.firstChild) tx.appendChild(p.firstChild);
+            div.appendChild(ic); div.appendChild(tx); p.replaceWith(div);
+        });
+        box.querySelectorAll('ul').forEach(function (ul) {
+            var items = [].slice.call(ul.children);
+            if (items.length < 2 || items.length > 4) return;
+            var parts = items.map(function (li) { var b = li.firstElementChild, rest = b && b.nextSibling; return b && b.tagName === 'STRONG' && li.firstChild === b && rest && rest.nodeType === 3 && /^\s*:/.test(rest.textContent) ? { b: b, li: li } : null; });
+            if (parts.some(function (x) { return !x; })) return;
+            var grid = document.createElement('div'); grid.className = 'art-cmp';
+            parts.forEach(function (x) {
+                var card = document.createElement('div'), h = document.createElement('b'), t = document.createElement('span');
+                h.textContent = x.b.textContent; x.b.remove(); x.li.firstChild.textContent = x.li.firstChild.textContent.replace(/^\s*:\s*/, '');
+                while (x.li.firstChild) t.appendChild(x.li.firstChild);
+                card.appendChild(h); card.appendChild(t); grid.appendChild(card);
+            });
+            ul.replaceWith(grid);
+        });
+        return box.innerHTML;
+    }
+    // a 💡 / ⚠️ / ✅ / ➡️ / 💊 line is a paragraph of its own: it does not join the line before (or a list it was trailing), nor the line after
+    function splitCallouts(text) { return String(text == null ? '' : text).replace(/(^|\n)([ \t]*(?:💡|⚠️|⚠|✅|➡️|➡|💊)[^\n]*)(?=\n|$)/g, function (m, a, line) { return '\n\n' + line + '\n\n'; }).replace(/\n{3,}/g, '\n\n').replace(/^\n+/, ''); }
+    function md(text) { return typeof window.renderMd === 'function' ? readable(window.renderMd(splitCallouts(text))) : esc(text).replace(/\n/g, '<br>'); }
     function render() {
         var c = S.cur, a = c.a, tx = textOf(a, S.lang), t = T[S.lang] || T.en, have = langs(a), saved = !!((me().articleSeen || {})[a.id] || {}).saved;
         var sh = document.getElementById('art-sheet'); if (!sh) return;

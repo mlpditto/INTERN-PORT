@@ -23,6 +23,7 @@ Admin: Dashboard ▸ 📰 Articles. Intern: the daily popup, History row, Codex 
 - `articles-editor-hints-qa` — empty TH/KO body says interns see 🇬🇧 · ✨ From EN; Saved n h / d ago; When & who remembers open/folded per browser (V102.606)
 - `articles-share-qa` — History row: language pill after the title; Source line `· 📤 LINE f` (FB only with a link); +0.1 score once per article; only the tapped icon turns wave blue; admin sees 📤 n (V101.291 / V102.612)
 - `articles-intern-qa` — intern sheet on a 390 px phone with a fake Firestore
+- `articles-readable-qa` — V101.310 owner pick A (mockup-article-readable): the intern popup reads easier without touching the text — a 💡 ⚠️ ✅ ➡️ line is its own soft box (tip yellow · warn red · ok green · next grey, classes c-*), a 2–4 item list of "**name**: text" becomes side-by-side cards, other lists stay, 💊 its own line, popup type 15.5 px / 1.78, bold = semi-bold (marked is stubbed in the test — the CDN is blocked)
 - `articles-codex-draft-qa` — 🩺 drafts a PENDING Disease Codex entry from the article (dx)
 - `articles-drug-draft-qa` — 💊 drafts a PENDING Drug Codex entry from the article (dc)
 - `articles-disease-link-qa` — ＋ Disease link by hand; the intern Disease entry lists its articles
