@@ -1,7 +1,9 @@
-// V102.626 (owner: "ยังไม่มีเสียงไทย") — 📰 Articles ▸ 🎬 Clip ▸ ▶ Play speaks with the AI voice (Gemini TTS, the Laboon Interactions request and key):
-// one request per line, all sent at once, 🙋 = Kore, 🧑‍⚕️ / 💡 = Puck, the chat steps on when each line's audio ends; a second Play reuses the cached
-// audio; a failed line falls back to this computer's voice with a note; no Gemini key = the computer's voice (as before). The REAL admin.html +
-// articles-admin.js; fetch and Audio stubbed (nothing leaves the page).
+// V102.626 (owner: "ยังไม่มีเสียงไทย") — 📰 Articles ▸ 🎬 Clip ▸ ▶ Play speaks each line with an AI voice, all requests sent at once, the chat steps on when
+// each line's audio ends, a replay reuses the cache.
+// V102.636 (owner pick C+): the language picks the voice — a Thai clip = iApp Chinda through callAIProxy (iapp_tts: 🙋 ไข่มุก friendly · 🧑‍⚕️ / 💡 ไข่ต้ม calm),
+// EN / KO = Gemini TTS as before (🙋 Kore · 🧑‍⚕️ / 💡 Puck). Two chips under ▶: tap = next voice of that family (remembered per article + as the next start),
+// hold = hear that side's first line; the speaking side's chip pulses; Chinda fails → Gemini goes on with one line saying so → this computer's voice;
+// ▶'s hover = ≈ IC · characters. The REAL admin.html + articles-admin.js; callTtsProxy, fetch and Audio stubbed (nothing leaves the page).
 const assert = require('node:assert/strict');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
@@ -22,7 +24,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
             window.fetch = async (url, o) => {
                 if (!/interactions/.test(String(url))) return realFetch(url, o);
                 const body = JSON.parse(o.body); window.__tts.push({ key: o.headers['x-goog-api-key'], model: body.model, text: body.input[0].content[0].text, voice: body.generation_config.speech_config[0].voice });
-                if (/FAIL/.test(body.input[0].content[0].text)) return new Response(JSON.stringify({ error: { message: 'quota' } }), { status: 400 });
+                if (/GEMFAIL/.test(body.input[0].content[0].text)) return new Response(JSON.stringify({ error: { message: 'quota' } }), { status: 400 });
                 return new Response(JSON.stringify({ outputs: [{ type: 'audio', mime_type: 'audio/wav', data: btoa('RIFF0000WAVEfmt ') }] }), { status: 200 });
             };
             // Audio stub: "plays" for 60 ms
@@ -32,52 +34,98 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         });
         await page.goto(require('url').pathToFileURL(process.cwd() + '/public/admin.html').href);
         await page.waitForFunction(() => window.Articles && document.readyState === 'complete');
+        // the proxy (iapp_tts) stub: records each request; text with CHINDAFAIL → a 502
+        await page.evaluate(() => {
+            window.__chinda = [];
+            window.callTtsProxy = async (p) => { window.__chinda.push(p); if (/CHINDAFAIL/.test(p.text)) throw new Error('iapp_tts proxy failed with status 502'); return { audioContent: btoa('ID3mp3'), mimeType: 'audio/mpeg', provider: 'iapp_tts' }; };
+            try { Object.keys(localStorage).filter(k => /^clp_v_/.test(k)).forEach(k => localStorage.removeItem(k)); } catch (e) { /* none */ }
+        });
 
-        const open = (key) => page.evaluate((key) => {
+        const open = (key, lang) => page.evaluate(([key, lang]) => {
             try { if (key) localStorage.setItem('ai_gemini_key', key); else localStorage.removeItem('ai_gemini_key'); } catch (e) { /* none */ }
             window.GEMINI_API_KEY = '';
             const S = Articles._S, now = Date.now();
             S.list = [{ id: 'a1', title: { th: 'บุสโคแพน', en: 'Buscopan' }, body: { th: 'เนื้อหา', en: 'Body' }, cover: { emoji: '💊' }, status: 'draft', startAt: now, endAt: now + 864e5,
                 audience: { divisions: [], groups: [] }, links: [], tags: [], rerun: 'any', source: null,
-                clip: { th: [{ w: 'q', t: 'หมอสั่ง Buscopan คู่ Motilium ต้านกันไหม' }, { w: 'rx', t: 'กลไกต้านกันจริง' }, { w: 'key', t: 'แยกเวลากิน' }] } }];
-            S.loaded = true; S.loading = false; Articles.open(); Articles.edit('a1'); Articles.lang('th'); if (!S.clipOpen) Articles.clip(); else Articles.lang('th');
-            window.__tts.length = 0; window.__played.length = 0;
+                clip: { th: [{ w: 'q', t: 'หมอสั่ง Buscopan คู่ Motilium ต้านกันไหม' }, { w: 'rx', t: 'กลไกต้านกันจริง' }, { w: 'key', t: 'แยกเวลากิน' }],
+                        en: [{ w: 'q', t: 'Buscopan with Motilium?' }, { w: 'rx', t: 'They work against each other.' }] } }];
+            S.loaded = true; S.loading = false; Articles.open(); Articles.edit('a1'); Articles.lang(lang); if (!S.clipOpen) Articles.clip(); else Articles.lang(lang);
+            window.__tts.length = 0; window.__played.length = 0; window.__chinda.length = 0;
             return document.querySelector('#art-body .clp-note').textContent;
-        }, key);
+        }, [key, lang]);
+        const chips = () => page.$$eval('#art-body .clp-vc', bs => bs.map(b => b.className.replace('clp-vc ', '') + ':' + b.textContent));
+        const play = async () => { await page.evaluate(() => { window.__tts.length = 0; window.__played.length = 0; window.__chinda.length = 0; Articles.clipPlay(); }); await page.waitForFunction(() => !Articles._S.clipPlaying, null, { timeout: 12000 }); };
 
-        // 1. with a key: the note says AI voice; ▶ Play sends every line at once with the speaker's voice, then plays them in order
-        let note = await open('AIza-test');
-        assert.match(note, /AI voice \(Gemini TTS\)/);
-        await page.evaluate(() => Articles.clipPlay());
-        await page.waitForFunction(() => !Articles._S.clipPlaying, null, { timeout: 8000 });
-        const r1 = await page.evaluate(() => ({ tts: window.__tts, played: window.__played.length }));
-        assert.deepEqual(r1.tts.map(t => [t.voice, t.text, t.key, t.model]), [
-            ['Kore', 'หมอสั่ง Buscopan คู่ Motilium ต้านกันไหม', 'AIza-test', 'gemini-3.8-flash-tts'],
-            ['Puck', 'กลไกต้านกันจริง', 'AIza-test', 'gemini-3.8-flash-tts'],
-            ['Puck', 'แยกเวลากิน', 'AIza-test', 'gemini-3.8-flash-tts']], 'one Gemini TTS request per line, 🙋 Kore · 🧑‍⚕️ / 💡 Puck: ' + JSON.stringify(r1.tts));
-        assert.equal(r1.played, 3, 'each line plays, then the next');
+        // 1. Thai clip: Chinda through the proxy, no engine words on screen, two chips, ▶ hover = ≈ IC · characters
+        let note = await open('AIza-test', 'th');
+        assert.doesNotMatch(note, /Gemini|Chinda|AI voice/, 'the note does not name the voice: ' + note);
+        assert.deepEqual(await chips(), ['th:🙋 ไข่มุก', 'th:🧑‍⚕️ ไข่ต้ม']);
+        assert.match(await page.$eval('#art-body .clp-go', b => b.title), /^Plays the chat in the Thai voice · ≈ 0\.06 IC · \d+ characters$/);
+        await page.evaluate(() => { window.__talk = 0; const t = setInterval(() => { if (document.querySelector('#art-body .clp-vc.talk')) window.__talk++; if (!Articles._S.clipPlaying) clearInterval(t); }, 10); });
+        await play();
+        assert.deepEqual(await page.evaluate(() => window.__chinda.map(p => [p.provider, p.voice, p.style, p.text])), [
+            ['iapp_tts', 'kaimook', 'friendly', 'หมอสั่ง Buscopan คู่ Motilium ต้านกันไหม'],
+            ['iapp_tts', 'kaitom', 'calm', 'กลไกต้านกันจริง'],
+            ['iapp_tts', 'kaitom', 'calm', 'แยกเวลากิน']], 'one Chinda request per line: 🙋 ไข่มุก friendly · 🧑‍⚕️ / 💡 ไข่ต้ม calm');
+        assert.deepEqual(await page.evaluate(() => [window.__tts.length, window.__played.length]), [0, 3], 'no Gemini call; each line plays');
+        assert.ok(await page.evaluate(() => window.__talk) > 0, 'the speaking side\'s chip pulses while playing');
 
-        // 2. Play again: cached, no new request
-        await page.evaluate(() => { window.__tts.length = 0; window.__played.length = 0; Articles.clipPlay(); });
-        await page.waitForFunction(() => !Articles._S.clipPlaying, null, { timeout: 8000 });
-        assert.deepEqual(await page.evaluate(() => [window.__tts.length, window.__played.length]), [0, 3], 'second Play reuses the audio');
+        // 2. Play again: cached
+        await play();
+        assert.deepEqual(await page.evaluate(() => [window.__chinda.length, window.__played.length]), [0, 3], 'replay reuses the audio');
 
-        // 3. a line that fails → note + this computer's voice (timed here), the chat still finishes
-        await page.evaluate(() => { const S = Articles._S; S.cur.clip.th[1].t = 'FAIL line'; window.__tts.length = 0; window.__played.length = 0; Articles.clipPlay(); });
-        await page.waitForFunction(() => !Articles._S.clipPlaying, null, { timeout: 12000 });
-        const r3 = await page.evaluate(() => ({ played: window.__played.length, err: Articles._S.clipVoiceErr }));
-        assert.equal(r3.played, 2, 'the two good lines play');
-        assert.match(r3.err, /AI voice: quota — this computer's voice instead/);
+        // 3. Chinda fails on a line → Gemini (Puck) reads it, the clip goes on, one line says so
+        await page.evaluate(() => { Articles._S.cur.clip.th[1].t = 'CHINDAFAIL line'; });
+        await play();
+        assert.deepEqual(await page.evaluate(() => [window.__chinda.length, window.__tts.map(t => t.voice + ':' + t.text), window.__played.length, Articles._S.clipVoiceErr]),
+            [1, ['Puck:CHINDAFAIL line'], 3, '🔊 Thai voice failed — Gemini instead']);
+        assert.match(await page.$eval('#art-body .clp-note', n => n.textContent), /Thai voice failed — Gemini instead/);
 
-        // 4. no key → the computer's voice, no request
-        note = await open('');
+        // 3b. Chinda fails and no Gemini key → this computer's voice for that line (timed here)
+        await open('', 'th');
+        await page.evaluate(() => { Articles._S.cur.clip.th[1].t = 'CHINDAFAIL again'; });
+        await play();
+        assert.deepEqual(await page.evaluate(() => [window.__tts.length, window.__played.length]), [0, 2], 'no key: the failed line is not sent to Gemini');
+        assert.match(await page.evaluate(() => Articles._S.clipVoiceErr), /502 — this computer's voice instead/);
+        await page.evaluate(() => { Articles._S.cur.clip.th[1].t = 'กลไกต้านกันจริง'; });
+
+        // 4. tap 🙋 → ไข่ต้ม → ไข่แดง: remembered for this article and as the next Thai start; the next Play uses it
+        await page.click('#art-body .clp-vc[data-w="q"]'); await page.click('#art-body .clp-vc[data-w="q"]');
+        assert.deepEqual(await chips(), ['th:🙋 ไข่แดง', 'th:🧑‍⚕️ ไข่ต้ม']);
+        assert.deepEqual(await page.evaluate(() => [localStorage.getItem('clp_v_th_a1'), localStorage.getItem('clp_v_th')]), ['{"q":"kaidang","rx":"kaitom"}', '{"q":"kaidang","rx":"kaitom"}']);
+        await play();
+        assert.equal(await page.evaluate(() => window.__chinda[0].voice), 'kaidang');
+        await page.click('#art-body .clp-vc[data-w="q"]');
+        assert.deepEqual(await chips(), ['th:🙋 ไข่มุก', 'th:🧑‍⚕️ ไข่ต้ม'], 'back round to the first');
+
+        // 5. hold 🧑‍⚕️ ≈ 0.8 s → hear its first line only (the clip does not start); the click after the hold changes nothing
+        await page.evaluate(() => { window.__chinda.length = 0; window.__played.length = 0; });
+        const b = await page.$('#art-body .clp-vc[data-w="rx"]'), box = await b.boundingBox();
+        await page.mouse.move(box.x + 10, box.y + 8); await page.mouse.down(); await page.waitForTimeout(950); await page.mouse.up();
+        await page.waitForFunction(() => !Articles._S.clipHear);
+        assert.deepEqual(await page.evaluate(() => [window.__played.length, Articles._S.clipPlaying || false]), [1, false], 'one line heard, no clip');
+        assert.deepEqual(await chips(), ['th:🙋 ไข่มุก', 'th:🧑‍⚕️ ไข่ต้ม'], 'the hold did not switch the voice');
+
+        // 6. keyboard: Tab to a chip, Space = next voice
+        await page.waitForTimeout(1600);   // past the hold's click guard
+        await page.focus('#art-body .clp-vc[data-w="rx"]'); await page.keyboard.press('Space');
+        assert.deepEqual(await chips(), ['th:🙋 ไข่มุก', 'th:🧑‍⚕️ ไข่แดง']);
+
+        // 7. English clip: Gemini as before (violet chips, Kore / Puck); no key → the computer's voice
+        await open('AIza-test', 'en');
+        assert.deepEqual(await chips(), ['gm:🙋 Kore', 'gm:🧑‍⚕️ Puck']);
+        assert.equal(await page.$eval('#art-body .clp-go', b => b.title), 'Plays the chat and reads each line aloud');
+        await play();
+        assert.deepEqual(await page.evaluate(() => [window.__chinda.length, window.__tts.map(t => [t.voice, t.key, t.model])]), [0, [['Kore', 'AIza-test', 'gemini-3.8-flash-tts'], ['Puck', 'AIza-test', 'gemini-3.8-flash-tts']]]);
+        note = await open('', 'en');
         assert.match(note, /This computer's voice — add a Gemini key/);
         await page.evaluate(() => Articles.clipPlay());
         await page.waitForTimeout(300);
-        assert.deepEqual(await page.evaluate(() => [window.__tts.length, Articles._S.clipPlaying]), [0, true], 'no key: no Gemini call');
+        assert.deepEqual(await page.evaluate(() => [window.__tts.length, window.__chinda.length, Articles._S.clipPlaying]), [0, 0, true], 'no key: no AI call');
         await page.evaluate(() => Articles.clipStop());
 
+        if (process.env.OUTDIR) { await open('AIza-test', 'th'); const pv = await page.$('#art-body .art-clip'); if (pv) await pv.screenshot({ path: process.env.OUTDIR + '/clip-voice-cplus.png' }); }
         assert.deepEqual(errors.filter(e => !/ServiceWorker|mermaid is not defined|reading 'auth'|db\.collection|firebase/.test(e)), [], 'no page errors: ' + errors);
-        console.log('PASS: 🎬 Clip AI voice (V102.626) — Gemini TTS per line (Kore / Puck), all sent at once, played in order, cached on replay, a failed line falls back with a note, no key = computer voice');
+        console.log('PASS: 🎬 Clip voice C+ (V102.636) — TH = Chinda via iapp_tts (ไข่มุก friendly / ไข่ต้ม calm), EN = Gemini (Kore / Puck), tap = next voice remembered, hold = hear one line, pulse while speaking, Chinda fail → Gemini → computer voice, ≈ IC on ▶ hover, cached replay');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
