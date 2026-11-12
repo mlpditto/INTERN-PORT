@@ -88,6 +88,8 @@
             tags: tagsOf(a.tags), rerun: a.rerun === 'off' ? 'off' : 'any', long: !!a.long, readMin: readMin(body.en || body.th || body.ko || '')
         }, c = clipOf(a.clip);
         if (c) o.clip = c;
+        var rd = clipReadingOf(a);   // V102.639: how the Thai voice reads the English words of the clip
+        if (rd) o.clipReading = rd;
         return o;
     }
     // which script a text is mostly written in (Thai · Hangul · Latin) — catches Thai typed into the EN slot
@@ -151,7 +153,7 @@
     function fromDoc(id, d) {
         return { id: id, title: Object.assign({}, d.title), body: Object.assign({}, d.body), cover: Object.assign({ emoji: '📰' }, d.cover), status: d.status === 'scheduled' ? 'scheduled' : 'draft',
             startAt: msOf(d.startAt), endAt: msOf(d.endAt), audience: { divisions: ((d.audience || {}).divisions || []).slice(), groups: ((d.audience || {}).groups || []).slice() },
-            links: (d.links || []).slice(), tags: tagsOf(d.tags), rerun: d.rerun === 'off' ? 'off' : 'any', long: !!d.long, clip: JSON.parse(JSON.stringify(clipOf(d.clip) || {})), createdAt: msOf(d.createdAt), source: d.source || null, dx: d.dx || null, dc: d.dc || null };   // V102.374: dc = the Drug Codex twin of dx   // V102.371: dx = {draftId, publishedId, name} once sent to the Disease Codex
+            links: (d.links || []).slice(), tags: tagsOf(d.tags), rerun: d.rerun === 'off' ? 'off' : 'any', long: !!d.long, clip: JSON.parse(JSON.stringify(clipOf(d.clip) || {})), clipReading: JSON.parse(JSON.stringify(d.clipReading || {})), createdAt: msOf(d.createdAt), source: d.source || null, dx: d.dx || null, dc: d.dc || null };   // V102.374: dc = the Drug Codex twin of dx   // V102.371: dx = {draftId, publishedId, name} once sent to the Disease Codex
     }
 
     // ---- data
@@ -379,6 +381,7 @@
             // V102.636 (owner pick C+): 🙋 / 🧑‍⚕️ voice chips under ▶ — Thai = Chinda (blue, 🇹🇭 dot), EN / KO = Gemini (violet); the speaking side pulses
             '.clp-vr{display:flex;gap:6px;justify-content:center}.clp-vc{position:relative;min-height:0!important;width:auto!important;margin:0!important;padding:4px 10px!important;border-radius:999px;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap;touch-action:manipulation;user-select:none;-webkit-user-select:none}' +
             '.clp-vc.th{border:1.5px solid #bfdbfe;background:#eff6ff;color:#1e40af}.clp-vc.th::after{content:"";position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;border:1px solid #fff;background:linear-gradient(#ef4444 0 33%,#fff 33% 45%,#1e3a8a 45% 55%,#fff 55% 67%,#ef4444 67%)}' +
+            '.clp-vc.rd{border:1.5px solid #fde68a;background:#fffbeb;color:#92400e}.clp-rd{display:flex;flex-direction:column;gap:4px;border:1px solid #fde68a;background:#fffbeb;border-radius:10px;padding:6px 8px;font-size:12px}.clp-rd label{display:flex;align-items:center;gap:6px;margin:0}.clp-rd label span{min-width:0;flex:0 1 auto;font-weight:700;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.clp-rd input{flex:1;min-width:0;border:1px solid #fde68a;border-radius:7px;padding:2px 6px;font:inherit;font-weight:700;color:#1e40af;background:#fff;margin:0}.clp-rd i{font-style:normal;color:#b45309;font-size:11px}' +
             '.clp-vc.gm{border:1.5px solid #ddd6fe;background:#f5f3ff;color:#6d28d9}.clp-vc.talk{animation:clpPulse 1s infinite}@keyframes clpPulse{50%{box-shadow:0 0 0 4px rgba(59,130,246,.35)}}@media (prefers-reduced-motion:reduce){.clp-vc.talk{animation:none;box-shadow:0 0 0 2px #3b82f6}}' +
             '.art-wl{max-height:56vh;overflow:auto}.art-ai{margin-left:auto;display:inline-flex;align-items:center;gap:4px}.art-tb .art-ai button{width:auto;padding:0 9px;font-size:12px;white-space:nowrap}.art-sug{display:flex;align-items:center;gap:8px;margin:-2px 0 8px;padding:6px 10px;border:1px solid #c7d2fe;border-radius:10px;background:#eef2ff;color:#3730a3;font:600 12.5px/1.35 Kanit,sans-serif}.art-sug b{flex:1;min-width:0;font-weight:800;overflow-wrap:anywhere}.art-sug span{color:#818cf8;font-size:11px;white-space:nowrap}.art-sug button{width:auto;min-height:0;margin:0;padding:3px 10px;border:1px solid #6366f1;border-radius:999px;background:#fff;color:#3730a3;font:800 12px Kanit,sans-serif;cursor:pointer}.art-sug button.no{border-color:#c7d2fe;color:#64748b}.art-ai .lk{font:700 11px/1.2 Kanit,sans-serif;color:#4f46e5;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:4px 9px;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}.art-tb .art-ai .go{background:#fef3c7;color:#92400e}.art-tb .art-ai .cpy{padding:0 7px;border:1px solid #e2e8f0;background:#fff;font-size:13px}.art-tb .art-ai .cpy.ok{background:#dcfce7;border-color:#86efac;color:#166534;font-weight:900}.art-tb .art-ai .go:disabled{opacity:.6}.art-tb .art-ai .mdl{color:#64748b;font-weight:700}.art-tb .art-ai .mdl{color:#fff;background:#1e293b;border-radius:8px;display:inline-flex;align-items:center;gap:5px;padding:0 9px 0 7px}.art-tb .art-ai .mdl:hover{background:#0f172a}.art-tb .art-ai .mdl i{font-style:normal;font-size:9px;color:#94a3b8}.art-ai .mdl .text-ai-logo{margin:0;width:15px;height:15px;vertical-align:0}.art-ai .mdl .text-ai-logo[data-owner="openai"]{background-image:url(assets/logos/openai-blossom-white.svg)}.art-ai .mdl .text-ai-logo[data-owner="grok"],.art-ai .mdl .text-ai-logo[data-owner="ollama"]{filter:none}.art-tb{flex-wrap:wrap}.art-ai.open{max-width:100%;overflow-x:auto;scrollbar-width:none}.art-ai .art-mrail{padding:0;border:0;background:transparent;display:inline-flex;align-items:center}.art-ai .art-mrail .audit-providers{padding-right:4px;margin-right:2px}.art-ai .art-mrail .audit-provider{width:26px;height:26px;border-radius:7px}.art-ai .art-mrail .text-ai-chips>button{padding:0 9px;height:26px;border-radius:8px;background:#fff;border:1px solid #e2e8f0;color:#475569;font-weight:800}.art-ai .art-mrail .text-ai-chips>button[aria-pressed="true"]{display:none}' +
             '.art-mrail{padding:6px 8px;border-bottom:1px solid #e2e8f0;background:#fcfcfd}.art-mrail .audit-model-row{margin:0;padding:0;border:0;gap:6px;flex-wrap:nowrap;overflow-x:auto}.art-mrail .audit-providers{flex-wrap:nowrap;gap:4px;padding-right:6px;border-right:1px solid #e2e8f0}.art-mrail .text-ai-chips{display:flex;flex-wrap:nowrap;gap:4px}.art-mrail .text-ai-chips>button[hidden]{display:none!important}.art-mrail .audit-provider{width:30px;height:30px;min-height:0;margin:0;padding:0;border:1px solid transparent;border-radius:8px;background:transparent;box-shadow:none;display:grid;place-items:center;cursor:pointer}.art-mrail .audit-provider[aria-pressed="true"]{background:#eef2ff;border-color:#c7d2fe}.art-mrail .text-ai-chips>button{min-height:0;margin:0;padding:4px 10px;font-size:12px}' +   // V102.341: only the picked vendor's models show (the shared rail marks the rest [hidden]); one line
@@ -803,7 +806,7 @@
             '<div class="clp-note">' + (S.clipVoiceErr ? '<span class="clp-verr">' + esc(S.clipVoiceErr) + '</span><br>' : '') + (clipAiOk(S.lang) ? '' : '💻 This computer\'s voice — add a Gemini key for the AI voice · ') + 'kept with the article — 💾 Save draft / 📅 Schedule saves it too</div></div>';
     }
     function clipPaint() { var pv = document.querySelector('#art-body .art-pv'); if (pv) pv.outerHTML = previewHtml(); var sl = document.getElementById('art-stl'); if (sl) sl.outerHTML = statusLine(S.cur, Date.now()); var bt = document.getElementById('art-btns'); if (bt) bt.outerHTML = btnsHtml(S.cur); }
-    function clipStopNow() { S.clipPlaying = false; S.clipStep = null; S.clipRun = (S.clipRun || 0) + 1; clearTimeout(S.clipTimer); if (S.clipAu) { try { S.clipAu.pause(); } catch (e) { /* gone */ } S.clipAu = null; } if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch (e) { /* nothing speaking */ } } }
+    function clipStopNow() { S.clipPlaying = false; S.clipStep = null; S.clipRun = (S.clipRun || 0) + 1; clearTimeout(S.clipTimer); (S.clipSubT || []).forEach(clearTimeout); S.clipSubT = []; if (S.clipAu) { try { S.clipAu.pause(); } catch (e) { /* gone */ } S.clipAu = null; } if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch (e) { /* nothing speaking */ } } }
     // V102.626 (owner: "ยังไม่มีเสียงไทย" — Chrome on Windows has no Thai voice): 🔊 the AI voice, Gemini TTS through the Laboon path (same key, same
     // Interactions request), one request per line, cached by language + speaker + text; 🙋 Kore · 🧑‍⚕️ / 💡 Puck. No key or a failed line → this computer's voice.
     // V102.636 (owner pick C+): a Thai article reads with iApp Chinda through callAIProxy (iapp_tts — the key stays on the server): 🙋 ไข่มุก friendly ·
@@ -846,10 +849,61 @@
         return window.callTtsProxy({ provider: 'iapp_tts', text: x.t, voice: voice, style: CHINDA_STYLE[x.w] || 'calm', feature: 'article_clip_voice' })
             .then(function (r) { if (!r || !r.audioContent) throw new Error('no audio came back'); return clipBlobUrl(r.audioContent, r.mimeType || 'audio/mpeg'); });
     }
+    // V102.639 (owner pick A, mockup-chinda-tts/smooth): English words in a Thai clip are read the way a Thai pharmacist says them. Once per clip an AI
+    // gives each new English word a Thai-script reading (Buscopan → บุสโคแพน), kept on the article (clipReading); only the voice uses it — the captions keep
+    // English. 🔤 n shows / fixes them; a fixed word is marked (e) so it can join a shared list later.
+    function clipReadingOf(a) {
+        var o = {}, rd = (a && a.clipReading) || {};
+        Object.keys(rd).forEach(function (k) { var v = rd[k] || {}, r = String(v.r || '').trim(); if (k && r) o[k] = v.e ? { r: r, e: true } : { r: r }; });
+        return Object.keys(o).length ? o : null;
+    }
+    var CLIP_EN_WORD = /[A-Za-z][A-Za-z0-9-]*[A-Za-z0-9]/g;
+    function clipEnWords(ls) {
+        var seen = {}, out = [];
+        ls.forEach(function (x) { (String(x.t || '').match(CLIP_EN_WORD) || []).forEach(function (w) { var k = w.toLowerCase(); if (!seen[k]) { seen[k] = 1; out.push(w); } }); });
+        return out;
+    }
+    function clipReadKey(a, w) { var rd = (a && a.clipReading) || {}, k = w.toLowerCase(); return Object.keys(rd).filter(function (x) { return x.toLowerCase() === k; })[0] || null; }
+    function clipSpoken(t) {
+        var rd = (S.cur && S.cur.clipReading) || {};
+        Object.keys(rd).sort(function (a, b) { return b.length - a.length; }).forEach(function (w) {
+            var r = rd[w] && String(rd[w].r || '').trim(); if (!r || r === w) return;
+            t = String(t).replace(new RegExp('(?<![A-Za-z])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![A-Za-z0-9])', 'gi'), r);
+        });
+        return t;
+    }
+    function clipReadingPrompt(words) {
+        return ['You write how Thai pharmacists SAY English words when they speak Thai (drug names, brands, abbreviations, units).',
+            'For each word give the Thai-script reading a Thai pharmacist would say aloud, e.g. Buscopan → บุสโคแพน, Warfarin → วาร์ฟาริน, INR → ไอเอ็นอาร์, mg → มิลลิกรัม, NSAIDs → เอ็นเสด.',
+            'Reply with PURE JSON only: {"Word": "คำอ่าน", ...} using each word exactly as given.', '', 'WORDS: ' + words.join(', ')].join('\n');
+    }
+    // the words of this clip that have no reading yet → one AI call; the readings join the article (saved with 💾 Save draft / 📅 Schedule)
+    function clipEnsureReading(ls) {
+        var a = S.cur, need = clipEnWords(ls).filter(function (w) { return !clipReadKey(a, w); });
+        if (!need.length || typeof window.callUniversalAI !== 'function') return Promise.resolve();
+        S.clipReadBusy = true; clipPaint();
+        return window.callUniversalAI(qModel(), clipReadingPrompt(need.slice(0, 40)), true, null, '', { feature: 'clip_reading', temperature: 0, maxTokens: 900 }).then(function (r) {
+            var t = r && r.text, d = null;
+            try { d = typeof window.safeJsonParse === 'function' ? window.safeJsonParse(t) : JSON.parse(String(t).replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()); } catch (e) { d = null; }
+            if (!d || typeof d !== 'object') throw new Error('no readings came back');
+            a.clipReading = a.clipReading || {};
+            need.forEach(function (w) { var k = Object.keys(d).filter(function (x) { return x.toLowerCase() === w.toLowerCase(); })[0], v = k && String(d[k] || '').trim(); a.clipReading[w] = { r: v && /[\u0E00-\u0E7F]/.test(v) ? v : w }; });   // no Thai reading back = read as written (and not asked again)
+        }).catch(function (e) { S.clipVoiceErr = '🔤 Thai reading: ' + ((e && e.message) || e) + ' — English words are read as written'; })
+            .then(function () { S.clipReadBusy = false; });
+    }
+    // V102.639: lines in a row by the same speaker (🧑‍⚕️ and 💡 are one voice) are read in ONE request — one breath, no restart between bubbles
+    function clipGroups(ls) {
+        var gs = [];
+        ls.forEach(function (x, i) {
+            var side = clipSide(x.w), g = gs[gs.length - 1];
+            if (g && g.side === side) { g.idx.push(i); g.t += ' ' + x.t; } else gs.push({ side: side, w: side, idx: [i], t: x.t });
+        });
+        return gs;
+    }
     function clipVoice(L, x) {
-        var v = clipPicksNow(L)[clipSide(x.w)], id = L + '|' + v + '|' + x.w + '|' + x.t; if (clipAudio[id]) return clipAudio[id];
+        var v = clipPicksNow(L)[clipSide(x.w)], said = L === 'th' ? clipSpoken(x.t) : x.t, id = L + '|' + v + '|' + clipSide(x.w) + '|' + said; if (clipAudio[id]) return clipAudio[id];
         var pr = L !== 'th' ? (clipGemOk() ? clipGemini(L, x, v) : Promise.reject(new Error('no Gemini key')))
-            : clipChinda(x, v).catch(function (e) {
+            : clipChinda({ w: x.w, t: said }, v).catch(function (e) {
                 if (!clipGemOk()) throw e;
                 S.clipVoiceErr = '🔊 Thai voice failed — Gemini instead';
                 return clipGemini(L, x, CLIP_VOICE[x.w] || 'Puck');
@@ -869,6 +923,17 @@
         return '<div class="clp-vr">' + ['q', 'rx'].map(function (w) {
             return '<button type="button" class="clp-vc ' + fam + (now === w ? ' talk' : '') + '" data-w="' + w + '" onpointerdown="Articles.clipVoiceDown(\'' + w + '\')" onclick="Articles.clipVoiceTap(\'' + w + '\')"' +
                 ' title="' + (w === 'q' ? '🙋 Asks' : '🧑‍⚕️ Pharmacist + 💡') + ' · tap = next voice · hold = hear it">' + CLIP_WHO[w][0] + ' ' + esc(clipVoiceName(L, p[w])) + '</button>';
+        }).join('') + (L === 'th' ? clipReadChipHtml(ls) : '') + '</div>' + (L === 'th' && S.clipReadOpen ? clipReadBoxHtml(ls) : '');
+    }
+    function clipReadChipHtml(ls) {
+        if (S.clipReadBusy) return '<button type="button" class="clp-vc rd" disabled title="Writing how the Thai voice says the English words">🔤 …</button>';
+        var n = clipEnWords(ls).filter(function (w) { return clipReadKey(S.cur, w); }).length;
+        return n ? '<button type="button" class="clp-vc rd" onclick="Articles.clipReadToggle()" aria-expanded="' + !!S.clipReadOpen + '" title="How the Thai voice reads the English words — tap to see / fix">🔤 ' + n + '</button>' : '';
+    }
+    function clipReadBoxHtml(ls) {
+        var rows = clipEnWords(ls).map(function (w) { var k = clipReadKey(S.cur, w); return k ? { k: k, v: S.cur.clipReading[k] } : null; }).filter(Boolean);
+        return '<div class="clp-rd lang-no-toggle"><b>🔤 the voice reads</b>' + rows.map(function (x) {
+            return '<label><span>' + esc(x.k) + ' →</span><input type="text" maxlength="40" value="' + esc(x.v.r) + '" aria-label="How to read ' + esc(x.k) + '" onchange="Articles.clipReadSet(this.dataset.k, this.value)" data-k="' + esc(x.k) + '">' + (x.v.e ? '<i title="you fixed this one">✏️</i>' : '') + '</label>';
         }).join('') + '</div>';
     }
     // hold a chip ≈ 0.8 s → that side's first line in its voice (the clip itself does not start)
@@ -1501,34 +1566,62 @@
         clipPlay: function () {
             var ls = clipLines(S.cur).filter(function (x) { return x.t.trim(); }); if (!ls.length) return;
             clipStopNow(); S.clipHear = ''; S.clipPlaying = true; S.clipStep = 0; S.clipVoiceErr = '';
-            var L = S.lang, ai = clipAiOk(L), runId = S.clipRun;
-            if (ai) ls.forEach(function (x) { clipVoice(L, x).catch(function () { /* that line falls back */ }); });   // every line at once: line 1 starts as soon as it is back
-            clipPaint();
-            var synth = window.speechSynthesis, BCP = { en: 'en-US', th: 'th-TH', ko: 'ko-KR' }[L] || 'en-US', run = function (i) {
-                if (!S.clipPlaying || S.clipRun !== runId) return;
-                if (i >= ls.length) { S.clipTimer = setTimeout(function () { if (S.clipRun === runId) { clipStopNow(); clipPaint(); } }, 900); return; }
-                S.clipStep = i; clipPaint();
-                var fired = false, next = function () { if (fired || !S.clipPlaying || S.clipRun !== runId) return; fired = true; clearTimeout(S.clipTimer); run(i + 1); }, ms = 900 + ls[i].t.length * 55;
-                var local = function () {
-                    if (synth && window.SpeechSynthesisUtterance) {
-                        try { var u = new SpeechSynthesisUtterance(ls[i].t); u.lang = BCP; u.pitch = ls[i].w === 'q' ? 1.25 : 0.95; u.rate = 1.02; u.onend = next; u.onerror = next; synth.speak(u); S.clipTimer = setTimeout(next, ms + 4000); return; } catch (e) { /* no voice: timed */ }
-                    }
-                    S.clipTimer = setTimeout(next, ms);
+            var L = S.lang, ai = clipAiOk(L), runId = S.clipRun, groups = clipGroups(ls);   // V102.639: one request per run of the same speaker
+            var synth = window.speechSynthesis, BCP = { en: 'en-US', th: 'th-TH', ko: 'ko-KR' }[L] || 'en-US';
+            var live = function () { return S.clipPlaying && S.clipRun === runId; };
+            var show = function (i) { if (live()) { S.clipStep = i; clipPaint(); } };
+            var run = function (gi) {
+                if (!live()) return;
+                if (gi >= groups.length) { S.clipTimer = setTimeout(function () { if (S.clipRun === runId) { clipStopNow(); clipPaint(); } }, 900); return; }
+                var g = groups[gi]; show(g.idx[0]);
+                var fired = false, next = function () { if (fired || !live()) return; fired = true; clearTimeout(S.clipTimer); (S.clipSubT || []).forEach(clearTimeout); S.clipSubT = []; run(gi + 1); }, ms = 900 + g.t.length * 55;   // a late bubble timer never runs into the next group
+                // the later bubbles of the group appear across its audio, in proportion to their length
+                var steps = function (durMs) {
+                    var tot = g.idx.reduce(function (n, i) { return n + ls[i].t.length; }, 0), acc = 0;
+                    g.idx.slice(0, -1).forEach(function (i, k) { acc += ls[i].t.length; S.clipSubT.push(setTimeout(function () { show(g.idx[k + 1]); }, durMs * acc / tot)); });
+                };
+                var local = function () {   // this computer's voice: line by line
+                    var k = 0, say = function () {
+                        if (!live()) return;
+                        if (k >= g.idx.length) return next();
+                        var x = ls[g.idx[k++]], step = function () { clearTimeout(S.clipTimer); say(); };
+                        show(g.idx[k - 1]);
+                        if (synth && window.SpeechSynthesisUtterance) {
+                            try { var u = new SpeechSynthesisUtterance(x.t); u.lang = BCP; u.pitch = x.w === 'q' ? 1.25 : 0.95; u.rate = 1.02; u.onend = step; u.onerror = step; synth.speak(u); S.clipTimer = setTimeout(step, 900 + x.t.length * 55 + 4000); return; } catch (e) { /* no voice: timed */ }
+                        }
+                        S.clipTimer = setTimeout(step, 900 + x.t.length * 55);
+                    };
+                    say();
                 };
                 if (!ai) return local();
-                clipVoice(L, ls[i]).then(function (url) {
-                    if (!S.clipPlaying || S.clipRun !== runId || fired) return;
-                    var au = S.clipAu = new Audio(url); au.onended = function () { S.clipTimer = setTimeout(next, 250); }; au.onerror = next;
-                    var pl = au.play(); if (pl && pl.catch) pl.catch(next);
+                clipVoice(L, g).then(function (url) {
+                    if (!live() || fired) return;
+                    var au = S.clipAu = new Audio(url); au.onended = function () { S.clipTimer = setTimeout(next, 150); }; au.onerror = next;   // V102.639: 0.25 → 0.15 s between speakers
+                    var pl = au.play(), go = function () { steps(isFinite(au.duration) && au.duration > 0 ? au.duration * 1000 : ms); };
+                    if (pl && pl.then) pl.then(go, next); else go();
                     S.clipTimer = setTimeout(next, ms + 15000);
                 }).catch(function (e) {
-                    if (!S.clipPlaying || S.clipRun !== runId || fired) return;
+                    if (!live() || fired) return;
                     S.clipVoiceErr = '🔊 AI voice: ' + (e && e.message || e) + ' — this computer\'s voice instead'; clipPaint(); local();
                 });
             };
-            run(0);
+            var start = function () {
+                if (!live()) return;
+                if (ai) groups.forEach(function (g) { clipVoice(L, g).catch(function () { /* that group falls back */ }); });   // every group at once: the first starts as soon as it is back
+                clipPaint(); run(0);
+            };
+            clipPaint();
+            if (L === 'th' && ai) clipEnsureReading(ls).then(start); else start();   // V102.639: Thai readings first (once per clip)
         },
         clipStop: function () { clipStopNow(); S.clipHear = ''; clipPaint(); },
+        // V102.639: 🔤 — see / fix how the Thai voice reads an English word (empty = read it as written)
+        clipReadToggle: function () { S.clipReadOpen = !S.clipReadOpen; clipPaint(); },
+        clipReadSet: function (k, v) {
+            var a = S.cur; if (!a || !k) return;
+            a.clipReading = a.clipReading || {};
+            a.clipReading[k] = { r: String(v || '').trim() || k, e: true };
+            clipStopNow(); clipPaint();
+        },
         // V102.636: voice chips — tap = next voice of the family; hold = hear (a hold swallows the click that follows it)
         clipVoiceDown: function (w) {
             clearTimeout(S.clipHoldT);
