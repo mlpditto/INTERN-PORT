@@ -5,7 +5,7 @@ from playwright.sync_api import sync_playwright
 root = Path(__file__).resolve().parents[1]
 html = (root / 'public/admin.html').read_text(encoding='utf-8')
 ui = (root / 'public/ai-model-ui.js').read_text(encoding='utf-8')
-start = html.index('        async function bulkPasteFindAnswers()')
+start = html.index('        async function bulkPasteFindAnswers(which)')
 batch = html[start:html.index('        // V97.23:', start)]
 # V102.04: the model is picked on a logo chip that unfolds the shared provider rail (the select is hidden).
 chip_js = html[html.index('        window.bpSyncModelChip = function()'):html.index('        function renderBulkPastePreview() {')]
@@ -25,8 +25,7 @@ with sync_playwright() as p:
             modal.style.display='block';modal.style.position='fixed';modal.style.inset='0';
             const content=modal.querySelector('.modal-content');
             content.style.boxSizing='border-box';content.style.width='100%';content.style.margin='0';
-            document.getElementById('bp-input-stage').style.display='none';
-            document.getElementById('bp-preview-stage').style.display='block';
+            document.querySelector('#bulkPasteModal .bp-wrap').classList.add('has-rows');
         }''')
         page.evaluate('window.syncModelDefault = () => {}')
         page.add_script_tag(content=ui)
