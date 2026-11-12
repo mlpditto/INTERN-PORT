@@ -11,6 +11,7 @@ Intern: home ▸ DD Codex; Poneglyph ▸ My Path; Submit New ▸ ⋯ ▸ Drug / 
 - `dd-codex-lean-qa` — one row of Drugs / Diseases chips + My Drafts; swipeable A–Z rail
 - `mypath-queue-qa` — My Path: one header rail, queue as one slim line
 - `drug-page-lean-qa` — Drug entry: TH ⌄ | ✨ pill, full-width chips, sticky folding head, lit rail, dosing lines
+- `drug-detail-c-qa` — V101.309 owner pick C (mockup-drug-detail-lean): the drug entry is grouped by the counter questions — 💊 How to give · ⛔ Who must not · ⚠️ What to watch · 🗣 Tell the patient · 🧬 Why it works · 🔗 (👶 first when there is a peds dose); same fields regrouped, Thai titles + field names on a Thai page, an empty question is left out
 - `disease-page-lean-qa` — Disease entry gets the same lean head (codexLeanHead)
 - `drug-submit-lean-qa` — Drug + Disease submit forms: one header row, hidden empty preview
 - `nika-links-qa` — 🌞 Nika tab: 🫘 Kidney risk screening one-click link (V101.303), TH/EN label, new tab in a browser / LINE external window, stays while Nika is paused

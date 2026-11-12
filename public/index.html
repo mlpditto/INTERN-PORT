@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.308)</title>
+    <title>Internship Portfolio (V101.309)</title>
     <link rel="stylesheet" href="nika-ask.css?v=V101.308">
     <link rel="stylesheet" href="daily-canvas.css?v=V101.266">
     <link rel="stylesheet" href="halloween.css?v=V101.249">
@@ -21212,9 +21212,6 @@
                 ['Toxicity', eff.toxicity, 'caution']
             ];
             const hasAnyAdmet = admetFields.some(([, v]) => v && String(v).trim());
-            const pkSection = hasAnyAdmet
-                ? { key: 'pk', title: '📊 Pharmacokinetics · ADMET', open: false, fields: admetFields }
-                : { key: 'pk', title: '📊 Pharmacokinetics', open: false, fields: [['Pharmacokinetics', eff.pharmacokinetics, 'reference']] };
             // V95.06 PK Visual Phase 2: ADMET infographic from admin's
             // Generate ADMET Visual modal. Renders only when pkVisual.downloadUrl
             // exists. open:true because the image is the most engaging
@@ -21224,43 +21221,57 @@
                 : null;
             // V101.60: 👶 paediatric dose calculator (peds-dosing.js) — first, so the rail opens it. Built from the ORIGINAL doc: the numbers are not translated.
             const pedsSection = (window.PedsDosing && PedsDosing.hasPeds(drug)) ? { key: 'peds', title: '👶 Pediatric dose', open: false, peds: drug.pedsDosing } : null;
+            // V101.309 (owner pick C, mockup-drug-detail-lean): the reading view follows the questions asked at the counter —
+            // 💊 how to give · ⛔ who must not · ⚠️ what to watch · 🗣 what to tell the patient · 🧬 why it works. Same fields as before, only regrouped;
+            // the admin form and the data are unchanged. Titles and field names follow the language on screen (Thai on a Thai page).
+            const T = (s) => { const w = s.split('|'); return lang === 'th' ? w[0] : lang === 'ko' ? w[2] : w[1]; };   // 'ไทย|English|한국어' — a Thai or Korean page gets its own words
+            const whySection = hasAnyAdmet
+                ? { key: 'why', title: T('🧬 ทำไมได้ผล|🧬 Why it works|🧬 작용 원리'), open: false, fields: [[T('กลไก|Mechanism|기전'), eff.mechanism, 'learn']].concat(admetFields.slice(0, 4).map(([l, v, c]) => [T({ Absorption: 'การดูดซึม|Absorption|흡수', Distribution: 'การกระจาย|Distribution|분포', Metabolism: 'การเปลี่ยนแปลง|Metabolism|대사', Excretion: 'การขับออก|Excretion|배설' }[l]), v, c])) }
+                : { key: 'why', title: T('🧬 ทำไมได้ผล|🧬 Why it works|🧬 작용 원리'), open: false, fields: [[T('กลไก|Mechanism|기전'), eff.mechanism, 'learn'], [T('เภสัชจลนศาสตร์|Pharmacokinetics|약동학'), eff.pharmacokinetics, 'reference']] };
             const sections = [
                 pedsSection,
                 {
-                    key: 'clinical',
-                    title: '🩺 Clinical Use',
+                    key: 'give',
+                    title: T('💊 ให้ยังไง|💊 How to give|💊 투여 방법'),
                     open: false, // V95.79: rail auto-opens the first section
                     fields: [
-                        ['Indication', eff.indication, 'safe'],
-                        ['Dosing', dcDosingLines(eff.dosing), 'reference'],   // V101.199
-                        ['Contraindication', eff.contraindication, 'hard-no'],
-                        ['Side Effects', eff.sideEffects, 'caution'],
-                        ['Interactions', eff.interactions, 'interactions']
+                        [T('ข้อบ่งใช้|Indication|적응증'), eff.indication, 'safe'],
+                        [T('ขนาดยา|Dosing|용량'), dcDosingLines(eff.dosing), 'reference']   // V101.199
                     ]
                 },
                 {
-                    key: 'moa',
-                    title: '💊 Mechanism of Action',
+                    key: 'avoid',
+                    title: T('⛔ ห้ามใคร|⛔ Who must not|⛔ 금기 대상'),
                     open: false,
                     fields: [
-                        ['Mechanism', eff.mechanism, 'learn']
+                        [T('ข้อห้ามใช้|Contraindication|금기'), eff.contraindication, 'hard-no']
                     ]
                 },
-                pkSection,
+                {
+                    key: 'watch',
+                    title: T('⚠️ ระวังอะไร|⚠️ What to watch|⚠️ 주의할 점'),
+                    open: false,
+                    fields: [
+                        [T('ยาตีกัน|Interactions|상호작용'), eff.interactions, 'interactions'],
+                        [T('ผลข้างเคียง|Side Effects|부작용'), eff.sideEffects, 'caution'],
+                        [T('การติดตาม|Monitoring|모니터링'), eff.monitoring, 'safe'],
+                        [T('พิษ · ได้รับเกินขนาด|Toxicity|독성 · 과량'), eff.toxicity, 'caution']
+                    ]
+                },
+                {
+                    key: 'tell',
+                    title: T('🗣 บอกผู้ป่วยว่า|🗣 Tell the patient|🗣 환자 안내'),
+                    open: false,
+                    fields: [
+                        [T('คำแนะนำผู้ป่วย|Patient Counseling|환자 상담'), eff.patientCounseling, 'empathy'],
+                        [T('เกร็ดสำคัญ|Clinical Pearls|임상 팁'), eff.pearls, 'tip']
+                    ]
+                },
+                whySection,
                 pkVisualSection,
                 {
-                    key: 'edu',
-                    title: '📖 Education',
-                    open: false,
-                    fields: [
-                        ['Monitoring', eff.monitoring, 'safe'],
-                        ['Patient Counseling · คำแนะนำผู้ป่วย', eff.patientCounseling, 'empathy'],
-                        ['Clinical Pearls', eff.pearls, 'tip']
-                    ]
-                },
-                {
                     key: 'refs',
-                    title: '🔗 References',
+                    title: T('🔗 อ้างอิง|🔗 References|🔗 참고문헌'),
                     open: false,
                     refs: Array.isArray(eff.references) ? eff.references.filter(Boolean) : []
                 }

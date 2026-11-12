@@ -33,20 +33,20 @@ async function open(browser, width) {
         await page.click('#drugCodexDetailModal .dc-detail-copy');
         let c = await page.evaluate(() => ({ clip: window.__clip.slice(), ok: document.querySelector('#drugCodexDetailModal .dc-detail-copy').classList.contains('ok'), txt: document.querySelector('#drugCodexDetailModal .dc-detail-copy').textContent, toast: window.__toasts.slice() }));
         assert.equal(c.clip.length, 1); const all = c.clip[0];
-        assert.match(all, /^# Itraconazole\nJ02AC02 · Azoles · © Sporal/, 'head: name + chips'); assert.match(all, /## 🩺 Clinical Use/); assert.match(all, /\*\*Indication\*\*\nTo treat \*\*fungal\*\* infections/, 'the author\'s Markdown survives (data-raw)');
-        assert.match(all, /## 💊 Mechanism of Action[\s\S]*Inhibits ergosterol synthesis/); assert.match(all, /## 📖 Education[\s\S]*Take after a meal/); assert.match(all, /## 🔗 References[\s\S]*https:\/\/example\.com\/a/);
+        assert.match(all, /^# Itraconazole\nJ02AC02 · Azoles · © Sporal/, 'head: name + chips'); assert.match(all, /## 💊 How to give/);   // V101.309 (owner pick C): grouped by the pharmacist's questions assert.match(all, /\*\*Indication\*\*\nTo treat \*\*fungal\*\* infections/, 'the author\'s Markdown survives (data-raw)');
+        assert.match(all, /## ⛔ Who must not[\s\S]*Heart failure/); assert.match(all, /## ⚠️ What to watch[\s\S]*Warfarin; simvastatin[\s\S]*Nausea[\s\S]*LFT/); assert.match(all, /## 🗣 Tell the patient[\s\S]*Take after a meal[\s\S]*Capsules need acid/); assert.match(all, /## 🧬 Why it works[\s\S]*Inhibits ergosterol synthesis[\s\S]*Absorption improves with food/); assert.match(all, /## 🔗 References[\s\S]*https:\/\/example\.com\/a/);
         assert.ok(!/Discussion/.test(all), 'the discussion is not copied');
         assert.deepEqual([c.ok, c.txt], [true, '✓'], 'the button turns green with ✓'); assert.ok(c.toast.some(t => /Copied/.test(t)));
         await page.waitForFunction(() => !document.querySelector('#drugCodexDetailModal .dc-detail-copy').classList.contains('ok'), null, { timeout: 4000 });
         assert.equal(await page.evaluate(() => document.querySelector('#drugCodexDetailModal .dc-detail-copy').textContent), '📋', 'and goes back');
         // one section: its own 📋, copies only that section and does NOT toggle it
-        const info = await page.evaluate(() => { const s = [...document.querySelectorAll('#dc-detail-body .dc-detail-section')]; const mo = s.find(x => x.dataset.sectionKey === 'moa'); return { keys: s.map(x => x.dataset.sectionKey), btns: s.map(x => !!x.querySelector('.dc-sec-copy')), moaOpen: mo.open }; });
+        const info = await page.evaluate(() => { const s = [...document.querySelectorAll('#dc-detail-body .dc-detail-section')]; const mo = s.find(x => x.dataset.sectionKey === 'why'); return { keys: s.map(x => x.dataset.sectionKey), btns: s.map(x => !!x.querySelector('.dc-sec-copy')), moaOpen: mo.open }; });
         assert.deepEqual(info.btns.slice(0, -1).every(Boolean), true, 'every section has its 📋'); assert.equal(info.btns[info.keys.indexOf('discussion')], false, '…except the discussion');
-        await page.evaluate(() => { window.__clip.length = 0; document.querySelector('#dc-detail-body .dc-detail-section[data-section-key="moa"] .dc-sec-copy').click(); });
-        c = await page.evaluate(() => ({ clip: window.__clip.slice(), open: document.querySelector('#dc-detail-body .dc-detail-section[data-section-key="moa"]').open }));
-        assert.equal(c.clip[0], '## 💊 Mechanism of Action\n\n**Mechanism**\nInhibits ergosterol synthesis'); assert.equal(c.open, info.moaOpen, 'copying does not toggle the section');
+        await page.evaluate(() => { window.__clip.length = 0; document.querySelector('#dc-detail-body .dc-detail-section[data-section-key="why"] .dc-sec-copy').click(); });
+        c = await page.evaluate(() => ({ clip: window.__clip.slice(), open: document.querySelector('#dc-detail-body .dc-detail-section[data-section-key="why"]').open }));
+        assert.equal(c.clip[0], '## 🧬 Why it works\n\n**Mechanism**\nInhibits ergosterol synthesis\n\n**Pharmacokinetics**\nAbsorption improves with food'); assert.equal(c.open, info.moaOpen, 'copying does not toggle the section');
         // the rail labels were not polluted by the added buttons
-        assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#drugCodexDetailModal .dc-sec-chip')].map(x => x.textContent.trim())), ['🩺 Clinical Use', '💊 Mechanism of Action', '📊 Pharmacokinetics', '📖 Education', '🔗 References', '💬 Discussion'], 'chip labels unchanged by the added buttons');
+        assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#drugCodexDetailModal .dc-sec-chip')].map(x => x.textContent.trim())), ['💊 How to give', '⛔ Who must not', '⚠️ What to watch', '🗣 Tell the patient', '🧬 Why it works', '🔗 References', '💬 Discussion'], 'chip labels unchanged by the added buttons');
         // no Clipboard API (some WebViews): the execCommand fallback copies
         await page.evaluate(() => { Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true }); window.__exec = 0; document.execCommand = c => { window.__exec++; return true; }; document.querySelector('#drugCodexDetailModal .dc-detail-copy').click(); });
         assert.equal(await page.evaluate(() => window.__exec), 1, 'fallback path used'); await ctx.close();

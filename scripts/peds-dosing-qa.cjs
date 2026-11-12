@@ -267,7 +267,7 @@ P.state.kg = null; P.state.age = null;
 
 // ---- 7. wiring in the pages ----
 assert.match(indexHtml, /<script src="peds-dosing\.js\?v=V\d+\.\d+"><\/script>/); assert.match(adminHtml, /<script src="peds-dosing\.js\?v=V\d+\.\d+"><\/script>/);
-assert.ok(indexHtml.includes("pedsSection,\n                {\n                    key: 'clinical'"), 'peds section comes first (the rail opens it)');
+assert.ok(indexHtml.includes("pedsSection,\n                {\n                    key: 'give'"), 'peds section comes first (the rail opens it)');
 assert.ok(indexHtml.includes("PedsDosing.sectionBodyHtml(drug._id, sec.peds, PedsDosing.state)") && indexHtml.includes('class="dc-row-peds"'));
 assert.match(adminHtml, /onclick="dcaPedsImportOpen\(\)"/);
 
