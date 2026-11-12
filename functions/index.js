@@ -5505,6 +5505,39 @@ async function groupUrgentFeedback(db) {
 }
 
 // Jev reads a saved quiz for the admin (jev-quiz-check.js): same kill switch, same client-closed cache collection, nothing written to the quiz.
+// V102.638 (owner pick: AI Review + Jev in the Drug Codex verify gate): Jev's two yes/no checks on the drug form as it is on screen —
+// is each tab about THIS drug, and does the Thai Education text say what the English says. Admin-only, suggest-only, nothing written to the drug;
+// answers cached in quiz_dup_scores (same keyed cache as the quiz check). Thresholds not calibrated on drug text yet (the reply says so).
+exports.jevCheckDrug = onCall({ secrets: ["OPENROUTER_API_KEY", "JEV_AI_API_KEY"], timeoutSeconds: 120, memory: "256MiB" }, async (request) => {
+    requireAdminCallable(request);
+    const db = admin.firestore();
+    const cfg = await db.collection("quiz_dup_scores").doc("_config").get();
+    if (cfg.exists && cfg.data().enabled === false) return { enabled: false };
+    const provider = jev.providerOf(cfg.exists ? cfg.data().provider : null);
+    const apiKey = jevApiKey(provider);
+    if (!apiKey) throw new HttpsError("failed-precondition", "No API key configured for provider " + provider);
+    const data = request.data || {};
+    if (!String(data.name || "").trim()) throw new HttpsError("invalid-argument", "name required");
+    const out = await require("./jev-drug-check").checkDrug(data, {
+        apiKey, provider, fetch: (url, opts) => fetch(url, opts),
+        readCache: async (keys) => {
+            const m = {};
+            for (let i = 0; i < keys.length; i += 30) {
+                const snaps = await db.getAll(...keys.slice(i, i + 30).map(k => db.collection("quiz_dup_scores").doc(k)));
+                snaps.forEach(sn => { if (sn.exists && typeof sn.data().score === "number") m[sn.id] = sn.data().score; });
+            }
+            return m;
+        },
+        writeCache: async (entries) => {
+            const batch = db.batch();
+            entries.forEach(e => batch.set(db.collection("quiz_dup_scores").doc(e.key), { score: e.score, at: admin.firestore.FieldValue.serverTimestamp() }));
+            await batch.commit();
+        },
+    });
+    if (out.calls) recordAiUsage(provider, jev.JEV_MODEL, out.inputTokens, true, "jev_drug_check", { inputTokens: out.inputTokens, outputTokens: 0 });
+    return { enabled: true, ...out };
+});
+
 exports.jevCheckQuiz = onCall({ secrets: ["OPENROUTER_API_KEY", "JEV_AI_API_KEY"], timeoutSeconds: 120, memory: "256MiB" }, async (request) => {
     requireAdminCallable(request);
     const db = admin.firestore();
