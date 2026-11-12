@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const root = path.resolve(__dirname, '..');
 const admin = fs.readFileSync(path.join(root, 'public/admin.html'), 'utf8');
 const backend = fs.readFileSync(path.join(root, 'functions/index.js'), 'utf8');
-const batchSource = admin.slice(admin.indexOf('        async function bulkPasteFindAnswers()'), admin.indexOf('        // V97.23:', admin.indexOf('        async function bulkPasteFindAnswers()')));
+const batchSource = admin.slice(admin.indexOf('        async function bulkPasteFindAnswers(which)'), admin.indexOf('        // V97.23:', admin.indexOf('        async function bulkPasteFindAnswers(which)')));
 const retrySource = backend.slice(backend.indexOf('async function postWithRetry('), backend.indexOf('function getAudioMimeType('));
 async function batch(failAt, message) {
     const rows = Array.from({length:10}, () => ({include:true,q:'Test',options:['A','B'],correct:[1]}));

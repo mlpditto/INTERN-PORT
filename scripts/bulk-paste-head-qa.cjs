@@ -9,7 +9,7 @@ const slice = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b, i); if 
 const modal = slice('    <div id="bulkPasteModal"', '    <!-- V97.20: Generate Quiz from Image(s)');
 const chipJs = slice('        window.bpSyncModelChip = function()', '        function renderBulkPastePreview() {');
 const logoJs = slice('        window.aiModelLogoHtml = function', '        window.syncAuditFixHints = function');
-const batchJs = slice('        async function bulkPasteFindAnswers()', '        // V97.23:');
+const batchJs = slice('        async function bulkPasteFindAnswers(which)', '        // V97.23:');
 const styles = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1]).join('\n');
 
 (async () => {
@@ -36,7 +36,7 @@ const styles = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => 
         await page.addScriptTag({ content: logoJs + chipJs + batchJs });
         await page.evaluate(() => bpSyncModelChip());
 
-        // stage 1 (paste): header = 📋 Bulk Paste ⓘ; how-to in the hover; no tools, no paragraph
+        // nothing pasted yet: header = 📋 Bulk Paste ⓘ; how-to in the hover; no tools, no paragraph (V102.635: one screen — the tools wait for the first question)
         const tools = page.locator('#bulkPasteModal .bp-head-tools');
         assert.equal(await tools.isVisible(), false, 'tools hidden while pasting');
         assert.match(await page.locator('.bp-help').getAttribute('title'), /คั่นด้วยบรรทัดว่าง/);
@@ -44,9 +44,9 @@ const styles = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => 
         assert.equal(await page.locator('#bulkPasteModal .bp-head p').count(), 0, 'no description paragraph');
         assert.equal(await page.locator('#bulkPasteModal h3').innerText(), 'Bulk Paste');
 
-        // stage 2 (preview): one row — ring · ← 📚 · 🎯 + logo ▾
-        await page.evaluate(() => { document.getElementById('bp-input-stage').style.display = 'none'; document.getElementById('bp-preview-stage').style.display = 'block'; });
-        assert.equal(await tools.isVisible(), true, 'tools shown in the preview stage');
+        // questions in: one row — ring · 📚 · 🎯 + logo ▾
+        await page.evaluate(() => document.querySelector('#bulkPasteModal .bp-wrap').classList.add('has-rows'));
+        assert.equal(await tools.isVisible(), true, 'tools shown once there are questions');
         const head = await page.locator('.bp-head').boundingBox();
         assert.ok(head.height <= 60, 'header is one row, got ' + head.height);
         for (const sel of ['#bp-status-dot', '.bp-tools', '#bp-find-btn', '#bp-model-chip']) {

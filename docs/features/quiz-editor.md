@@ -12,7 +12,8 @@ Admin: Quiz Engine ▸ Edit / ＋ New quiz.
 - `quiz-deadline-editor-qa` — the Deadline alert (LINE) chip: ON for new / legacy quizzes, OFF reads back `notifyDeadline:false`, independent of Notify LINE every submit
 - `quiz-editor-toolbar-lean-qa` — one strip: answer type | this question | whole quiz
 - `quiz-editor-toolbar-handlers-qa` — 🐑 clone and answer-type handlers do not throw
-- `bulk-paste-head-qa` — one-row Bulk Paste header + progress ring
+- `bulk-paste-head-qa` — one-row Bulk Paste header + progress ring (V102.635: the tools wait for the first question)
+- `bulk-paste-hybrid-qa` — Bulk Paste on one screen (V102.635, owner pick: hybrid C + B + D): paste left, the list right as you type (no ✂️ Parse / ← back); one line per question, tap = stem + A B C D chips (tap = key, tap the stem = edit); keys / ticks / edits survive a re-parse (rows are keyed by stem without its number + options); the same stem again starts unticked (♊); lines no question took = ⚠️ L n (tap selects them in the text); filter chips ❔ → 🎯 n (E.V.I.E. on the no-key ones only) · 🤖 <80 → ☐ n · ♊ side by side ✓ keep; ⓘ = rules + one example ("Paste this" follows the text's numbering); 📂 JSON / 🧩 image rows sit after the text's rows; 🏷 one tag for the batch; ➕ Add n then ↶ Undo for 8 s (takes them out, reopens as it was); phone = one column
 - `bulk-paste-parser-qa` — parseBulkQuestions on pastes with options in own paragraphs
 - `bulk-paste-insert-qa` — ➕ Add selected replaces the empty starter question
 - `quiz-resource-cards-qa` — one lean row per resource (domain chip, ✎, 💬, 🗑)
