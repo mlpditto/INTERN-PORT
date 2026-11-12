@@ -19,6 +19,8 @@ Admin: Dashboard ▸ Drug Codex / Disease Codex.
 - `bronchodilator-seed-qa` — inhaled bronchodilators → pending drafts, names only
 - `peds-dosing-qa` — peds-dosing.js data, calculator, intern markup, admin import
 - `drug-codex-lean-b-qa` — V102.637 owner pick B (mockup-codex-lean): one line per drug (name + thin % bar · ATC / Cls / Brd dots — ○ = add at that field · 🤖 ✏️ ⋯ with who / when / 📰 inside), column heads filter in Incomplete first (ATC / Class / Brands chips gone), no avg line, 👶 / 🫁 imports under 📥, drafts grouped by source (note once, % per row, ✓ Approve amber + "⚠️ Only n% filled" under 80 %, no "new entry")
+- `drug-verify-gate-check-qa` — V102.638 owner pick AI Review + Jev: the "tabs unverified" gate's 🔍 Check — AI Review (another model than the drafter) gives the reason, Jev (jevCheckDrug) flags a tab that may be about another drug and Thai ≠ English in Education; each tab ✓ / ⚠️ + one line, "✓ n clear" ticks only clear tabs; advice only
+- `jev-drug-check-check` — functions/jev-drug-check.js: on_topic per known tab, same_meaning per Education field with EN + TH, cached, ok / look / bad (quiz thresholds, not calibrated on drug text), admin-only, writes nothing to the drug
 
 ## What usually lies
 

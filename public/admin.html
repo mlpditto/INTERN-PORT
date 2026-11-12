@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.637)</title>
+    <title>Nika Admin (V102.638)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -50687,7 +50687,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         keys: unchecked,
                         titles: DCA_SECTION_TITLES,
                         onJumpTo: key => dcaSwitchSection(key),
-                        onMarkVerified: key => { dcaState.verified[key] = true; dcaUpdateSectionBadges(); dcaRefreshVerifyStrip(); }
+                        onMarkVerified: key => { dcaState.verified[key] = true; dcaUpdateSectionBadges(); dcaRefreshVerifyStrip(); },
+                        check: dcaGateCheck   // V102.638
                     });
                     if (!ok) return;
                 }
@@ -50872,12 +50873,47 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // closer look. Resolves true (proceed with save) when the admin clicks "Save
         // anyway" OR every row gets verified in-place (auto-continues to save); resolves
         // false (abort save, stay on form) on Cancel/Escape/backdrop-click/jump-to-tab.
+        // V102.638 (owner pick: AI Review + Jev): the verify gate's 🔍 Check for a drug. AI Review (another model than the drafter) gives the reasons;
+        // Jev (jevCheckDrug) answers two yes/no questions — is each tab about THIS drug · does the Thai Education text say what the English says.
+        // Both are advice: the result is a colour + one line per tab; nothing is saved or ticked until the admin taps "✓ n clear" or ✓ on a row.
+        const DCA_GATE_SEV = { safety: 'bad', factual: 'bad', consistency: 'warn', suggestion: 'warn' };
+        async function dcaGateCheck(keys) {
+            const cur = dcaCollectForm();
+            const sections = {}, langs = {};
+            keys.forEach(k => {
+                const def = DCA_SECTION_DEFS.find(d => d.key === k); if (!def) return;
+                sections[k] = def.fields.filter(f => f !== 'genericName').map(f => { const v = cur[f]; const t = Array.isArray(v) ? v.filter(Boolean).join(', ') : String(v == null ? '' : v).trim(); return t ? (DCA_FIELD_LABELS[f] || f) + ': ' + t : ''; }).filter(Boolean).join('\n').slice(0, 2000);
+            });
+            if (keys.includes('edu')) DCA_EDU_I18N_FIELDS.forEach(f => { const x = (cur.educationI18n || {})[f] || {}; if (String(x.en || '').trim() && String(x.th || '').trim()) langs[f] = { en: x.en, th: x.th }; });
+            const app = window.adminApp || (window.firebase && firebase.app && firebase.app('admin'));
+            const [rv, jv] = await Promise.allSettled([
+                dcaAiReviewDraft({ other: true }),
+                app.functions().httpsCallable('jevCheckDrug')({ name: cur.genericName, sections, langs })
+            ]);
+            const findings = rv.status === 'fulfilled' && Array.isArray(rv.value) ? rv.value : null;
+            const j = jv.status === 'fulfilled' && jv.value && jv.value.data && jv.value.data.enabled !== false ? jv.value.data : null;
+            const rank = { ok: 0, unknown: 1, warn: 2, bad: 3 }, byKey = {};
+            keys.forEach(k => {
+                let level = findings || j ? 'ok' : 'unknown', notes = [];
+                const up = l => { if (rank[l] > rank[level]) level = l; };
+                (findings || []).filter(f => f.section === k).sort((a, b) => rank[DCA_GATE_SEV[b.severity] || 'warn'] - rank[DCA_GATE_SEV[a.severity] || 'warn']).forEach(f => { up(DCA_GATE_SEV[f.severity] || 'warn'); notes.push(f.issue); });   // the top one shows, the rest count as +n
+                const t = j && j.sections && j.sections[k];
+                if (t && t.verdict === 'bad') { up('bad'); notes.push('🧠 Jev: may be about another drug'); } else if (t && t.verdict === 'look') { up('warn'); notes.push('🧠 Jev: check it is all this drug'); }
+                if (k === 'edu' && j && j.langs) Object.keys(j.langs).forEach(f => { const v = j.langs[f]; if (v.verdict === 'bad' || v.verdict === 'look') { up('warn'); notes.push('🧠 Jev: Thai ≠ English in ' + (DCA_FIELD_LABELS[f] || f)); } });
+                const more = notes.length > 1 ? ' (+' + (notes.length - 1) + ')' : '';
+                byKey[k] = { level, note: notes.length ? notes[0] + more : level === 'ok' ? (findings ? 'no issue found' : 'Jev ok') + (findings && j ? '' : findings ? ' · Jev not run' : ' · AI Review failed') : 'check failed' };
+            });
+            const foot = (findings ? '🔍 AI Review · ' : '🔍 AI Review failed · ') + (j ? '🧠 Jev' + (j.calibrated === false ? ' (not yet calibrated on drug text)' : '') : '🧠 Jev not run') + ' — advice only, model knowledge, not live sources';
+            return { byKey, foot };
+        }
+
         function codexVerifyGatePrompt(opts) {
             opts = opts || {};
             const keys = opts.keys || [];
             const titles = opts.titles || {};
             const onJumpTo = typeof opts.onJumpTo === 'function' ? opts.onJumpTo : () => {};
             const onMarkVerified = typeof opts.onMarkVerified === 'function' ? opts.onMarkVerified : () => {};
+            const check = typeof opts.check === 'function' ? opts.check : null;   // V102.638: Drug Codex — AI Review + Jev
             return new Promise(resolve => {
                 const overlay = document.createElement('div');
                 overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:100050;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
@@ -50892,12 +50928,13 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 overlay.innerHTML = `
                     <div class="lang-no-toggle" style="background:white; width:92vw; max-width:460px; max-height:80vh; display:flex; flex-direction:column; border-radius:18px; overflow:hidden; box-shadow:0 25px 50px rgba(0,0,0,0.3); font-family:Inter,sans-serif;">
                         <div style="padding:18px 20px 6px;">
-                            <h3 style="margin:0 0 6px; color:#b45309; font-size:1.05em;">⚠️ <span data-count>${keys.length}</span> tab(s) still unverified</h3>
+                            <h3 style="margin:0 0 6px; color:#b45309; font-size:1.05em; display:flex; align-items:center; gap:8px;">⚠️ <span data-count>${keys.length}</span> tab(s) still unverified${check ? `<button type="button" data-act="check" title="🔍 AI Review (another model than the one that drafted) + 🧠 Jev (is each tab about this drug · Thai = English) — advice only, you still tick" style="margin-left:auto; width:auto; min-height:0; padding:6px 12px; border:none; border-radius:999px; background:linear-gradient(135deg,#0ea5e9,#6366f1); color:#fff; font-weight:800; font-size:0.8em; cursor:pointer;">🔍 Check</button>` : ''}</h3>
                             <div style="font-size:0.85em; color:#78716c;">Press "👁 Go to" to open that tab, or "✓ Verified" if it already looks right.</div>
                         </div>
                         <div data-rows style="padding:12px 20px; overflow-y:auto; flex:1;">${keys.map(rowHtml).join('')}</div>
                         <div style="padding:14px 20px 18px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid #f1f5f9;">
                             <button type="button" data-act="cancel" style="background:#e2e8f0; color:#334155; border:none; padding:9px 18px; border-radius:10px; cursor:pointer; font-weight:700; width:auto; min-height:0;">Cancel</button>
+                            <button type="button" data-act="clear" hidden style="background:#16a34a; color:#fff; border:none; padding:9px 14px; border-radius:10px; cursor:pointer; font-weight:800; width:auto; min-height:0;">✓ <span data-clear>0</span> clear</button>
                             <button type="button" data-act="save-anyway" style="background:#f59e0b; color:#fff; border:none; padding:9px 18px; border-radius:10px; cursor:pointer; font-weight:700; width:auto; min-height:0;">💾 Save anyway (skip verify)</button>
                         </div>
                     </div>`;
@@ -50929,6 +50966,33 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     }
                 });
                 overlay.querySelector('button[data-act="cancel"]').addEventListener('click', () => cleanup(false));
+                // V102.638: 🔍 Check — each row gets ✓ / ⚠️ + one line; "✓ n clear" ticks the clear rows (the admin still decides the rest)
+                const checkBtn = overlay.querySelector('button[data-act="check"]'), clearBtn = overlay.querySelector('button[data-act="clear"]');
+                if (checkBtn) checkBtn.addEventListener('click', async () => {
+                    checkBtn.disabled = true; checkBtn.textContent = '⏳ Checking…';
+                    let res = null;
+                    try { res = await check(keys); } catch (e) { console.warn('verify gate check', e); }
+                    checkBtn.disabled = false; checkBtn.textContent = '🔍 Check again';
+                    const by = (res && res.byKey) || {}, COL = { ok: ['#bbf7d0', '#f0fdf4', '#166534'], warn: ['#fde68a', '#fffbeb', '#92400e'], bad: ['#fecaca', '#fef2f2', '#991b1b'], unknown: ['#e2e8f0', '#f8fafc', '#475569'] };
+                    let clear = 0;
+                    rowsWrap.querySelectorAll('.cvg-row').forEach(row => {
+                        const r = by[row.dataset.key] || { level: 'unknown', note: 'not checked' }, c = COL[r.level] || COL.unknown;
+                        row.style.borderColor = c[0]; row.style.background = c[1];
+                        let n = row.querySelector('.cvg-note');
+                        if (!n) { n = document.createElement('small'); n.className = 'cvg-note'; n.style.cssText = 'order:3; flex:1 1 100%; margin:2px 0 0; font-weight:600; font-size:0.8em; line-height:1.35;'; row.style.flexWrap = 'wrap'; row.appendChild(n); }   // the line sits under the tab name
+                        n.style.color = c[2]; n.textContent = (r.level === 'ok' ? '✓ ' : r.level === 'unknown' ? '· ' : '⚠️ ') + (r.note || '');
+                        row.dataset.level = r.level; if (r.level === 'ok') clear++;
+                    });
+                    if (res && res.foot) { let f = overlay.querySelector('.cvg-foot'); if (!f) { f = document.createElement('div'); f.className = 'cvg-foot'; f.style.cssText = 'padding:0 20px 8px; font-size:0.75em; color:#64748b;'; rowsWrap.after(f); } f.textContent = res.foot; }
+                    clearBtn.hidden = !clear; clearBtn.querySelector('[data-clear]').textContent = clear;
+                });
+                if (clearBtn) clearBtn.addEventListener('click', () => {
+                    rowsWrap.querySelectorAll('.cvg-row[data-level="ok"]').forEach(row => { onMarkVerified(row.dataset.key); row.remove(); });
+                    const remaining = rowsWrap.querySelectorAll('.cvg-row').length;
+                    if (countEl) countEl.textContent = remaining;
+                    clearBtn.hidden = true;
+                    if (remaining === 0) cleanup(true);
+                });
                 overlay.querySelector('button[data-act="save-anyway"]').addEventListener('click', () => cleanup(true));
                 overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); });
                 document.addEventListener('keydown', onKey);
@@ -52590,6 +52654,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         ? `🔍 AI Review: ${findings.length} point${findings.length === 1 ? '' : 's'} to check (${ml})`
                         : `🔍 AI Review: no clear issues found (${ml}) — still verify each tab`);
                 }
+                return findings;   // V102.638: the verify gate reads them per tab
             } catch (err) {
                 console.error('[drug-codex] AI review failed:', err);
                 if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'AI Review failed: ' + (err && err.message ? err.message : 'unknown error'); }
