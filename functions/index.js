@@ -988,9 +988,9 @@ function orVideoUrl(data, id) {
 
 /**
  * 🤖 AI Proxy Function (V89.19)
- * Handles: Gemini, OpenAI, Anthropic, OpenRouter, AI Studio, ThaiLLM, Typhoon, Cloud TTS
+ * Handles: Gemini, OpenAI, Anthropic, OpenRouter, AI Studio, ThaiLLM, Typhoon, Cloud TTS, iApp Chinda TTS
  */
-exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEY", "TYPHOON_API_KEY", "THAILLM_API_KEY", "JEV_AI_API_KEY"], timeoutSeconds: 540, memory: "512MiB" }, async (req, res) => { // V101.09: 300 -> 540, see postWithRetry
+exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEY", "TYPHOON_API_KEY", "THAILLM_API_KEY", "JEV_AI_API_KEY", "IAPP_API_KEY"], timeoutSeconds: 540, memory: "512MiB" }, async (req, res) => { // V101.09: 300 -> 540, see postWithRetry
     try {
         // 1. Auth: Firebase ID token (replaces the public x-mlp-secret gate).
         const decoded = await verifyIdTokenFromHeader(req, res);
@@ -1012,7 +1012,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             };
             model = googleModelAliases[model] || model;
         }
-        if (!provider || (provider !== "cloud_tts" && provider !== "jev" && !prompt)) {
+        if (!provider || (provider !== "cloud_tts" && provider !== "iapp_tts" && provider !== "jev" && !prompt)) {
             return res.status(400).json({ error: "Missing provider or prompt" });
         }
 
@@ -1069,6 +1069,22 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 model: ttsConfig.voice.modelName || model || "cloud_tts",
                 provider: "cloud_tts"
             });
+        }
+
+        // --- V102.636: iApp Chinda TTS — the Thai voice of the 🎬 article clip (admin-only like every route but Typhoon).
+        // The key lives only here (secret IAPP_API_KEY); the reply is MP3, sent back as base64 like cloud_tts. 0.02 IC per 100 characters.
+        if (provider === "iapp_tts") {
+            const t = String(req.body.text || "").trim();
+            const voice = String(req.body.voice || "kaitom"), style = String(req.body.style || "neutral");
+            if (!t || t.length > 1200) return res.status(400).json({ error: "Chinda text must be 1-1200 characters" });
+            if (!["kaitom", "kaimook", "kaidang"].includes(voice)) return res.status(400).json({ error: "Unknown Chinda voice" });
+            if (!["neutral", "friendly", "cheerful", "calm", "serious", "sad", "excited", "empathetic"].includes(style)) return res.status(400).json({ error: "Unknown Chinda style" });
+            if (!process.env.IAPP_API_KEY) return res.status(500).json({ error: "iApp key unavailable" });
+            const response = await postWithRetry("https://api.iapp.co.th/v3/store/audio/tts", { text: t, voice, style, format: "mp3" }, {
+                headers: { apikey: process.env.IAPP_API_KEY, "Content-Type": "application/json" },
+                responseType: "arraybuffer", timeout: 60000
+            });
+            return res.json({ audioContent: Buffer.from(response.data).toString("base64"), mimeType: "audio/mpeg", model: "chinda-tts", provider: "iapp_tts", usage: { characters: t.length } });
         }
 
         // Image models use the Images API, never the chat completion fallback.

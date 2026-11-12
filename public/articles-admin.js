@@ -376,6 +376,10 @@
             '.clp-w,.clp-d{min-height:0!important;width:26px!important;height:26px;margin:0!important;padding:0!important;border:0!important;background:#f1f5f9!important;border-radius:7px;font-size:13px;cursor:pointer;flex:none}.clp-d{background:none!important;color:#94a3b8;font-size:12px}.clp-bad{cursor:help}' +
             '.clp-add{min-height:0!important;width:auto!important;align-self:flex-start;margin:0!important;padding:3px 10px!important;border:1.5px dashed #cbd5e1;border-radius:999px;background:#fff;color:#64748b;font-size:12px;font-weight:800;cursor:pointer}' +
             '.clp-note{font-size:11px;color:#94a3b8;text-align:center}.clp-verr{color:#b45309;font-weight:700}' +
+            // V102.636 (owner pick C+): 🙋 / 🧑‍⚕️ voice chips under ▶ — Thai = Chinda (blue, 🇹🇭 dot), EN / KO = Gemini (violet); the speaking side pulses
+            '.clp-vr{display:flex;gap:6px;justify-content:center}.clp-vc{position:relative;min-height:0!important;width:auto!important;margin:0!important;padding:4px 10px!important;border-radius:999px;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap;touch-action:manipulation;user-select:none;-webkit-user-select:none}' +
+            '.clp-vc.th{border:1.5px solid #bfdbfe;background:#eff6ff;color:#1e40af}.clp-vc.th::after{content:"";position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;border:1px solid #fff;background:linear-gradient(#ef4444 0 33%,#fff 33% 45%,#1e3a8a 45% 55%,#fff 55% 67%,#ef4444 67%)}' +
+            '.clp-vc.gm{border:1.5px solid #ddd6fe;background:#f5f3ff;color:#6d28d9}.clp-vc.talk{animation:clpPulse 1s infinite}@keyframes clpPulse{50%{box-shadow:0 0 0 4px rgba(59,130,246,.35)}}@media (prefers-reduced-motion:reduce){.clp-vc.talk{animation:none;box-shadow:0 0 0 2px #3b82f6}}' +
             '.art-wl{max-height:56vh;overflow:auto}.art-ai{margin-left:auto;display:inline-flex;align-items:center;gap:4px}.art-tb .art-ai button{width:auto;padding:0 9px;font-size:12px;white-space:nowrap}.art-sug{display:flex;align-items:center;gap:8px;margin:-2px 0 8px;padding:6px 10px;border:1px solid #c7d2fe;border-radius:10px;background:#eef2ff;color:#3730a3;font:600 12.5px/1.35 Kanit,sans-serif}.art-sug b{flex:1;min-width:0;font-weight:800;overflow-wrap:anywhere}.art-sug span{color:#818cf8;font-size:11px;white-space:nowrap}.art-sug button{width:auto;min-height:0;margin:0;padding:3px 10px;border:1px solid #6366f1;border-radius:999px;background:#fff;color:#3730a3;font:800 12px Kanit,sans-serif;cursor:pointer}.art-sug button.no{border-color:#c7d2fe;color:#64748b}.art-ai .lk{font:700 11px/1.2 Kanit,sans-serif;color:#4f46e5;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:4px 9px;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}.art-tb .art-ai .go{background:#fef3c7;color:#92400e}.art-tb .art-ai .cpy{padding:0 7px;border:1px solid #e2e8f0;background:#fff;font-size:13px}.art-tb .art-ai .cpy.ok{background:#dcfce7;border-color:#86efac;color:#166534;font-weight:900}.art-tb .art-ai .go:disabled{opacity:.6}.art-tb .art-ai .mdl{color:#64748b;font-weight:700}.art-tb .art-ai .mdl{color:#fff;background:#1e293b;border-radius:8px;display:inline-flex;align-items:center;gap:5px;padding:0 9px 0 7px}.art-tb .art-ai .mdl:hover{background:#0f172a}.art-tb .art-ai .mdl i{font-style:normal;font-size:9px;color:#94a3b8}.art-ai .mdl .text-ai-logo{margin:0;width:15px;height:15px;vertical-align:0}.art-ai .mdl .text-ai-logo[data-owner="openai"]{background-image:url(assets/logos/openai-blossom-white.svg)}.art-ai .mdl .text-ai-logo[data-owner="grok"],.art-ai .mdl .text-ai-logo[data-owner="ollama"]{filter:none}.art-tb{flex-wrap:wrap}.art-ai.open{max-width:100%;overflow-x:auto;scrollbar-width:none}.art-ai .art-mrail{padding:0;border:0;background:transparent;display:inline-flex;align-items:center}.art-ai .art-mrail .audit-providers{padding-right:4px;margin-right:2px}.art-ai .art-mrail .audit-provider{width:26px;height:26px;border-radius:7px}.art-ai .art-mrail .text-ai-chips>button{padding:0 9px;height:26px;border-radius:8px;background:#fff;border:1px solid #e2e8f0;color:#475569;font-weight:800}.art-ai .art-mrail .text-ai-chips>button[aria-pressed="true"]{display:none}' +
             '.art-mrail{padding:6px 8px;border-bottom:1px solid #e2e8f0;background:#fcfcfd}.art-mrail .audit-model-row{margin:0;padding:0;border:0;gap:6px;flex-wrap:nowrap;overflow-x:auto}.art-mrail .audit-providers{flex-wrap:nowrap;gap:4px;padding-right:6px;border-right:1px solid #e2e8f0}.art-mrail .text-ai-chips{display:flex;flex-wrap:nowrap;gap:4px}.art-mrail .text-ai-chips>button[hidden]{display:none!important}.art-mrail .audit-provider{width:30px;height:30px;min-height:0;margin:0;padding:0;border:1px solid transparent;border-radius:8px;background:transparent;box-shadow:none;display:grid;place-items:center;cursor:pointer}.art-mrail .audit-provider[aria-pressed="true"]{background:#eef2ff;border-color:#c7d2fe}.art-mrail .text-ai-chips>button{min-height:0;margin:0;padding:4px 10px;font-size:12px}' +   // V102.341: only the picked vendor's models show (the shared rail marks the rest [hidden]); one line
             '.art-ft .ai{color:#b45309;font-weight:700}' +
@@ -786,8 +790,8 @@
             '<button type="button" class="clp-x" onclick="Articles.clip()" aria-label="Back to the preview" title="Back to the 📱 preview">✕</button></div>' +
             '<div class="clp-phone"><div class="clp-prog">' + ls.map(function (x, i) { return '<i' + (up == null || i <= up ? ' class="on"' : '') + '></i>'; }).join('') + '</div>' +
             (ls.length ? clipChatHtml(ls, up) : '<div class="clp-empty">✨ Script turns this article into a short chat:<br>🙋 asks · 🧑‍⚕️ answers · 💡 the key point</div>') + '<span class="clp-brand">MEDLIFE PLUS</span></div>' +
-            '<div class="clp-ctl">' + (S.clipPlaying ? '<button type="button" class="clp-go" onclick="Articles.clipStop()">■ Stop</button>' : '<button type="button" class="clp-go" onclick="Articles.clipPlay()"' + (ls.length ? '' : ' disabled') + ' title="Plays the chat and reads each line aloud with this computer\'s voice">▶ Play</button>') +
-            '<button type="button" class="clp-ai" onclick="Articles.clipScript()"' + (S.clipBusy ? ' disabled' : '') + ' title="Write the chat from the ' + S.lang.toUpperCase() + ' article with ' + esc(modelName(modelId())) + ' (replaces these lines — check, then save)">' + (S.clipBusy ? '✨ ' + Math.floor((Date.now() - (S.clipT0 || Date.now())) / 1000) + ' s' : ls.length ? '✨ Re-script' : '✨ Script') + '</button></div>' +
+            '<div class="clp-ctl">' + (S.clipPlaying ? '<button type="button" class="clp-go" onclick="Articles.clipStop()">■ Stop</button>' : '<button type="button" class="clp-go" onclick="Articles.clipPlay()"' + (ls.length ? '' : ' disabled') + ' title="' + esc(clipPlayTitle(ls)) + '">▶ Play</button>') +
+            '<button type="button" class="clp-ai" onclick="Articles.clipScript()"' + (S.clipBusy ? ' disabled' : '') + ' title="Write the chat from the ' + S.lang.toUpperCase() + ' article with ' + esc(modelName(modelId())) + ' (replaces these lines — check, then save)">' + (S.clipBusy ? '✨ ' + Math.floor((Date.now() - (S.clipT0 || Date.now())) / 1000) + ' s' : ls.length ? '✨ Re-script' : '✨ Script') + '</button></div>' + (ls.length ? clipChipsHtml() : '') +
             (S.clipErr ? '<div class="art-err" role="alert">⚠️ ' + esc(S.clipErr) + '</div>' : '') +
             '<div class="clp-lines">' + ls.map(function (x, i) {
                 var bad = clipBad(a, x.t), who = CLIP_WHO[x.w] || CLIP_WHO.rx;
@@ -796,29 +800,88 @@
                     (bad.length ? '<span class="clp-bad" title="Not in the article: ' + esc(bad.join(', ')) + ' — check the number">⚠️</span>' : '') +
                     '<button type="button" class="clp-d" onclick="Articles.clipDrop(' + i + ')" aria-label="Remove line ' + (i + 1) + '">✕</button></div>';
             }).join('') + (ls.length < CLIP_MAX ? '<button type="button" class="clp-add" onclick="Articles.clipAdd()">＋ line</button>' : '') + '</div>' +
-            '<div class="clp-note">' + (S.clipVoiceErr ? '<span class="clp-verr">' + esc(S.clipVoiceErr) + '</span><br>' : '') + (clipAiOk() ? '🔊 AI voice (Gemini TTS) · ' : '💻 This computer\'s voice — add a Gemini key for the AI voice · ') + 'kept with the article — 💾 Save draft / 📅 Schedule saves it too</div></div>';
+            '<div class="clp-note">' + (S.clipVoiceErr ? '<span class="clp-verr">' + esc(S.clipVoiceErr) + '</span><br>' : '') + (clipAiOk(S.lang) ? '' : '💻 This computer\'s voice — add a Gemini key for the AI voice · ') + 'kept with the article — 💾 Save draft / 📅 Schedule saves it too</div></div>';
     }
     function clipPaint() { var pv = document.querySelector('#art-body .art-pv'); if (pv) pv.outerHTML = previewHtml(); var sl = document.getElementById('art-stl'); if (sl) sl.outerHTML = statusLine(S.cur, Date.now()); var bt = document.getElementById('art-btns'); if (bt) bt.outerHTML = btnsHtml(S.cur); }
     function clipStopNow() { S.clipPlaying = false; S.clipStep = null; S.clipRun = (S.clipRun || 0) + 1; clearTimeout(S.clipTimer); if (S.clipAu) { try { S.clipAu.pause(); } catch (e) { /* gone */ } S.clipAu = null; } if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch (e) { /* nothing speaking */ } } }
     // V102.626 (owner: "ยังไม่มีเสียงไทย" — Chrome on Windows has no Thai voice): 🔊 the AI voice, Gemini TTS through the Laboon path (same key, same
     // Interactions request), one request per line, cached by language + speaker + text; 🙋 Kore · 🧑‍⚕️ / 💡 Puck. No key or a failed line → this computer's voice.
+    // V102.636 (owner pick C+): a Thai article reads with iApp Chinda through callAIProxy (iapp_tts — the key stays on the server): 🙋 ไข่มุก friendly ·
+    // 🧑‍⚕️ / 💡 ไข่ต้ม calm by default. Two chips under ▶: tap = the next voice of the same family (remembered for this article, and the start of the next
+    // article in that language), hold = hear that side's first line. Chinda fails → Gemini goes on (one line says so) → this computer's voice.
     var CLIP_TTS = 'gemini-3.8-flash-tts', CLIP_VOICE = { q: 'Kore', rx: 'Puck', key: 'Puck' }, CLIP_STYLE = { th: 'Natural Thai, warm and clear, like a short pharmacy chat.', en: 'Warm, clear and conversational.', ko: 'Natural Korean, warm and clear.' };
+    var CHINDA = [['kaimook', 'ไข่มุก'], ['kaitom', 'ไข่ต้ม'], ['kaidang', 'ไข่แดง']], CLIP_GEM = ['Kore', 'Puck', 'Charon', 'Achird'], CHINDA_STYLE = { q: 'friendly', rx: 'calm', key: 'calm' };
     var clipAudio = {};
     function clipKeyOf() { try { return window.GEMINI_API_KEY || localStorage.getItem('ai_gemini_key') || ''; } catch (e) { return window.GEMINI_API_KEY || ''; } }
-    function clipAiOk() { return !!clipKeyOf() && typeof window.laboonGeminiTtsBody === 'function' && typeof window.laboonGeminiTtsAudio === 'function'; }
-    function clipVoice(L, x) {
-        var id = L + '|' + x.w + '|' + x.t; if (clipAudio[id]) return clipAudio[id];
-        var body = window.laboonGeminiTtsBody(CLIP_TTS, x.t, { style: CLIP_STYLE[L] || CLIP_STYLE.en, voice: CLIP_VOICE[x.w] || 'Puck' });
-        var pr = fetch('https://generativelanguage.googleapis.com/v1beta/interactions', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': clipKeyOf() }, body: JSON.stringify(body) })
+    function clipGemOk() { return !!clipKeyOf() && typeof window.laboonGeminiTtsBody === 'function' && typeof window.laboonGeminiTtsAudio === 'function'; }
+    function clipAiOk(L) { return L === 'th' ? typeof window.callTtsProxy === 'function' || clipGemOk() : clipGemOk(); }
+    function clipFam(L) { return L === 'th' ? 'th' : 'gm'; }
+    function clipVoices(L) { return L === 'th' ? CHINDA.map(function (c) { return c[0]; }) : CLIP_GEM; }
+    function clipVoiceName(L, v) { var c = L === 'th' ? CHINDA.filter(function (x) { return x[0] === v; })[0] : null; return c ? c[1] : v; }
+    function clipPicks(L) {
+        var fam = clipFam(L), ok = clipVoices(L), id = (S.cur && S.cur.id) || '';
+        var def = L === 'th' ? { q: 'kaimook', rx: 'kaitom' } : { q: CLIP_VOICE.q, rx: CLIP_VOICE.rx };
+        var read = function (k) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v && ok.indexOf(v.q) >= 0 && ok.indexOf(v.rx) >= 0 ? v : null; } catch (e) { return null; } };
+        return (id && read('clp_v_' + fam + '_' + id)) || read('clp_v_' + fam) || def;
+    }
+    function clipPickSave(L, p) {
+        var fam = clipFam(L), id = (S.cur && S.cur.id) || '';
+        try { if (id) localStorage.setItem('clp_v_' + fam + '_' + id, JSON.stringify(p)); localStorage.setItem('clp_v_' + fam, JSON.stringify(p)); } catch (e) { /* private mode: this session only */ }
+        S.clipPick = S.clipPick || {}; S.clipPick[fam + (id || '')] = p;
+    }
+    function clipPicksNow(L) { var k = clipFam(L) + ((S.cur && S.cur.id) || ''); return (S.clipPick && S.clipPick[k]) || clipPicks(L); }
+    function clipSide(w) { return w === 'q' ? 'q' : 'rx'; }   // 💡 is read by the pharmacist's voice
+    function clipBlobUrl(b64, mime) { var bin = atob(b64), u8 = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); var pay = typeof window.resolveTtsAudioPayload === 'function' ? window.resolveTtsAudioPayload(u8, mime) : { blob: new Blob([u8], { type: mime || 'audio/wav' }) }; return URL.createObjectURL(pay.blob); }
+    function clipGemini(L, x, voice) {
+        var body = window.laboonGeminiTtsBody(CLIP_TTS, x.t, { style: CLIP_STYLE[L] || CLIP_STYLE.en, voice: voice });
+        return fetch('https://generativelanguage.googleapis.com/v1beta/interactions', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': clipKeyOf() }, body: JSON.stringify(body) })
             .then(function (r) { return r.json().then(function (d) {
                 if (!r.ok) throw new Error((d && d.error && d.error.message) || 'Gemini ' + r.status);
                 var a = window.laboonGeminiTtsAudio(d); if (!a) throw new Error('no audio came back');
-                var bin = atob(a.data), u8 = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-                var pay = typeof window.resolveTtsAudioPayload === 'function' ? window.resolveTtsAudioPayload(u8, a.mimeType) : { blob: new Blob([u8], { type: a.mimeType || 'audio/wav' }) };
-                return URL.createObjectURL(pay.blob);
+                return clipBlobUrl(a.data, a.mimeType);
             }); });
+    }
+    function clipChinda(x, voice) {
+        if (typeof window.callTtsProxy !== 'function') return Promise.reject(new Error('the AI proxy is not loaded'));
+        return window.callTtsProxy({ provider: 'iapp_tts', text: x.t, voice: voice, style: CHINDA_STYLE[x.w] || 'calm', feature: 'article_clip_voice' })
+            .then(function (r) { if (!r || !r.audioContent) throw new Error('no audio came back'); return clipBlobUrl(r.audioContent, r.mimeType || 'audio/mpeg'); });
+    }
+    function clipVoice(L, x) {
+        var v = clipPicksNow(L)[clipSide(x.w)], id = L + '|' + v + '|' + x.w + '|' + x.t; if (clipAudio[id]) return clipAudio[id];
+        var pr = L !== 'th' ? (clipGemOk() ? clipGemini(L, x, v) : Promise.reject(new Error('no Gemini key')))
+            : clipChinda(x, v).catch(function (e) {
+                if (!clipGemOk()) throw e;
+                S.clipVoiceErr = '🔊 Thai voice failed — Gemini instead';
+                return clipGemini(L, x, CLIP_VOICE[x.w] || 'Puck');
+            });
         clipAudio[id] = pr; pr.catch(function () { delete clipAudio[id]; });
         return pr;
+    }
+    // ▶'s hover: what the Thai voice costs (Chinda bills each request rounded up per 100 characters)
+    function clipPlayTitle(ls) {
+        if (S.lang !== 'th' || !ls.length) return 'Plays the chat and reads each line aloud';
+        var n = 0, ic = 0; ls.forEach(function (x) { var k = x.t.trim().length; if (k) { n += k; ic += Math.ceil(k / 100) * 0.02; } });
+        return 'Plays the chat in the Thai voice · ≈ ' + ic.toFixed(2) + ' IC · ' + n + ' characters';
+    }
+    function clipChipsHtml() {
+        var L = S.lang, fam = clipFam(L), p = clipPicksNow(L), ls = clipLines(S.cur).filter(function (x) { return x.t.trim(); });
+        var now = S.clipHear || (S.clipPlaying && S.clipStep != null && ls[S.clipStep] ? clipSide(ls[S.clipStep].w) : '');
+        return '<div class="clp-vr">' + ['q', 'rx'].map(function (w) {
+            return '<button type="button" class="clp-vc ' + fam + (now === w ? ' talk' : '') + '" data-w="' + w + '" onpointerdown="Articles.clipVoiceDown(\'' + w + '\')" onclick="Articles.clipVoiceTap(\'' + w + '\')"' +
+                ' title="' + (w === 'q' ? '🙋 Asks' : '🧑‍⚕️ Pharmacist + 💡') + ' · tap = next voice · hold = hear it">' + CLIP_WHO[w][0] + ' ' + esc(clipVoiceName(L, p[w])) + '</button>';
+        }).join('') + '</div>';
+    }
+    // hold a chip ≈ 0.8 s → that side's first line in its voice (the clip itself does not start)
+    function clipHear(w) {
+        var L = S.lang, x = clipLines(S.cur).filter(function (y) { return y.t.trim() && clipSide(y.w) === w; })[0];
+        if (!x) return;
+        clipStopNow(); S.clipHear = w; S.clipVoiceErr = ''; clipPaint();
+        var run = S.clipRun, done = function () { if (S.clipRun === run && S.clipHear === w) { S.clipHear = ''; clipPaint(); } };
+        clipVoice(L, x).then(function (url) {
+            if (S.clipRun !== run) return;
+            var au = S.clipAu = new Audio(url); au.onended = done; au.onerror = done;
+            var pl = au.play(); if (pl && pl.catch) pl.catch(done);
+        }).catch(function (e) { if (S.clipRun !== run) return; S.clipVoiceErr = '🔊 ' + (e && e.message || e); done(); });
     }
     function clipPrompt(a, L) {
         var NAME = { en: 'English', th: 'Thai', ko: 'Korean' }, t = (a.title || {})[L] || a.title.en || '', b = (a.body || {})[L] || a.body.en || '';
@@ -1437,8 +1500,8 @@
         },
         clipPlay: function () {
             var ls = clipLines(S.cur).filter(function (x) { return x.t.trim(); }); if (!ls.length) return;
-            clipStopNow(); S.clipPlaying = true; S.clipStep = 0; S.clipVoiceErr = '';
-            var L = S.lang, ai = clipAiOk(), runId = S.clipRun;
+            clipStopNow(); S.clipHear = ''; S.clipPlaying = true; S.clipStep = 0; S.clipVoiceErr = '';
+            var L = S.lang, ai = clipAiOk(L), runId = S.clipRun;
             if (ai) ls.forEach(function (x) { clipVoice(L, x).catch(function () { /* that line falls back */ }); });   // every line at once: line 1 starts as soon as it is back
             clipPaint();
             var synth = window.speechSynthesis, BCP = { en: 'en-US', th: 'th-TH', ko: 'ko-KR' }[L] || 'en-US', run = function (i) {
@@ -1465,7 +1528,22 @@
             };
             run(0);
         },
-        clipStop: function () { clipStopNow(); clipPaint(); },
+        clipStop: function () { clipStopNow(); S.clipHear = ''; clipPaint(); },
+        // V102.636: voice chips — tap = next voice of the family; hold = hear (a hold swallows the click that follows it)
+        clipVoiceDown: function (w) {
+            clearTimeout(S.clipHoldT);
+            var up = function () { clearTimeout(S.clipHoldT); document.removeEventListener('pointerup', up, true); document.removeEventListener('pointercancel', up, true); };
+            document.addEventListener('pointerup', up, true); document.addEventListener('pointercancel', up, true);
+            S.clipHoldT = setTimeout(function () { S.clipHeldAt = Date.now(); clipHear(w); }, 800);
+        },
+        clipVoiceTap: function (w) {
+            if (S.clipHeldAt && Date.now() - S.clipHeldAt < 1500) { S.clipHeldAt = 0; return; }
+            var L = S.lang, list = clipVoices(L), p = Object.assign({}, clipPicksNow(L));
+            p[w] = list[(list.indexOf(p[w]) + 1) % list.length];
+            clipPickSave(L, p);
+            if (S.clipPlaying || S.clipHear) { clipStopNow(); S.clipHear = ''; }
+            clipPaint();
+        },
         tagOpen: function () { S.tagOpen = true; render(); var el = document.getElementById('art-tag-in'); if (el) el.focus(); },
         // V102.374: the hint after Save
         hintLink: function () { var a = S.cur, h = S.hint; if (!a || !h) return; S.hint = null; a.links.push({ kind: 'disease', id: h.id, label: h.label }); save(a.status === 'scheduled'); },
