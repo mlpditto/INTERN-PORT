@@ -4,11 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.639)</title>
+    <title>Nika Admin (V102.640)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
-    <link rel="stylesheet" href="drug-list-ui.css?v=V102.637">
+    <link rel="stylesheet" href="drug-list-ui.css?v=V102.640">
     <link rel="stylesheet" href="mypath-ui.css?v=V102.143">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -51853,7 +51853,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             bar.innerHTML = (n ? `<span>☑ ${n} drug${n === 1 ? '' : 's'} selected</span><span class="dca-batch-sub">model: ${dcaEscapeHtml(dcaBatchModelLabel())} · ${n} AI call${n === 1 ? '' : 's'}</span>` : `<span>✓ ${ready} draft${ready === 1 ? '' : 's'} ready to review</span>`)
                 + '<span style="flex:1"></span>'
                 + (n ? '<button type="button" class="ghost" onclick="dcaBatchSelect(\'clear\')">Clear</button>' : '')
-                + (ready ? `<button type="button" class="${n ? 'ghost' : 'go'}" onclick="dcaBatchReviewNext()">Review next (${ready})</button>` : '')
+                + (ready ? `<button type="button" class="${n ? 'ghost' : 'go'}" onclick="dcaSheetOpen()" title="Review the AI drafts together — ⚡ short fields in one table · 🩺 clinical fields checked by AI Review + Jev">📋 Review ${ready}</button><button type="button" class="ghost" onclick="dcaBatchReviewNext()" title="Open the next one in the full form">One by one</button>` : '')
                 + (n ? `<button type="button" class="go" onclick="dcaBatchRun()">🤖 Draft ${n} selected</button>` : '');
         }
         function dcaBatchRenderHint() {
@@ -51988,6 +51988,171 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (typeof showToast === 'function') showToast(`🤖 "${drug.genericName}": ${filled.length} empty field${filled.length === 1 ? '' : 's'} filled by ${r.model}. Verify, then Save.`);
             const edu = (r.edu || []).filter(k => filled.includes(k));
             if (edu.length) dcaTranslateEducationI18n({ fields: edu, silent: false }).catch(err => console.warn('[drug-codex] batch Edu i18n translate failed:', err && err.message));
+        }
+        // V102.640 (owner pick 2, mockup-codex-batch-review): review many AI drafts in ONE sheet, two tabs.
+        //   ⚡ Short fields — ATC · Class · Brands the AI proposed for the drugs that had them empty: one table, all ticked (an ATC that is not
+        //      letter-2 digits-2 letters-2 digits comes unticked and amber), each cell editable; "Save n ticked" writes only those fields.
+        //   🩺 Clinical — the other fields: 🔍 runs AI Review (a model from another provider than the drafter) + Jev on every drug, 2 at a time;
+        //      clean ones (no safety / factual / consistency finding, Jev ok) come ticked; "Save n ticked" writes their fields; ⚠ opens the full form.
+        // Only fields that are still EMPTY on the drug are written; every drug saved here keeps aiDrafted (interns see 🤖 AI-drafted · verify)
+        // until the admin opens and saves it once. Nothing is written without a tap.
+        const DCA_SHORT = ['atcCode', 'class', 'brandNames'];
+        const DCA_ATC_OK = /^[A-Z]\d{2}[A-Z]{2}\d{2}$/;
+        const dcaSheet = { tab: 'short', tick: {}, edit: {}, check: {}, ctick: {}, running: false };
+        function dcaIsEmpty(drug, key) { const cur = drug[key]; return DCA_ARRAY_FIELDS[key] ? !(Array.isArray(cur) && cur.filter(Boolean).length) : !String(cur == null ? '' : cur).trim(); }
+        function dcaSheetReady() { return Object.keys(dcaBatch.results).filter(id => dcaBatch.status[id] === 'ok' && dcaState.codex.some(d => d._id === id)); }
+        // what this draft would still write: { key: value } for the fields that are empty on the drug
+        function dcaSheetFill(id, keys) {
+            const r = dcaBatch.results[id], drug = dcaState.codex.find(d => d._id === id), out = {};
+            if (!r || !drug) return out;
+            Object.keys(r.fill).filter(k => !keys || keys.includes(k)).forEach(k => { if (dcaIsEmpty(drug, k)) out[k] = r.fill[k]; });
+            return out;
+        }
+        function dcaSheetShortRows() { return dcaSheetReady().map(id => ({ id, fill: dcaSheetFill(id, DCA_SHORT) })).filter(x => Object.keys(x.fill).length); }
+        function dcaSheetClinRows() { return dcaSheetReady().map(id => ({ id, fill: dcaSheetFill(id, Object.keys((dcaBatch.results[id] || {}).fill || {}).filter(k => !DCA_SHORT.includes(k))) })).filter(x => Object.keys(x.fill).length); }
+        function dcaSheetVal(id, k) { const e = (dcaSheet.edit[id] || {})[k]; return e != null ? e : (DCA_ARRAY_FIELDS[k] ? [].concat(dcaSheetFill(id, [k])[k] || []).join(', ') : String(dcaSheetFill(id, [k])[k] || '')); }
+        function dcaSheetOpen(tab) {
+            let m = document.getElementById('dca-sheet');
+            if (!m) {
+                m = document.createElement('div'); m.id = 'dca-sheet'; m.className = 'dca-rs-wrap lang-no-toggle';
+                m.addEventListener('click', e => { if (e.target === m) dcaSheetClose(); });
+                document.body.appendChild(m);
+            }
+            dcaSheetShortRows().forEach(x => { if (dcaSheet.tick[x.id] == null) dcaSheet.tick[x.id] = !x.fill.atcCode || DCA_ATC_OK.test(String(x.fill.atcCode).trim()); });
+            dcaSheet.tab = tab || (dcaSheetShortRows().length ? 'short' : 'clin');
+            m.hidden = false; dcaSheetRender();
+        }
+        function dcaSheetClose() { const m = document.getElementById('dca-sheet'); if (m) m.hidden = true; }
+        function dcaSheetTab(t) { dcaSheet.tab = t; dcaSheetRender(); }
+        function dcaSheetRender() {
+            const m = document.getElementById('dca-sheet'); if (!m || m.hidden) return;
+            const name = id => dcaEscapeHtml(((dcaState.codex.find(d => d._id === id) || {}).genericName) || id);
+            const sr = dcaSheetShortRows(), cr = dcaSheetClinRows();
+            const tabs = `<div class="dca-rs-tabs"><button type="button" class="${dcaSheet.tab === 'short' ? 'on' : ''}" onclick="dcaSheetTab('short')">⚡ Short fields ${sr.length}</button><button type="button" class="${dcaSheet.tab === 'clin' ? 'on' : ''}" onclick="dcaSheetTab('clin')">🩺 Clinical ${cr.length}</button><span style="flex:1"></span><button type="button" class="x" onclick="dcaSheetClose()" aria-label="Close">✕</button></div>`;
+            let body;
+            if (dcaSheet.tab === 'short') {
+                const cell = (id, k, fill) => {
+                    if (!(k in fill)) return '<td class="dim">—</td>';
+                    const v = dcaSheetVal(id, k), bad = k === 'atcCode' && !DCA_ATC_OK.test(String(v).trim());
+                    return `<td><input type="text" class="${bad ? 'bad' : ''}" value="${dcaEscapeHtml(v)}" aria-label="${k} for ${name(id)}" title="${bad ? 'Not the usual ATC shape (A10BA02) — check it' : 'Edit before saving'}" onchange="dcaSheetEdit('${dcaEscapeHtml(id)}','${k}',this.value)"></td>`;
+                };
+                const n = sr.filter(x => dcaSheet.tick[x.id]).length;
+                body = sr.length ? `<div class="dca-rs-tw"><table class="dca-rs-t"><tr><th></th><th>Drug</th><th>ATC</th><th>Class</th><th>Brands</th></tr>${sr.map(x => `<tr class="${dcaSheet.tick[x.id] ? '' : 'off'}"><td><input type="checkbox" ${dcaSheet.tick[x.id] ? 'checked' : ''} onchange="dcaSheetTick('${dcaEscapeHtml(x.id)}',this.checked)" aria-label="Save ${name(x.id)}"></td><td class="nm">${name(x.id)}</td>${cell(x.id, 'atcCode', x.fill)}${cell(x.id, 'class', x.fill)}${cell(x.id, 'brandNames', x.fill)}</tr>`).join('')}</table></div>`
+                    + `<div class="dca-rs-foot"><span class="dim">Only empty fields are written · the drug keeps 🤖 AI-drafted until you open it</span><span style="flex:1"></span><button type="button" class="go" ${n ? '' : 'disabled'} onclick="dcaSheetSaveShort()">✓ Save ${n} ticked</button></div>`
+                    : '<div class="dca-rs-empty">No short fields left to review.</div>';
+            } else {
+                const st = id => dcaSheet.check[id] || { s: 'none' };
+                const pill = id => { const c = st(id); return c.s === 'run' ? '<span class="dca-rs-p">⏳</span>' : c.s === 'ok' ? '<span class="dca-rs-p ok">✓ clean</span>' : c.s === 'warn' ? `<button type="button" class="dca-rs-p bad" onclick="dcaSheetOpenOne('${dcaEscapeHtml(id)}')" title="${dcaEscapeHtml(c.note || '')} — open the full form">⚠ ${c.n}</button>` : c.s === 'err' ? `<span class="dca-rs-p" title="${dcaEscapeHtml(c.note || '')}">— not checked</span>` : '<span class="dca-rs-p dim">not checked</span>'; };
+                const n = cr.filter(x => dcaSheet.ctick[x.id] && st(x.id).s === 'ok').length, todo = cr.filter(x => ['none', 'err'].includes(st(x.id).s)).length;
+                body = cr.length ? `<div class="dca-rs-list">${cr.map(x => `<div class="dca-rs-row">${st(x.id).s === 'ok' ? `<input type="checkbox" ${dcaSheet.ctick[x.id] ? 'checked' : ''} onchange="dcaSheetCTick('${dcaEscapeHtml(x.id)}',this.checked)" aria-label="Save ${name(x.id)}">` : '<span class="sp16"></span>'}<span class="nm">${name(x.id)}</span><span class="dim">${Object.keys(x.fill).length} fields</span>${pill(x.id)}${st(x.id).s === 'ok' && st(x.id).note ? `<span class="dim" title="${dcaEscapeHtml(st(x.id).note)}">💡</span>` : ''}</div>`).join('')}</div>`
+                    + `<div class="dca-rs-foot">${todo ? `<button type="button" class="chk" ${dcaSheet.running ? 'disabled' : ''} onclick="dcaSheetCheckAll()" title="AI Review (another provider than the drafter) + Jev for each — ${todo} + ${todo} calls">${dcaSheet.running ? '⏳ Checking…' : '🔍 Check ' + todo}</button>` : ''}<span class="dim">Clean = no safety / factual / consistency finding and Jev ok · advice, not live sources</span><span style="flex:1"></span><button type="button" class="go" ${n ? '' : 'disabled'} onclick="dcaSheetSaveClin()">✓ Save ${n} ticked</button></div>`
+                    : '<div class="dca-rs-empty">No clinical fields left to review.</div>';
+            }
+            m.innerHTML = `<div class="dca-rs">${tabs}${body}</div>`;
+        }
+        function dcaSheetTick(id, on) { dcaSheet.tick[id] = !!on; dcaSheetRender(); }
+        function dcaSheetCTick(id, on) { dcaSheet.ctick[id] = !!on; dcaSheetRender(); }
+        function dcaSheetEdit(id, k, v) { (dcaSheet.edit[id] = dcaSheet.edit[id] || {})[k] = String(v); dcaSheetRender(); }
+        function dcaSheetOpenOne(id) { dcaSheetClose(); dcaBatchReview(id); }
+        // write fields to one drug; only keys still empty on the drug; keeps aiDrafted; drops them from the stored draft
+        function dcaSheetWrite(batch, id, fields) {
+            const drug = dcaState.codex.find(d => d._id === id), r = dcaBatch.results[id];
+            if (!drug || !r) return 0;
+            const payload = {};
+            Object.keys(fields).forEach(k => {
+                if (!dcaIsEmpty(drug, k)) return;
+                let v = fields[k];
+                if (DCA_ARRAY_FIELDS[k]) v = (Array.isArray(v) ? v : String(v).split(',')).map(x => String(x).trim()).filter(Boolean);
+                else v = String(v == null ? '' : v).trim();
+                if (DCA_ARRAY_FIELDS[k] ? !v.length : !v) return;
+                payload[k] = v;
+                if (DCA_EDU_I18N_FIELDS.includes(k)) payload['educationI18n.' + k + '.' + DCA_EDU_I18N_PRIMARY[k]] = v;   // the field's primary language, like a form save
+            });
+            if (!Object.keys(payload).length) return 0;
+            const email = (auth.currentUser && auth.currentUser.email) || 'admin-ui';
+            Object.assign(payload, { aiDrafted: true, aiDraftedModel: r.model || '', updatedAt: firebase.firestore.FieldValue.serverTimestamp(), contributors: firebase.firestore.FieldValue.arrayUnion('admin:' + email) });
+            batch.update(db.collection('drug_codex').doc(id), payload);
+            return Object.keys(fields).length;
+        }
+        function dcaSheetAfter(ids, keysOf) {
+            ids.forEach(id => {
+                const r = dcaBatch.results[id]; if (!r) return;
+                keysOf(id).forEach(k => { delete r.fill[k]; });
+                delete dcaSheet.edit[id];
+                if (!Object.keys(r.fill).length) dcaBatchDone(id);
+            });
+            dcaBatchSave(); dcaBatchRenderBar(); dcaRenderPublishedList(); dcaSheetRender();
+        }
+        async function dcaSheetSaveShort() {
+            const rows = dcaSheetShortRows().filter(x => dcaSheet.tick[x.id]);
+            if (!rows.length) return;
+            const batch = db.batch(), done = [];
+            rows.forEach(x => { const f = {}; Object.keys(x.fill).forEach(k => { f[k] = dcaSheetVal(x.id, k); }); if (dcaSheetWrite(batch, x.id, f)) done.push(x); });
+            try { await batch.commit(); } catch (e) { console.error('[drug-codex] sheet save', e); showToast('Not saved: ' + ((e && e.message) || e)); return; }
+            dcaSheetAfter(done.map(x => x.id), id => DCA_SHORT);
+            showToast(`✓ ATC · Class · Brands saved for ${done.length} drug${done.length === 1 ? '' : 's'} · 🤖 AI-drafted until you open them`);
+        }
+        async function dcaSheetSaveClin() {
+            const rows = dcaSheetClinRows().filter(x => dcaSheet.ctick[x.id] && (dcaSheet.check[x.id] || {}).s === 'ok');
+            if (!rows.length) return;
+            const batch = db.batch(), done = [];
+            rows.forEach(x => { if (dcaSheetWrite(batch, x.id, x.fill)) done.push(x); });
+            try { await batch.commit(); } catch (e) { console.error('[drug-codex] sheet save', e); showToast('Not saved: ' + ((e && e.message) || e)); return; }
+            dcaSheetAfter(done.map(x => x.id), id => Object.keys(dcaSheetFill(id)).filter(k => !DCA_SHORT.includes(k)).concat(Object.keys((dcaBatch.results[id] || {}).fill || {}).filter(k => !DCA_SHORT.includes(k))));
+            showToast(`✓ ${done.length} checked drug${done.length === 1 ? '' : 's'} saved · 🤖 AI-drafted until you open them`);
+        }
+        // a model from another provider than the one that drafted
+        function dcaSheetOtherModel(fillModel) {
+            const ms = Array.isArray(window.TEXT_AI_MODELS) ? window.TEXT_AI_MODELS : [];
+            const bare = id => String(id || '').replace(/^(as|or)\//, '');
+            const prov = id => { const m = ms.find(x => x.id === id || bare(x.id) === bare(id)); return m ? String(m.label).split(' ')[0] : bare(id).split(/[-/]/)[0]; };
+            const pick = ms.find(m => prov(m.id) !== prov(fillModel));
+            return (pick && pick.id) || (window.dcaSelectedToolbarModel && dcaSelectedToolbarModel()) || DCA_AI_FALLBACK_MODEL;
+        }
+        // one drug: AI Review (headless — same prompt as the form's 🔍) + Jev on the drug as it would be after saving
+        async function dcaSheetCheckOne(id) {
+            const drug = dcaState.codex.find(d => d._id === id), r = dcaBatch.results[id];
+            if (!drug || !r) return;
+            dcaSheet.check[id] = { s: 'run' }; dcaSheetRender();
+            const cur = Object.assign({}, drug, dcaSheetFill(id));
+            const filledLines = [], sections = {};
+            let total = 0;
+            DCA_SECTION_DEFS.forEach(def => {
+                const parts = [];
+                def.fields.forEach(key => {
+                    if (key === 'genericName') return; total++;
+                    const v = cur[key], text = DCA_ARRAY_FIELDS[key] ? (Array.isArray(v) ? v.filter(Boolean).join(', ') : '') : String(v == null ? '' : v).trim();
+                    if (!text) return;
+                    filledLines.push(`- [${DCA_SECTION_TITLES[def.key] || def.key}] ${DCA_FIELD_LABELS[key] || key} (key=${key}): ${text}`);
+                    parts.push((DCA_FIELD_LABELS[key] || key) + ': ' + text);
+                });
+                if (parts.length) sections[def.key] = parts.join('\n').slice(0, 2000);
+            });
+            const model = dcaSheetOtherModel(r.model);
+            const app = window.adminApp || (window.firebase && firebase.app && firebase.app('admin'));
+            const [rv, jv] = await Promise.allSettled([
+                window.callUniversalAI(model, dcaBuildReviewPrompt(cur, filledLines, '', { filled: filledLines.length, total }), true, null, '', { maxOutputTokens: 32768, feature: 'ai_review_batch' })
+                    .then(resp => { const parsed = dcaParseAutoDraftResponse((resp && resp.text) || ''); if (!parsed) throw new Error('AI Review returned no JSON'); return (Array.isArray(parsed.findings) ? parsed.findings : []).filter(f => f && f.issue && dcaSectionOfField(String(f.field || ''))); }),
+                app.functions().httpsCallable('jevCheckDrug')({ name: cur.genericName, sections, langs: {} }).then(x => x.data)
+            ]);
+            const findings = rv.status === 'fulfilled' ? rv.value : null, j = jv.status === 'fulfilled' && jv.value && jv.value.enabled !== false ? jv.value : null;
+            if (!findings) { dcaSheet.check[id] = { s: 'err', note: (rv.reason && rv.reason.message) || 'AI Review failed' }; dcaSheetRender(); return; }
+            const block = findings.filter(f => ['safety', 'factual', 'consistency'].includes(String(f.severity || '').toLowerCase()));
+            const jevBad = j ? Object.keys(j.sections || {}).filter(k => ['bad', 'look'].includes(j.sections[k].verdict)) : [];
+            const n = block.length + jevBad.length;
+            dcaSheet.check[id] = n ? { s: 'warn', n, note: block.map(f => f.issue).concat(jevBad.map(k => '🧠 Jev: ' + k + ' may be about another drug')).join(' · ') }
+                : { s: 'ok', note: findings.length ? findings.map(f => f.issue).join(' · ') : '' };
+            if (!n) dcaSheet.ctick[id] = true;
+            dcaSheetRender();
+        }
+        async function dcaSheetCheckAll() {
+            if (dcaSheet.running) return;
+            const ids = dcaSheetClinRows().map(x => x.id).filter(id => ['none', 'err', undefined].includes((dcaSheet.check[id] || {}).s));
+            if (!ids.length || typeof window.callUniversalAI !== 'function') return;
+            dcaSheet.running = true; dcaSheetRender();
+            const q = ids.slice(), worker = async () => { while (q.length) await dcaSheetCheckOne(q.shift()); };
+            await Promise.all([worker(), worker()]);
+            dcaSheet.running = false; dcaSheetRender();
         }
         // called after the reviewed drug is saved
         function dcaBatchDone(id) {

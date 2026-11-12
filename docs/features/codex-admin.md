@@ -15,6 +15,7 @@ Admin: Dashboard ▸ Drug Codex / Disease Codex.
 - `drug-codex-incomplete-view-qa` — Incomplete view: < 90 % only, chip rail narrows
 - `drug-autodraft-chip-qa` — 🤖 AI Auto-Draft panel as one line
 - `drug-codex-batch-qa` — multi-select AI draft never writes; a throwing fake Firestore
+- `drug-codex-review-sheet-qa` — V102.640 owner pick 2 (mockup-codex-batch-review): after 🤖 batch drafts, 📋 Review n opens one sheet — ⚡ Short fields (ATC / Class / Brands for drugs that had them empty, ticked, bad ATC shape unticked + amber, editable, one batch write) and 🩺 Clinical (🔍 AI Review on another provider + Jev per drug, 2 at a time; clean = no safety / factual / consistency finding + Jev ok, ticked; ⚠ n opens the full form); only empty fields are written, aiDrafted kept; "One by one" keeps the old path
 - `drug-codex-files-qa` — 📎 download files on both sides
 - `bronchodilator-seed-qa` — inhaled bronchodilators → pending drafts, names only
 - `peds-dosing-qa` — peds-dosing.js data, calculator, intern markup, admin import
