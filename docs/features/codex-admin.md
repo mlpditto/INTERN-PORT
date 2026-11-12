@@ -18,6 +18,7 @@ Admin: Dashboard ▸ Drug Codex / Disease Codex.
 - `drug-codex-files-qa` — 📎 download files on both sides
 - `bronchodilator-seed-qa` — inhaled bronchodilators → pending drafts, names only
 - `peds-dosing-qa` — peds-dosing.js data, calculator, intern markup, admin import
+- `drug-codex-lean-b-qa` — V102.637 owner pick B (mockup-codex-lean): one line per drug (name + thin % bar · ATC / Cls / Brd dots — ○ = add at that field · 🤖 ✏️ ⋯ with who / when / 📰 inside), column heads filter in Incomplete first (ATC / Class / Brands chips gone), no avg line, 👶 / 🫁 imports under 📥, drafts grouped by source (note once, % per row, ✓ Approve amber + "⚠️ Only n% filled" under 80 %, no "new entry")
 
 ## What usually lies
 

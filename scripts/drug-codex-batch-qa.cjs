@@ -42,7 +42,9 @@ const page = `<style>${css}.dca-row{display:grid;grid-template-columns:1fr auto;
             var dcaState = { codex: [], sortMode: 'completeness' };
             function dcaSyncAutoDraftChipFromStorage() {}
             function dcaEscapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-            function dcaCompletenessScore(d) { return { pct: d.__pct }; }
+            function dcaCompletenessScore(d) { return { pct: d.__pct, sections: {} }; }
+            function dcaCompletenessColor() { return { bg: '#eee', fg: '#000', bd: '#ccc' }; }   // V102.637: the row draws a thin % bar
+            var DCA_SECTION_DEFS = [], DCA_SECTION_LABELS = {};
             function dcaMatBtnHtml() { return ''; }   // V102.129: the row template now asks for the 📎 chip
             function dcaCompleteChipHtml(d) { return '<span class="dca-row-complete">' + d.__pct + '%</span>'; }
             function dcaListContribChipsHtml() { return ''; }

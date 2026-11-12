@@ -4,11 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.636)</title>
+    <title>Nika Admin (V102.637)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
-    <link rel="stylesheet" href="drug-list-ui.css?v=V102.328">
+    <link rel="stylesheet" href="drug-list-ui.css?v=V102.637">
     <link rel="stylesheet" href="mypath-ui.css?v=V102.143">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -17016,8 +17016,13 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                 <div class="dca-toolbar">
                     <input type="text" id="dca-search" placeholder="Search by name, brand, or ATC code…" oninput="dcaSearch()">
                     <button type="button" class="dca-ai-draft-btn" onclick="dcaAutoDraftToggle()" title="Generate a starting draft with AI · admin verifies before save">🤖 AI Auto-Draft</button>
-                    <button type="button" class="dca-ai-draft-btn" onclick="dcaPedsImportOpen()" title="Import the paediatric oral dosing list (76 drugs) — shows a preview first, nothing is written until you confirm">👶 Peds import</button>
-                    <button type="button" class="dca-ai-draft-btn" onclick="dcaBronchImportOpen()" title="Import inhaled bronchodilators (generic + brand NAMES only) as pending drafts — preview first, credit to the MED Library guide (CC BY-NC-SA 4.0)">🫁 Bronchodilator drafts</button>
+                    <!-- V102.637 (owner pick B): the one-time imports sit under 📥 instead of on the toolbar line -->
+                    <details class="dca-import"><summary title="Import — preview first, nothing is written until you confirm" aria-label="Import">📥</summary>
+                        <div class="dca-import-menu">
+                            <button type="button" class="dca-ai-draft-btn" onclick="dcaPedsImportOpen()" title="Import the paediatric oral dosing list (76 drugs) — shows a preview first, nothing is written until you confirm">👶 Peds import</button>
+                            <button type="button" class="dca-ai-draft-btn" onclick="dcaBronchImportOpen()" title="Import inhaled bronchodilators (generic + brand NAMES only) as pending drafts — preview first, credit to the MED Library guide (CC BY-NC-SA 4.0)">🫁 Bronchodilator drafts</button>
+                        </div>
+                    </details>
                     <button type="button" class="dca-add-btn" onclick="dcaAddNew()">+ Add Drug</button>
                 </div>
 
@@ -48707,7 +48712,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     const pcts = dcaState.codex.map(d => dcaCompletenessScore(d).pct);
                     const avg = Math.round(pcts.reduce((a, b) => a + b, 0) / n);
                     const incomplete = pcts.filter(p => p < 90).length;
-                    summary.textContent = ` · avg ${avg}%` + (incomplete ? ` · ${incomplete} incomplete` : '');
+                    summary.textContent = '';   // V102.637 (owner pick B): numbers once — the chips / column heads carry the counts
+                    summary.title = `avg ${avg}% · ${incomplete} under 90%`;
                 }
             }
             const badge = document.getElementById('dca-drafts-badge');
@@ -48738,7 +48744,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             peds:   { label: '👶 From Peds import', th: 'มาจากการนำเข้ายาเด็ก', kr: '소아 용량 가져오기에서', test: d => d.importSource === 'peds-dosing' },
         };
         function dcaIncRailHtml(inc) {
-            const chips = Object.keys(DCA_INC_FILTERS).map(k => {
+            const chips = Object.keys(DCA_INC_FILTERS).filter(k => !['atc', 'cls', 'brands'].includes(k)).map(k => {   // V102.637: ATC / Class / Brands = the column heads
                 const f = DCA_INC_FILTERS[k], n = inc.filter(f.test).length;
                 if (!n) return '';
                 return `<button type="button" class="dca-inc-chip${dcaState.incFilter === k ? ' on' : ''}" onclick="dcaSetIncFilter('${k}')" aria-pressed="${dcaState.incFilter === k}" title="Show only: ${f.label} · ${f.th} · ${f.kr}">${f.label} <b>${n}</b></button>`;
@@ -48861,51 +48867,54 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         function dcaPublishedRowHtml(drug) {
-            // V102.136: three FIXED tiers so every row is the same height — ① name + completeness ② ATC + class ③ up to two brands (+N) · actions.
-            // A missing value shows a faint placeholder instead of vanishing; Edit + ⋯ replace the four buttons (the rest live in the ⋯ menu).
+            // V102.637 (owner pick B, mockup-codex-lean): ONE line per drug — name + a thin completeness bar under it · ATC / Class / Brands as dots
+            // (● has it — the value in the hover · ○ missing — tap = open the form at that field) · 🤖 (under 90 %) ✏️ ⋯. Who / when / 📰 live in ⋯.
             const id = dcaEscapeHtml(drug._id), name = dcaEscapeHtml(drug.genericName);
             const brands = (Array.isArray(drug.brandNames) ? drug.brandNames : []).filter(Boolean);
-            const brandChips = brands.slice(0, 2).map(b => `<span class="dca-br">${dcaEscapeHtml(b)}</span>`).join('')
-                + (brands.length > 2 ? `<span class="dca-br dca-br-more" title="${dcaEscapeHtml(brands.slice(2).join(', '))}">+${brands.length - 2}</span>` : '');
+            const s = dcaCompletenessScore(drug), col = dcaCompletenessColor(s.pct);
+            const missing = DCA_SECTION_DEFS.filter(def => s.sections[def.key].filled < s.sections[def.key].total).map(def => DCA_SECTION_LABELS[def.key] || def.key);
+            const tip = `${s.pct}% · ${s.filled}/${s.total} fields` + (missing.length ? ` · missing: ${missing.join(', ')}` : '');
+            const dot = (field, label, val) => val
+                ? `<span class="dca-dot on" title="${label}: ${dcaEscapeHtml(val)}" aria-label="${label}: ${dcaEscapeHtml(val)}"></span>`
+                : `<button type="button" class="dca-dot dca-add" onclick="dcaEditAt('${id}','${field}')" title="＋ ${label} — opens this drug at that field · เพิ่ม ${label} · ${label} 추가" aria-label="Add ${label}"></button>`;
             const updatedAbs = dcaFormatAbsolute(drug.updatedAt || drug.createdAt);
-            // V102.327: an empty tier is a ＋ button that opens the form at that field; 🤖 (AI fill empty fields) while the drug is under 90 %.
-            const addBtn = (field, label, cls) => `<button type="button" class="${cls} dca-ph dca-add" onclick="dcaEditAt('${id}','${field}')" title="Add ${label} — opens this drug at that field · เพิ่ม ${label} · ${label} 추가">＋ ${label}</button>`;
-            const lowPct = dcaCompletenessScore(drug).pct < 90;
+            const lowPct = s.pct < 90;
             return `
                         <div class="dca-row${dcaBatch.sel.has(drug._id) ? ' dca-on' : ''}" data-id="${id}">
                             <input type="checkbox" class="dca-pick" title="Select for AI draft" ${dcaBatch.sel.has(drug._id) ? 'checked' : ''} ${dcaBatch.running ? 'disabled' : ''} onclick="dcaBatchToggle('${dcaEscapeHtml(drug._id)}', this)">
                             <div class="dca-row-main">
                                 <div class="dca-t1">
-                                    <div class="dca-row-name">${name}</div>
+                                    <div class="dca-row-name" title="${dcaEscapeHtml(tip)}">${name}</div>
                                     ${drug.aiDrafted ? '<span class="dca-ai-badge" title="AI-drafted · verify before relying on it">🤖</span>' : ''}
-                                    <div class="dca-row-side-top">${dcaBatchChipHtml(drug._id)}${dcaCompleteChipHtml(drug)}</div>
+                                    <div class="dca-row-side-top">${dcaBatchChipHtml(drug._id)}</div>
                                 </div>
-                                <div class="dca-row-meta dca-t2">
-                                    ${drug.atcCode ? `<span class="dca-row-meta-chip">${dcaEscapeHtml(drug.atcCode)}</span>` : addBtn('atcCode', 'ATC', 'dca-row-meta-chip')}
-                                    ${drug.sourceArticleId ? dxaArticleChipHtml(drug) : ''}
-                                    ${drug.class ? `<span class="dca-cls">${dcaEscapeHtml(drug.class)}</span>` : addBtn('class', 'class', 'dca-cls')}
-                                </div>
-                                <div class="dca-t3">
-                                    <div class="dca-row-brands">${brandChips || addBtn('brandNames', 'brands', 'dca-br')}</div>
-                                    <div class="dca-row-side">
-                                        ${dcaListContribChipsHtml(drug)}
-                                        ${updatedAbs ? `<span class="dca-row-updated-abs" title="Last updated">🕒 ${dcaEscapeHtml(updatedAbs)}</span>` : ''}
-                                        <div class="dca-row-actions">
-                                            ${dcaMatBtnHtml(drug)}
-                                            ${lowPct ? `<button type="button" class="dca-row-ai-btn" onclick="dcaRowAiFill('${id}')" title="AI fill the empty fields — you review before saving · ให้ AI เติมช่องว่าง · AI로 빈 칸 채우기" aria-label="AI fill empty fields">🤖</button>` : ''}
-                                            <button type="button" class="dca-row-edit-btn" onclick="dcaEdit('${id}')" title="Edit" aria-label="Edit">✏️</button>
-                                            <details class="dca-more"><summary title="More" aria-label="More actions">⋯</summary>
-                                                <div class="dca-more-menu">
-                                                    <button type="button" class="dca-row-visual-btn" onclick="dcaQuickVisual('${id}')" title="Create / edit the PK visual — opens the edit view">🎨 PK visual</button>
-                                                    <button type="button" class="dca-row-copy-btn" onclick="dcaCopyRow('${id}', this)" title="Copy as Markdown">📋 Copy as Markdown</button>
-                                                    <button type="button" class="dca-row-del-btn" onclick="dcaDelete('${id}', this)" title="Delete">🗑️ Delete</button>
-                                                </div>
-                                            </details>
-                                        </div>
+                                <span class="dca-bar" title="${dcaEscapeHtml(tip)}" data-pct="${s.pct}"><i style="width:${Math.max(s.pct, 3)}%;background:${col.bd || col.bg};"></i></span>
+                            </div>
+                            <span class="dca-dots">${dot('atcCode', 'ATC', drug.atcCode)}${dot('class', 'Class', drug.class)}${dot('brandNames', 'Brands', brands.join(', '))}</span>
+                            <div class="dca-row-actions">
+                                ${dcaMatBtnHtml(drug)}
+                                ${lowPct ? `<button type="button" class="dca-row-ai-btn" onclick="dcaRowAiFill('${id}')" title="AI fill the empty fields — you review before saving · ให้ AI เติมช่องว่าง · AI로 빈 칸 채우기" aria-label="AI fill empty fields">🤖</button>` : ''}
+                                <button type="button" class="dca-row-edit-btn" onclick="dcaEdit('${id}')" title="Edit" aria-label="Edit">✏️</button>
+                                <details class="dca-more"><summary title="More" aria-label="More actions">⋯</summary>
+                                    <div class="dca-more-menu">
+                                        <div class="dca-more-who">${dcaListContribChipsHtml(drug)}${updatedAbs ? `<span class="dca-row-updated-abs" title="Last updated">🕒 ${dcaEscapeHtml(updatedAbs)}</span>` : ''}${drug.sourceArticleId ? dxaArticleChipHtml(drug) : ''}</div>
+                                        <button type="button" class="dca-row-visual-btn" onclick="dcaQuickVisual('${id}')" title="Create / edit the PK visual — opens the edit view">🎨 PK visual</button>
+                                        <button type="button" class="dca-row-copy-btn" onclick="dcaCopyRow('${id}', this)" title="Copy as Markdown">📋 Copy as Markdown</button>
+                                        <button type="button" class="dca-row-del-btn" onclick="dcaDelete('${id}', this)" title="Delete">🗑️ Delete</button>
                                     </div>
-                                </div>
+                                </details>
                             </div>
                         </div>`;
+        }
+        // V102.637: the column heads above the rows — Drug · ATC · Cls · Brd. In the Incomplete view a head with missing drugs is a filter
+        // (its count beside it, tap again = all); the same three filters are no longer chips.
+        function dcaColsHtml(inc) {
+            const head = (k, label) => {
+                if (!inc) return `<span class="dca-col">${label}</span>`;
+                const n = inc.filter(DCA_INC_FILTERS[k].test).length, on = dcaState.incFilter === k;
+                return n ? `<button type="button" class="dca-col${on ? ' on' : ''}" onclick="dcaSetIncFilter('${on ? 'all' : k}')" aria-pressed="${on}" title="${DCA_INC_FILTERS[k].label} — show only those · ${DCA_INC_FILTERS[k].th}">${label} <b>${n}</b></button>` : `<span class="dca-col">${label}</span>`;
+            };
+            return `<div class="dca-cols lang-no-toggle"><span class="dca-col-drug">Drug</span><span class="dca-cols-dots">${head('atc', 'ATC')}${head('cls', 'Cls')}${head('brands', 'Brd')}</span><span class="dca-col-act"></span></div>`;
         }
 
         function dcaRenderPublishedList() {
@@ -48942,7 +48951,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     ? (a, b) => (when(b) - when(a)) || byName(a, b)
                     : (a, b) => (dcaCompletenessScore(a).pct - dcaCompletenessScore(b).pct) || byName(a, b));
                 dcaState.incRows = sorted.map(d => d._id);
-                list.innerHTML = sorted.map(dcaPublishedRowHtml).join('');
+                list.innerHTML = dcaColsHtml(dcaState.sortMode === 'completeness' && incRail && !incRail.hidden ? filtered.length && dcaState.codex.filter(d => dcaMatchesSearch(d, dcaState.searchTerm) && dcaCompletenessScore(d).pct < 90) : null) + sorted.map(dcaPublishedRowHtml).join('');
                 return;
             }
             // Group by first letter A-Z, with non-A-Z (digits / Thai) bucketed under '#'.
@@ -48958,12 +48967,19 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (b === '#') return -1;
                 return a.localeCompare(b);
             });
-            list.innerHTML = orderedKeys.map(letter => {
+            list.innerHTML = dcaColsHtml(null) + orderedKeys.map(letter => {
                 const rows = groups[letter].map(dcaPublishedRowHtml).join('');
                 return `<div class="dca-letter-heading" data-letter="${letter}">${letter}</div>${rows}`;
             }).join('');
         }
 
+        // V102.637 (owner pick B, mockup-codex-lean): drafts grouped by where they came from — an import (importSource) · articles · interns.
+        // The group says its source and note ONCE; each row = name · % · (✨ edit · X for an edit request) · Review · ✓ · ✗ (✓ amber under 80 %).
+        function dcaDraftGroupOf(draft) {
+            if (draft.importSource) return { key: 'src:' + draft.importSource, icon: '📄', label: draft.submittedByName || draft.importSource };
+            if (draft.sourceArticleId) return { key: 'articles', icon: '📰', label: 'From articles' };
+            return { key: 'interns', icon: '🙋', label: 'Interns' };
+        }
         function dcaRenderDraftsList() {
             const list = document.getElementById('dca-drafts-list');
             if (!list) return;
@@ -48971,55 +48987,53 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 list.innerHTML = '<div class="dca-empty-state">No pending drafts. When interns submit drug entries (Phase 5), they appear here for moderation.</div>';
                 return;
             }
-            list.innerHTML = dcaState.drafts.map(draft => {
-                // V96.06: show the submitter's profile picture. submittedBy is the
-                // intern's Firebase AUTH uid (never matches usersData, keyed by LINE
-                // id), so resolve the LIVE profile via submittedByUserId — freshest if
-                // the intern changed name/pic. Fall back to the snapshot stored at
-                // submit time (submittedByName/submittedByPictureUrl), then the uid.
-                // Mirrors dcaContribChipHtml's intern-role resolution.
-                const lineId = draft.submittedByUserId || (window.dcaAuthLinkCache || {})[draft.submittedBy] || draft.submittedBy;
-                const subUser = (typeof usersData !== 'undefined' ? usersData : []).find(x => x.id === lineId);
-                const submitterPic = (subUser && subUser.pictureUrl) || draft.submittedByPictureUrl || '';
-                const submitter = (subUser && subUser.displayName) || draft.submittedByName || draft.submittedBy || 'unknown';
-                const submitterAvatar = submitterPic
-                    ? `<img class="dca-contrib-avatar" src="${dcaEscapeHtml(submitterPic)}" alt="" onerror="this.outerHTML='📝'">`
-                    : '📝';
-                const created = draft.createdAt && draft.createdAt.toDate ? draft.createdAt.toDate() : null;
-                const dateStr = created ? created.toLocaleDateString('th-TH') : '—';
-                // V94.35 Phase 5: resolve targetDrugId → published drug name so the
-                // edit-request shows "edit · Metformin" instead of a 20-char doc id.
-                let target;
-                if (draft.targetDrugId) {
-                    const targetDrug = dcaState.codex.find(d => d._id === draft.targetDrugId);
-                    const targetLabel = targetDrug ? targetDrug.genericName : draft.targetDrugId;
-                    target = `<span class="dca-row-meta-chip" title="edit request targeting ${dcaEscapeHtml(draft.targetDrugId)}">✨ edit · ${dcaEscapeHtml(targetLabel)}</span>`;
-                } else {
-                    target = '<span class="dca-row-meta-chip">📥 new entry</span>';
-                }
-                // V94.35 Phase 5: surface intern's free-text note to admin as a
-                // truncated snippet under the submitter line. Full text is also
-                // injected into the Review form's banner (see dcaReviewDraft).
-                const notesSnippet = (draft.sourceImageUrl ? '<div class="dca-draft-notes-snippet">📷 Source image attached</div>' : '') + (draft.internNotes // V101.19
-                    ? `<div class="dca-draft-notes-snippet">📝 ${dcaEscapeHtml(String(draft.internNotes).slice(0, 120))}${String(draft.internNotes).length > 120 ? '…' : ''}</div>`
-                    : '');
-                return `
+            const groups = [];
+            dcaState.drafts.forEach(d => { const g = dcaDraftGroupOf(d); let x = groups.find(y => y.key === g.key); if (!x) groups.push(x = Object.assign(g, { rows: [] })); x.rows.push(d); });
+            list.innerHTML = groups.map(g => {
+                const notes = g.rows.map(d => String(d.internNotes || '').trim());
+                const shared = g.rows.length > 1 && notes[0] && notes.every(n => n === notes[0]) ? notes[0] : '';
+                return `<div class="dca-dgroup${g.key === 'interns' ? ' dca-dgroup-in' : ''}">
+                        <div class="dca-dgroup-head lang-no-toggle">${g.icon} ${dcaEscapeHtml(g.label)} · ${g.rows.length}</div>
+                        ${shared ? `<div class="dca-draft-notes-snippet" title="${dcaEscapeHtml(shared)}">📝 ${dcaEscapeHtml(shared.slice(0, 160))}${shared.length > 160 ? '…' : ''}</div>` : ''}
+                        ${g.rows.map(d => dcaDraftRowHtml(d, !shared, g.key === 'interns')).join('')}
+                    </div>`;
+            }).join('');
+        }
+        function dcaDraftRowHtml(draft, showNote, showWho) {
+            // V96.06: the submitter's live profile (submittedByUserId → usersData), else the snapshot stored at submit time.
+            const lineId = draft.submittedByUserId || (window.dcaAuthLinkCache || {})[draft.submittedBy] || draft.submittedBy;
+            const subUser = (typeof usersData !== 'undefined' ? usersData : []).find(x => x.id === lineId);
+            const submitterPic = (subUser && subUser.pictureUrl) || draft.submittedByPictureUrl || '';
+            const submitter = (subUser && subUser.displayName) || draft.submittedByName || draft.submittedBy || 'unknown';
+            const created = draft.createdAt && draft.createdAt.toDate ? draft.createdAt.toDate() : null;
+            const dateStr = created ? created.toLocaleDateString('th-TH') : '—';
+            const avatar = submitterPic ? `<img class="dca-contrib-avatar" src="${dcaEscapeHtml(submitterPic)}" alt="" onerror="this.outerHTML='📝'">` : '📝';
+            // V94.35 Phase 5: an edit request names the published drug it targets ("edit · Metformin"); a new entry needs no chip.
+            let target = '';
+            if (draft.targetDrugId) {
+                const targetDrug = dcaState.codex.find(d => d._id === draft.targetDrugId);
+                const targetLabel = targetDrug ? targetDrug.genericName : draft.targetDrugId;
+                target = `<span class="dca-row-meta-chip" title="edit request targeting ${dcaEscapeHtml(draft.targetDrugId)}">✨ edit · ${dcaEscapeHtml(targetLabel)}</span>`;
+            }
+            const pct = dcaCompletenessScore(draft).pct, id = dcaEscapeHtml(draft._id);
+            const note = showNote ? (draft.sourceImageUrl ? '<div class="dca-draft-notes-snippet">📷 Source image attached</div>' : '') + (draft.internNotes   // V101.19
+                ? `<div class="dca-draft-notes-snippet">📝 ${dcaEscapeHtml(String(draft.internNotes).slice(0, 120))}${String(draft.internNotes).length > 120 ? '…' : ''}</div>` : '') : '';
+            return `
                     <div class="dca-draft-row">
                         <div class="dca-draft-row-head">
                             <div style="flex:1; min-width:0;">
                                 <div class="dca-row-name">${dcaEscapeHtml(draft.genericName || '(no name)')}</div>
-                                <div class="dca-draft-submitter lang-no-toggle">${submitterAvatar} submitted by ${dcaEscapeHtml(submitter)} · ${dateStr}</div>
-                                ${notesSnippet}
+                                ${showWho ? `<div class="dca-draft-submitter lang-no-toggle">${avatar} ${dcaEscapeHtml(submitter)} · ${dateStr}</div>` : ''}
+                                ${note}
                             </div>
                             <div class="dca-draft-actions">
-                                ${draft.sourceArticleId ? dxaArticleChipHtml(draft) : ''}${target}
-                                <button type="button" class="dca-draft-review-btn" onclick="dcaReviewDraft('${dcaEscapeHtml(draft._id)}')">Review & Edit</button>
-                                <button type="button" class="dca-draft-approve-btn" onclick="dcaApproveDraft('${dcaEscapeHtml(draft._id)}', this)">✓ Approve</button>
-                                <button type="button" class="dca-draft-reject-btn" onclick="dcaRejectDraft('${dcaEscapeHtml(draft._id)}', this)">✗ Reject</button>
+                                ${dcaCompleteChipHtml(draft)}${draft.sourceArticleId ? dxaArticleChipHtml(draft) : ''}${target}
+                                <button type="button" class="dca-draft-review-btn" onclick="dcaReviewDraft('${id}')">Review & Edit</button>
+                                <button type="button" class="dca-draft-approve-btn${pct < 80 ? ' dca-low' : ''}" onclick="dcaApproveDraft('${id}', this)"${pct < 80 ? ` title="Only ${pct}% filled — Review & Edit (🤖 fills the empty tabs) before publishing"` : ''}>✓ Approve</button>
+                                <button type="button" class="dca-draft-reject-btn" onclick="dcaRejectDraft('${id}', this)">✗ Reject</button>
                             </div>
                         </div>
                     </div>`;
-            }).join('');
         }
 
         function dcaArrayToInput(value, kind) {
@@ -50941,7 +50955,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!draft) return;
             // V96.25: modal doubles as the approve gate AND the contributor reward input.
             // Cancel = don't approve; blank/0 = approve without awarding points.
-            const contributorBonus = await codexBonusPrompt({ heading: `Approve & publish "${draft.genericName || draftId}" to Drug Codex as-is?\n(Press "Review & Edit" to fix fields first.)`, defaultVal: 0.1 });
+            const _pct = dcaCompletenessScore(draft).pct;   // V102.637: under 80 % the prompt says so first
+            const contributorBonus = await codexBonusPrompt({ heading: (_pct < 80 ? `⚠️ Only ${_pct}% filled.\n` : '') + `Approve & publish "${draft.genericName || draftId}" to Drug Codex as-is?\n(Press "Review & Edit" to fix fields first.)`, defaultVal: 0.1 });
             if (contributorBonus === null) return;
             if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
             const nowTs = firebase.firestore.FieldValue.serverTimestamp();
@@ -78193,7 +78208,7 @@ Summarize in English in 3–5 concise lines:
 <script src="ai-capsule.js?v=V102.475"></script>
 <script src="drug-toolbar.js?v=V102.475"></script>
 <script src="drug-form-ui.js?v=V102.135"></script>
-<script src="drug-list-ui.js?v=V102.136"></script>
+<script src="drug-list-ui.js?v=V102.637"></script>
 <script src="mypath-ui.js?v=V102.391"></script>
 <script src="ai-settings-ui.js?v=V102.574" defer></script>
 <link rel="stylesheet" href="journal-feedback-admin.css?v=V102.587">

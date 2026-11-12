@@ -39,7 +39,7 @@ const cut = (from, to) => { const a = html.indexOf(from), b = html.indexOf(to, a
             dcaRenderPublishedList();
         });
         const names = () => page.locator('#dca-list .dca-row-name').allInnerTexts().then(a => a.map(s => s.trim().toLowerCase()));
-        const pctOf = () => page.locator('#dca-list .dca-row-complete').allInnerTexts().then(a => a.map(s => parseInt(s.replace(/\D/g, ''), 10)));
+        const pctOf = () => page.locator('#dca-list .dca-row .dca-bar').evaluateAll(es => es.map(e => +e.dataset.pct));   // V102.637: the % is the bar under the name
 
         // ---- default = least complete first, flat, no letters ----
         assert.equal(await page.evaluate(() => dcaState.sortMode), 'completeness');
@@ -60,18 +60,19 @@ const cut = (from, to) => { const a = html.indexOf(from), b = html.indexOf(to, a
         assert.deepEqual(await names(), ['ofloxacin', 'acetazolamide', 'atorvastatin', 'amoxicillin', 'metformin', 'untouched'], 'recent = latest update first');
         await page.evaluate(() => dcaSetSort('completeness', document.querySelector('.dca-sort-row [data-sort="completeness"]')));
 
-        // ---- three fixed tiers: every row has them, so every row is the same height ----
+        // ---- V102.637 (owner pick B): ONE line per drug — name + thin % bar · ATC / Cls / Brd dots · actions; column heads on top ----
         const rows = page.locator('#dca-list .dca-row');
         const nRows = await rows.count();
         assert.ok(nRows >= 4, 'incomplete rows: ' + nRows);
-        assert.equal(await page.locator('#dca-list .dca-row .dca-t1').count(), nRows); assert.equal(await page.locator('#dca-list .dca-row .dca-t2').count(), nRows); assert.equal(await page.locator('#dca-list .dca-row .dca-t3').count(), nRows);
+        assert.equal(await page.locator('#dca-list .dca-row .dca-bar').count(), nRows); assert.equal(await page.locator('#dca-list .dca-row .dca-dots > .dca-dot').count(), nRows * 3);
+        assert.equal(await page.locator('#dca-list .dca-cols').count(), 1, 'one column-head line');
         const hs = await rows.evaluateAll(es => es.map(e => Math.round(e.getBoundingClientRect().height)));
-        assert.ok(Math.min(...hs) > 40, 'rows are laid out: ' + hs); assert.ok(Math.max(...hs) - Math.min(...hs) <= 2, 'rows share one height: ' + hs);
+        assert.ok(Math.max(...hs) <= 50 && Math.min(...hs) > 24, 'one line per drug: ' + hs); assert.ok(Math.max(...hs) - Math.min(...hs) <= 2, 'rows share one height: ' + hs);
+        assert.equal(await page.locator('#dca-list .dca-row .dca-t2, #dca-list .dca-row .dca-t3').count(), 0, 'the old tiers are gone');
         const first = rows.filter({ hasText: 'UNTOUCHED' });
-        assert.match(await first.locator('.dca-t2').innerText(), /＋ ATC[\s\S]*＋ class/); assert.match(await first.locator('.dca-t3 .dca-row-brands').innerText(), /＋ brands/);   // V102.327: the placeholders are ＋ buttons
+        assert.deepEqual(await first.locator('button.dca-dot').evaluateAll(es => es.map(e => e.getAttribute('aria-label'))), ['Add ATC', 'Add Class', 'Add Brands'], 'missing = ○ buttons');
         const amox = rows.filter({ hasText: 'AMOXICILLIN' });
-        assert.equal(await amox.locator('.dca-br:not(.dca-br-more)').count(), 2); assert.equal((await amox.locator('.dca-br-more').innerText()).trim(), '+1'); assert.equal(await amox.locator('.dca-br-more').getAttribute('title'), 'Clamoxyl');
-        assert.equal((await amox.locator('.dca-row-meta-chip').innerText()).trim(), 'J01CA04');
+        assert.deepEqual(await amox.locator('.dca-dot.on').evaluateAll(es => es.map(e => e.title)), ['ATC: J01CA04', 'Class: Aminopenicillin', 'Brands: Amoxil, Moxatag, Clamoxyl'], 'filled = ● with the value in the hover');
 
         // ---- actions: Edit + ⋯ only; the menu holds visual / copy / delete ----
         assert.deepEqual(await amox.locator('.dca-row-actions > *').evaluateAll(es => es.map(e => e.tagName.toLowerCase() + '.' + (e.className.split(' ')[0]))), ['button.dca-row-ai-btn', 'button.dca-row-edit-btn', 'details.dca-more'], 'V102.327: 🤖 sits before ✏️ while the drug is under 90 %');
@@ -97,9 +98,9 @@ const cut = (from, to) => { const a = html.indexOf(from), b = html.indexOf(to, a
         assert.deepEqual(await col(0), ['#eef2f7', '#64748b']); assert.deepEqual(await col(39), ['#ffedd5', '#9a3412']); assert.deepEqual(await col(40), ['#fef08a', '#713f12']);
         assert.deepEqual(await col(74), ['#fef08a', '#713f12']); assert.deepEqual(await col(75), ['#bbf7d0', '#14532d']); assert.deepEqual(await col(89), ['#bbf7d0', '#14532d']); assert.deepEqual(await col(90), ['#15803d', '#ffffff']); assert.deepEqual(await col(100), ['#15803d', '#ffffff']);
         await page.evaluate(() => dcaSetSort('az', document.querySelector('.dca-sort-row [data-sort="az"]')));   // V102.327: the complete drug lives outside the Incomplete view
-        const bg = await page.locator('#dca-list .dca-row-complete').evaluateAll(es => es.map(e => getComputedStyle(e).backgroundColor));
+        const bg = await page.locator('#dca-list .dca-bar i').evaluateAll(es => es.map(e => getComputedStyle(e).backgroundColor));   // V102.637: the bar wears the scale's edge colour
         const metIdx = (await names()).indexOf('metformin');
-        assert.equal(bg[(await names()).indexOf('untouched')], 'rgb(255, 237, 213)', 'a drug with only a name (5%) is orange — grey is for 0%, checked above'); assert.equal(bg[metIdx], 'rgb(21, 128, 61)', 'a complete drug is dark green');
+        assert.equal(bg[(await names()).indexOf('untouched')], 'rgb(253, 186, 116)', 'a drug with only a name (5%) is orange — grey is for 0%, checked above'); assert.equal(bg[metIdx], 'rgb(21, 128, 61)', 'a complete drug is dark green');
         assert.equal(new Set(bg).size >= 4, true, 'the sample spans several steps: ' + [...new Set(bg)]);
 
         if (process.env.SHOT) {
@@ -108,6 +109,6 @@ const cut = (from, to) => { const a = html.indexOf(from), b = html.indexOf(to, a
             await page.locator('#drugCodexAdminModal .modal-content').screenshot({ path: 'output/drug-list-ui.png' });
         }
         assert.deepEqual(errors, [], 'no page errors: ' + errors.join(' | '));
-        console.log('PASS: drug list — least-complete first by default (+ A–Z, Recent), three fixed tiers with placeholders (same row height), brands ≤ 2 + N, Edit + ⋯ menu (closes on action / Esc / outside click), one 5-step completeness scale');
+        console.log('PASS: drug list — least-complete first by default (+ A–Z, Recent), one line per drug (V102.637 pick B: % bar, ATC / Cls / Brd dots, ○ = add at that field), Edit + ⋯ menu (closes on action / Esc / outside click), one 5-step completeness scale');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

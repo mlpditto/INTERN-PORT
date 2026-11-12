@@ -52,22 +52,25 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
         // 1 · the rail + only drugs under 90 %
         assert.equal(await page.$eval('#dca-inc-rail', e => e.hidden), false, 'rail shown in Incomplete first');
         const c = await chips();
-        assert.deepEqual(c.map(t => t.replace(/ \d+$/, '')), ['All incomplete', 'ATC missing', 'Class missing', 'Brands missing', '👶 From Peds import', '🏷️ Tag 7 earlier Peds drugs'], JSON.stringify(c));
+        assert.deepEqual(c.map(t => t.replace(/ \d+$/, '')), ['All incomplete', '👶 From Peds import', '🏷️ Tag 7 earlier Peds drugs'], JSON.stringify(c));
+        // V102.637 (owner pick B): ATC / Class / Brands missing are the column heads now (count beside each), not chips
+        const heads = await page.$$eval('#dca-list .dca-cols button.dca-col', es => es.map(e => e.textContent.replace(/\s+/g, ' ').trim()));
+        assert.equal(heads.length, 3, 'three filter heads: ' + JSON.stringify(heads)); assert.deepEqual(heads.map(t => t.replace(/ \d+$/, '')), ['ATC', 'Cls', 'Brd']);
         const all = await ids();
         assert.ok(!all.some(id => /^full/.test(id)), 'complete drugs leave the view');
         assert.equal(all.length, 42, '30 + 7 + 1 + 4 incomplete');
         assert.equal(c[0], 'All incomplete 42');
-        assert.equal(c[4], '👶 From Peds import 30', 'only importSource counts');
+        assert.equal(c[1], '👶 From Peds import 30', 'only importSource counts');
 
         // 2 · a filter
-        await page.click('#dca-inc-rail .dca-inc-chip:has-text("Class missing")');
-        assert.equal(await page.$eval('#dca-inc-rail .dca-inc-chip.on', e => e.getAttribute('aria-pressed')), 'true');
+        await page.click('#dca-list .dca-cols button.dca-col:has-text("Cls")');
+        assert.equal(await page.$eval('#dca-list .dca-cols button.dca-col.on', e => e.getAttribute('aria-pressed')), 'true');
         const noCls = await ids();
         assert.ok(noCls.length && noCls.every(id => /^(tag|old|own)/.test(id)), 'class missing: ' + noCls.join(','));
         // a filter with no match falls back to All (here: search for a complete drug only)
         await page.fill('#dca-search', 'Partial'); await page.evaluate(() => dcaSearch());
         assert.deepEqual((await chips()).slice(0, 1), ['All incomplete 4'], 'the chosen chip had no drug → back to All');
-        assert.ok(!(await chips()).some(t => /Class missing/.test(t)), 'a chip with no drug is not drawn');
+        assert.equal(await page.$$eval('#dca-list .dca-cols button.dca-col:has-text("Cls")', e => e.length), 0, 'a head with no drug is not a filter');
         await page.fill('#dca-search', ''); await page.evaluate(() => dcaSearch());
 
         // 3 · Peds: progress line + ☑ 20 → 🤖
@@ -84,11 +87,11 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
         await page.evaluate(() => dcaAutoDraftCancel());
 
         // 4 · ＋ field buttons open the form at that field; 🤖 runs AI fill; complete rows have no 🤖
-        await page.click('#dca-list .dca-row[data-id="tag10"] .dca-add:has-text("ATC")');
+        await page.click('#dca-list .dca-row[data-id="tag10"] button.dca-dot[aria-label="Add ATC"]');
         await page.waitForTimeout(150);
         assert.equal(await page.evaluate(() => [dcaState.editingId, document.activeElement && document.activeElement.id].join('|')), 'tag10|dca-f-atcCode');
         await page.evaluate(() => { dcaSwitchView('published'); dcaRenderPublishedList(); });
-        await page.click('#dca-list .dca-row[data-id="tag11"] .dca-add:has-text("brands")');
+        await page.click('#dca-list .dca-row[data-id="tag11"] button.dca-dot[aria-label="Add Brands"]');
         await page.waitForTimeout(150);
         assert.equal(await page.evaluate(() => document.activeElement && document.activeElement.id), 'dca-f-brandNames');
         await page.evaluate(() => { dcaSwitchView('published'); dcaRenderPublishedList(); });
