@@ -3,7 +3,10 @@
 // V102.636 (owner pick C+): the language picks the voice — a Thai clip = iApp Chinda through callAIProxy (iapp_tts: 🙋 ไข่มุก friendly · 🧑‍⚕️ / 💡 ไข่ต้ม calm),
 // EN / KO = Gemini TTS as before (🙋 Kore · 🧑‍⚕️ / 💡 Puck). Two chips under ▶: tap = next voice of that family (remembered per article + as the next start),
 // hold = hear that side's first line; the speaking side's chip pulses; Chinda fails → Gemini goes on with one line saying so → this computer's voice;
-// ▶'s hover = ≈ IC · characters. The REAL admin.html + articles-admin.js; callTtsProxy, fetch and Audio stubbed (nothing leaves the page).
+// ▶'s hover = ≈ IC · characters.
+// V102.639 (owner pick 1 + A): lines in a row by one speaker (🧑‍⚕️ + 💡 = one voice) are ONE request; a Thai clip's English words get a Thai reading
+// once (AI, kept on the article as clipReading) that only the voice uses; 🔤 n shows / fixes them (a fixed one is marked e).
+// The REAL admin.html + articles-admin.js; callTtsProxy, callUniversalAI, fetch and Audio stubbed (nothing leaves the page).
 const assert = require('node:assert/strict');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
@@ -37,6 +40,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         // the proxy (iapp_tts) stub: records each request; text with CHINDAFAIL → a 502
         await page.evaluate(() => {
             window.__chinda = [];
+            window.__readAsk = [];
+            window.callUniversalAI = async (model, prompt, json, v, s2, o) => { window.__readAsk.push([o && o.feature, (prompt.match(/WORDS: (.*)$/m) || [])[1]]); return { text: JSON.stringify({ Buscopan: 'บุสโคแพน', Motilium: 'โมทีเลียม' }) }; };
             window.callTtsProxy = async (p) => { window.__chinda.push(p); if (/CHINDAFAIL/.test(p.text)) throw new Error('iapp_tts proxy failed with status 502'); return { audioContent: btoa('ID3mp3'), mimeType: 'audio/mpeg', provider: 'iapp_tts' }; };
             try { Object.keys(localStorage).filter(k => /^clp_v_/.test(k)).forEach(k => localStorage.removeItem(k)); } catch (e) { /* none */ }
         });
@@ -53,7 +58,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
             window.__tts.length = 0; window.__played.length = 0; window.__chinda.length = 0;
             return document.querySelector('#art-body .clp-note').textContent;
         }, [key, lang]);
-        const chips = () => page.$$eval('#art-body .clp-vc', bs => bs.map(b => b.className.replace('clp-vc ', '') + ':' + b.textContent));
+        const chips = () => page.$$eval('#art-body .clp-vc:not(.rd)', bs => bs.map(b => b.className.replace('clp-vc ', '') + ':' + b.textContent));
         const play = async () => { await page.evaluate(() => { window.__tts.length = 0; window.__played.length = 0; window.__chinda.length = 0; Articles.clipPlay(); }); await page.waitForFunction(() => !Articles._S.clipPlaying, null, { timeout: 12000 }); };
 
         // 1. Thai clip: Chinda through the proxy, no engine words on screen, two chips, ▶ hover = ≈ IC · characters
@@ -64,30 +69,43 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         await page.evaluate(() => { window.__talk = 0; const t = setInterval(() => { if (document.querySelector('#art-body .clp-vc.talk')) window.__talk++; if (!Articles._S.clipPlaying) clearInterval(t); }, 10); });
         await play();
         assert.deepEqual(await page.evaluate(() => window.__chinda.map(p => [p.provider, p.voice, p.style, p.text])), [
-            ['iapp_tts', 'kaimook', 'friendly', 'หมอสั่ง Buscopan คู่ Motilium ต้านกันไหม'],
-            ['iapp_tts', 'kaitom', 'calm', 'กลไกต้านกันจริง'],
-            ['iapp_tts', 'kaitom', 'calm', 'แยกเวลากิน']], 'one Chinda request per line: 🙋 ไข่มุก friendly · 🧑‍⚕️ / 💡 ไข่ต้ม calm');
-        assert.deepEqual(await page.evaluate(() => [window.__tts.length, window.__played.length]), [0, 3], 'no Gemini call; each line plays');
+            ['iapp_tts', 'kaimook', 'friendly', 'หมอสั่ง บุสโคแพน คู่ โมทีเลียม ต้านกันไหม'],
+            ['iapp_tts', 'kaitom', 'calm', 'กลไกต้านกันจริง แยกเวลากิน']], 'V102.639: 🧑‍⚕️ + 💡 in a row = ONE request; English words read in Thai');
+        assert.deepEqual(await page.evaluate(() => [window.__tts.length, window.__played.length]), [0, 2], 'no Gemini call; each group plays');
+        assert.deepEqual(await page.evaluate(() => window.__readAsk), [['clip_reading', 'Buscopan, Motilium']], 'one reading call for the clip\'s English words');
+        assert.deepEqual(await page.evaluate(() => Articles._S.cur.clipReading), { Buscopan: { r: 'บุสโคแพน' }, Motilium: { r: 'โมทีเลียม' } }, 'kept on the article');
+        assert.equal(await page.$eval('#art-body .clp-vc.rd', b => b.textContent), '🔤 2');
+        assert.match(await page.$eval('#art-body .clp-m.q', e => e.textContent), /Buscopan/, 'the caption keeps English');
         assert.ok(await page.evaluate(() => window.__talk) > 0, 'the speaking side\'s chip pulses while playing');
 
         // 2. Play again: cached
         await play();
-        assert.deepEqual(await page.evaluate(() => [window.__chinda.length, window.__played.length]), [0, 3], 'replay reuses the audio');
+        assert.deepEqual(await page.evaluate(() => [window.__chinda.length, window.__played.length, window.__readAsk.length]), [0, 2, 1], 'replay reuses the audio and the readings');
 
         // 3. Chinda fails on a line → Gemini (Puck) reads it, the clip goes on, one line says so
         await page.evaluate(() => { Articles._S.cur.clip.th[1].t = 'CHINDAFAIL line'; });
         await play();
         assert.deepEqual(await page.evaluate(() => [window.__chinda.length, window.__tts.map(t => t.voice + ':' + t.text), window.__played.length, Articles._S.clipVoiceErr]),
-            [1, ['Puck:CHINDAFAIL line'], 3, '🔊 Thai voice failed — Gemini instead']);
+            [1, ['Puck:CHINDAFAIL line แยกเวลากิน'], 2, '🔊 Thai voice failed — Gemini instead']);
         assert.match(await page.$eval('#art-body .clp-note', n => n.textContent), /Thai voice failed — Gemini instead/);
 
         // 3b. Chinda fails and no Gemini key → this computer's voice for that line (timed here)
         await open('', 'th');
         await page.evaluate(() => { Articles._S.cur.clip.th[1].t = 'CHINDAFAIL again'; });
         await play();
-        assert.deepEqual(await page.evaluate(() => [window.__tts.length, window.__played.length]), [0, 2], 'no key: the failed line is not sent to Gemini');
+        assert.deepEqual(await page.evaluate(() => [window.__tts.length, window.__played.length]), [0, 1], 'no key: the failed group is not sent to Gemini');
         assert.match(await page.evaluate(() => Articles._S.clipVoiceErr), /502 — this computer's voice instead/);
         await page.evaluate(() => { Articles._S.cur.clip.th[1].t = 'กลไกต้านกันจริง'; });
+
+        // 3c. 🔤 → fix Motilium → the next Play says it; the word is marked as fixed and saved with the article
+        const asked = await page.evaluate(() => window.__readAsk.length);
+        await page.click('#art-body .clp-vc.rd');
+        await page.fill('#art-body .clp-rd input[data-k="Motilium"]', 'โมติเลียม'); await page.press('#art-body .clp-rd input[data-k="Motilium"]', 'Tab');
+        assert.deepEqual(await page.evaluate(() => Articles._S.cur.clipReading.Motilium), { r: 'โมติเลียม', e: true });
+        await play();
+        assert.match(await page.evaluate(() => window.__chinda[0].text), /โมติเลียม/);
+        if (process.env.OUTDIR) { const pv = await page.$('#art-body .art-clip'); if (pv) await pv.screenshot({ path: process.env.OUTDIR + '/clip-reading.png' }); }
+        assert.equal(await page.evaluate(() => window.__readAsk.length), asked, 'no new reading call: every word has one (a word with no Thai reading is kept as written)');
 
         // 4. tap 🙋 → ไข่ต้ม → ไข่แดง: remembered for this article and as the next Thai start; the next Play uses it
         await page.click('#art-body .clp-vc[data-w="q"]'); await page.click('#art-body .clp-vc[data-w="q"]');
