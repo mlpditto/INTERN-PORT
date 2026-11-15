@@ -73,6 +73,7 @@
             var peak = 0, ctx = null, timer = null;
             try {
                 ctx = new (window.AudioContext || window.webkitAudioContext)();
+                if (ctx.resume) ctx.resume();   // created after the permission prompt, so it can start suspended
                 var an = ctx.createAnalyser(); an.fftSize = 512; ctx.createMediaStreamSource(stream).connect(an);
                 var buf = new Uint8Array(an.fftSize);
                 timer = setInterval(function () { an.getByteTimeDomainData(buf); for (var i = 0; i < buf.length; i++) peak = Math.max(peak, Math.abs(buf[i] - 128)); }, 100);
@@ -83,12 +84,13 @@
             rec.onerror = function (e) { say('recorder error', (e.error && e.error.name) || 'unknown'); };
             rec.onstop = function () {
                 if (timer) clearInterval(timer);
-                if (ctx && ctx.close) ctx.close();
                 var blob = new Blob(chunks, { type: rec.mimeType || (chunks[0] && chunks[0].type) || '' });
                 say('recorded', (blob.type || 'no type') + ' · ' + blob.size + ' bytes · ' + chunks.length + ' chunk(s)');
-                say('loudest', Math.round(peak / 128 * 100) + '%');
+                // a suspended meter reads 0 whatever the microphone hears — say "not measured" instead of a false 0%
+                say('loudest', ctx && ctx.state === 'running' ? Math.round(peak / 128 * 100) + '%' : 'not measured (meter ' + (ctx ? ctx.state : 'missing') + ')');
                 say('result', blob.size > 0 ? 'OK · play it back below' : 'FAIL · the recording is empty');
                 if (blob.size > 0) { audio.src = URL.createObjectURL(blob); audio.hidden = false; }
+                if (ctx && ctx.close) ctx.close();
                 stop();
             };
             say('recorder', rec.mimeType || 'default type');

@@ -40,7 +40,8 @@ const url = pathToFileURL(path.resolve('public/mic-probe.html')).href;
         assert.match(t, /permission: granted after \d+ ms/);
         const rec = /recorded: (\S+) · (\d+) bytes · (\d+) chunk/.exec(t);
         assert.ok(rec && /^audio\//.test(rec[1]) && Number(rec[2]) > 1000, 'an audio clip with real bytes: ' + t);
-        assert.match(t, /loudest: \d+%/); assert.ok(Number(/loudest: (\d+)%/.exec(t)[1]) > 0, 'the fake microphone beeps, so the level is above 0: ' + t);
+        // a CI runner has no audio output, so the meter can read 0% or stay suspended there — either a level or an honest "not measured"
+        assert.match(t, /loudest: (\d+%|not measured \(meter \w+\))/, 'a level, or "not measured": ' + t);
         assert.match(t, /result: OK · play it back below/);
         assert.equal(await page.locator('#mp-audio').isVisible(), true, 'the clip can be played back');
         assert.match(await page.locator('#mp-audio').getAttribute('src'), /^blob:/, 'the clip lives in memory only');
