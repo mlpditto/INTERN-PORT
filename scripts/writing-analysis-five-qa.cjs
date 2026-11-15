@@ -1,4 +1,4 @@
-// V102.643 (owner: Writing Analysis mockup, "all five" — #1 #3 #4 #5 #7). Reflective Review · Writing Analysis card, the REAL admin.html
+// V102.645 (owner: Writing Analysis mockup, "all five" — #1 #3 #4 #5 #7). Reflective Review · Writing Analysis card, the REAL admin.html
 // with a fixture log + fixture analyses and the real render / try / reset / retry handlers:
 //  #1 the grade pill is never an empty oval: a real Thai grade stays readable in EN mode (the language toggle used to hide it), and a grade
 //     of invisible Unicode (U+3164) or no grade draws NO pill
@@ -132,6 +132,6 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
         assert.match(r.during2.line, /^⏳ Flash 3\.8 reading…/); assert.deepEqual([r.afterFail.line, r.afterFail.opacity, r.failText], ['', '1', true], '#7 a failed run clears the line and shows the error');
         assert.deepEqual(errs, [], 'no page errors: ' + errs.join(' | '));
         if (process.env.OUTDIR) { await page.locator('#reflective-grammar-card').screenshot({ path: path.join(process.env.OUTDIR, 'writing-analysis-five.png') }); }
-        console.log('PASS: Writing Analysis five (V102.643) — #1 invisible / missing grade draws no pill · #3 🔴 High 🟠 Med ⚪ Low · #4 💬＋ Tip vs ✏ Try / Try all (names + "not changed" in title, ✓ Tried, n / N tried) · #5 first Try rings + scrolls the preview once, again after Reset · #7 earlier result fades under "⏳ model reading…", cleared on success and failure');
+        console.log('PASS: Writing Analysis five (V102.645) — #1 invisible / missing grade draws no pill · #3 🔴 High 🟠 Med ⚪ Low · #4 💬＋ Tip vs ✏ Try / Try all (names + "not changed" in title, ✓ Tried, n / N tried) · #5 first Try rings + scrolls the preview once, again after Reset · #7 earlier result fades under "⏳ model reading…", cleared on success and failure');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

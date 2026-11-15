@@ -1,4 +1,4 @@
-// V102.368: Reflective Review · "➕ Add tip to reply" (owner's option A; V102.643: the chip reads 💬＋ Tip, aria-label "Add tip to reply") — the first writing suggestion goes into the reply draft in the
+// V102.368: Reflective Review · "➕ Add tip to reply" (owner's option A; V102.645: the chip reads 💬＋ Tip, aria-label "Add tip to reply") — the first writing suggestion goes into the reply draft in the
 // reply language, with the example edit and a checked reference picked by the suggestion's kind. The REAL admin.html with a fixture log,
 // fixture analyses (object suggestions, string suggestions, unknown kind) and the real chip handler.
 const fs = require('node:fs');

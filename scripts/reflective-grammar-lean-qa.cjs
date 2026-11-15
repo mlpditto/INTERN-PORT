@@ -1,4 +1,4 @@
-// V102.367: Reflective Review · Writing Analysis column, lean (owner's PR 2) — Issues → Suggestions → Why these changes (✏ Try per change — V102.643 wording,
+// V102.367: Reflective Review · Writing Analysis column, lean (owner's PR 2) — Issues → Suggestions → Why these changes (✏ Try per change — V102.645 wording,
 // Apply all on the heading) → the edited preview only once something is applied → the improved sample folded at the end as a plain
 // sentence (no word-level diff). The REAL admin.html with a fixture log, a fixture analysis and the real apply / reset handlers.
 const fs = require('node:fs');
@@ -55,7 +55,7 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
         });
         assert.deepEqual(r.before.heads, ['issues', 'suggestions', 'why'], 'before any Apply: Issues → Suggestions → Why — no Improved sample heading, no Edited preview: ' + JSON.stringify(r.before.heads));
         assert.equal(r.before.preview, false, 'no preview panel before the first Apply');
-        assert.deepEqual(r.before.applyBtns, ['💬＋ Tip', '✏ Try all', '✏ Try', '✏ Try'], 'tip chip (V102.368; V102.643: 💬＋ Tip) + ✏ Try all on the Why heading + one ✏ Try per change: ' + JSON.stringify(r.before.applyBtns));
+        assert.deepEqual(r.before.applyBtns, ['💬＋ Tip', '✏ Try all', '✏ Try', '✏ Try'], 'tip chip (V102.368; V102.645: 💬＋ Tip) + ✏ Try all on the Why heading + one ✏ Try per change: ' + JSON.stringify(r.before.applyBtns));
         assert.deepEqual([r.before.details, r.before.detailsOpen, r.before.sampleVisible, r.before.wordDiffSpans], [true, false, false, 0], 'the improved sample is a closed <details> with a plain sentence (no diff spans)');
         assert.ok(r.before.order[r.before.order.length - 1].startsWith('DETAILS:'), 'the folded sample is last: ' + JSON.stringify(r.before.order));
         assert.equal(r.after1.preview, true, 'after one Apply the preview panel appears'); assert.equal(r.after1.previewText, '1 / 2 tried');
