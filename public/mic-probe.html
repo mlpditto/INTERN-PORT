@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>Mic probe</title>
+    <!-- TEMPORARY (2026-11-15, 🎤 Case by voice, step 0): can a page opened inside LINE record the microphone?
+         Open this page from a LINE chat on a real iPhone and a real Android phone, tap 🎤, then 📋 and paste the result back.
+         The recording stays in the phone's memory for playback only — nothing is uploaded, nothing is stored. Delete this file when Case by voice ships. -->
+    <style>
+        body { margin: 0; padding: 16px; font: 500 15px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; color: #0f172a; background: #f1f5f9; }
+        main { max-width: 460px; margin: 0 auto; }
+        h1 { font-size: 18px; margin: 0 0 2px; }
+        p { margin: 0 0 12px; color: #475569; font-size: 13px; }
+        .row { display: flex; gap: 8px; align-items: stretch; margin: 0 0 12px; }
+        button { height: 48px; border-radius: 14px; border: 1.5px solid #c7d2fe; background: #eef2ff; color: #3730a3; font: 700 15px/1 inherit; padding: 0 16px; }
+        #mp-rec { flex: 1; }
+        #mp-rec[aria-busy="true"] { border-color: #fca5a5; background: #fef2f2; color: #991b1b; }
+        #mp-copy { flex: 0 0 56px; padding: 0; font-size: 20px; }
+        #mp-out { margin: 0 0 12px; padding: 12px; border-radius: 12px; background: #fff; border: 1px solid #e2e8f0; font: 500 13px/1.6 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-word; -webkit-user-select: text; user-select: text; }
+        audio { width: 100%; }
+        #mp-copied { color: #15803d; font-weight: 700; font-size: 13px; min-height: 18px; }
+    </style>
+</head>
+<body>
+<main>
+    <h1>🎤 Mic probe</h1>
+    <p>Records 5 seconds on this phone and plays it back. Nothing is uploaded. · อัดเสียง 5 วินาทีในเครื่องนี้แล้วเล่นกลับ ไม่ส่งออกไปไหน</p>
+    <div class="row">
+        <button type="button" id="mp-rec" aria-busy="false">🎤 Record 5 s · อัด 5 วินาที</button>
+        <button type="button" id="mp-copy" title="Copy the result" aria-label="Copy the result">📋</button>
+    </div>
+    <div id="mp-copied" role="status"></div>
+    <pre id="mp-out" aria-label="Result"></pre>
+    <audio id="mp-audio" controls hidden></audio>
+</main>
+<script>
+(function () {
+    'use strict';
+    var out = document.getElementById('mp-out'), btn = document.getElementById('mp-rec'), audio = document.getElementById('mp-audio');
+    var lines = [];
+    function say(k, v) { lines.push(k + ': ' + v); out.textContent = lines.join('\n'); }
+    var ua = navigator.userAgent || '';
+    var TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/mp4;codecs=mp4a.40.2', 'audio/ogg;codecs=opus', 'audio/aac'];
+    function supported() { return TYPES.filter(function (t) { try { return window.MediaRecorder && MediaRecorder.isTypeSupported(t); } catch (e) { return false; } }); }
+    function env() {
+        lines = [];
+        say('probe', 'mic-probe 1 · ' + new Date().toISOString());
+        say('app', (/\bLine\//i.test(ua) ? 'LINE' : 'not LINE') + (/LIFF/i.test(ua) ? ' · LIFF' : '') + ' · ' + (/iPhone|iPad|iPod/i.test(ua) ? 'iOS' : /Android/i.test(ua) ? 'Android' : 'other'));
+        say('ua', ua);
+        say('secure context', String(window.isSecureContext));
+        say('getUserMedia', String(!!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)));
+        say('MediaRecorder', String(typeof window.MediaRecorder === 'function'));
+        say('types', supported().join(' | ') || 'none');
+    }
+    env();
+    if (navigator.permissions && navigator.permissions.query) {
+        try { navigator.permissions.query({ name: 'microphone' }).then(function (p) { say('permission before', p.state); }, function () { say('permission before', 'not queryable'); }); } catch (e) { say('permission before', 'not queryable'); }
+    }
+    btn.addEventListener('click', function () {
+        if (btn.getAttribute('aria-busy') === 'true') return;
+        if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) { say('result', 'FAIL · no getUserMedia in this browser'); return; }
+        btn.setAttribute('aria-busy', 'true'); btn.textContent = '⏳ asking for the microphone…';
+        var t0 = Date.now();
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+            say('permission', 'granted after ' + (Date.now() - t0) + ' ms');
+            var track = stream.getAudioTracks()[0];
+            say('track', track ? (track.label || 'unnamed') + ' · ' + track.readyState : 'none');
+            var stop = function () { stream.getTracks().forEach(function (t) { t.stop(); }); btn.setAttribute('aria-busy', 'false'); btn.textContent = '🎤 Record 5 s · อัด 5 วินาที'; };
+            if (typeof window.MediaRecorder !== 'function') { say('result', 'FAIL · microphone OK but no MediaRecorder'); stop(); return; }
+            // loudest sample seen while recording — a stream that records only silence shows 0%
+            var peak = 0, ctx = null, timer = null;
+            try {
+                ctx = new (window.AudioContext || window.webkitAudioContext)();
+                var an = ctx.createAnalyser(); an.fftSize = 512; ctx.createMediaStreamSource(stream).connect(an);
+                var buf = new Uint8Array(an.fftSize);
+                timer = setInterval(function () { an.getByteTimeDomainData(buf); for (var i = 0; i < buf.length; i++) peak = Math.max(peak, Math.abs(buf[i] - 128)); }, 100);
+            } catch (e) { say('level meter', 'unavailable · ' + e.name); }
+            var rec, chunks = [];
+            try { rec = new MediaRecorder(stream); } catch (e) { say('result', 'FAIL · MediaRecorder: ' + e.name + ' · ' + e.message); stop(); return; }
+            rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+            rec.onerror = function (e) { say('recorder error', (e.error && e.error.name) || 'unknown'); };
+            rec.onstop = function () {
+                if (timer) clearInterval(timer);
+                if (ctx && ctx.close) ctx.close();
+                var blob = new Blob(chunks, { type: rec.mimeType || (chunks[0] && chunks[0].type) || '' });
+                say('recorded', (blob.type || 'no type') + ' · ' + blob.size + ' bytes · ' + chunks.length + ' chunk(s)');
+                say('loudest', Math.round(peak / 128 * 100) + '%');
+                say('result', blob.size > 0 ? 'OK · play it back below' : 'FAIL · the recording is empty');
+                if (blob.size > 0) { audio.src = URL.createObjectURL(blob); audio.hidden = false; }
+                stop();
+            };
+            say('recorder', rec.mimeType || 'default type');
+            rec.start();
+            var left = 5; btn.textContent = '🔴 ' + left + ' s — say something · พูดอะไรก็ได้';
+            var tick = setInterval(function () { left--; if (left <= 0) { clearInterval(tick); try { rec.stop(); } catch (e) { say('result', 'FAIL · stop: ' + e.name); stop(); } } else btn.textContent = '🔴 ' + left + ' s — say something · พูดอะไรก็ได้'; }, 1000);
+        }, function (e) {
+            say('permission', 'refused after ' + (Date.now() - t0) + ' ms');
+            say('result', 'FAIL · ' + e.name + ' · ' + e.message);
+            btn.setAttribute('aria-busy', 'false'); btn.textContent = '🎤 Record 5 s · อัด 5 วินาที';
+        });
+    });
+    document.getElementById('mp-copy').addEventListener('click', function () {
+        var text = out.textContent, note = document.getElementById('mp-copied');
+        var done = function (ok) { note.textContent = ok ? '✓ copied — paste it in the chat · คัดลอกแล้ว' : 'Select the text below and copy it · เลือกข้อความด้านล่างแล้วคัดลอก'; };
+        var fallback = function () {   // LINE's WebView may have no navigator.clipboard
+            var ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+            var ok = false; try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+            document.body.removeChild(ta); done(ok);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { done(true); }, fallback); else fallback();
+    });
+})();
+</script>
+</body>
+</html>

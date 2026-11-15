@@ -16,6 +16,7 @@ Intern: the ＋ sunset tab on the right edge ▸ Submit New. Home ▸ My Cases.
 - `case-studio-ui-check` — Case studio UI (Playwright)
 - `my-cases-rows-qa` — My Cases as timeline rows on desktop (≥ 701 px)
 - `case-mail-notify-check` — notifyAdminOnNewCase mails the admin; LINE + mail independent
+- `mic-probe-qa` — 🎤 Case by voice step 0 (temporary `public/mic-probe.html`): environment report, 5 s recording with a fake microphone, 📋 copy, refused / missing microphone say FAIL, no network request
 
 ## What usually lies
 
