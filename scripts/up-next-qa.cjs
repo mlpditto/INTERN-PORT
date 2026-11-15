@@ -72,6 +72,14 @@ assert.ok(!r.fresh.some(x => x.id === 'ins'), 'a paired quiz is not repeated as 
 assert.equal(build(Q, TH, { ids: {}, done: true }).asked[0].cap, 'none', 'model answered, nothing similar → says so');
 assert.equal(build(Q, TH, null).asked[0].cap, '', 'model not asked / failed → no claim');
 assert.equal(build(Q, TH, { ids: { 'ยาความดัน': 'poll' }, done: true }).asked[0].kind, 'topic', 'a poll / unknown id is never offered');
+// V102.650 (pick B): a request a LIVE quiz covers is that quiz, and it names the other live quizzes on the topic — from the model's list and from the text match
+const Q2 = Q.concat([{ id: 'htn2', title: 'BP in pregnancy', isActive: true, tags: 'hypertension' }, { id: 'htn3', title: 'ACEi vs ARB', isActive: true, tags: '' }]);
+r = build(Q2, TH, { ids: { 'ยาความดัน': 'live' }, also: { 'ยาความดัน': ['htn3', 'ins', 'nope'] }, done: true });
+assert.deepEqual([r.asked[0].kind, r.asked[0].id, r.asked[0].also], ['live', 'live', ['ACEi vs ARB']], 'only other LIVE quizzes are named (a paused / unknown id is not): ' + JSON.stringify(r.asked[0]));
+r = build(Q2, [{ userId: 'h', nextTopic: 'hypertension basics', timestamp: ts(1) }], null);
+assert.deepEqual([r.asked[0].id, r.asked[0].also], ['live', ['BP in pregnancy']], 'text match: the other live quiz that hits the same words is named, no model needed');
+assert.deepEqual(build(Q, TH, { ids: { 'ยาความดัน': 'live' }, done: true }).asked[0].also, [], 'no other live quiz → nothing to add');
+assert.equal(build(Q2, TH, { ids: { 'ยาความดัน': 'ins' }, also: { 'ยาความดัน': ['htn3'] }, done: true }).asked[0].also, undefined, 'a ▶ tile never carries the note');
 // 5. matchAi(): sends only what the text match could not place, cached per day + set, tolerant of nonsense
 const store = {}; ctx.localStorage = { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = v; } };
 ctx.safeJsonParse = JSON.parse;
@@ -82,12 +90,19 @@ ctx.safeJsonParse = JSON.parse;
     let m = await ctx.upNextMatchAi(Q, F5, call);
     assert.equal(calls.length, 1); assert.equal(calls[0][0], 'as/gemini-3.5-flash-lite', 'the cheap model'); assert.equal(calls[0][2], true, 'JSON mode');
     assert.ok(!/asthma/i.test(calls[0][1].split('TOPICS:')[1].split('QUIZZES:')[0]), 'a topic the text match already placed is not sent'); assert.ok(!/userId|u1/.test(calls[0][1]), 'no user ids in the prompt');
-    assert.deepEqual(JSON.parse(JSON.stringify(m)), { ids: { 'ยาปฏิชีวนะ': 'live' }, rel: {}, done: true }, 'only valid, strong, in-range pairs are kept (the prompt numbers topics 0..: ' + JSON.stringify(m));
+    assert.deepEqual(JSON.parse(JSON.stringify(m)), { ids: { 'ยาปฏิชีวนะ': 'live' }, rel: {}, also: {}, done: true }, 'only valid, strong, in-range pairs are kept (the prompt numbers topics 0..: ' + JSON.stringify(m));
     await ctx.upNextMatchAi(Q, F5, call); assert.equal(calls.length, 1, 'same day + same set → the cache answers');
     await ctx.upNextMatchAi(Q.concat([{ id: 'new', title: 'Another quiz', isActive: false }]), F5, call); assert.equal(calls.length, 2, 'a changed quiz set asks again');
-    assert.deepEqual(JSON.parse(JSON.stringify(await ctx.upNextMatchAi(Q, [{ userId: 'a', nextTopic: 'asthma', timestamp: ts(1) }], call))), { ids: {}, rel: {}, done: true }); assert.equal(calls.length, 2, 'nothing left for the model → no call');
+    assert.deepEqual(JSON.parse(JSON.stringify(await ctx.upNextMatchAi(Q, [{ userId: 'a', nextTopic: 'asthma', timestamp: ts(1) }], call))), { ids: {}, rel: {}, also: {}, done: true }); assert.equal(calls.length, 2, 'nothing left for the model → no call');
+    // V102.650: q may be a list — every quiz that covers the topic; a LIVE one wins over a paused one listed first, the other live ones are kept in `also`
+    { const QL = Q.concat([{ id: 'htn2', title: 'BP in pregnancy', isActive: true }, { id: 'htn3', title: 'ACEi vs ARB', isActive: true }]);   // titled order: live, asthma, warf, ins, old, htn2, htn3
+      const was = answer, own = []; answer = '{"m":[{"t":0,"q":[3,0,5,5,99,6],"s":0.9},{"t":1,"q":[1,2],"s":0.8}]}';
+      const ml = JSON.parse(JSON.stringify(await ctx.upNextMatchAi(QL, [{ userId: 'k', nextTopic: 'ยาตวามดัน', timestamp: ts(9) }, { userId: 'l', nextTopic: 'โรคหืด', timestamp: ts(8) }].map(hydrate), async (...a) => { own.push(a); return { text: answer }; })));
+      assert.deepEqual(ml, { ids: { 'ยาตวามดัน': 'live', 'โรคหืด': 'asthma' }, rel: {}, also: { 'ยาตวามดัน': ['htn2', 'htn3'] }, done: true }, 'a live quiz wins; only-paused lists keep the first; duplicates / out-of-range dropped: ' + JSON.stringify(ml));
+      const pr = own[0][1]; assert.match(pr, /q lists EVERY quiz that clearly covers the topic/); assert.match(pr, /may be misspelled/); assert.match(pr, /\d+: Hypertension basics \| HTN \| LIVE/, 'live quizzes are marked for the model'); assert.ok(!/Asthma — GINA step-up[^\n]*LIVE/.test(pr), 'a paused quiz is not');
+      answer = was; }
     answer = 'not json at all'; ctx.safeJsonParse = () => null;
-    assert.deepEqual(JSON.parse(JSON.stringify(await ctx.upNextMatchAi(Q, [{ userId: 'z', nextTopic: 'โรคหัวใจ', timestamp: ts(9) }], call))), { ids: {}, rel: {}, done: true }, 'unparsable answer → no pairs');
+    assert.deepEqual(JSON.parse(JSON.stringify(await ctx.upNextMatchAi(Q, [{ userId: 'z', nextTopic: 'โรคหัวใจ', timestamp: ts(9) }], call))), { ids: {}, rel: {}, also: {}, done: true }, 'unparsable answer → no pairs');
     assert.equal(calls.length, 3);
     // V102.499: a topic with no strong match gets up to 3 RELATED quizzes (valid, distinct, in range), never one that was strongly matched
     ctx.safeJsonParse = JSON.parse; answer = '{"m":[],"r":[{"t":0,"q":[1,2,2,99]},{"t":1,"q":[0]}]}';
@@ -95,12 +110,12 @@ ctx.safeJsonParse = JSON.parse;
     const before = calls.length;
     const rr = JSON.parse(JSON.stringify(await ctx.upNextMatchAi(Q, SK, call)));
     assert.equal(calls.length, before + 1); assert.match(calls[calls.length - 1][1], /r: for a topic that has NO strong match/, 'the prompt asks for related quizzes');
-    assert.deepEqual(rr, { ids: {}, rel: { 'ยาทาโรคผิวหนัง': ['asthma', 'warf'], 'โรคตา': ['live'] }, done: true }, 'out-of-range / duplicate numbers dropped: ' + JSON.stringify(rr));
+    assert.deepEqual(rr, { ids: {}, rel: { 'ยาทาโรคผิวหนัง': ['asthma', 'warf'], 'โรคตา': ['live'] }, also: {}, done: true }, 'out-of-range / duplicate numbers dropped: ' + JSON.stringify(rr));
     const built = build(Q, SK, rr);
     const skin = built.asked.find(x => x.title === 'ยาทาโรคผิวหนัง');
     assert.deepEqual([skin.kind, skin.rel.map(r => [r.id, r.title, r.live])], ['topic', [['asthma', 'Asthma — GINA step-up', false], ['warf', 'Warfarin interactions', false]]], 'the topic tile carries its related quizzes: ' + JSON.stringify(skin));
     assert.equal(built.asked.find(x => x.title === 'โรคตา').rel[0].live, true, 'a live related quiz is marked live');
-    assert.deepEqual(build(Q, SK, { ids: {}, rel: {}, done: true }).asked.map(x => x.rel.length), [0, 0], 'no related list → the old "No quiz yet" caption');
+    assert.deepEqual(build(Q, SK, { ids: {}, rel: {}, also: {}, done: true }).asked.map(x => x.rel.length), [0, 0], 'no related list → the old "No quiz yet" caption');
     await assert.rejects(ctx.upNextMatchAi(Q, [{ userId: 'y', nextTopic: 'โรคตับ', timestamp: ts(9) }], async () => { throw new Error('proxy down'); }), /proxy down/, 'a failing call rejects (the strip catches it and keeps the text-only version)');
 })().then(page).catch(e => { console.error(e); process.exit(1); });
 
@@ -174,6 +189,12 @@ function page() { return (async () => {
             await page.evaluate(() => { window.calls.length = 0; });
             await page.click('#upnext-card .un-go[data-i="0"]');
             assert.deepEqual(await page.evaluate(() => window.calls.map(c => c[0])), ['open', 'toast']);
+            // V102.650: the served request's row says how many OTHER live quizzes cover it; the titles are in the tooltip; ↗ stays the only action
+            await page.evaluate(() => { window.quizzesData.push(window.hy({ id: 'htn2', title: 'BP in pregnancy', isActive: true, tags: 'hypertension' })); window.upNext.render(); });
+            { const also = await page.evaluate(() => { const a = document.querySelector('#upnext-card .un-also'), t = a && a.closest('.un-tile'); return a ? [a.textContent, a.title, t.classList.contains('un-live'), t.querySelector('.un-go').textContent, t.querySelector('b').textContent, document.querySelectorAll('#upnext-card .un-also').length, getComputedStyle(a).color] : null; });
+              assert.deepEqual(also, ['🟢 +1', 'Also live on this topic · เปิดอยู่แล้วอีก: BP in pregnancy', true, '↗', 'Hypertension basics', 1, 'rgb(6, 95, 70)'], 'one quiet green note on the live row: ' + JSON.stringify(also)); }
+            await page.evaluate(() => { window.quizzesData.pop(); window.upNext.render(); });
+            assert.equal(await page.$$eval('#upnext-card .un-also', e => e.length), 0, 'no other live quiz → no note');
             // text is escaped
             await page.evaluate(() => { window.quizzesData.push(window.hy({ id: 'x', title: '<img src=x onerror=window.pwned=1>', isActive: false, createdAt: 9e9 })); window.upNext.render(); });
             assert.equal(await page.evaluate(() => window.pwned), undefined, 'quiz titles are escaped');
