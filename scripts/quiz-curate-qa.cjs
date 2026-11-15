@@ -200,6 +200,8 @@ const { chromium } = require('playwright');
         assert.equal(await page.locator('.curate-compare-card .curate-key').count(), 2);
         assert(await page.getByRole('button', { name: '🗑 Remove Q14', exact: true }).isDisabled(), 'cannot remove pinned Q14');
         assert.deepEqual(await page.locator('.curate-compare-card').evaluateAll(cs => cs.map(c => (c.querySelector('.curate-cmp-del') || {}).textContent)), ['🗑 Remove Q10', '🗑 Remove Q14'], 'V102.591: 🗑 on each side, like Jev check');
+        { const g = await page.locator('.curate-compare-card h4').evaluateAll(hs => hs.map(h => { const r = e => e.getBoundingClientRect(), c = h.querySelector('.curate-copy'), d = h.querySelector('.curate-cmp-del'); return { gap: Math.round(r(d).left - r(c).right), right: Math.round(r(h).right - r(d).right) }; }));
+          assert.deepEqual(g, [{ gap: 8, right: 0 }, { gap: 8, right: 0 }], 'V102.649: ⧉ sits beside 🗑 Remove at the right of the heading, not floating mid-heading: ' + JSON.stringify(g)); }
         for (const width of [320, 390, 736, 1024]) {
             await page.setViewportSize({ width, height: 900 });
             assert(await page.locator('#quiz-curate-dialog').evaluate(d => d.scrollWidth <= d.clientWidth + 1), 'comparison overflow at ' + width);
