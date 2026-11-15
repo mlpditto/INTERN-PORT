@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.645)</title>
+    <title>Nika Admin (V102.646)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -5934,6 +5934,9 @@
         .pra-fs { display:inline-flex; gap:6px; align-items:center; } .pra-fs:empty { display:none; }
         .pra-chip.pra-f { border-color:#fcd34d; background:#fffbeb; color:#92400e; } .pra-chip.pra-f[aria-pressed="true"] { background:#b45309; border-color:#b45309; color:#fff; }
         .pra-chip.pra-ico { padding:4px 9px; }
+        /* V102.646 (owner pick A, mockup-tag-dialog-picker): the ✨ AI suggests tag dialog uses the shared model rail; it wraps in the 440 px dialog; a model waiting for ↻ is ringed amber */
+        #qtx-overlay .qtx-rail { flex-wrap:wrap; margin:0 0 12px; }
+        #qtx-overlay .qtx-rail > button.qtx-pend { outline:2px solid #d97706; outline-offset:1px; }
         .pra-model-row { padding:6px 12px; border-bottom:1px solid #eee; background:#fff; } .pra-model-row[hidden] { display:none; } .pra-model-row .pra-model { justify-content:flex-start; margin:0; }
         .q-ps { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:8px; padding:6px 10px; border:1px solid #ddd6fe; border-radius:12px; background:#f5f3ff; font-size:0.85em; color:#312e81; }
         .q-ps[hidden] { display:none; }
@@ -75099,7 +75102,7 @@ RULES:
             const r = window.quizTagCompletenessFrom(document.getElementById('quiz-system-select')?.value || '', document.getElementById('quiz-tags')?.value || '');
             if (r.complete) return Promise.resolve(true);
             return new Promise(resolve => {
-                window._qtx = { action, resolve, missing: r.missing, prop: null, error: '', model: window.qtxModel(), vendor: window.qtxVendorOf(window.qtxModel()) };
+                window._qtx = { action, resolve, missing: r.missing, prop: null, error: '', model: window.qtxModel() };
                 qtxRender('ask');
             });
         };
@@ -75210,50 +75213,33 @@ RULES:
             qtxRender('result');
         };
         // V102.471: the Save-time "AI suggests" dialog names its model and lets the admin pick one — local first (Ollama on this computer: nothing leaves it), remembered
-        // V102.498: vendor first, then the model — [id, short label, tooltip, vendor]. Ids are the shared catalogue's (ai-model-ui.js); Grok is the audit-toolbar trial model, asked for here too.
-        window.QTX_MODELS = [
-            ['ol/local', 'Ollama · local', 'Runs on this computer — nothing leaves it', 'ollama'],
-            ['gemini-3.8-flash', 'Flash 3.8', 'Gemini 3.8 Flash', 'gemini'], ['as/gemini-3.5-flash-lite', 'Lite 3.5', 'Gemini 3.5 Flash-Lite', 'gemini'], ['as/gemini-4-argon', 'Argon 4', 'Gemini 4 Argon', 'gemini'],
-            ['gpt-6-luna', 'Luna 6', 'GPT 6 Luna', 'gpt'], ['gpt-6.1-terra', 'Terra 6.1', 'GPT 6.1 Terra', 'gpt'],
-            ['claude-haiku-5-5', 'Haiku 5.5', 'Claude Haiku 5.5', 'claude'], ['claude-sonnet-5-5', 'Sonnet 5.5', 'Claude Sonnet 5.5', 'claude'],
-            ['or/x-ai/grok-4.7', 'Grok 4.7', 'Grok 4.7 (via OpenRouter)', 'grok'],
-            ['or/deepseek/deepseek-v4.1-flash-1017', 'Flash V4.1', 'DeepSeek V4.1 Flash (via OpenRouter)', 'deepseek'], ['or/deepseek/deepseek-v4-pro-0813', 'Pro V4', 'DeepSeek V4 Pro (via OpenRouter)', 'deepseek'],
-            ['or/qwen/qwen3.8-flash', 'Flash 3.8', 'Qwen 3.8 Flash (via OpenRouter)', 'qwen'], ['or/qwen/qwen3.8-omni-flash', 'Omni Flash 3.8', 'Qwen 3.8 Omni Flash (via OpenRouter)', 'qwen'], ['or/qwen/qwen3.8-max-0902', 'Max 3.8', 'Qwen 3.8 Max (via OpenRouter)', 'qwen']
-        ];
-        // [vendor, name, logo file (assets/logos), dark disc behind a white logo]
-        window.QTX_VENDORS = [['ollama', 'Ollama', 'ollama-white.svg', true], ['gemini', 'Gemini', 'gemini-spark-color.svg'], ['gpt', 'GPT', 'openai-blossom-black.svg'], ['claude', 'Claude', 'claude-spark-clay.svg'],
-            ['grok', 'Grok', 'grok-white.svg', true], ['deepseek', 'DeepSeek', 'deepseek-color.svg'], ['qwen', 'Qwen', 'qwen-color.svg']];
-        window.qtxVendorOf = id => ((window.QTX_MODELS.find(x => x[0] === id) || [])[3]) || window.QTX_MODELS[0][3];
-        window.qtxModel = function () { let m = ''; try { m = localStorage.getItem('quizTagAiModel') || ''; } catch (e) { /* none */ } return window.QTX_MODELS.some(x => x[0] === m) ? m : window.QTX_MODELS[0][0]; };
-        window.qtxModelName = id => { const m = window.QTX_MODELS.find(x => x[0] === id); if (!m) return String(id || ''); const v = window.QTX_VENDORS.find(x => x[0] === m[3]); return m[3] === 'ollama' ? m[1] : v[1] + ' ' + m[1]; };
-        // V102.505: style D (icon-only) — ONE header line: the title is an icon (its words in the tooltip / for screen readers), the vendor logos sit on the same line,
-        // the vendor's models under it on the right; the model in use is the pressed chip, so nothing repeats its name. A pending model (waiting for ↻) is outlined amber.
+        // V102.646 (owner pick A, mockup-tag-dialog-picker): the picker is the app's ONE rail (ai-model-ui.js — vendor icons, the picked vendor's chips right after its
+        // icon) with every catalogue model + the trial ones. The dialog's own lists (QTX_MODELS / QTX_VENDORS) are gone, so a model added to the catalogue shows here by itself.
+        const qtxKnown = id => !!(typeof window.textAIModelInfo === 'function' && window.textAIModelInfo(id));
+        window.qtxModel = function () { let m = ''; try { m = localStorage.getItem('quizTagAiModel') || ''; } catch (e) { /* none */ } return qtxKnown(m) ? m : 'ol/local'; };   // nothing remembered → local
+        window.qtxModelName = id => { const m = typeof window.textAIModelInfo === 'function' && window.textAIModelInfo(id); return m ? m.label : String(id || ''); };
+        // V102.505: style D (icon-only) — the title is an icon (its words in the tooltip / for screen readers); the model in use is the pressed chip, so nothing
+        // repeats its name. A pending model (waiting for ↻) is ringed amber and its vendor is the one shown (qtxRender, once the rail is seated).
         function qtxHead(icon, title, sel) {
-            const st = window._qtx || {}, selVendor = window.qtxVendorOf(sel), shown = st.vendor || selVendor;
-            const vbtn = v => '<button type="button" onclick="qtxVendor(\'' + v[0] + '\')" aria-pressed="' + (v[0] === shown) + '" aria-label="' + v[1] + '" title="' + v[1] + (v[0] === selVendor ? ' · in use' : '') + '" style="position:relative; width:26px; min-height:0; height:26px; padding:0; margin:0; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; background:' + (v[3] ? '#1e293b' : '#fff') + '; border:' + (v[0] === shown ? '2px solid #4f46e5' : '1px solid #cbd5e1') + ';"><img src="assets/logos/' + v[2] + '" alt="" style="width:14px; height:14px;">' + (v[0] === selVendor ? '<i aria-hidden="true" style="position:absolute; right:-2px; top:-2px; width:8px; height:8px; border-radius:50%; background:#f97316; border:2px solid #fff;"></i>' : '') + '</button>';
-            const mbtn = x => { const on = x[0] === sel, pend = x[0] === st.pendingModel;
-                return '<button type="button" onclick="qtxPick(\'' + x[0] + '\')" aria-pressed="' + on + '" title="' + escapeHtml(x[2]) + '" style="width:auto; min-height:0; margin:0; padding:3px 10px; border-radius:999px; font-size:0.76em; font-weight:800; cursor:pointer; border:' + (pend ? '2px solid #d97706' : '1px solid ' + (on ? '#4f46e5' : '#cbd5e1')) + '; background:' + (on ? '#4f46e5' : pend ? '#fffbeb' : '#fff') + '; color:' + (on ? '#fff' : pend ? '#92400e' : '#475569') + ';">' + escapeHtml(x[1]) + '</button>'; };
+            const st = window._qtx || {};
             const edited = st.view === 'result' && st.dirty ? '<i title="Edited" aria-label="Edited" style="display:inline-block; width:8px; height:8px; margin-left:4px; border-radius:50%; background:#f59e0b; vertical-align:middle;"></i>' : '';
             return '<div class="qtx-model" style="display:flex; align-items:center; gap:8px; margin:0 0 6px;"><h3 id="qtx-title" title="' + escapeHtml(title) + '" style="margin:0; font-size:1.2em; line-height:1; color:#1e293b;">' + icon + edited +
-                '<span style="position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;">' + escapeHtml(title) + '</span></h3>' +
-                '<div role="group" aria-label="AI vendor" style="margin-left:auto; display:flex; flex-wrap:wrap; justify-content:flex-end; gap:4px;">' + window.QTX_VENDORS.map(vbtn).join('') + '</div></div>' +
-                '<div role="group" aria-label="AI model" style="display:flex; flex-wrap:wrap; justify-content:flex-end; gap:5px; margin:0 0 12px;">' + window.QTX_MODELS.filter(x => x[3] === shown).map(mbtn).join('') + '</div>';
+                '<span style="position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;">' + escapeHtml(title) + '</span></h3></div>' +
+                '<div class="text-ai-chips qtx-rail lang-no-toggle" role="group" aria-label="AI model">' + window.textAIChipContents(sel, 'qtxPick(this.dataset.value)', null, window.TEXT_AI_TRIAL_MODELS || []) + '</div>';
         }
-        // a vendor tap only changes which models are listed — nothing re-runs, nothing is replaced
-        window.qtxVendor = function (v) { const st = window._qtx; if (!st || !window.QTX_VENDORS.some(x => x[0] === v)) return; st.vendor = v; qtxRender(st.view || 'ask'); };
-        // a pick is remembered; on the result / error view it runs again with that model (the proposal is replaced)
+        // a pick is remembered; on the result / error view it runs again with that model (the proposal is replaced). Browsing a vendor is the rail's own business — nothing runs.
         // V102.505: on the result view after the admin edited the chips, ask first (↻ / ✋) — nothing runs or is stored until confirmed
         window.qtxPick = function (id, confirmed) {
             const st = window._qtx;
-            if (!st || !window.QTX_MODELS.some(x => x[0] === id)) return;
-            if (st.view === 'result' && st.dirty && !confirmed) { st.pendingModel = id; st.vendor = window.qtxVendorOf(id); return qtxRender('result'); }
+            if (!st || !qtxKnown(id)) return;
+            if (st.view === 'result' && st.dirty && !confirmed) { st.pendingModel = id; return qtxRender('result'); }
             st.pendingModel = null;
             try { localStorage.setItem('quizTagAiModel', id); } catch (e) { /* none */ }
-            st.model = id; st.vendor = window.qtxVendorOf(id);
+            st.model = id;
             if (st.view === 'result' || st.view === 'error') return window.qtxChoose('ai');
             qtxRender(st.view || 'ask');
         };
-        window.qtxKeepEdits = function () { const st = window._qtx; if (!st) return; st.pendingModel = null; st.vendor = window.qtxVendorOf(st.usedModel || st.model); qtxRender('result'); };   // V102.505
+        window.qtxKeepEdits = function () { const st = window._qtx; if (!st) return; st.pendingModel = null; qtxRender('result'); };   // V102.505
         function qtxRender(view) {
             const st = window._qtx;
             if (!st) return;
@@ -75300,7 +75286,11 @@ RULES:
                         : foot(ib("qtxChoose('back')", 'fa-arrow-left', 'Back'), ib("qtxChoose('apply')", 'fa-tags', 'Apply only (no save yet)'), ib("qtxChoose('applysave')", 'fa-floppy-disk', 'Apply & ' + lowerAction, 'pri'))}`;
             }
             el.innerHTML = `<div style="background:#fff; border-radius:16px; padding:18px; max-width:440px; width:100%; max-height:90vh; overflow:auto; box-shadow:0 20px 50px rgba(0,0,0,0.35);">${body}</div>`;
-            const first = el.querySelector('button, select');
+            // V102.646: seat the shared rail now (not on the observer's turn), then show a pending model's vendor with its chip ringed, then focus what is visible
+            if (typeof window.oneStyleModelPickers === 'function') window.oneStyleModelPickers(el);
+            const rail = el.querySelector('.qtx-rail'), pend = rail && st.pendingModel ? [...rail.querySelectorAll(':scope > button[data-value]')].find(b => b.dataset.value === st.pendingModel) : null;
+            if (pend) { const ven = rail.querySelector('.mr-vendor[data-provider="' + (pend.getAttribute('aria-label') || '').split(' ')[0] + '"]'); if (ven) ven.click(); pend.classList.add('qtx-pend'); }
+            const first = el.querySelector('.mr-vendor[aria-pressed="true"]') || [...el.querySelectorAll('button, select')].find(b => !b.hidden);
             if (first) first.focus();
         }
 
