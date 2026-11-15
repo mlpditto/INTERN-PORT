@@ -27,7 +27,7 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
             window.dcaCollectForm = () => ({ genericName: 'gabapentin', dosing: '1,800 mg once daily with dinner', indication: 'PHN', mechanism: 'α2δ ligand', absorption: 'saturable', pearls: 'x',
                 patientCounseling: 'กินพร้อมมื้อเย็น', educationI18n: { patientCounseling: { en: 'Take with dinner', th: 'กินพร้อมมื้อเย็น' } } });
             window.__sent = null;
-            window.dcaAiReviewDraft = async opts => { window.__otherModel = !!(opts && opts.other); return [
+            window.dcaAiReviewDraft = async opts => { window.__otherModel = !!(opts && opts.other); dcaState._reviewModel = window.__rvModel || ''; return [
                 { section: 'clinical', field: 'dosing', severity: 'factual', issue: '1,800 mg is the Gralise dose only — say so' },
                 { section: 'clinical', field: 'indication', severity: 'suggestion', issue: 'add DPN?' }]; };
             window.adminApp = { functions: () => ({ httpsCallable: name => async data => { window.__sent = [name, data]; if (jevFails) throw new Error('jev down');
@@ -49,6 +49,17 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
         const sent = await page.evaluate(() => window.__sent);
         assert.equal(sent[0], 'jevCheckDrug'); assert.deepEqual(Object.keys(sent[1].sections).sort(), ['clinical', 'edu', 'moa', 'pk']); assert.deepEqual(Object.keys(sent[1].langs), ['patientCounseling']);
         assert.match(await page.$eval('.cvg-foot', e => e.textContent), /AI Review · 🧠 Jev \(not yet calibrated on drug text\) — advice only/);
+        // V102.653: the footer names the reviewing model; ⚠ when it is the model that filled the entry
+        { const pick = await page.evaluate(() => { const m = (window.TEXT_AI_MODELS || []); return m.length >= 2 ? [m[0].id, m[1].id, dcaAiTrail.label(m[0].id), dcaAiTrail.label(m[1].id)] : null; });
+          assert.ok(pick && pick[2] && pick[2] !== pick[3], 'two catalogue models with different names: ' + JSON.stringify(pick));
+          await page.evaluate(([a, b]) => { window.__rvModel = a; dcaAiTrail.load({ aiDraftedModel: b }); }, pick);
+          await page.click('button[data-act="check"]');
+          await page.waitForFunction(n => document.querySelector('.cvg-foot').textContent.includes('AI Review · ' + n + ' · 🧠 Jev'), pick[2]);
+          assert.ok(!/same model/.test(await page.$eval('.cvg-foot', e => e.textContent)), 'a different model than the fill → no warning');
+          await page.evaluate(([a]) => dcaAiTrail.load({ aiDraftedModel: a }), pick);
+          await page.click('button[data-act="check"]');
+          await page.waitForFunction(n => document.querySelector('.cvg-foot').textContent.includes('AI Review · ' + n + ' ⚠ same model as the fill · 🧠 Jev'), pick[2]);
+          await page.evaluate(() => { window.__rvModel = ''; dcaAiTrail.load({}); }); }
         assert.equal(await page.$eval('button[data-act="clear"]', b => [b.hidden, b.textContent.trim()].join('|')), 'false|✓ 1 clear');
         assert.deepEqual(await page.evaluate(() => __marked), [], 'the check ticks nothing by itself');
         await page.click('button[data-act="clear"]');

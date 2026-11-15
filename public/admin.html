@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.652)</title>
+    <title>Nika Admin (V102.653)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -51198,7 +51198,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const more = notes.length > 1 ? ' (+' + (notes.length - 1) + ')' : '';
                 byKey[k] = { level, note: notes.length ? notes[0] + more : level === 'ok' ? (findings ? 'no issue found' : 'Jev ok') + (findings && j ? '' : findings ? ' · Jev not run' : ' · AI Review failed') : 'check failed' };
             });
-            const foot = (findings ? '🔍 AI Review · ' : '🔍 AI Review failed · ') + (j ? '🧠 Jev' + (j.calibrated === false ? ' (not yet calibrated on drug text)' : '') : '🧠 Jev not run') + ' — advice only, model knowledge, not live sources';
+            // V102.653: say WHICH model reviewed (it is picked to differ from the one that filled; ⚠ when it could not)
+            const trail = window.dcaAiTrail && window.dcaAiTrail.state ? window.dcaAiTrail.state() : { fill: null, review: [] };
+            const rvModel = findings ? (dcaState._reviewModel || trail.review[trail.review.length - 1] || '') : '';
+            const rvName = rvModel ? (window.dcaAiTrail ? window.dcaAiTrail.label(rvModel) : String(rvModel)) : '';
+            const rvSame = !!rvName && !!trail.fill && window.dcaAiTrail.label(trail.fill) === rvName;
+            const foot = (findings ? '🔍 AI Review · ' + (rvName ? rvName + (rvSame ? ' ⚠ same model as the fill' : '') + ' · ' : '') : '🔍 AI Review failed · ') + (j ? '🧠 Jev' + (j.calibrated === false ? ' (not yet calibrated on drug text)' : '') : '🧠 Jev not run') + ' — advice only, model knowledge, not live sources';
             return { byKey, foot };
         }
 
