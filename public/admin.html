@@ -4,7 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<<<<<<< HEAD
     <title>Nika Admin (V102.650)</title>
+=======
+    <title>Nika Admin (V102.651)</title>
+>>>>>>> e8e2473f (Codex approve: the points box opens empty — no default score (admin V102.651))
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -51023,8 +51027,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         function codexBonusPrompt(opts) {
             opts = opts || {};
             const heading = opts.heading || 'Points to award the intern contributor';
-            const defaultVal = (opts.defaultVal == null ? '1' : String(opts.defaultVal));
-            const presets = opts.presets || [0.1, 0.5, 1, 2, 5];
+            const defaultVal = (opts.defaultVal == null ? '' : String(opts.defaultVal));   // V102.651: opens empty — no score is offered unless the admin picks one
+            const presets = [...new Set((opts.suggest != null ? [opts.suggest] : []).concat(opts.presets || [0.1, 0.5, 1, 2, 5]))];   // an AI-suggested score is the first chip, one tap away
             return new Promise(resolve => {
                 const overlay = document.createElement('div');
                 overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:100050;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
@@ -51039,7 +51043,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         </div>
                         <div style="padding:12px 20px;display:flex;flex-wrap:wrap;gap:8px;">${chipsHtml}</div>
                         <div style="padding:0 20px;">
-                            <input type="text" inputmode="decimal" value="${escapeHtml(defaultVal)}" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:1.1em;font-weight:700;text-align:center;color:#1e293b;">
+                            <input type="text" inputmode="decimal" value="${escapeHtml(defaultVal)}" placeholder="—" aria-label="Points" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:1.1em;font-weight:700;text-align:center;color:#1e293b;">
                             <div style="font-size:0.78em;color:#94a3b8;margin-top:5px;">Blank or 0 = no points · decimals allowed, e.g. 0.1</div>
                         </div>
                         <div style="padding:14px 20px 18px;display:flex;justify-content:flex-end;gap:10px;">
@@ -51216,7 +51220,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const heading = suggested
                 ? 'Points to award contributor "' + (name || '') + '"\n🎁 AI suggests ' + suggested.value + ' pts' + (suggested.rationale ? ' — ' + suggested.rationale : '')
                 : 'Points to award contributor "' + (name || '') + '"';
-            const v = await codexBonusPrompt({ heading, defaultVal: suggested ? suggested.value : 0.1 });
+            const v = await codexBonusPrompt({ heading, suggest: suggested ? suggested.value : null });
             return v == null ? 0 : v;
         }
 
@@ -51226,7 +51230,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // V96.25: modal doubles as the approve gate AND the contributor reward input.
             // Cancel = don't approve; blank/0 = approve without awarding points.
             const _pct = dcaCompletenessScore(draft).pct;   // V102.637: under 80 % the prompt says so first
-            const contributorBonus = await codexBonusPrompt({ heading: (_pct < 80 ? `⚠️ Only ${_pct}% filled.\n` : '') + `Approve & publish "${draft.genericName || draftId}" to Drug Codex as-is?\n(Press "Review & Edit" to fix fields first.)`, defaultVal: 0.1 });
+            const contributorBonus = await codexBonusPrompt({ heading: (_pct < 80 ? `⚠️ Only ${_pct}% filled.\n` : '') + `Approve & publish "${draft.genericName || draftId}" to Drug Codex as-is?\n(Press "Review & Edit" to fix fields first.)` });
             if (contributorBonus === null) return;
             if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
             const nowTs = firebase.firestore.FieldValue.serverTimestamp();
@@ -56046,7 +56050,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!draft) return;
             // V96.25: modal doubles as the approve gate AND the contributor reward input.
             // Cancel = don't approve; blank/0 = approve without awarding points.
-            const contributorBonus = await codexBonusPrompt({ heading: `Approve & publish "${draft.diseaseName || draftId}" to Disease Codex as-is?\n(Press "Review & Edit" to fix fields first.)`, defaultVal: 0.1 });
+            const contributorBonus = await codexBonusPrompt({ heading: `Approve & publish "${draft.diseaseName || draftId}" to Disease Codex as-is?\n(Press "Review & Edit" to fix fields first.)` });
             if (contributorBonus === null) return;
             if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
             const nowTs = firebase.firestore.FieldValue.serverTimestamp();
