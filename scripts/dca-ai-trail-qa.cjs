@@ -51,7 +51,7 @@ assert.ok(o && prov(o) !== 'Gemini', 'first second opinion comes from another pr
 T.addReview(o);
 const o2 = T.other();
 assert.ok(o2 && o2 !== o && prov(o2) !== 'Gemini' && prov(o2) !== prov(o), 'the next one is yet another provider: ' + o2);
-assert.deepEqual(JSON.parse(JSON.stringify(T.payload())), { aiDraftedModel: 'as/gemini-4-argon', aiReviewedModels: [o] });
+{ const p = JSON.parse(JSON.stringify(T.payload())); assert.ok(Date.now() - p.aiReviewedAt < 5000, 'V102.653: the check stamps its time'); delete p.aiReviewedAt; assert.deepEqual(p, { aiDraftedModel: 'as/gemini-4-argon', aiReviewedModels: [o] }); }
 assert.ok(els['dca-form-ai-trail'].innerHTML.includes('🔍') && !els['dca-form-ai-trail'].innerHTML.includes('warn'), 'a different model is not flagged');
 // 4. the same model that filled it is flagged
 T.addReview('as/gemini-4-argon');
