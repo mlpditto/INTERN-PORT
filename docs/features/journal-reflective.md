@@ -12,6 +12,7 @@ Intern: home ▸ Journal. Admin: Kanban ▸ a reflective card ▸ Reflective Rev
 - `reflective-model-row-qa` — vendor-first MODEL rows, trial chips survive a reload
 - `reflective-grammar-lean-qa` — Writing Analysis column: Issues → Suggestions → Why; Apply per change / all
 - `reflective-diff-runs-qa` — Edited preview word diff: Thai phrase whole, no side padding, space is a space
+- `writing-analysis-five-qa` — Writing Analysis five (V102.645): invisible / missing grade draws no pill, 🔴 High 🟠 Med ⚪ Low, 💬＋ Tip vs ✏ Try / Try all, the first Try rings + scrolls the preview, the earlier result fades under "⏳ model reading…"
 - `reflective-writing-tip-qa` — ➕ Add tip to reply in the reply language with a reference
 - `reflective-bonus-footer-qa` — Bonus in the footer beside Save; AI pick ringed 💡
 - `reflective-mood-emoji-qa` — admin shows the saved mood emoji, not 📝
