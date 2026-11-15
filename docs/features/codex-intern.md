@@ -9,6 +9,7 @@ Intern: home ▸ DD Codex; Poneglyph ▸ My Path; Submit New ▸ ⋯ ▸ Drug / 
 ## Scripts that drive it
 
 - `dd-codex-lean-qa` — one row of Drugs / Diseases chips + My Drafts; swipeable A–Z rail
+- `pk-deck-qa` — 🧠 n beside the drug search (listed drugs with card lines, hidden at 0) → PK flash cards: covered A·D·M·E·T lines on the ADMET picture or in five slots, 👁, 🔁 Again / ✓ Got it kept on the device only (`pk-deck.js`)
 - `mypath-queue-qa` — My Path: one header rail, queue as one slim line
 - `drug-page-lean-qa` — Drug entry: TH ⌄ | ✨ pill, full-width chips, sticky folding head, lit rail, dosing lines
 - `drug-detail-c-qa` — V101.309 owner pick C (mockup-drug-detail-lean): the drug entry is grouped by the counter questions — 💊 How to give · ⛔ Who must not · ⚠️ What to watch · 🗣 Tell the patient · 🧬 Why it works · 🔗 (👶 first when there is a peds dose); same fields regrouped, Thai titles + field names on a Thai page, an empty question is left out
