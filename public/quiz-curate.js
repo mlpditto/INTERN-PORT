@@ -466,7 +466,7 @@
         setup();
         startSession(source);
         dialog.showModal(); byId('curate-target').focus();
-        loadHistory(state);
+        loadHistory(state, true);   // V102.647: a fresh open comes back on the last saved result of these questions
     };
     // Fresh session from an editor snapshot. `keep` carries the admin's settings across ↻ Use latest questions.
     function startSession(source, keep = {}) {
@@ -500,14 +500,36 @@
         return { version: 1, form: s.source.form, model: s.model, target: target(s), mode: s.mode,
             pins: [...s.pins].sort((a, b) => a - b), instructions: byId('curate-instructions').value.trim() };
     }
-    async function loadHistory(s) {
+    // V102.647 (owner pick A, mockup-curate-reopen): `adopt` = a fresh open. Every open resets the settings (Settings model, Keep 10, balanced, no
+    // pins, no instructions), so a run made with any other setting never matched and the window came back empty — Suggest had to be paid for again.
+    // Now a fresh open takes the NEWEST saved run of THESE questions and puts its model, Keep, strategy, pins and instructions back, so that run is
+    // the one on screen. A run of other questions (edited since) has another key: it stays in 🕘 and Suggest is asked for, as before.
+    async function adoptLastRun(s, initial) {
+        for (const run of s.runs || []) {
+            if (!window.TEXT_AI_MODELS.some(m => m.id === run.model)) continue;   // a retired model cannot be picked again — leave that run in 🕘
+            const settings = { version: 1, form: s.source.form, model: run.model, target: run.target, mode: run.mode,
+                pins: [...(run.pins || [])].sort((a, b) => a - b), instructions: String(run.instructions || '').trim() };
+            if (await curateHistory.key(settings) !== run.key) continue;
+            if (state !== s || s.busy || s.proposal || fingerprint(requestSettings(s)) !== initial) return null;   // the admin moved on while this was read
+            s.model = run.model; s.mode = run.mode; s.pins = new Set(run.pins || []);
+            byId('curate-target').value = run.target;
+            byId('curate-instructions').value = run.instructions || ''; dialog.querySelector('.curate-instructions').open = !!run.instructions;
+            const provider = (window.TEXT_AI_MODELS.find(m => m.id === run.model)?.label || '').split(' ')[0];
+            const providerTab = dialog.querySelector(`.audit-provider[data-provider="${provider}"]`);
+            if (providerTab) window.browseAuditProvider(providerTab);
+            return run;
+        }
+        return null;
+    }
+    async function loadHistory(s, adopt = false) {
         const initial = fingerprint(requestSettings(s));
         try {
             s.runs = await curateHistory.load(s.source.sourceId);
             if (state !== s) return;
             const key = await curateHistory.key(requestSettings(s));
             if (state !== s || s.busy || s.proposal || fingerprint(requestSettings(s)) !== initial) return;
-            const match = s.runs.find(r => r.key === key);
+            let match = s.runs.find(r => r.key === key);
+            if (!match && adopt) { match = await adoptLastRun(s, initial); if (state !== s || s.busy || s.proposal) return; }
             if (match) {
                 s.proposal = validateProposal({ questions: match.proposal }, s, target(s));
                 s.keep = new Set(s.proposal.filter(q => q.keep).map(q => q.id)); s.needsSuggestion = false;
