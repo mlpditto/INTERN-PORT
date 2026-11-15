@@ -44,7 +44,11 @@
     const trialModels = window.TEXT_AI_TRIAL_MODELS = [
         { id: 'or/x-ai/grok-4.7', label: 'Grok 4.7', short: 'Grok 4.7', hint: 'Grok 4.7 (SpaceXAI) รุ่นทดลอง สำหรับ Audit / Analyze ผ่าน OpenRouter' },
         // V102.76: Ollama on the admin's own computer (ollama-local.js; the browser calls localhost:11434 directly).
-        { id: 'ol/local', label: 'Ollama local', short: 'Ollama', hint: 'Ollama บนเครื่องนี้ (localhost:11434) รุ่นทดลอง ใช้ได้เมื่อ Ollama เปิดอยู่และอนุญาตเว็บนี้ใน OLLAMA_ORIGINS — ไม่คิดค่าใช้จ่าย ช้ากว่าโมเดลออนไลน์' }
+        { id: 'ol/local', label: 'Ollama local', short: 'Ollama', hint: 'Ollama บนเครื่องนี้ (localhost:11434) รุ่นทดลอง ใช้ได้เมื่อ Ollama เปิดอยู่และอนุญาตเว็บนี้ใน OLLAMA_ORIGINS — ไม่คิดค่าใช้จ่าย ช้ากว่าโมเดลออนไลน์' },
+        // V102.642 (owner): Inkling 2 Small (Thinking Machines, open weights, text + image in) as the second chip under the Ollama tab (the tab = the
+        // first word of `label`) — but it is called through OpenRouter ($0.30/$1 per MTok), so data leaves this computer, unlike `ol/local`.
+        // The `:free` variant answers 403 "only available on agentic harnesses" to this app (probe 2026-11-15), so this is the paid id.
+        { id: 'or/thinkingmachines/inkling-2-small', label: 'Ollama Inkling 2 Small', short: 'Inkling 2 Small', hint: 'Inkling 2 Small ของ Thinking Machines รุ่นทดลอง รับภาพ เร็ว ราคาประหยัด — เรียกผ่าน OpenRouter (ข้อมูลออกนอกเครื่อง ไม่ใช่ Ollama บนเครื่องนี้) · Thinking Machines Inkling 2 Small, 이미지 입력, OpenRouter 경유' }
     ];
     // V101.57: Gemini called directly (Vertex, or AI Studio `as/`) is billed to the Google Cloud
     // billing account; `or/google/…` is billed by OpenRouter. The chip shows it (text-ai-chips.css).

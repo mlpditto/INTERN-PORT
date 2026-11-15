@@ -1680,7 +1680,8 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             // thinking like DeepSeek did in V101.28. It takes the same `effort: "low"` as DeepSeek.
             // V102.432: Moonshot Kimi K3.1 Pro is a reasoning model too (OpenRouter lists `reasoning` + `reasoning_effort`) — same effort "low" as DeepSeek / Grok.
             const orIsQwen = /^qwen\//i.test(orModel);
-            const orReasoningCapable = !isImageRequest && (orIsQwen || /^(deepseek|x-ai|moonshotai)\//i.test(orModel));
+            // V102.642: Thinking Machines Inkling 2 Small reasons too (endpoints list `reasoning` + `reasoning_effort`) — effort "low" probed 2026-11-15.
+            const orReasoningCapable = !isImageRequest && (orIsQwen || /^(deepseek|x-ai|moonshotai|thinkingmachines)\//i.test(orModel));
             const orReasoning = orIsQwen
                 ? { max_tokens: Math.max(1024, Math.floor(orMaxTokens * 0.2)), exclude: true }
                 : { effort: "low", exclude: true };
