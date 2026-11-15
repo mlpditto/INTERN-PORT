@@ -54,7 +54,7 @@ fs.writeFileSync(tmp, `<!DOCTYPE html><html><head><meta charset="utf-8"><link re
     assert.equal(await page.locator('#c .mr-vendor').count(), 9, 'C: 9 vendor icons (7 + Grok + Ollama)');
     assert.equal(await page.locator('#c .mr-vendor[data-provider="Ollama"] .text-ai-logo').count(), 1, 'C: Ollama is a logo, not the word');
     assert.ok(g.spread <= 4 && seated(g.seq) && g.seq.includes('[Claude*]'), 'C: one line, only the picked vendor’s chips after its icon: ' + g.seq.join(' '));
-    assert.equal(await page.locator('#c .text-ai-chips > button[data-value]').count(), 21, 'C: every chip still in the DOM');
+    assert.equal(await page.locator('#c .text-ai-chips > button[data-value]').count(), 22, 'C: every chip still in the DOM');   // V102.642: + Inkling 2 Small
 
     // 3 · Compare B (B · its own vendor icons · that vendor's models) → chips after the picked icon
     await page.evaluate(() => { document.body.insertAdjacentHTML('beforeend', '<div id="d" style="width:900px">' + _compareModelBPickerHtml() + '</div>'); });

@@ -54,10 +54,10 @@ for (const id of ['lp-gen-btn', 'lp-path-toggle-btn', 'lp-path-subtitle', 'lp-pa
         await p.evaluate(() => { document.getElementById('lp-path-subtitle').textContent = 'Generated 4/10/2026'; });
         assert.equal(await p.locator('#lp-path-subtitle').isVisible(), true, 'the generated-on date still shows');
 
-        // trial chips: Ollama tab shows only "Ollama local"; picking it sets the model, marks it, and is remembered
+        // trial chips: Ollama tab shows "Ollama local" and (V102.642) Inkling 2 Small; picking it sets the model, marks it, and is remembered
         await p.locator('#lp-providers .audit-provider[data-provider="Ollama"]').click();
-        assert.deepEqual(await visibleChips(p), ['Ollama']);
-        await p.locator('#lp-model-row .text-ai-chips > button:not([hidden])').click();
+        assert.deepEqual(await visibleChips(p), ['Ollama', 'Inkling 2 Small']);
+        await p.locator('#lp-model-row .text-ai-chips > button:not([hidden])').first().click();
         assert.equal(await p.locator('#lp-ai-model').inputValue(), 'ol/local');
         assert.equal(await p.locator('#lp-model-row .text-ai-chips [aria-pressed="true"]').count(), 1);
         assert.equal(await p.evaluate(() => localStorage.getItem('ai_lp_trial_model')), 'ol/local');
@@ -66,17 +66,17 @@ for (const id of ['lp-gen-btn', 'lp-path-toggle-btn', 'lp-path-subtitle', 'lp-pa
         await p.locator('#lp-providers .audit-provider[data-provider="Claude"]').click();
         await p.locator('#lp-model-row .text-ai-chips > button:not([hidden])', { hasText: 'Sonnet 5.5' }).click();
         assert.equal(await p.evaluate(() => resolveTrialTextAIModel(document.getElementById('lp-ai-model').value)), await p.evaluate(() => TEXT_AI_MODELS.find(m => /Sonnet 5.5/.test(m.label)).id));
-        assert.equal(await p.evaluate(() => document.querySelectorAll('#lp-model-row .text-ai-chips > button').length), 19 + 2, '19 catalogue chips (V102.588: Kimi joins the catalogue, trial = Grok + Ollama; V102.518: + Qwen 3.8 Omni Flash; V102.365: + Gemini 4 Argon; V102.268: + Muse Spark Open; V102.242: + Gemma 4 26B A4B) + Grok + Kimi + Ollama trial chips');
+        assert.equal(await p.evaluate(() => document.querySelectorAll('#lp-model-row .text-ai-chips > button').length), 19 + 3, 'V102.642: + Inkling 2 Small trial chip; 19 catalogue chips (V102.588: Kimi joins the catalogue, trial = Grok + Ollama; V102.518: + Qwen 3.8 Omni Flash; V102.365: + Gemini 4 Argon; V102.268: + Muse Spark Open; V102.242: + Gemma 4 26B A4B) + Grok + Kimi + Ollama trial chips');
         assert.equal(await p.evaluate(() => localStorage.getItem('ai_lp_trial_model')), null, 'a catalogue pick clears the trial pick');
         await p.locator('#lp-providers .audit-provider[data-provider="Ollama"]').click();
-        await p.locator('#lp-model-row .text-ai-chips > button:not([hidden])').click();
+        await p.locator('#lp-model-row .text-ai-chips > button:not([hidden])').first().click();
         await p.close();
 
         // ---- reload: the saved trial pick comes back (the registry alone would normalise it away) ----
         p = await open(900);
         assert.equal(await p.locator('#lp-ai-model').inputValue(), 'ol/local');
         assert.equal(await p.locator('#lp-providers .audit-provider[aria-pressed="true"]').getAttribute('data-provider'), 'Ollama');
-        assert.deepEqual(await visibleChips(p), ['Ollama']);
+        assert.deepEqual(await visibleChips(p), ['Ollama', 'Inkling 2 Small']);
         await p.close();
 
         // ---- phone ----

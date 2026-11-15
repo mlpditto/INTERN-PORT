@@ -73,10 +73,10 @@ for (const id of ['ai-model-review', 'ai-model-grammar', 'rr-providers', 'rr-gra
         await p.waitForFunction(() => getComputedStyle(document.querySelector('#rr-model-row .text-ai-chips [aria-pressed="true"]')).color === 'rgb(255, 255, 255)', null, { timeout: 3000 }).catch(() => assert.fail('picked chip is the solid vendor colour (white name)'));
         assert.equal(await p.evaluate(() => localStorage.getItem('ai_default_review_model')), 'or/qwen/qwen3.8-flash', 'catalogue pick is the review default');
 
-        // trial: Ollama tab → one chip; picking it holds in the <select> (option added), is remembered under its own key, and reaches the AI call unnormalised
+        // trial: Ollama tab → Ollama local + (V102.642) Inkling 2 Small; picking the first holds in the <select> (option added), is remembered under its own key, and reaches the AI call unnormalised
         await p.locator('#rr-providers .audit-provider[data-provider="Ollama"]').click();
-        assert.deepEqual(await visibleChips(p, 'rr-model-row'), ['Ollama']);
-        await p.locator('#rr-model-row .text-ai-chips > button:not([hidden])').click();
+        assert.deepEqual(await visibleChips(p, 'rr-model-row'), ['Ollama', 'Inkling 2 Small']);
+        await p.locator('#rr-model-row .text-ai-chips > button:not([hidden])').first().click();
         assert.equal(await p.locator('#ai-model-review').inputValue(), 'ol/local', 'select holds the trial id');
         assert.equal(await p.evaluate(() => localStorage.getItem('ai_rr_trial_ai-model-review')), 'ol/local');
         assert.equal(await p.evaluate(() => localStorage.getItem('ai_default_review_model')), 'or/qwen/qwen3.8-flash', 'trial pick never becomes the Settings default');
