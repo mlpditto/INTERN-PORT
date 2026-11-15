@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.652)</title>
+    <title>Nika Admin (V102.653)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -8852,7 +8852,7 @@
     <script src="ollama-local.js?v=V102.109"></script>
 <script src="case-dup.js?v=V102.569"></script>
 <script src="case-article.js?v=V102.395"></script>
-<script src="dca-ai-trail.js?v=V102.390"></script>
+<script src="dca-ai-trail.js?v=V102.653"></script>
 <script src="dxa-ai-trail.js?v=V102.389"></script>
 <script src="case-review-ai.js?v=V102.595"></script>
 <script src="case-file-review.js?v=V102.550"></script>
@@ -50983,7 +50983,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         titles: DCA_SECTION_TITLES,
                         onJumpTo: key => dcaSwitchSection(key),
                         onMarkVerified: key => { dcaState.verified[key] = true; dcaUpdateSectionBadges(); dcaRefreshVerifyStrip(); },
-                        check: dcaGateCheck   // V102.638
+                        check: dcaGateCheck,   // V102.638
+                        history: () => (window.dcaAiTrail && window.dcaAiTrail.history ? window.dcaAiTrail.history() : '')   // V102.653
                     });
                     if (!ok) return;
                 }
@@ -51198,7 +51199,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const more = notes.length > 1 ? ' (+' + (notes.length - 1) + ')' : '';
                 byKey[k] = { level, note: notes.length ? notes[0] + more : level === 'ok' ? (findings ? 'no issue found' : 'Jev ok') + (findings && j ? '' : findings ? ' · Jev not run' : ' · AI Review failed') : 'check failed' };
             });
-            const foot = (findings ? '🔍 AI Review · ' : '🔍 AI Review failed · ') + (j ? '🧠 Jev' + (j.calibrated === false ? ' (not yet calibrated on drug text)' : '') : '🧠 Jev not run') + ' — advice only, model knowledge, not live sources';
+            // V102.653: say WHICH model reviewed (it is picked to differ from the one that filled; ⚠ when it could not)
+            const trail = window.dcaAiTrail && window.dcaAiTrail.state ? window.dcaAiTrail.state() : { fill: null, review: [] };
+            const rvModel = findings ? (dcaState._reviewModel || trail.review[trail.review.length - 1] || '') : '';
+            const rvName = rvModel ? (window.dcaAiTrail ? window.dcaAiTrail.label(rvModel) : String(rvModel)) : '';
+            const rvSame = !!rvName && !!trail.fill && window.dcaAiTrail.label(trail.fill) === rvName;
+            const foot = (findings ? '🔍 AI Review · ' + (rvName ? rvName + (rvSame ? ' ⚠ same model as the fill' : '') + ' · ' : '') : '🔍 AI Review failed · ') + (j ? '🧠 Jev' + (j.calibrated === false ? ' (not yet calibrated on drug text)' : '') : '🧠 Jev not run') + ' — advice only, model knowledge, not live sources';
             return { byKey, foot };
         }
 
@@ -51209,6 +51215,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const onJumpTo = typeof opts.onJumpTo === 'function' ? opts.onJumpTo : () => {};
             const onMarkVerified = typeof opts.onMarkVerified === 'function' ? opts.onMarkVerified : () => {};
             const check = typeof opts.check === 'function' ? opts.check : null;   // V102.638: Drug Codex — AI Review + Jev
+            const history = typeof opts.history === 'function' ? opts.history : null;   // V102.653: 🤖 filled by · when   🔍 checked by · when
             return new Promise(resolve => {
                 const overlay = document.createElement('div');
                 overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:100050;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
@@ -51225,6 +51232,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                         <div style="padding:18px 20px 6px;">
                             <h3 style="margin:0 0 6px; color:#b45309; font-size:1.05em; display:flex; align-items:center; gap:8px;">⚠️ <span data-count>${keys.length}</span> tab(s) still unverified${check ? `<button type="button" data-act="check" title="🔍 AI Review (another model than the one that drafted) + 🧠 Jev (is each tab about this drug · Thai = English) — advice only, you still tick" style="margin-left:auto; width:auto; min-height:0; padding:6px 12px; border:none; border-radius:999px; background:linear-gradient(135deg,#0ea5e9,#6366f1); color:#fff; font-weight:800; font-size:0.8em; cursor:pointer;">🔍 Check</button>` : ''}</h3>
                             <div style="font-size:0.85em; color:#78716c;">Press "👁 Go to" to open that tab, or "✓ Verified" if it already looks right.</div>
+                            <div class="cvg-hist" style="margin-top:6px; font-size:0.78em; font-weight:700; color:#475569; white-space:pre-wrap;" ${history && history() ? '' : 'hidden'}>${history ? escapeHtml(history()) : ''}</div>
                         </div>
                         <div data-rows style="padding:12px 20px; overflow-y:auto; flex:1;">${keys.map(rowHtml).join('')}</div>
                         <div style="padding:14px 20px 18px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid #f1f5f9;">
@@ -51268,6 +51276,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     let res = null;
                     try { res = await check(keys); } catch (e) { console.warn('verify gate check', e); }
                     checkBtn.disabled = false; checkBtn.textContent = '🔍 Check again';
+                    { const h = overlay.querySelector('.cvg-hist'), t = history ? history() : ''; if (h) { h.textContent = t; h.hidden = !t; } }   // the check just added itself to the history
                     const by = (res && res.byKey) || {}, COL = { ok: ['#bbf7d0', '#f0fdf4', '#166534'], warn: ['#fde68a', '#fffbeb', '#92400e'], bad: ['#fecaca', '#fef2f2', '#991b1b'], unknown: ['#e2e8f0', '#f8fafc', '#475569'] };
                     let clear = 0;
                     rowsWrap.querySelectorAll('.cvg-row').forEach(row => {
@@ -51336,7 +51345,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             payload.lastReviewedAt = nowTs;
             payload.reviewedBy = reviewerEmail;
             payload.aiDrafted = false;
-            if (draft.aiDraftedModel) payload.aiDraftedModel = draft.aiDraftedModel;   // V102.390: the published entry still says which model filled it
+            if (draft.aiDraftedModel) { payload.aiDraftedModel = draft.aiDraftedModel; if (draft.aiDraftedAt) payload.aiDraftedAt = draft.aiDraftedAt; }   // V102.390: the published entry still says which model filled it
             if (Array.isArray(draft.aiReviewedModels) && draft.aiReviewedModels.length) payload.aiReviewedModels = draft.aiReviewedModels;
             // V94.46: approve-as-is path — seed contributors[] with both the intern
             // submitter and the approving admin. Literal array (set() can't use arrayUnion).
@@ -52278,7 +52287,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 if (empty) { merged[key] = r.fill[key]; filled.push(key); }
             });
             merged.aiDrafted = true;
-            merged.aiDraftedModel = r.model;
+            merged.aiDraftedModel = r.model; merged.aiDraftedAt = Date.now();   // V102.653
             dcaFillForm(merged);
             if (typeof showToast === 'function') showToast(`🤖 "${drug.genericName}": ${filled.length} empty field${filled.length === 1 ? '' : 's'} filled by ${r.model}. Verify, then Save.`);
             const edu = (r.edu || []).filter(k => filled.includes(k));
@@ -52365,7 +52374,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             });
             if (!Object.keys(payload).length) return 0;
             const email = (auth.currentUser && auth.currentUser.email) || 'admin-ui';
-            Object.assign(payload, { aiDrafted: true, aiDraftedModel: r.model || '', updatedAt: firebase.firestore.FieldValue.serverTimestamp(), contributors: firebase.firestore.FieldValue.arrayUnion('admin:' + email) });
+            Object.assign(payload, { aiDrafted: true, aiDraftedModel: r.model || '', aiDraftedAt: Date.now(), updatedAt: firebase.firestore.FieldValue.serverTimestamp(), contributors: firebase.firestore.FieldValue.arrayUnion('admin:' + email) });
             batch.update(db.collection('drug_codex').doc(id), payload);
             return Object.keys(fields).length;
         }
@@ -52829,7 +52838,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 merged._id = dcaState.editingId; // restore doc-id strip via dcaFillForm
                 merged.aiDrafted = true;          // surface the badge until first human save
                 // V94.45: stamp the model so the pill + subtitle can name it.
-                merged.aiDraftedModel = (resp && resp.model) ? resp.model : selectedModel;
+                merged.aiDraftedModel = (resp && resp.model) ? resp.model : selectedModel; merged.aiDraftedAt = Date.now();   // V102.653
+                merged.aiReviewedAt = window.dcaAiTrail ? window.dcaAiTrail.state().reviewAt : 0;
                 merged.aiReviewedModels = window.dcaAiTrail ? window.dcaAiTrail.state().review : [];   // V102.390: the fill replaces the filler, not the checkers
                 let filledCount = 0;
                 // V94.50: track which Edu fields got new content so we only

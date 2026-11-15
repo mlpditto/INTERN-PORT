@@ -2,7 +2,7 @@
 // (drug_codex.aiDraftedModel / aiReviewedModels) — and a one-tap "check again with another model" in the AI Review panel.
 // The 🔁 picks a model from a DIFFERENT provider than the one that filled / already checked (a second opinion from the same family is not one).
 (function () {
-    const state = { fill: null, review: [] };
+    const state = { fill: null, review: [], fillAt: 0, reviewAt: 0 };   // V102.653: + when (ms; 0 = not recorded — entries saved before this)
     const MAX_REVIEWS = 4;
     const bare = (id) => String(id || '').replace(/^(as|or)\//, '').trim();
     const models = () => (Array.isArray(window.TEXT_AI_MODELS) ? window.TEXT_AI_MODELS : []);
@@ -13,6 +13,23 @@
     const esc = (s) => (typeof escapeHtml === 'function' ? escapeHtml(String(s)) : String(s).replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';'));
     const same = (a, b) => !!a && !!b && bare(a) === bare(b);
 
+    const toMs = (t) => (t && typeof t.toMillis === 'function') ? t.toMillis() : (t && t.seconds ? t.seconds * 1000 : (Number(t) > 0 ? Number(t) : 0));
+    // "today 14:05" · "yesterday" · "12 Nov" (Bangkok); '' when the time was never recorded
+    function when(ms) {
+        if (!ms) return '';
+        const day = (d) => new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+        if (day(ms) === day(Date.now())) return 'today ' + new Date(ms).toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
+        if (day(ms) === day(Date.now() - 864e5)) return 'yesterday';
+        return new Date(ms).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short' }) + (new Date(ms).getFullYear() !== new Date().getFullYear() ? ' ' + new Date(ms).getFullYear() : '');
+    }
+    // one line for the verify gate: who filled (when) · who checked last (when); '' when no AI touched the entry
+    function history() {
+        const last = state.review[state.review.length - 1], parts = [];
+        if (state.fill) parts.push('🤖 Filled · ' + label(state.fill) + (state.fillAt ? ' · ' + when(state.fillAt) : ''));
+        if (last) parts.push('🔍 Checked · ' + label(last) + (same(last, state.fill) ? ' ⚠ same model' : '') + (state.reviewAt ? ' · ' + when(state.reviewAt) : ''));
+        else if (state.fill) parts.push('🔍 not checked yet');
+        return parts.join('   ');
+    }
     function render() {
         const el = document.getElementById('dca-form-ai-trail');
         if (!el) return;
@@ -41,22 +58,24 @@
         load(data) {
             state.fill = (data && data.aiDraftedModel) ? String(data.aiDraftedModel) : null;
             state.review = Array.isArray(data && data.aiReviewedModels) ? data.aiReviewedModels.map(String).filter(Boolean).slice(0, MAX_REVIEWS) : [];
+            state.fillAt = state.fill ? toMs(data.aiDraftedAt) : 0; state.reviewAt = state.review.length ? toMs(data.aiReviewedAt) : 0;
             render();
         },
         addReview(id) {
             if (!id) return;
             state.review = state.review.filter(x => !same(x, id)).concat(String(id)).slice(-MAX_REVIEWS);
+            state.reviewAt = Date.now();
             render();
         },
-        state: () => ({ fill: state.fill, review: state.review.slice() }),
+        state: () => ({ fill: state.fill, review: state.review.slice(), fillAt: state.fillAt, reviewAt: state.reviewAt }),
         // fields to keep on the saved entry (nothing new when no AI touched it)
         payload() {
             const p = {};
-            if (state.fill) p.aiDraftedModel = state.fill;
-            if (state.review.length) p.aiReviewedModels = state.review.slice();
+            if (state.fill) { p.aiDraftedModel = state.fill; if (state.fillAt) p.aiDraftedAt = state.fillAt; }
+            if (state.review.length) { p.aiReviewedModels = state.review.slice(); if (state.reviewAt) p.aiReviewedAt = state.reviewAt; }
             return p;
         },
-        other, label, render,
+        other, label, render, history, when,
         // the review panel's model name + 🔁 (the model it was checked with is the last one added)
         panelHtml() {
             const last = state.review[state.review.length - 1];
