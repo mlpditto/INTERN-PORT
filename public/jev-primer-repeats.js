@@ -17,7 +17,7 @@
         const primers = window._praRead().map(x => x.primer);
         btn.disabled = true;
         const text = btn.textContent;
-        btn.textContent = 'Checking…';
+        btn.textContent = '⏳ Jev';   // V102.644: the chip says who is checking
         try {
             const r = (await adminApp.functions().httpsCallable('jevPrimerRepeats')({ primers })).data || {};
             if (r.enabled === false) { showToast('Jev is switched off'); return; }
