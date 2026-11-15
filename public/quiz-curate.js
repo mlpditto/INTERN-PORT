@@ -76,6 +76,67 @@
         return JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item)
             ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
     }
+    // V102.648 (owner: an explicit button that says the result is "from the old set"; pick A + lean L1, mockup-curate-old-set): every saved run
+    // also keeps one short key per question (text, body, type, options, key — not tags / timer / explanation), so a run made before a question was
+    // deleted, added or edited can be CARRIED OVER to the questions that are still the same. Never by itself: an amber chip offers it.
+    function shortKey(text) {   // two 32-bit FNV-1a passes → 16 hex; only ever compared inside one quiz's five runs
+        let a = 0x811c9dc5, b = 0x01000193;
+        for (let i = 0; i < text.length; i++) { const c = text.charCodeAt(i); a = Math.imul(a ^ c, 0x01000193) >>> 0; b = Math.imul(b ^ (c + i), 0x811c9dc5) >>> 0; }
+        return a.toString(16).padStart(8, '0') + b.toString(16).padStart(8, '0');
+    }
+    const questionKey = q => shortKey(fingerprint([looseValue(q.q), looseValue(q.content), q.type || 'choice', (q.options || []).map(looseValue), looseValue(q.correct)]));
+    // the newest run (of a model still offered) that still covers at least half of today's questions — and at least two
+    function findOldSet(s) {
+        const now = s.source.form.questions.map(questionKey);
+        for (const run of s.runs || []) {
+            if (!Array.isArray(run.qkeys) || !Array.isArray(run.proposal) || !window.TEXT_AI_MODELS.some(m => m.id === run.model)) continue;
+            const free = new Map(); run.qkeys.forEach((k, i) => { if (!free.has(k)) free.set(k, []); free.get(k).push(i + 1); });
+            const map = new Map();   // today's number → that run's number
+            now.forEach((k, j) => { const list = free.get(k); if (list && list.length) map.set(j + 1, list.shift()); });
+            if (map.size >= 2 && map.size * 2 >= now.length) return { run, map, matched: map.size, total: now.length, gone: run.qkeys.length - map.size };
+        }
+        return null;
+    }
+    function useOldSet(s) {
+        const o = s.oldOffer; if (!o || s.busy || s.saving || s.saved) return;
+        const back = new Map([...o.map].map(([now, was]) => [was, now]));
+        const proposal = s.source.form.questions.map((_, i) => {
+            const id = i + 1, a = o.run.proposal.find(p => p.id === o.map.get(id));
+            if (!a) return { id, keep: true, notAssessed: true, topic: '', reasonType: 'other', related: [], reason: 'Not assessed — this question changed since that run.', reasonTh: 'ยังไม่ได้ประเมิน — ข้อนี้ถูกแก้หรือเพิ่มหลังรอบนั้น · 미평가 — 그 실행 이후 수정되었거나 추가된 문항입니다',
+                detail: 'The saved result has no verdict for this question.', detailTh: 'ผลที่บันทึกไว้ไม่มีคำตัดสินของข้อนี้ · 저장된 결과에 이 문항의 판정이 없습니다', impact: 'Unknown — run Suggest to assess it.', impactTh: 'ยังไม่ทราบ — กด Suggest เพื่อประเมิน · 알 수 없음 — Suggest를 눌러 평가하세요' };
+            const related = (a.related || []).filter(r => back.has(r.id)).map(r => ({ ...r, id: back.get(r.id), evidence: (r.evidence || []).filter(e => back.has(e.id)).map(e => ({ ...e, id: back.get(e.id) })) }));
+            return { ...a, id, related, reasonType: a.reasonType === 'overlap' && !related.length ? 'other' : a.reasonType };
+        });
+        s.model = o.run.model; s.mode = o.run.mode; s.pins = new Set((o.run.pins || []).filter(id => back.has(id)).map(id => back.get(id)));
+        s.proposal = proposal; s.keep = new Set(proposal.filter(q => q.keep || s.pins.has(q.id)).map(q => q.id));
+        byId('curate-target').value = s.keep.size;   // what is kept now — it can differ from that run's Keep when a kept question is gone
+        byId('curate-instructions').value = o.run.instructions || ''; dialog.querySelector('.curate-instructions').open = !!o.run.instructions;
+        const provider = (window.TEXT_AI_MODELS.find(m => m.id === s.model)?.label || '').split(' ')[0];
+        const providerTab = dialog.querySelector(`.audit-provider[data-provider="${provider}"]`); if (providerTab) window.browseAuditProvider(providerTab);
+        s.oldSet = o; s.needsSuggestion = false; s.done = true; s.startedAt = 0; s.finishedAt = o.run.elapsedMs; s.message = '';
+        s.view = s.keep.size < proposal.length ? 'remove' : 'keep';
+        setStatus('Based on an older set · ' + o.run.model + ' · ' + new Date(o.run.createdAt).toLocaleString() + ' · ' + o.matched + ' of ' + o.total + ' carried over · No AI call');   // no run time on 🕘: nothing ran
+        render();
+    }
+    function clearOldSet(s) {
+        if (!s.oldSet || s.busy || s.saving || s.saved) return;
+        s.oldSet = null; s.proposal = null; s.keep = new Set(s.source.form.questions.map((_, i) => i + 1)); s.pins.forEach(id => s.keep.add(id));
+        s.needsSuggestion = true; s.done = false; s.view = 'keep'; s.message = '';
+        setStatus('Previous results differ from these questions or settings. Select Suggest.');
+        render();
+    }
+    function paintOldSet(s) {
+        const chip = byId('curate-old'), o = s.oldSet || (!s.proposal && !s.busy ? s.oldOffer : null);
+        chip.hidden = !o; if (!o) return;
+        const on = !!s.oldSet, fresh = o.total - o.matched, model = window.TEXT_AI_MODELS.find(m => m.id === o.run.model), when = new Date(o.run.createdAt).toLocaleString();
+        chip.classList.toggle('on', on); chip.setAttribute('aria-pressed', String(on)); chip.disabled = !!(s.busy || s.saving || s.saved);
+        chip.replaceChildren(document.createTextNode((on ? '⚠️' : '↩') + ' old set '), node('b', o.matched + '/' + o.total));
+        chip.title = on
+            ? 'Based on an older set · ' + o.matched + ' carried over · ' + fresh + ' changed or new = not assessed · ' + o.gone + ' no longer in the quiz · numbers inside the reasons are the old ones. Tap to clear.'
+            : 'Last result is from an older set — ' + (model?.short || o.run.model) + ' · ' + o.run.count + ' → Keep ' + o.run.target + ' · ' + when + '. ' + o.matched + ' of your ' + o.total + ' questions were in it. Tap to carry it over (no AI call); a changed or new question stays Keep, not assessed.';
+        chip.dataset.thTitle = on ? 'อิงจากชุดคำถามเก่า · ยกมา ' + o.matched + ' ข้อ · ' + fresh + ' ข้อถูกแก้หรือเพิ่มใหม่ = ยังไม่ประเมิน · ' + o.gone + ' ข้อไม่อยู่ใน quiz แล้ว · เลขข้อในเหตุผลเป็นของชุดเก่า กดเพื่อล้าง' : 'ผลล่าสุดมาจากชุดคำถามเก่า · ' + o.matched + ' จาก ' + o.total + ' ข้อยังเหมือนเดิม กดเพื่อนำมาใช้ ไม่เรียก AI ข้อที่ถูกแก้หรือเพิ่มใหม่จะเก็บไว้และยังไม่ประเมิน'; chip.dataset.krTitle = on ? '이전 문항 세트 기준 · ' + o.matched + '개 이어받음 · ' + fresh + '개 변경·추가 = 미평가 · ' + o.gone + '개는 퀴즈에 없음 · 사유 속 번호는 이전 세트 기준입니다. 눌러서 해제' : '마지막 결과는 이전 문항 세트의 것입니다 · ' + o.total + '개 중 ' + o.matched + '개 문항이 그대로입니다. 눌러서 가져오기 (AI 호출 없음). 변경·추가된 문항은 유지되고 미평가로 표시됩니다';
+        chip.setAttribute('aria-label', on ? 'Based on an older set: ' + o.matched + ' of ' + o.total + ' carried over. Clear' : 'Use the last result, from an older set: ' + o.matched + ' of ' + o.total + ' questions');
+    }
     const RAIL_FOLD_KEY = 'quiz_curate_rail_folded';
     function node(tag, text, className) {
         const el = document.createElement(tag); if (text !== undefined) el.textContent = text;
@@ -337,7 +398,9 @@
         // V102.219: …now inside the controls row (display:contents, CSS orders them): 20→[15] │ ⚖ ★ ⇄ │ ✏️ 🕘 03:37 │ ↻. The status text is for screen readers unless it is a problem.
         const foot = node('div', undefined, 'curate-foot'); byId('curate-suggest').before(foot);
         const status = node('div'); status.id = 'curate-history-status'; status.setAttribute('role', 'status');
-        foot.append(dialog.querySelector('.curate-instructions'), history, status);
+        const oldSet = node('button', undefined, 'curate-old lang-no-toggle'); oldSet.type = 'button'; oldSet.id = 'curate-old'; oldSet.hidden = true;   // V102.648 (lean L1): inline with ✏ 🕘 Suggest, no line of its own
+        oldSet.onclick = () => { if (state) (state.oldSet ? clearOldSet : useOldSet)(state); };
+        foot.append(dialog.querySelector('.curate-instructions'), history, status, oldSet);   // last in the DOM, seated between ✏ and 🕘 by its flex order
         // V101.95: when the editor's questions changed, this takes Suggest's place — no close / reopen needed.
         const reload = node('button', '↻ Use latest questions', 'curate-primary'); reload.type = 'button'; reload.id = 'curate-reload'; reload.hidden = true;
         reload.title = 'อ่านคำถามล่าสุดจาก Editor อีกครั้ง โดยคงจำนวน โหมด โมเดล และคำสั่งเดิมไว้';
@@ -363,6 +426,7 @@
         const focusedAction = focusedRow && { id: focusedRow.dataset.questionId, selector: document.activeElement.classList.contains('curate-pin') ? '.curate-pin' : '.curate-move' };
         const count = s.source.form.questions.length;
         dialog.setAttribute('aria-busy', String(s.busy || s.saving));
+        paintOldSet(s);
         const modelInfo = window.TEXT_AI_MODELS.find(m => m.id === s.model);
         byId('curate-model').textContent = modelInfo?.short || modelInfo?.label || s.model;
         byId('curate-model-chip').setAttribute('aria-label', 'Model: ' + (modelInfo?.label || s.model) + ' — show all models');
@@ -384,12 +448,14 @@
             sourceView(row.querySelector('.curate-source'), q, false, [], s.source.missingKeys.includes(id), id);
             const reason = row.querySelector('.curate-reason');
             const source = row.querySelector('.curate-source'); source.insertBefore(reason, source.querySelector('.curate-source-controls'));
-            if (s.pins.has(id) || (assessment && assessment.keep !== kept)) {
+            if (s.pins.has(id) || (assessment && !assessment.notAssessed && assessment.keep !== kept)) {
                 const note = document.createElement('div');
                 note.textContent = s.pins.has(id) ? 'Pinned to keep · ปักหมุดให้เก็บไว้' : 'Manual selection · AI suggested ' + (assessment.keep ? 'Keep' : 'Remove');
                 reason.append(note);
             }
-            if (assessment) {
+            if (assessment && assessment.notAssessed) {   // V102.648: changed or new since the run this result is carried over from — kept, never guessed
+                const na = node('span', 'not assessed · changed since that run', 'curate-na'); na.title = assessment.reasonTh; reason.append(na);
+            } else if (assessment) {
                 bilingual(reason, assessment.reason, assessment.reasonTh);
                 const details = disclosure('Details', 'รายละเอียดเหตุผลและผลกระทบหากตัดข้อนี้', reason);
                 details.className = 'curate-reason-details';
@@ -411,8 +477,9 @@
         if (!rows.children.length) rows.textContent = 'No questions in this group.';
         let coverage = 'Coverage pending · ' + s.pins.size + ' pinned';
         if (s.proposal) {
-            const topics = new Set(s.proposal.map(q => q.topic));
-            const covered = new Set(s.proposal.filter(q => s.keep.has(q.id)).map(q => q.topic));
+            const assessed = s.proposal.filter(q => !q.notAssessed);   // V102.648: a question with no verdict has no topic to cover
+            const topics = new Set(assessed.map(q => q.topic));
+            const covered = new Set(assessed.filter(q => s.keep.has(q.id)).map(q => q.topic));
             const missing = [...topics].filter(t => !covered.has(t));
             coverage = missing.length ? 'Coverage gap · ' + missing.join(', ') : covered.size + '/' + topics.size + ' topics covered · ' + s.pins.size + ' pinned';
         }
@@ -472,7 +539,7 @@
     function startSession(source, keep = {}) {
         state = { source: JSON.parse(JSON.stringify(source)), core: core(source), model: keep.model || textAIModel('ai-analyzer-model-val'),
             keep: new Set(source.form.questions.map((_, i) => i + 1)), pins: new Set(), mode: keep.mode || 'balanced', view: 'keep',
-            busy: false, saving: false, saved: false, stale: false, needsSuggestion: true, proposal: null, message: '' };
+            busy: false, saving: false, saved: false, stale: false, needsSuggestion: true, proposal: null, message: '', oldOffer: null, oldSet: null };
         if (source.sourceId) state.serverBaseline = db.collection('quizzes').doc(source.sourceId).get({ source: 'server' })
             .then(doc => ({ exists: doc.exists, data: doc.exists ? doc.data() : null }), error => ({ error }));
         const provider = (window.TEXT_AI_MODELS.find(m => m.id === state.model)?.label || '').split(' ')[0];
@@ -536,7 +603,10 @@
                 s.done = true; s.startedAt = 0; s.finishedAt = match.elapsedMs; s.view = 'remove';
                 setStatus('Saved result · ' + match.model + ' · ' + new Date(match.createdAt).toLocaleString() + ' · No AI call', 'saved', elapsed(s));
                 render();
-            } else setStatus(s.runs.length ? 'Previous results differ from these questions or settings. Select Suggest.' : 'No saved result yet.');
+            } else {
+                setStatus(s.runs.length ? 'Previous results differ from these questions or settings. Select Suggest.' : 'No saved result yet.');
+                s.oldOffer = findOldSet(s); if (s.oldOffer) render();   // V102.648: the chip offers the newest run that still covers these questions
+            }
             renderHistory(s);
         } catch (error) { console.warn('Curate history:', error); if (state === s) setStatus('Could not load history. You can still select Suggest.', 'bad'); }
     }
@@ -700,8 +770,9 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
             }
             const proposal = validateProposal(parsed, s, n);
             s.proposal = proposal; s.keep = new Set(proposal.filter(q => q.keep).map(q => q.id));
+            s.oldSet = null; s.oldOffer = null;   // V102.648: a fresh result of today's questions replaces anything carried over
             s.needsSuggestion = false; s.done = true; s.view = s.keep.size < form.questions.length ? 'remove' : 'keep'; s.message = '';
-            const run = { id: crypto.randomUUID(), key: requestKey, model: s.model, createdAt: Date.now(), elapsedMs: performance.now() - s.startedAt, count: form.questions.length, target: n, mode: s.mode, pins: settings.pins, instructions: settings.instructions, proposal };
+            const run = { id: crypto.randomUUID(), key: requestKey, model: s.model, createdAt: Date.now(), elapsedMs: performance.now() - s.startedAt, count: form.questions.length, target: n, mode: s.mode, pins: settings.pins, instructions: settings.instructions, proposal, qkeys: form.questions.map(questionKey) };
             try {
                 await curateHistory.save(s.source.sourceId, run);
                 if (state !== s) return;

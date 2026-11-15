@@ -10,6 +10,7 @@ Admin: Quiz Editor ▸ ✨ Curate / Expand quiz / Suggested questions.
 
 - `quiz-curate-qa` — Curate responsive 320–1024, routing, validation, safe text; an active quiz is not refused on Remove / Split — the confirm says it will be deactivated first and the same transaction writes `isActive:false` (V102.513)
 - `quiz-curate-reopen-qa` — AI Curate opened again (V102.647): a fresh open adopts the newest saved run of the same questions (model · Keep · strategy · pins · instructions) and shows its result with no AI call; edited questions → defaults; ↻ keeps current settings
+- `quiz-curate-oldset-qa` — AI Curate "old set" (V102.648): runs keep a key per question; after questions change an amber chip `↩ old set m/n` in the tools row offers the last result; tap carries verdicts over with today's numbers (pins + comparisons follow, a changed question = kept + "not assessed"), chip turns `⚠️ old set m/n`, tap again clears
 - `quiz-curate-compact-qa` — one-row Curate controls (mockup #4)
 - `quiz-curate-copy-check` — questionPlainText for the Copy button
 - `quiz-curate-evidence-check` — tolerant evidence check (snapQuote / validateProposal)
