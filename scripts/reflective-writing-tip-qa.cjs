@@ -1,4 +1,4 @@
-// V102.368: Reflective Review · "➕ Add tip to reply" (owner's option A) — the first writing suggestion goes into the reply draft in the
+// V102.368: Reflective Review · "➕ Add tip to reply" (owner's option A; V102.643: the chip reads 💬＋ Tip, aria-label "Add tip to reply") — the first writing suggestion goes into the reply draft in the
 // reply language, with the example edit and a checked reference picked by the suggestion's kind. The REAL admin.html with a fixture log,
 // fixture analyses (object suggestions, string suggestions, unknown kind) and the real chip handler.
 const fs = require('node:fs');
@@ -71,14 +71,14 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
             out.draft3 = draft();
             return out;
         });
-        assert.deepEqual(r.chip0, [true, '➕ Add tip to reply', true, false], 'the chip sits on the Writing suggestions heading: ' + JSON.stringify(r.chip0));
+        assert.deepEqual(r.chip0, [true, '💬＋ Tip', true, false], 'the chip sits on the Writing suggestions heading: ' + JSON.stringify(r.chip0));
         assert.equal(r.card, 1, 'object suggestions render their text');
         assert.equal(r.draft1, 'Thank you for being honest.\n\n✍️ Writing tip: Say which steps you can already handle on your own.\nFor example: “ทำงานได้ครบกระบวนการทั้งหมดโดยยังไม่ต้องถาม” → “ปฏิบัติงานได้ครบทุกขั้นตอนด้วยตนเอง”\nNext time try What? · So what? · Now what? (Rolfe, Freshwater & Jasper, 2001) · https://books.google.com/books?vid=ISBN9780333777954', 'English reply: en tip + example + structure reference: ' + JSON.stringify(r.draft1));
         assert.deepEqual(r.chip1, ['✓ Added to reply', true], 'chip turns ✓ and disables');
         assert.equal(r.status1, '✍️ Writing tip added · ref: Rolfe, Freshwater & Jasper, 2001');
         assert.equal(r.draft1b, r.draft1, 'a second click adds nothing');
         assert.equal(r.chipAfterRerender, '✓ Added to reply', 'a re-render (Apply etc.) keeps the ✓');
-        assert.deepEqual(r.chip2, ['➕ Add tip to reply', false, true], 'another log: fresh chip; string suggestions still render');
+        assert.deepEqual(r.chip2, ['💬＋ Tip', false, true], 'another log: fresh chip; string suggestions still render');
         assert.equal(r.draft2, '✍️ คำแนะนำการเขียน: เพิ่มรายละเอียดของเคสที่พบ', 'Thai reply, string suggestion, no changes: the Thai tip alone');
         assert.equal(r.status2, '✍️ Writing tip added');
         assert.equal(r.draft3, 'Hi.\n\n✍️ Writing tip: Be specific.\nFor example: “ทำงานได้ครบกระบวนการทั้งหมดโดยยังไม่ต้องถาม” → “ปฏิบัติงานได้ครบทุกขั้นตอนด้วยตนเอง”', 'unknown kind: tip + example, no reference');

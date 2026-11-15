@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.642)</title>
+    <title>Nika Admin (V102.643)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -6015,6 +6015,12 @@
         #reflectiveReviewModal .reflective-bonus-chip.ai-pick::after { content:'AI'; margin-left:4px; padding:0 4px; border-radius:5px; background:#7c3aed; color:#fff; font-size:0.78em; vertical-align:1px; }
         #reflectiveReviewModal .reflective-review-actions { flex:1 1 300px; align-items:center; justify-content:flex-end; border:0; padding:0; margin:0; }
         #reflectiveReviewModal #reflective-grammar-score:empty { display:none; }   /* V102.454: an empty score badge takes no wrapped line */
+        /* V102.643 (owner: Writing Analysis #5 #7): the first ✏ Try brings the admin preview into view with a green ring for 1.5 s; while a model
+           is reading, the earlier result fades under one line that names the model */
+        #reflectiveReviewModal #rr-ga-preview { border-radius:10px; transition:box-shadow .25s ease; }
+        #reflectiveReviewModal #rr-ga-preview.rr-ga-flash { box-shadow:0 0 0 3px #22c55e, 0 0 14px rgba(34,197,94,.45); }
+        #reflectiveReviewModal #reflective-grammar-content.rr-ga-stale { opacity:.38; pointer-events:none; }
+        #reflectiveReviewModal #rr-ga-wait { display:inline-flex; align-items:center; gap:5px; margin:0 0 8px; padding:4px 12px; border-radius:999px; background:#eef2ff; border:1px solid #c7d2fe; color:#3730a3; font-size:0.78em; font-weight:700; }
         #reflectiveReviewModal .rr-guard-ban { display:flex; align-items:center; gap:8px; font-size:0.8em; color:#78350f; background:#fffbeb; border:1px solid #fde68a; padding:6px 8px; border-radius:10px; line-height:1.3; }   /* V102.454 */
         #reflectiveReviewModal .rr-guard-ban img { width:18px; height:18px; border-radius:5px; flex:0 0 auto; }
         #reflectiveReviewModal .rr-guard-ban span { flex:1 1 auto; min-width:0; } #reflectiveReviewModal .rr-guard-ban b { font-weight:900; }
@@ -15862,7 +15868,7 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                             <div class="audit-model-row rr-model-row" id="rr-grammar-model-row" title="Analysis model — analyses the intern's writing, separate from the reply model"><div class="audit-providers" id="rr-grammar-providers" role="group" aria-label="Browse model providers"></div><div class="reflective-grammar-model-rail lang-no-toggle" role="group" aria-label="Grammar Model">
                                 <button type="button" class="reflective-grammar-model-chip active" data-value="gemini-3.6-flash" onclick="selectGrammarModel(this)" title="Gemini 3.6 Flash">3.6</button>
                             </div><input type="hidden" id="ai-model-grammar" value="gemini-3.6-flash"></div>
-                            <span id="reflective-grammar-score" style="font-size:0.72em; font-weight:900; padding:3px 10px; border-radius:999px; border:1px solid transparent;"></span>
+                            <span id="reflective-grammar-score" class="lang-no-toggle" style="font-size:0.72em; font-weight:900; padding:3px 10px; border-radius:999px; border:1px solid transparent;"></span>
                         </div>
                     </div>
                     <div id="reflective-grammar-content" class="lang-no-toggle"></div>
@@ -24790,12 +24796,13 @@ Respond ONLY with valid JSON (no markdown, no code fences, no preamble):
                 const guardrail = skipGrammar ? { risky: false, checked: false } : await checkWritingInjectionRisk(grammarSource);
                 const blockedByGuardrail = guardrail.risky;
                 const [feedbackResult, grammarResult] = await Promise.allSettled([
-                    window.callUniversalAI(selectedModelName, feedbackPrompt, true, null, '', { feature: 'reflective_feedback' }),
+                    (((!skipGrammar && !blockedByGuardrail) ? rrGaLoading(true, grammarModel) : null), window.callUniversalAI(selectedModelName, feedbackPrompt, true, null, '', { feature: 'reflective_feedback' })),   // V102.643 (#7): fade the earlier Writing Analysis while this run reads
                     // V94.09: isJson=true → proxy sets responseMimeType:application/json
                     // so the grammar response is raw JSON (no ```json markdown fences).
                     (skipGrammar || blockedByGuardrail) ? Promise.resolve(null) : window.callUniversalAI(grammarModel, grammarPrompt, true, null, '', { feature: 'writing_analysis' })
                 ]);
 
+                rrGaLoading(false);
                 if (feedbackResult.status === 'fulfilled') {
                     const raw = feedbackResult.value.text || '';
                     let parsed = null;
@@ -25146,6 +25153,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             try {
                 // V94.18: honor chip rail selection on Retry too — admin can switch Flash→Pro and re-run.
                 const grammarModel = getGrammarModel();
+                rrGaLoading(true, grammarModel);
                 const result = await window.callUniversalAI(grammarModel, buildGrammarPrompt(grammarSource, detectLanguage(grammarSource)), true, null, '', { feature: 'writing_analysis' });
                 renderGrammarAnalysis(result.text, grammarSource);
                 saveGrammarCache(result.text, grammarSource);
@@ -25156,6 +25164,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 console.error(`[reflective-grammar] retry failed (${getGrammarModel()}):`, err);
                 renderGrammarAnalysisError(reason);
             } finally {
+                rrGaLoading(false);
                 // Button is rerendered by either renderGrammarAnalysis (replaces innerHTML) or
                 // renderGrammarAnalysisError (also replaces innerHTML), so restoring here is
                 // only relevant on the rare path where the button still lives in the DOM.
@@ -25169,6 +25178,27 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         // V93.77: visible error state when the grammar call (gemini-3.5-flash) fails or times out.
         // Previously the card stayed hidden, leaving admins unsure if AI Suggest worked at all.
         // V93.94: added inline Retry button that calls runGrammarOnly (skips feedback re-billing).
+        // V102.643 (#7): a new run while a result is on screen — the earlier result stays readable but faded, under one line naming the model
+        // that is reading. Nothing on screen yet → nothing to fade. Every path that ends a run calls rrGaLoading(false).
+        function rrGaLoading(on, model) {
+            const card = document.getElementById('reflective-grammar-card');
+            const content = document.getElementById('reflective-grammar-content');
+            const old = document.getElementById('rr-ga-wait'); if (old) old.remove();
+            if (content) content.classList.remove('rr-ga-stale');
+            if (!on || !card || !content || card.style.display === 'none' || !content.children.length) return;
+            const info = (typeof window.textAIModelInfo === 'function' && window.textAIModelInfo(model)) || {};
+            content.classList.add('rr-ga-stale');
+            content.insertAdjacentHTML('beforebegin', '<div id="rr-ga-wait" class="lang-no-toggle" role="status" title="The earlier result stays below until the new one arrives" data-th-title="ผลเดิมอยู่ด้านล่างจนกว่าผลใหม่จะมา">⏳ <b>' + escapeHtml(info.short || model || 'AI') + '</b> reading… กำลังอ่าน · earlier result below</div>');
+        }
+        window.rrGaLoading = rrGaLoading;
+        // V102.643 (#5): the first ✏ Try draws the admin preview under the list — bring it into view and ring it green for 1.5 s (not sticky)
+        function rrGaShowPreview() {
+            const p = document.getElementById('rr-ga-preview');
+            if (!p) return;
+            p.classList.add('rr-ga-flash');
+            try { p.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (_) { /* older WebView */ }
+            setTimeout(() => { if (p.isConnected) p.classList.remove('rr-ga-flash'); }, 1500);
+        }
         function renderGrammarAnalysisError(reason) {
             const card = document.getElementById('reflective-grammar-card');
             const content = document.getElementById('reflective-grammar-content');
@@ -25210,10 +25240,11 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 'พอใช้':   { color:'#b45309', bg:'#fffbeb', border:'#fcd34d' },
                 'ควรปรับ': { color:'#dc2626', bg:'#fef2f2', border:'#fca5a5' }
             };
-            const g = gradeMap[data.grade] || gradeMap['พอใช้'];
+            const grade = qfpNormalizeTopic(data.grade);   // V102.643 (#1): a grade of invisible Unicode (U+3164 …) drew an empty yellow pill — :empty cannot hide it
+            const g = gradeMap[grade] || gradeMap['พอใช้'];
 
-            badge.textContent = data.grade || '';
-            badge.style.cssText = `font-size:0.72em; font-weight:900; padding:3px 10px; border-radius:999px; background:${g.bg}; color:${g.color}; border:1px solid ${g.border};`;
+            badge.textContent = grade || '';
+            badge.style.cssText = grade ? `font-size:0.72em; font-weight:900; padding:3px 10px; border-radius:999px; background:${g.bg}; color:${g.color}; border:1px solid ${g.border};` : '';
 
             let html = '';
 
@@ -25227,9 +25258,9 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             // sort high→medium→low, color-code per tier (red/orange/gray).
             const SEV_ORDER = { high: 0, medium: 1, low: 2 };
             const SEV_STYLE = {
-                high:   { label: 'High',   border: '#ef4444', bg: '#fef2f2', text: '#7f1d1d', badgeBg: '#dc2626', badgeText: '#ffffff' },
-                medium: { label: 'Med',    border: '#fb923c', bg: '#fff7ed', text: '#7c2d12', badgeBg: '#ea580c', badgeText: '#ffffff' },
-                low:    { label: 'Low',    border: '#94a3b8', bg: '#f1f5f9', text: '#475569', badgeBg: '#64748b', badgeText: '#ffffff' }
+                high:   { icon: '🔴', label: 'High',   border: '#ef4444', bg: '#fef2f2', text: '#7f1d1d', badgeBg: '#dc2626', badgeText: '#ffffff' },
+                medium: { icon: '🟠', label: 'Med',    border: '#fb923c', bg: '#fff7ed', text: '#7c2d12', badgeBg: '#ea580c', badgeText: '#ffffff' },
+                low:    { icon: '⚪', label: 'Low',    border: '#94a3b8', bg: '#f1f5f9', text: '#475569', badgeBg: '#64748b', badgeText: '#ffffff' }
             };
             const normalizeIssue = (x) => {
                 if (x && typeof x === 'object') {
@@ -25254,7 +25285,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                     <div style="font-size:0.7em; font-weight:900; color:#ef4444; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">⚠ Issues to fix จุดที่ควรแก้ไข</div>
                     ${cleanIssues.map(i => {
                         const s = SEV_STYLE[i.severity];
-                        return `<div style="font-size:0.8em; color:${s.text}; background:${s.bg}; border-left:3px solid ${s.border}; padding:5px 9px; border-radius:0 8px 8px 0; margin-bottom:4px; line-height:1.5; display:flex; align-items:flex-start; gap:7px;"><span style="flex:0 0 auto; font-size:0.72em; font-weight:900; background:${s.badgeBg}; color:${s.badgeText}; padding:1px 7px; border-radius:999px; letter-spacing:0.04em; text-transform:uppercase; margin-top:1px;">${s.label}</span><span style="flex:1 1 auto;">${escapeHtml(i.text)}</span></div>`;
+                        return `<div style="font-size:0.8em; color:${s.text}; background:${s.bg}; border-left:3px solid ${s.border}; padding:5px 9px; border-radius:0 8px 8px 0; margin-bottom:4px; line-height:1.5; display:flex; align-items:flex-start; gap:7px;"><span style="flex:0 0 auto; font-size:0.72em; font-weight:900; background:${s.badgeBg}; color:${s.badgeText}; padding:1px 7px; border-radius:999px; letter-spacing:0.04em; text-transform:uppercase; margin-top:1px; white-space:nowrap;">${s.icon} ${s.label}</span><span style="flex:1 1 auto;">${escapeHtml(i.text)}</span></div>`;
                     }).join('')}
                 </div>`;
             }
@@ -25288,7 +25319,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 // V102.367: "Why these changes" is the main view; until something is applied, Apply all sits on its heading (the preview panel is not drawn yet)
                 const sb0 = logIdNow ? getGrammarSandbox(logIdNow, originalText) : null;
                 const applied0 = sb0 ? Object.values(sb0.applied).filter(Boolean).length : 0;
-                const applyAllHead = logIdNow && applied0 === 0 ? `<button type="button" onclick="grammarApplyAll()" title="Apply every change — the edited preview appears below" style="background:#0ea5e9; color:white; border:0; padding:3px 9px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:pointer;">Apply all</button>` : '';
+                const applyAllHead = logIdNow && applied0 === 0 ? `<button type="button" onclick="grammarApplyAll()" title="Try every change in the admin preview below — the intern's text is not changed" aria-label="Try all changes" style="background:#0ea5e9; color:white; border:0; padding:3px 9px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:pointer; white-space:nowrap;">✏ Try all</button>` : '';
                 html += `<div>
                     <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:5px;"><div style="font-size:0.7em; font-weight:900; color:#0e7490; text-transform:uppercase; letter-spacing:0.05em;">📚 Why these changes ทำไมถึงปรับ</div>${applyAllHead}</div>
                     ${cleanChanges.map((c, idx) => {
@@ -25296,8 +25327,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                         const applied = sandbox && sandbox.applied[idx];
                         const applyBtn = logIdNow
                             ? (applied
-                                ? `<button type="button" disabled title="Already applied" style="flex:0 0 auto; background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:3px 9px; border-radius:8px; font-weight:800; font-size:0.78em; cursor:not-allowed;">✓ Applied</button>`
-                                : `<button type="button" onclick="grammarApplyChange(${idx})" title="Apply this change to the preview below" style="flex:0 0 auto; background:#ffffff; border:1px solid #0ea5e9; color:#0369a1; padding:3px 9px; border-radius:8px; font-weight:800; font-size:0.78em; cursor:pointer;">Apply</button>`)
+                                ? `<button type="button" disabled title="Already tried in the preview" style="flex:0 0 auto; background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:3px 9px; border-radius:8px; font-weight:800; font-size:0.78em; cursor:not-allowed; white-space:nowrap;">✓ Tried</button>`
+                                : `<button type="button" onclick="grammarApplyChange(${idx})" title="Try this change in the admin preview below — the intern's text is not changed" aria-label="Try this change" style="flex:0 0 auto; background:#ffffff; border:1px solid #0ea5e9; color:#0369a1; padding:3px 9px; border-radius:8px; font-weight:800; font-size:0.78em; cursor:pointer; white-space:nowrap;">✏ Try</button>`)
                             : '';
                         return `<div style="font-size:0.8em; background:#f0f9ff; border-left:3px solid #0ea5e9; padding:6px 9px; border-radius:0 8px 8px 0; margin-bottom:5px; line-height:1.5;">
                             <div style="display:flex; align-items:flex-start; gap:8px;">
@@ -25317,6 +25348,12 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             html += improvedFold;
 
             content.innerHTML = html || `<div style="font-size:0.82em; color:#15803d;">✅ Writing looks good — no issues to fix การเขียนดี ไม่พบจุดที่ต้องแก้ไข</div>`;
+            // V102.643 (#5): 0 → some tried = the preview has just appeared under the list — show where it is (once per log, again after Reset)
+            const triedNow = logIdNow ? Object.values(getGrammarSandbox(logIdNow, originalText).applied).filter(Boolean).length : 0;
+            if (!window._rrGaTriedSeen) window._rrGaTriedSeen = {};
+            const triedBefore = window._rrGaTriedSeen[logIdNow] || 0;
+            window._rrGaTriedSeen[logIdNow] = triedNow;
+            if (logIdNow && triedBefore === 0 && triedNow > 0) rrGaShowPreview();
             card.style.display = '';
         }
 
@@ -25339,25 +25376,25 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const total = cleanChanges.length;
             const appliedCount = Object.values(sandbox.applied).filter(Boolean).length;
             const isEmpty = appliedCount === 0;
-            if (isEmpty) return '';   // V102.367: nothing applied yet → no panel (Apply all lives on the "Why these changes" heading until then)
+            if (isEmpty) return '';   // V102.367: nothing applied yet → no panel (Try all lives on the "Why these changes" heading until then)
             const previewBody = isEmpty
                 ? `<div style="font-size:0.82em; color:#64748b; font-style:italic;">Click <b>Apply</b> on individual changes below to build a polished version here. Original learner content is not modified.</div>`
                 : `<div style="font-size:0.85em; color:#1e293b; line-height:1.6;">${renderWordDiff(sandbox.original, sandbox.text)}</div>`;
             const allApplied = appliedCount >= total;
             const applyAllBtn = allApplied
-                ? `<button type="button" disabled style="background:#e2e8f0; color:#94a3b8; border:0; padding:4px 10px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:not-allowed;">All applied</button>`
-                : `<button type="button" onclick="grammarApplyAll()" title="Apply every remaining change to the preview" style="background:#0ea5e9; color:white; border:0; padding:4px 10px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:pointer;">Apply all</button>`;
+                ? `<button type="button" disabled style="background:#e2e8f0; color:#94a3b8; border:0; padding:4px 10px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:not-allowed;">All tried</button>`
+                : `<button type="button" onclick="grammarApplyAll()" title="Try every remaining change in the preview" aria-label="Try all changes" style="background:#0ea5e9; color:white; border:0; padding:4px 10px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:pointer; white-space:nowrap;">✏ Try all</button>`;
             const resetBtn = isEmpty
                 ? `<button type="button" disabled style="background:#f1f5f9; color:#94a3b8; border:1px solid #e2e8f0; padding:4px 10px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:not-allowed;">Reset</button>`
                 : `<button type="button" onclick="grammarResetSandbox()" title="Discard applied changes — sandbox returns to original" style="background:#ffffff; color:#475569; border:1px solid #cbd5e1; padding:4px 10px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:pointer;">Reset</button>`;
             const copyBtn = isEmpty
                 ? `<button type="button" disabled style="background:#f1f5f9; color:#94a3b8; border:1px solid #e2e8f0; padding:4px 10px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:not-allowed;">Copy</button>`
                 : `<button type="button" onclick="grammarCopySandbox()" title="Copy the current preview text to clipboard" style="background:#ffffff; color:#475569; border:1px solid #cbd5e1; padding:4px 10px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:pointer;">📋 Copy</button>`;
-            return `<div style="margin-bottom:8px;">
+            return `<div id="rr-ga-preview" style="margin-bottom:8px;">
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:5px;">
                     <div style="font-size:0.7em; font-weight:900; color:#4338ca; text-transform:uppercase; letter-spacing:0.05em;">🛠 Edited preview (admin sandbox)</div>
                     <div style="display:flex; align-items:center; gap:6px;">
-                        <span style="font-size:0.7em; font-weight:800; color:${appliedCount > 0 ? '#4338ca' : '#94a3b8'};">${appliedCount} / ${total} applied</span>
+                        <span style="font-size:0.7em; font-weight:800; color:${appliedCount > 0 ? '#4338ca' : '#94a3b8'};">${appliedCount} / ${total} tried</span>
                         ${applyAllBtn}
                         ${resetBtn}
                         ${copyBtn}
@@ -25384,7 +25421,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const added = !!((window._rrTipAdded || {})[logId]);
             return added
                 ? `<button type="button" id="rr-tip-chip" disabled style="background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:3px 9px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:default; text-transform:none; letter-spacing:0; white-space:nowrap; flex-shrink:0;">✓ Added to reply</button>`
-                : `<button type="button" id="rr-tip-chip" onclick="rrAddWritingTip()" title="Adds the first suggestion to the reply draft, in the reply language, with the example edit and a reference" style="background:#fff; color:#b45309; border:1px solid #f59e0b; padding:3px 9px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:pointer; text-transform:none; letter-spacing:0; white-space:nowrap; flex-shrink:0;">➕ Add tip to reply</button>`;
+                : `<button type="button" id="rr-tip-chip" onclick="rrAddWritingTip()" title="Tip → the reply to the intern: adds the first suggestion to the reply draft, in the reply language, with the example edit and a reference" style="background:#fff; color:#b45309; border:1px solid #f59e0b; padding:3px 9px; border-radius:8px; font-size:0.72em; font-weight:800; cursor:pointer; text-transform:none; letter-spacing:0; white-space:nowrap; flex-shrink:0;" aria-label="Add tip to reply">💬＋ Tip</button>`;
         }
         window.rrAddWritingTip = function() {
             const logId = getGrammarCurrentLogId();
@@ -25447,8 +25484,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 appliedCount++;
             });
             if (typeof showToast === 'function') {
-                if (appliedCount && !skippedCount) showToast(`✓ Applied ${appliedCount} change${appliedCount > 1 ? 's' : ''}`);
-                else if (appliedCount && skippedCount) showToast(`✓ Applied ${appliedCount}, skipped ${skippedCount} (substring not found)`);
+                if (appliedCount && !skippedCount) showToast(`✓ Tried ${appliedCount} change${appliedCount > 1 ? 's' : ''} in the preview`);
+                else if (appliedCount && skippedCount) showToast(`✓ Tried ${appliedCount}, skipped ${skippedCount} (substring not found)`);
                 else if (skippedCount) showToast(`⚠ Skipped ${skippedCount} — substrings not found in preview`);
             }
             if (cached.rawText) renderGrammarAnalysis(cached.rawText, cached.originalText);

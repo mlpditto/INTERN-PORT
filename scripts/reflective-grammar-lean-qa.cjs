@@ -1,4 +1,4 @@
-// V102.367: Reflective Review · Writing Analysis column, lean (owner's PR 2) — Issues → Suggestions → Why these changes (Apply per change,
+// V102.367: Reflective Review · Writing Analysis column, lean (owner's PR 2) — Issues → Suggestions → Why these changes (✏ Try per change — V102.643 wording,
 // Apply all on the heading) → the edited preview only once something is applied → the improved sample folded at the end as a plain
 // sentence (no word-level diff). The REAL admin.html with a fixture log, a fixture analysis and the real apply / reset handlers.
 const fs = require('node:fs');
@@ -45,7 +45,7 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
             const before = snap();
             // Apply the first change → the preview panel appears with 1 / 2 applied; Apply all leaves the heading (it is on the panel now)
             grammarApplyChange(0); await new Promise(res => setTimeout(res, 50));
-            const after1 = snap(); after1.previewText = (content.textContent.match(/\d \/ \d applied/) || [])[0];
+            const after1 = snap(); after1.previewText = (content.textContent.match(/\d \/ \d tried/) || [])[0];
             // open the folded sample
             content.querySelector('details.rr-improved').open = true; await new Promise(res => setTimeout(res, 30));
             const opened = { sampleVisible: vis(content.querySelector('details.rr-improved > div')), sampleText: content.querySelector('details.rr-improved > div').textContent.trim() };
@@ -55,14 +55,14 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
         });
         assert.deepEqual(r.before.heads, ['issues', 'suggestions', 'why'], 'before any Apply: Issues → Suggestions → Why — no Improved sample heading, no Edited preview: ' + JSON.stringify(r.before.heads));
         assert.equal(r.before.preview, false, 'no preview panel before the first Apply');
-        assert.deepEqual(r.before.applyBtns, ['➕ Add tip to reply', 'Apply all', 'Apply', 'Apply'], 'tip chip (V102.368) + Apply all on the Why heading + one Apply per change: ' + JSON.stringify(r.before.applyBtns));
+        assert.deepEqual(r.before.applyBtns, ['💬＋ Tip', '✏ Try all', '✏ Try', '✏ Try'], 'tip chip (V102.368; V102.643: 💬＋ Tip) + ✏ Try all on the Why heading + one ✏ Try per change: ' + JSON.stringify(r.before.applyBtns));
         assert.deepEqual([r.before.details, r.before.detailsOpen, r.before.sampleVisible, r.before.wordDiffSpans], [true, false, false, 0], 'the improved sample is a closed <details> with a plain sentence (no diff spans)');
         assert.ok(r.before.order[r.before.order.length - 1].startsWith('DETAILS:'), 'the folded sample is last: ' + JSON.stringify(r.before.order));
-        assert.equal(r.after1.preview, true, 'after one Apply the preview panel appears'); assert.equal(r.after1.previewText, '1 / 2 applied');
-        assert.deepEqual(r.after1.applyBtns, ['➕ Add tip to reply', '✓ Applied', 'Apply', 'Apply all', 'Reset', '📋 Copy'], 'first change marked Applied, Apply all moved to the panel: ' + JSON.stringify(r.after1.applyBtns));
+        assert.equal(r.after1.preview, true, 'after one Apply the preview panel appears'); assert.equal(r.after1.previewText, '1 / 2 tried');
+        assert.deepEqual(r.after1.applyBtns, ['💬＋ Tip', '✓ Tried', '✏ Try', '✏ Try all', 'Reset', '📋 Copy'], 'first change marked ✓ Tried, ✏ Try all moved to the panel: ' + JSON.stringify(r.after1.applyBtns));
         assert.ok(r.after1.heads.indexOf('why') < r.after1.heads.indexOf('preview'), 'Why stays above the preview: ' + JSON.stringify(r.after1.heads));
         assert.deepEqual([r.opened.sampleVisible, r.opened.sampleText], [true, 'ยังไม่สามารถปฏิบัติงานได้ครบทุกขั้นตอนด้วยตนเอง ได้เรียนรู้เทคนิคการเลือกยาและการคัดแยกโรคเพิ่มขึ้น'], 'opening the fold shows the plain improved sentence');
-        assert.deepEqual([r.reset.preview, r.reset.applyBtns], [false, ['➕ Add tip to reply', 'Apply all', 'Apply', 'Apply']], 'Reset: the panel goes away, Apply all back on the heading');
+        assert.deepEqual([r.reset.preview, r.reset.applyBtns], [false, ['💬＋ Tip', '✏ Try all', '✏ Try', '✏ Try']], 'Reset: the panel goes away, ✏ Try all back on the heading');
         assert.equal(r.cardShown, true);
         assert.deepEqual(errs, [], 'no page errors: ' + errs.join(' | '));
         console.log('PASS: Reflective Review Writing Analysis lean — Why these changes first (Apply, Apply all on the heading), the edited preview only after an Apply, the improved sample folded at the end as a plain sentence; Reset restores');
