@@ -5,7 +5,9 @@
 // page (quiz-watch-first.js) plays it. A video link in the box beside it wins when both are set.
 (function () {
     'use strict';
-    var MAX = 12, LEN = 90, WHO = { q: ['🙋', 'Q'], rx: ['🧑‍⚕️', 'RX'], key: ['💡', 'KEY'] }, ORDER = ['q', 'rx', 'key'];
+    // V102.667 (owner 2026-11-16, after the first real run came back as a table of contents): about two lines a note (12 to 24), and every
+    // answer / key line must carry a fact from its note.
+    var MAX = 24, LEN = 90, WHO = { q: ['🙋', 'Q'], rx: ['🧑‍⚕️', 'RX'], key: ['💡', 'KEY'] }, ORDER = ['q', 'rx', 'key'];
     var S = { story: null, busy: false, err: '', t0: 0, play: -1, timer: null };
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function box() { return document.getElementById('qws-box'); }
@@ -20,12 +22,15 @@
         var ls = story.lines.map(function (x) { return x && ORDER.indexOf(x.w) > -1 && String(x.t || '').trim() ? { w: x.w, t: String(x.t).trim().slice(0, LEN), q: (Array.isArray(x.q) ? x.q : []).filter(function (n) { return Number.isInteger(n) && n > 0; }).slice(0, 6) } : null; }).filter(Boolean).slice(0, MAX);
         return ls.length ? { lang: /^(th|en|ko)$/.test(story.lang) ? story.lang : langOf(ls.map(function (x) { return x.t; }).join(' ')), lines: ls } : null;
     }
+    function want(n) { return Math.max(12, Math.min(MAX, n * 2)); }
     function prompt(ns, L) {
-        var NAME = { en: 'English', th: 'Thai', ko: 'Korean' };
+        var NAME = { en: 'English', th: 'Thai', ko: 'Korean' }, N = want(ns.length);
         return 'These are the "Read first" notes pharmacy interns see before each question of one quiz. Turn them into ONE short CHAT STORY that prepares the intern for the whole quiz, in ' + NAME[L] + '.\n' +
-            'Write 6 to ' + MAX + ' lines, one per line, each starting with a speaker tag and the note number(s) it comes from in square brackets:\n' +
-            'Q [1]: a pharmacy intern asks\nRX [1]: the pharmacist answers\nKEY [1,2]: one key point to remember (2 to 4 of these)\n' +
-            'Rules: follow the order of the notes; cover every note that has content. Keep each line short (under 70 characters; under 50 for Thai or Korean). ' +
+            'Write ' + (N - 4) + ' to ' + N + ' lines, one per line, each starting with a speaker tag and the note number(s) it comes from in square brackets:\n' +
+            'Q [1]: a pharmacy intern asks\nRX [1]: the pharmacist answers\nKEY [1,2]: one key point to remember (' + Math.round(N / 6) + ' to ' + Math.round(N / 4) + ' of these)\n' +
+            'Rules: follow the order of the notes; cover every note that has content. Keep each line short (under 80 characters; under 60 for Thai or Korean). ' +
+            'Every RX and KEY line must TEACH one concrete fact taken from its note — a drug name, a number, a rule, a reason. Never write a line that only names a topic or says something should be reviewed, checked or understood. ' +
+            'Every Q line is a real question an intern would ask, ending with a question mark. The last line is a KEY line. ' +
             'Copy every number, dose, strength and drug name EXACTLY as the notes write it — never add a number or a fact the notes do not say. ' +
             'Do not give away which choice is correct in any question. No markdown, no emoji at the start, nothing else.\n\n' +
             ns.map(function (x) { return 'NOTE ' + x.n + ' (question: ' + x.q.slice(0, 140) + ')\n' + x.primer.slice(0, 900); }).join('\n\n');
