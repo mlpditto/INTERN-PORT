@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.665)</title>
+    <title>Nika Admin (V102.666)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -7072,6 +7072,28 @@
         .review-running .audit-run { pointer-events:auto; }
         /* V102.109: the running ↻ button is also the Stop button — the spinner turns into a square on hover / focus. */
         .audit-run .run-stop { display:none; }
+        /* V102.666 🎬 Watch first ▸ story from Read first (quiz-watch-story.js): the ✨ button beside the link box and the editable lines under it */
+        #quizManageModal .qws-make { flex:none; width:auto; min-height:0; height:30px; margin:0; padding:0 10px; border-radius:8px; border:1px solid #f1b55e; background:#f1b55e; color:#211a10; font-size:12.5px; font-weight:700; white-space:nowrap; cursor:pointer; }
+        #quizManageModal .qws-make:disabled { opacity:.7; cursor:progress; }
+        #quizManageModal #quiz-watch-first { margin:0; }   /* the global input margin pushed the box off the row centre */
+        #quizManageModal .qws-box { margin:-2px 0 10px; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); color:#cbd5e1; font-size:12.5px; }
+        #quizManageModal .qws-box[hidden] { display:none; }
+        #quizManageModal .qws-h { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 8px; color:#e2e8f0; }
+        #quizManageModal .qws-h small { color:#94a3b8; }
+        #quizManageModal .qws-ok { margin-left:auto; color:#6ee7b7; font-weight:800; }
+        #quizManageModal .qws-warn { color:#fcd34d; font-weight:800; white-space:nowrap; }
+        #quizManageModal .qws-h .qws-warn { margin-left:auto; }
+        #quizManageModal .qws-b, #quizManageModal .qws-x, #quizManageModal .qws-w, #quizManageModal .qws-add { width:auto; min-height:0; margin:0; border-radius:8px; border:1px solid #475569; background:transparent; color:#e2e8f0; font-size:12.5px; font-weight:700; cursor:pointer; }
+        #quizManageModal .qws-b { height:30px; min-width:34px; padding:0 8px; }
+        #quizManageModal .qws-l { display:flex; gap:8px; align-items:center; padding:3px 0; }
+        #quizManageModal .qws-w { flex:none; width:64px; height:28px; padding:0; font-size:11px; color:#cbd5e1; }
+        #quizManageModal .qws-l input { flex:1; min-width:0; margin:0; padding:4px 8px; border-radius:7px; background:#0f172a; border:1px solid #334155; color:#f1f5f9; font-size:12.5px; }
+        #quizManageModal .qws-l.k input { border-color:#b45309; color:#fcd34d; }
+        #quizManageModal .qws-l.now input { box-shadow:0 0 0 2px #facc15; }
+        #quizManageModal .qws-l em { flex:none; min-width:34px; font-style:normal; font-size:11px; color:#7c8aa5; text-align:right; }
+        #quizManageModal .qws-x { flex:none; width:26px; height:26px; padding:0; border-color:transparent; color:#94a3b8; }
+        #quizManageModal .qws-add { margin-top:6px; height:28px; padding:0 10px; border-style:dashed; color:#94a3b8; }
+        #quizManageModal .qws-err { margin:0 0 6px; color:#fca5a5; font-weight:700; }
         .audit-actions .clinical-angle[aria-pressed="true"] { background:#fde68a; color:#78350f; box-shadow:inset 0 0 0 1px #f59e0b; }   /* V102.158: 🩺 toggle on */
         /* V102.659 (owner pick D, mockup-rewrites-head): Rewrites header = two quiet rows. Row 1: tabs · ✨ 🩺 [model ▾] ↻ Rewrite ⤓ ✕ (only the model chip and Rewrite read as buttons).
            Row 2: 🏷 Full ✓ · Short ✓ │ 📊 summary chip · result pill. The model row opens under row 1 from the chip. */
@@ -8915,6 +8937,7 @@
     <link rel="stylesheet" href="jev-quiz-check.css?v=V102.619">
     <link rel="stylesheet" href="jev-primer-repeats.css?v=V102.563">
     <script src="jev-primer-repeats.js?v=V102.658"></script>
+    <script src="quiz-watch-story.js?v=V102.666"></script>
     <link rel="stylesheet" href="case-card-multi.css?v=V102.583">
     <script src="case-card-multi.js?v=V102.592"></script>
     <link rel="stylesheet" href="quiz-compact-toolbar.css?v=V102.406">
@@ -15501,7 +15524,10 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                     <div style="margin-bottom:8px; display:flex; align-items:center; gap:8px;">
                         <label for="quiz-watch-first" title="Watch first — a short film shown on one page before question 1. Paste a direct https video link (.mp4). Empty = no film." style="font-size:0.7em; color:#818cf8; font-weight:600; white-space:nowrap; text-transform:uppercase; letter-spacing:0.5px;">🎬 Watch first</label>
                         <input type="url" id="quiz-watch-first" inputmode="url" placeholder="https://… .mp4 — plays before question 1" style="flex:1; min-width:0; padding:5px 8px; border:1px solid #334155; border-radius:6px; font-size:0.85em; background:#0f172a; color:#f1f5f9;">
+                        <!-- V102.666 (owner pick C1): no film? ✨ writes a short chat story from the Read first notes of every question (quiz-watch-story.js); the link wins when both are set -->
+                        <button type="button" id="qws-make" class="qws-make" onclick="QuizWatchStory.make()" title="AI turns the Read first notes of every question into a short chat story — no video file. A video link in the box wins when both are set.">✨ From Read first</button>
                     </div>
+                    <div id="qws-box" class="qws-box lang-no-toggle" hidden></div>
 
                     <section class="quiz-resources" aria-label="Quiz materials">
                         <header><div><strong>📚 Materials <span id="quiz-resource-count">0</span> <span id="quiz-resource-state" data-state="clean" role="status" title="บันทึกพร้อมกับ Quiz" aria-label="Saved with the quiz">✓</span></strong><p>Links for learners · Add as many resources as this quiz needs.</p></div><button type="button" onclick="quizResourceCards.add()">＋ Add link</button></header>
@@ -27880,6 +27906,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             { const ia = document.getElementById('quiz-instant-answer'); if (ia) ia.checked = q.instantAnswer === true; }   // V102.502
             { const ab = document.getElementById('quiz-allow-break'); if (ab) ab.checked = q.allowBreak === true; }   // V102.610 ⏸
             { const wf = document.getElementById('quiz-watch-first'); if (wf) { wf.value = (q.watchFirst && q.watchFirst.url) || ''; wf.style.borderColor = '#334155'; } }   // V102.662 🎬
+            if (window.QuizWatchStory) QuizWatchStory.set(q.watchFirst && q.watchFirst.story);   // V102.666
             { const ng = document.getElementById('quiz-notify-group'); if (ng) ng.checked = !!q.notifyGroup; }
             { const nd = document.getElementById('quiz-notify-deadline'); if (nd) nd.checked = q.notifyDeadline !== false; }
             toggleTimerModeUI();
@@ -27983,6 +28010,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             { const ia = document.getElementById('quiz-instant-answer'); if (ia) ia.checked = false; }   // V102.502
             { const ab = document.getElementById('quiz-allow-break'); if (ab) ab.checked = false; }   // V102.610
             { const wf = document.getElementById('quiz-watch-first'); if (wf) { wf.value = ''; wf.style.borderColor = '#334155'; } }   // V102.662
+            if (window.QuizWatchStory) QuizWatchStory.set(null);   // V102.666
             { const ng = document.getElementById('quiz-notify-group'); if (ng) ng.checked = false; }
             { const nd = document.getElementById('quiz-notify-deadline'); if (nd) nd.checked = true; }
             toggleTimerModeUI();
@@ -28414,8 +28442,10 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const allowBreak = document.getElementById('quiz-allow-break')?.checked || false;   // V102.610 ⏸ break on Read first (intern quiz-break.js)
             // V102.662 🎬 Watch first: { url } for an https link, null for none; anything else is not saved and the box turns red
             const wfEl = document.getElementById('quiz-watch-first'), wfRaw = ((wfEl && wfEl.value) || '').trim();
-            const watchFirst = /^https:\/\/\S+$/i.test(wfRaw) ? { url: wfRaw } : null;
-            if (wfEl) wfEl.style.borderColor = wfRaw && !watchFirst ? '#ef4444' : '#334155';
+            const wfStory = window.QuizWatchStory ? QuizWatchStory.get() : null;   // V102.666: the chat story written from Read first (text only)
+            const wfUrl = /^https:\/\/\S+$/i.test(wfRaw) ? wfRaw : '';
+            const watchFirst = wfUrl || wfStory ? { ...(wfUrl ? { url: wfUrl } : {}), ...(wfStory ? { story: wfStory } : {}) } : null;
+            if (wfEl) wfEl.style.borderColor = wfRaw && !wfUrl ? '#ef4444' : '#334155';
             // V97.47: opt-in instant LINE push on submit (notifyQuizSubmitted).
             const notifyGroup = document.getElementById('quiz-notify-group')?.checked || false;
             const notifyDeadline = document.getElementById('quiz-notify-deadline')?.checked !== false;
