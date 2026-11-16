@@ -54,9 +54,10 @@
 
     // the story of a quiz: text lines only, each said by q (the intern), rx (the pharmacist) or key (a point to remember)
     function storyOf(q) {
-        var st = q && q.watchFirst && q.watchFirst.story, ls = st && Array.isArray(st.lines) ? st.lines.filter(function (x) { return x && /^(q|rx|key)$/.test(x.w) && typeof x.t === 'string' && x.t.trim(); }).slice(0, 12) : [];
+        var st = q && q.watchFirst && q.watchFirst.story, ls = st && Array.isArray(st.lines) ? st.lines.filter(function (x) { return x && /^(q|rx|key)$/.test(x.w) && typeof x.t === 'string' && x.t.trim(); }).slice(0, 24) : [];
         return ls.length ? { lang: /^(th|en|ko)$/.test(st.lang) ? st.lang : 'en', lines: ls } : null;
     }
+    function muted() { try { return localStorage.getItem('qwsMute') === '1'; } catch (e) { return false; } }
     var play = null;   // the story being played: { i, sound, done, t0, timer, n }
     function stopStory() { if (play) { clearTimeout(play.timer); play.n++; } if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch (e) { /* nothing speaking */ } } }
 
@@ -119,12 +120,14 @@
     }
 
     // V101.315: the story page — lines appear one by one (muted: timed by their length; with sound: when the voice has said them)
+    // V101.316: the voice is ON when the page opens (owner 2026-11-16) unless this phone's intern muted it before
     function storyPage(box, q, story) {
         stopStory();
-        var k = play = { i: -1, sound: false, done: false, t0: Date.now(), timer: null, n: 0 }, ls = story.lines;
+        var can = !!(window.speechSynthesis && window.SpeechSynthesisUtterance), on = can && !muted();
+        var k = play = { i: -1, sound: on, auto: on, done: false, t0: Date.now(), timer: null, n: 0 }, ls = story.lines;
         seen = { max: 0, played: false, ended: false, failed: false };
         box.innerHTML = '<div class="lang-no-toggle qwf"><div class="qwf-h">🎬 ' + esc(L(T.head)) + '<small>· ' + esc(L(T.sub)) + '</small></div>' +
-            '<div class="qws"><div class="qws-top"><span class="qws-t">🎬 ' + esc(q.title || '') + '</span><button type="button" class="qws-snd" aria-pressed="false">🔇 ' + esc(L(T.sound)) + '</button></div>' +
+            '<div class="qws"><div class="qws-top"><span class="qws-t">🎬 ' + esc(q.title || '') + '</span><button type="button" class="qws-snd" aria-pressed="' + on + '">' + (on ? '🔊' : '🔇 ' + esc(L(T.sound))) + '</button></div>' +
             '<div class="qws-prog">' + ls.map(function () { return '<i></i>'; }).join('') + '</div><div class="qws-chat" aria-live="polite"></div></div>' +
             '<p class="qwf-n">' + esc(L(T.snote)) + '</p><button type="button" class="qwf-go" data-state="go">' + esc(L(T.go)) + '</button></div>';
         var chat = box.querySelector('.qws-chat'), snd = box.querySelector('.qws-snd'), dots = box.querySelectorAll('.qws-prog i');
@@ -146,14 +149,26 @@
             if (k.sound && window.speechSynthesis && window.SpeechSynthesisUtterance) {
                 try {
                     var u = new SpeechSynthesisUtterance(ls[k.i].t); u.lang = { th: 'th-TH', en: 'en-US', ko: 'ko-KR' }[story.lang] || 'en-US';
-                    u.onend = function () { k.timer = setTimeout(next, 250); }; u.onerror = next;
-                    window.speechSynthesis.speak(u); k.timer = setTimeout(next, ms + 5000); return;
+                    // V101.316: the voice starts by itself. A phone that refuses a voice nobody tapped for (or has none) says nothing —
+                    // then the page goes quiet: 🔇 Tap for sound, lines timed by their length, as before.
+                    var heard = false, quiet = function () {
+                        if (fired || play !== k || k.n !== n) return;
+                        k.sound = k.auto = false; face(); stopStory(); k.timer = setTimeout(function () { step(); }, Math.max(300, ms - 1500));
+                    };
+                    u.onstart = function () { heard = true; k.auto = false; };
+                    u.onend = function () { heard = true; k.auto = false; k.timer = setTimeout(next, 250); };
+                    u.onerror = function () { if (k.auto) quiet(); else next(); };
+                    window.speechSynthesis.speak(u); k.timer = setTimeout(next, ms + 5000);
+                    if (k.auto) setTimeout(function () { if (!heard && k.auto) quiet(); }, 1500);
+                    return;
                 } catch (e) { /* no voice: fall back to the timer */ }
             }
             k.timer = setTimeout(next, ms);
         };
+        var face = function () { snd.setAttribute('aria-pressed', String(k.sound)); snd.textContent = (k.sound ? '🔊' : '🔇 ' + L(T.sound)); };
         snd.onclick = function () {
-            k.sound = !k.sound; snd.setAttribute('aria-pressed', String(k.sound)); snd.textContent = (k.sound ? '🔊' : '🔇 ' + L(T.sound));
+            k.sound = !k.sound; k.auto = false; face();
+            try { if (k.sound) localStorage.removeItem('qwsMute'); else localStorage.setItem('qwsMute', '1'); } catch (e) { /* private window */ }   // a tap is remembered on this phone
             stopStory();
             if (k.sound) { if (k.done) { k.done = false; k.i = -1; } else if (k.i > -1) k.i--; step(); }   // say the line on screen (from the top once it has ended)
             else if (!k.done) k.timer = setTimeout(function () { step(); }, 900);
