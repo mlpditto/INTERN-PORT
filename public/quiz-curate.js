@@ -249,10 +249,46 @@
     function backToReview() {
         state.compare = null; render(); dialog.querySelector('[data-view="' + state.view + '"]').focus();
     }
+    // V102.665 (owner pick C, mockup-curate-steps): on a wide window the Review step is two panes — the list on the left, the picked question on
+    // the right (beside its twin when it has one). The pane reuses the Compare view; this is its first line: verdict · reason · Details · Keep / Remove · 📌.
+    const WIDE = '(min-width:1300px)';
+    function paneOn(s) { return s.step === 'review' && !!s.proposal && window.matchMedia(WIDE).matches; }
+    function paneHead(s, panel, id) {
+        const kept = s.keep.has(id), a = s.proposal.find(q => q.id === id), head = node('div', undefined, 'curate-pane-head');
+        head.append(node('b', 'Q' + id + ' → ' + (kept ? 'Keep' : 'Remove')));
+        const why = node('div', undefined, 'curate-pane-why'); head.append(why);
+        if (a && a.notAssessed) why.append(node('span', 'not assessed · changed since that run', 'curate-na'));
+        else if (a) {
+            bilingual(why, a.reason, a.reasonTh);
+            const details = disclosure('Details', 'Reasoning and what is lost if this question is removed', why); details.className = 'curate-reason-details';
+            bilingual(details, a.detail, a.detailTh); details.append(node('strong', 'Impact if removed')); bilingual(details, a.impact, a.impactTh);
+        }
+        if (a && !a.notAssessed && a.related.length > 1) a.related.forEach((r, i) => {   // more than one twin: pick which one is beside it
+            const b = node('button', '↔ Q' + r.id, 'curate-pane-twin'); b.type = 'button'; b.setAttribute('aria-pressed', String(i === (s.twin || 0)));
+            b.onclick = () => { s.twin = i; s.message = ''; render(); }; head.append(b);
+        });
+        const move = node('button', kept ? 'Remove' : 'Keep', 'curate-pane-move'); move.type = 'button'; move.disabled = s.pins.has(id) || s.busy || s.saving || s.saved;
+        move.onclick = () => { kept ? s.keep.delete(id) : s.keep.add(id); s.message = ''; render(); };
+        const pin = node('button', '📌 Must keep', 'curate-pane-pin'); pin.type = 'button'; pin.setAttribute('aria-pressed', String(s.pins.has(id))); pin.disabled = s.busy || s.saving || s.saved;
+        pin.onclick = () => { if (s.pins.has(id)) s.pins.delete(id); else { s.pins.add(id); s.keep.add(id); } s.message = ''; render(); };
+        head.append(move, pin); panel.append(head);
+    }
     function renderComparison(s) {
-        const panel = byId('curate-comparison'); panel.replaceChildren(); panel.hidden = !s.compare;
+        const panel = byId('curate-comparison'); panel.replaceChildren();
+        const pane = dialog.classList.contains('two') && !!s.sel;   // V102.665: the Review step's right side
+        panel.hidden = !s.compare && !pane;
         dialog.classList.toggle('comparing', !!s.compare);
-        if (!s.compare) return;
+        if (pane) paneHead(s, panel, s.sel);
+        if (!s.compare) {
+            if (pane) {   // no twin to compare with: the question alone, opened
+                const q = s.source.form.questions[s.sel - 1], missing = s.source.missingKeys.includes(s.sel);
+                const card = node('section', undefined, 'curate-compare-card curate-solo');
+                const heading = node('h4', 'Q' + s.sel + ' · ' + (s.keep.has(s.sel) ? 'Keep' : 'Remove') + (s.pins.has(s.sel) ? ' · Pinned' : '')); heading.append(copyButton(q, s.sel, missing)); card.append(heading);
+                sourceView(card, q, true, [], missing, s.sel); panel.append(card);
+                card.querySelectorAll(':scope details').forEach(d => d.classList.add(/explanation/i.test(d.querySelector('summary')?.textContent || '') ? 'curate-cmp-exp' : 'curate-cmp-flat'));
+            }
+            return;
+        }
         const [a, b] = s.compare, assessment = s.proposal.find(q => q.id === a), relation = assessment.related.find(r => r.id === b);
         const back = node('button', '← Back to review', 'curate-back'); back.type = 'button'; back.title = 'กลับรายการข้อสอบ'; back.onclick = backToReview;
         // V102.591 (owner: lean + inline): one header line — ← · Q10 ↔ Q14 · ⓘ · Shared case context · Keep both
@@ -385,7 +421,8 @@
         dialog.querySelector('.curate-close').onclick = () => dialog.close();
         // Keep the editor's global Escape handler from closing the underlying modal.
         document.addEventListener('keydown', event => { if (dialog.open && event.key === 'Escape') event.stopPropagation(); }, true);
-        dialog.addEventListener('cancel', event => { if (state?.saving) event.preventDefault(); else if (state?.compare) { event.preventDefault(); backToReview(); } });
+        dialog.addEventListener('cancel', event => { if (state?.saving) event.preventDefault(); else if (state?.compare && !state.auto) { event.preventDefault(); backToReview(); } });
+        window.matchMedia(WIDE).addEventListener('change', () => { if (state && dialog.open) render(); });   // V102.665: crossing the width opens / closes the pane
         dialog.addEventListener('close', () => { settleConfirm(false); clearInterval(state?.timer); state = null; stemObserver.disconnect(); });
         dialog.querySelectorAll('[data-mode]').forEach(button => button.onclick = () => {
             state.mode = button.dataset.mode; state.needsSuggestion = true; state.done = false; state.message = ''; render();
@@ -436,10 +473,13 @@
         s.step = step; s.compare = null; s.message = ''; render();
         dialog.scrollTop = 0; dialog.querySelector('.curate-steps [data-curate-step="' + step + '"]').focus();
     }
-    function renderSteps(s, count) {
+    function syncStep(s) {
         if (!s.proposal) { s.steppedFor = null; s.step = 'set'; }
         else if (s.proposal !== s.steppedFor) { s.steppedFor = s.proposal; s.step = 'review'; }   // a new result (Suggest, a saved run, an old set) opens on Review
         if (s.step === 'save' && stepBlocked(s, 'save')) s.step = 'review';
+    }
+    function renderSteps(s, count) {
+        syncStep(s);
         dialog.dataset.step = s.step; dialog.dataset.save = s.saveMode;
         const removed = count - s.keep.size, at = STEPS.indexOf(s.step), modelInfo = window.TEXT_AI_MODELS.find(m => m.id === s.model);
         const icon = { balanced: '⚖', quality: '★', duplicates: '⇄' }[s.mode] || '';
@@ -498,6 +538,16 @@
         const count = s.source.form.questions.length;
         dialog.setAttribute('aria-busy', String(s.busy || s.saving));
         paintOldSet(s);
+        // V102.665: two panes on a wide window. The picked question (first of the tab until one is clicked) decides the right side.
+        syncStep(s);
+        const two = paneOn(s); dialog.classList.toggle('two', two);
+        if (two) {
+            const ids = s.source.form.questions.map((_, i) => i + 1).filter(id => s.keep.has(id) === (s.view === 'keep'));
+            if (!ids.includes(s.sel)) { s.sel = ids.length ? ids[0] : null; s.twin = 0; }
+            const picked = s.sel && s.proposal.find(q => q.id === s.sel), twins = picked && !picked.notAssessed ? picked.related : [];
+            if (!(s.twin < twins.length)) s.twin = 0;
+            s.compare = twins.length ? [s.sel, twins[s.twin].id] : null; s.auto = true; s.openRow = null;
+        } else if (s.auto) { s.auto = false; s.compare = null; s.sel = null; }
         const modelInfo = window.TEXT_AI_MODELS.find(m => m.id === s.model);
         byId('curate-model').textContent = modelInfo?.short || modelInfo?.label || s.model;
         byId('curate-model-chip').setAttribute('aria-label', 'Model: ' + (modelInfo?.label || s.model) + ' — show all models');
@@ -515,8 +565,8 @@
             const assessment = s.proposal?.find(item => item.id === id);
             // V102.660 (owner pick C → rows of A, mockup-curate-steps): every question is ONE line — Q · stem · reason · ↔ twin · Keep / Remove · 📌.
             // ▾ (or a click on the line) opens it in place with everything it had before; one open at a time, so the list fits a screen.
-            const open = s.openRow === id;
-            const row = document.createElement('div'); row.className = 'curate-question' + (kept ? ' kept' : '') + (open ? ' open' : ' compact');
+            const open = !two && s.openRow === id;
+            const row = document.createElement('div'); row.className = 'curate-question' + (kept ? ' kept' : '') + (open ? ' open' : ' compact') + (two && s.sel === id ? ' sel' : '');
             row.dataset.questionId = id;
             row.innerHTML = `<span class="curate-number">Q${id}</span><div class="curate-body"><div class="curate-source"></div><div class="curate-reason"></div></div><div class="curate-actions"><button type="button" class="curate-move" title="${kept ? 'ย้ายไปกลุ่มที่เสนอให้ตัด ยังไม่ลบต้นฉบับ' : 'เก็บข้อนี้ในรอบปัจจุบัน AI อาจเลือกใหม่เมื่อกด Suggest'}">${kept ? 'Remove' : 'Keep'}</button><button type="button" class="curate-pin" aria-pressed="${s.pins.has(id)}" title="บังคับเก็บข้อนี้แม้กด Suggest ใหม่ กดอีกครั้งเพื่อปลด">📌 Must keep</button></div>`;
             sourceView(row.querySelector('.curate-source'), q, false, [], s.source.missingKeys.includes(id), id);
@@ -537,7 +587,7 @@
                 details.append(node('strong', 'Impact if removed')); bilingual(details, assessment.impact, assessment.impactTh);
                 for (const related of assessment.related) {
                     const compare = node('button', 'Compare Q' + id + ' ↔ Q' + related.id, 'curate-compare'); compare.type = 'button'; compare.dataset.short = '↔ Q' + related.id; compare.title = 'เปรียบเทียบโจทย์ ตัวเลือก เฉลย และเหตุผลที่ AI เลือก';
-                    compare.onclick = () => { s.compare = [id, related.id]; render(); byId('curate-comparison').querySelector('button').focus(); dialog.scrollTop = 0; }; reason.append(compare);
+                    compare.onclick = () => { if (two) { s.sel = id; s.twin = assessment.related.indexOf(related); s.message = ''; return render(); } s.compare = [id, related.id]; render(); byId('curate-comparison').querySelector('button').focus(); dialog.scrollTop = 0; }; reason.append(compare);
                 }
             } else if (!s.pins.has(id)) reason.remove(); // V101.02: no per-row placeholder — the proposal label above already says to select Suggest
             row.querySelector('.curate-pin').onclick = () => {
@@ -547,8 +597,8 @@
             const move = row.querySelector('.curate-move'); move.disabled = s.pins.has(id);
             move.onclick = () => { kept ? s.keep.delete(id) : s.keep.add(id); s.message = ''; render(); };
             const toggle = node('button', open ? '▴' : '▾', 'curate-row-toggle'); toggle.type = 'button';
-            toggle.setAttribute('aria-expanded', String(open)); toggle.setAttribute('aria-label', (open ? 'Fold Q' : 'Open Q') + id); toggle.title = open ? 'Fold this question' : 'Choices, explanation, details';
-            const flip = () => { s.openRow = open ? null : id; s.message = ''; render(); const again = rows.querySelector('[data-question-id="' + id + '"] .curate-row-toggle'); if (again) again.focus(); };
+            toggle.setAttribute('aria-expanded', String(open || (two && s.sel === id))); toggle.setAttribute('aria-label', (two ? 'Show Q' : open ? 'Fold Q' : 'Open Q') + id); toggle.title = open ? 'Fold this question' : 'Choices, explanation, details';
+            const flip = () => { if (two) { s.sel = id; s.twin = 0; } else s.openRow = open ? null : id; s.message = ''; render(); const again = rows.querySelector('[data-question-id="' + id + '"] .curate-row-toggle'); if (again) again.focus(); };
             toggle.onclick = flip; row.querySelector('.curate-actions').append(toggle);
             if (!open) row.onclick = event => { if (!event.target.closest('button, a, input, summary')) flip(); };
             rows.append(row);
