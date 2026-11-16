@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.657)</title>
+    <title>Nika Admin (V102.659)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -7073,6 +7073,29 @@
         /* V102.109: the running ↻ button is also the Stop button — the spinner turns into a square on hover / focus. */
         .audit-run .run-stop { display:none; }
         .audit-actions .clinical-angle[aria-pressed="true"] { background:#fde68a; color:#78350f; box-shadow:inset 0 0 0 1px #f59e0b; }   /* V102.158: 🩺 toggle on */
+        /* V102.659 (owner pick D, mockup-rewrites-head): Rewrites header = two quiet rows. Row 1: tabs · ✨ 🩺 [model ▾] ↻ Rewrite ⤓ ✕ (only the model chip and Rewrite read as buttons).
+           Row 2: 🏷 Full ✓ · Short ✓ │ 📊 summary chip · result pill. The model row opens under row 1 from the chip. */
+        .audit-toolbar.rw-lean { margin-bottom:6px; }
+        .audit-toolbar.rw-lean.folded .audit-model-row { display:none; }
+        .audit-toolbar.rw-lean .audit-run { margin-left:0; }
+        .audit-toolbar .audit-model-chip { gap:6px; font-weight:600; }
+        .audit-toolbar .audit-model-chip .text-ai-logo { width:16px; height:16px; margin:0; }
+        .audit-toolbar.rw-lean :is(.audit-magic, .audit-export.ico, .clinical-angle:not([aria-pressed="true"])) { background:transparent; border-color:transparent; box-shadow:none; }
+        .rw-info { display:flex; align-items:center; gap:8px; min-width:0; margin:0 2px 10px; font-size:0.82em; color:#475569; }
+        .rw-titles { display:flex; align-items:center; gap:8px; flex:3 1 0; min-width:0; }
+        .rw-t { flex:1 1 0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#334155; }
+        .rw-t.rw-short { flex:0 1 auto; max-width:35%; }
+        .rw-t b { color:#6d28d9; }
+        .rw-ic, .rw-dot, .rw-bar { flex:none; }
+        .rw-dot, .rw-bar { color:#cbd5e1; }
+        .rw-ok { flex:none; width:auto; min-height:0; margin:0; padding:1px 8px; border:0; border-radius:6px; background:#ede9fe; color:#6d28d9; font-size:0.9em; font-weight:800; cursor:pointer; }
+        .rw-sum-chip { display:inline-flex; align-items:center; gap:6px; flex:1.5 1 0; min-width:0; width:auto; min-height:0; height:30px; margin:0; padding:0 11px; border:1px solid #e2e8f0; border-radius:999px; background:#fff; color:#475569; font:inherit; cursor:pointer; }
+        .rw-sum-chip[aria-expanded="true"] { border-color:#c4b5fd; background:#f5f3ff; }
+        .rw-sum-t { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; }
+        .rw-info .audit-pill { flex:none; padding:3px 9px; border-radius:999px; background:rgba(148,163,184,.18); border:1px solid rgba(148,163,184,.35); font-size:12px; white-space:nowrap; opacity:.85; }
+        .rw-sum { white-space:pre-wrap; line-height:1.8; color:#333; font-size:0.95em; margin:0 2px 10px; padding:10px 14px; background:#fafafa; border:1px solid #f0f0f0; border-radius:12px; }
+        .rw-sum[hidden] { display:none; }
+        @media (max-width:640px) { .rw-info { flex-wrap:wrap; } .rw-titles { flex:1 1 100%; } .rw-bar { display:none; } .rw-sum-chip { flex:1 1 0; } }
         .audit-run.is-running:is(:hover, :focus-visible) i.fa-spinner { display:none; }
         .audit-run.is-running:is(:hover, :focus-visible) .run-stop { display:inline; }
         .review-run-bar { position:sticky; z-index:6; height:3px; overflow:hidden; background:#e0f2fe; }
@@ -20520,17 +20543,17 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                         </div>
                     `;
                 }
-                // V102.256: ONE line — "🏷️ Full … ✓ · Short … ✓ 🔄": the titles ellipsize (the full text is the tooltip), Apply is a ✓ with a tooltip (it used to wrap onto 2–3 lines)
+                // V102.256: ONE line — "🏷️ Full … ✓ · Short … ✓": the titles ellipsize (the full text is the tooltip), Apply is a ✓ with a tooltip (it used to wrap onto 2–3 lines)
+                // V102.659 (owner pick D, mockup-rewrites-head): the titles share ONE quiet line with the 📊 summary chip and the result pill — no purple / grey bands
                 const titleSection = result.suggestedTitles ? `
-                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:nowrap; padding:7px 12px; background:#f5f3ff; border:1px solid #ede9fe; border-radius:10px; margin-bottom:10px; font-size:0.82em; min-width:0;">
-                        <span style="color:#7c3aed; flex:0 0 auto;" title="Suggested titles">🏷️</span>
-                        <span title="${escapeHtml(result.suggestedTitles.full)}" style="color:#4c1d95; flex:2 1 0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><b>Full</b> ${result.suggestedTitles.full}</span>
-                        <button class="btn-sm" style="background:#8b5cf6; color:white; border:none; padding:2px 8px; border-radius:6px; font-size:0.85em; flex:0 0 auto; width:auto; min-height:0; margin:0;" title="Use as the full title" aria-label="Apply full title" onclick="document.getElementById('quiz-title').value='${result.suggestedTitles.full.replace(/'/g, "\\'")}'; showToast('Title Updated');">✓</button>
-                        <span style="color:#ddd6fe; font-weight:800; flex:0 0 auto;">·</span>
-                        <span title="${escapeHtml(result.suggestedTitles.short)}" style="color:#4c1d95; flex:1 1 0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><b>Short</b> ${result.suggestedTitles.short}</span>
-                        <button class="btn-sm" style="background:#8b5cf6; color:white; border:none; padding:2px 8px; border-radius:6px; font-size:0.85em; flex:0 0 auto; width:auto; min-height:0; margin:0;" title="Use as the short title" aria-label="Apply short title" onclick="document.getElementById('quiz-short-title').value='${result.suggestedTitles.short.replace(/'/g, "\\'")}'; showToast('Short Title Updated');">✓</button>
-                        <button onclick="analyzeQuizAI()" title="Regenerate Titles & Analysis" aria-label="Regenerate titles" style="margin-left:auto; flex:0 0 auto; background:rgba(139,92,246,0.1); border:none; border-radius:6px; cursor:pointer; font-size:1em; padding:2px 6px; line-height:1; width:auto; min-height:0;">🔄</button>
-                    </div>
+                    <span class="rw-titles">
+                        <span class="rw-ic" title="Suggested titles">🏷️</span>
+                        <span class="rw-t" title="${escapeHtml(result.suggestedTitles.full)}"><b>Full</b> ${result.suggestedTitles.full}</span>
+                        <button type="button" class="rw-ok" title="Use as the full title" aria-label="Apply full title" onclick="document.getElementById('quiz-title').value='${result.suggestedTitles.full.replace(/'/g, "\\'")}'; showToast('Title Updated');">✓</button>
+                        <span class="rw-dot" aria-hidden="true">·</span>
+                        <span class="rw-t rw-short" title="${escapeHtml(result.suggestedTitles.short)}"><b>Short</b> ${result.suggestedTitles.short}</span>
+                        <button type="button" class="rw-ok" title="Use as the short title" aria-label="Apply short title" onclick="document.getElementById('quiz-short-title').value='${result.suggestedTitles.short.replace(/'/g, "\\'")}'; showToast('Short Title Updated');">✓</button>
+                    </span><span class="rw-bar" aria-hidden="true">│</span>
                 ` : '';
 
                 // V101.65: one summary line (as on the Scorecard) replaces the saved-analysis banner
@@ -20540,16 +20563,9 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                 const pillsHtml = `<span class="audit-pill" title="Model · tokens: ${rewriteTokens.toLocaleString()}">${escapeHtml(window.aiModelShortName(aiModel))} · ${rewriteTokens >= 1000 ? (rewriteTokens / 1000).toFixed(1) + 'k' : rewriteTokens}</span>${(opts && opts.cachedResult && !opts.batchMerged) ? `<span class="audit-pill" title="Saved analysis — no tokens spent. Pick a model and press Rewrite to run again." data-th-title="ผลวิเคราะห์ที่บันทึกไว้ ไม่เสียโทเคน · เลือกโมเดลแล้วกด Rewrite เพื่อรันใหม่"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> ${escapeHtml(opts.cachedSavedAtLabel || 'Saved')}</span>` : ''}`;
 
                 resultDiv.innerHTML = `
-                    ${window.auditToolbarHtml(true, 'specialist', true, { count: (result.items || []).length, pills: pillsHtml, magic: true })}
-                    ${titleSection}
-
-                    <details style="margin-bottom:10px; background:#fafafa; border:1px solid #f0f0f0; border-radius:14px; padding:10px 16px;">
-                        <summary style="cursor:pointer; display:flex; align-items:center; gap:8px; font-size:0.85em; color:#475569; font-weight:700;">
-                            <span>📊</span>
-                            <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:400; color:#64748b;">${analysisClean}</span>
-                        </summary>
-                        <div style="white-space:pre-wrap; line-height:1.8; color:#333; font-size:0.95em; margin-top:10px; padding-top:10px; border-top:1px dashed #e2e8f0;">${analysisClean}</div>
-                    </details>
+                    ${window.auditToolbarHtml(true, 'specialist', true, { count: (result.items || []).length, magic: true })}
+                    <div class="rw-info lang-no-toggle">${titleSection}<button type="button" class="rw-sum-chip" aria-expanded="false" aria-controls="rw-sum" aria-label="Overall analysis" title="Overall analysis — tap to read all of it" onclick="const p=document.getElementById('rw-sum'); p.hidden=!p.hidden; this.setAttribute('aria-expanded', String(!p.hidden));"><span aria-hidden="true">📊</span><span class="rw-sum-t">${analysisClean}</span><span aria-hidden="true">▾</span></button>${pillsHtml}</div>
+                    <div id="rw-sum" class="rw-sum" hidden>${analysisClean}</div>
 
                     ${improvementsHtml}
 
@@ -20822,15 +20838,30 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
             const isAudit = mode === 'audit';
             const inputId = isAudit ? 'quality-audit-model' : 'rewrite-ai-model';
             const selected = isAudit ? 'gpt-6-luna' : textAIModel('ai-analyzer-model-val');
-            const action = `document.getElementById('${inputId}').value=this.dataset.value;this.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===this);b.setAttribute('aria-pressed',String(b===this))});this.closest('.audit-toolbar').querySelector('.audit-run').title='ใช้ '+this.getAttribute('aria-label')+' ทำงานนี้'` + (isAudit ? ';syncAuditFixHints()' : ";if(!isTrialTextAIModel(this.dataset.value))syncModelDefault('ai-analyzer-model-val',this.dataset.value)");
+            const action = `document.getElementById('${inputId}').value=this.dataset.value;this.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===this);b.setAttribute('aria-pressed',String(b===this))});this.closest('.audit-toolbar').querySelector('.audit-run').title='ใช้ '+this.getAttribute('aria-label')+' ทำงานนี้'` + (isAudit ? ';syncAuditFixHints()' : ";if(!isTrialTextAIModel(this.dataset.value))syncModelDefault('ai-analyzer-model-val',this.dataset.value);syncRewriteModelChip(this)");
             return window.providerModelRailHtml(inputId, selected, action, TEXT_AI_TRIAL_MODELS);
+        };
+        window.rewriteRailFolded = function() { try { return localStorage.getItem('rewriteRailFolded') !== '0'; } catch (_) { return true; } };
+        window.toggleRewriteRail = function(btn) {
+            const tb = btn.closest('.audit-toolbar'), folded = tb.classList.toggle('folded');
+            btn.setAttribute('aria-expanded', String(!folded));
+            try { localStorage.setItem('rewriteRailFolded', folded ? '1' : '0'); } catch (_) { /* storage may be blocked */ }
+        };
+        window.syncRewriteModelChip = function(picked) {   // a pick in the row renames the chip
+            const tb = picked.closest('.audit-toolbar'), chip = tb && tb.querySelector('.audit-model-chip'), id = picked.dataset.value; if (!chip) return;
+            chip.querySelector('.amc-logo').innerHTML = window.aiModelLogoHtml ? window.aiModelLogoHtml(id) : '';
+            chip.querySelector('.amc-name').textContent = window.aiModelShortName ? window.aiModelShortName(id) : picked.textContent.trim();
+            chip.setAttribute('aria-label', 'Model: ' + (picked.getAttribute('aria-label') || id) + ' — show all models');
         };
         window.auditToolbarHtml = function(hasResult, mode = 'audit', allowExport = false, x = null) {
             const isAudit = mode === 'audit';
             const run = isAudit ? 'runSelectedQualityAudit(this)' : 'runSelectedAnalyze(this)';
             const selected = isAudit ? 'gpt-6-luna' : textAIModel('ai-analyzer-model-val');
             const label = TEXT_AI_MODELS.find(m => m.id === selected).label;
-            return `<div class="audit-toolbar${isAudit ? ' one-row' : ''} lang-no-toggle"><div class="audit-toolbar-top">${window.reviewTabsHtml(mode, x && x.count)}${x && x.pills ? x.pills : ''}<div class="audit-actions">${x && x.magic ? '<button type="button" id="btn-apply-ai-improve" class="audit-magic" onclick="applyQuizImprovements()" title="Magic Overhaul — rewrite all questions (independent of the fixes below; regenerates the entire quiz)" data-th-title="Magic Overhaul — เขียนคำถามใหม่ทั้งหมด (แยกจากรายการแก้ไขด้านล่าง สร้างข้อสอบใหม่ทั้งชุด)" aria-label="Magic Overhaul">✨</button>' : ''}${isAudit ? '' : window.clinicalAngleChipHtml()}<button type="button" class="audit-run" onclick="${run}" title="Use ${label} for this task" data-th-title="ใช้ ${label} ทำงานนี้">↻ ${isAudit ? 'Review' : 'Rewrite'}</button>${allowExport ? `<button type="button" onclick="exportAiAnalysisMd()" class="audit-export${x ? ' ico' : ''}" aria-label="Export" title="Export — download the analysis as Markdown" data-th-title="ดาวน์โหลดผลการวิเคราะห์เป็น Markdown">${x ? '⤓' : 'Export'}</button>` : ''}<button type="button" class="audit-close" onclick="closeQuizReview()" aria-label="Close review" title="Close the quiz review" data-th-title="ปิดหน้าตรวจข้อสอบ">×</button></div></div>${window.auditModelControlsHtml(hasResult, mode)}</div>`;
+            // V102.659 (owner pick D): on Rewrites the model row folds into ONE chip beside ↻ Rewrite — tap = the row of chips opens under it (remembered in this browser)
+            const folded = !isAudit && (window.rewriteRailFolded ? window.rewriteRailFolded() : true);
+            const modelChip = isAudit ? '' : `<button type="button" class="audit-model-chip" onclick="toggleRewriteRail(this)" aria-expanded="${!folded}" aria-label="Model: ${label} — show all models" title="Model for the next Rewrite — tap to choose another"><span class="amc-logo">${window.aiModelLogoHtml ? window.aiModelLogoHtml(selected) : ''}</span><span class="amc-name">${window.aiModelShortName ? window.aiModelShortName(selected) : label}</span><span aria-hidden="true">▾</span></button>`;
+            return `<div class="audit-toolbar${isAudit ? ' one-row' : ' rw-lean' + (folded ? ' folded' : '')} lang-no-toggle"><div class="audit-toolbar-top">${window.reviewTabsHtml(mode, x && x.count)}${x && x.pills ? x.pills : ''}<div class="audit-actions">${x && x.magic ? '<button type="button" id="btn-apply-ai-improve" class="audit-magic" onclick="applyQuizImprovements()" title="Magic Overhaul — rewrite all questions (independent of the fixes below; regenerates the entire quiz)" data-th-title="Magic Overhaul — เขียนคำถามใหม่ทั้งหมด (แยกจากรายการแก้ไขด้านล่าง สร้างข้อสอบใหม่ทั้งชุด)" aria-label="Magic Overhaul">✨</button>' : ''}${isAudit ? '' : window.clinicalAngleChipHtml()}${modelChip}<button type="button" class="audit-run" onclick="${run}" title="Use ${label} for this task" data-th-title="ใช้ ${label} ทำงานนี้">↻ ${isAudit ? 'Review' : 'Rewrite'}</button>${allowExport ? `<button type="button" onclick="exportAiAnalysisMd()" class="audit-export${x ? ' ico' : ''}" aria-label="Export" title="Export — download the analysis as Markdown" data-th-title="ดาวน์โหลดผลการวิเคราะห์เป็น Markdown">${x ? '⤓' : 'Export'}</button>` : ''}<button type="button" class="audit-close" onclick="closeQuizReview()" aria-label="Close review" title="Close the quiz review" data-th-title="ปิดหน้าตรวจข้อสอบ">×</button></div></div>${window.auditModelControlsHtml(hasResult, mode)}</div>`;
         };
 
         window.runSelectedQualityAudit = function(btn) {
