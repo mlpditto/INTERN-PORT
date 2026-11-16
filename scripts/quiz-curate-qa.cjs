@@ -175,6 +175,11 @@ const { chromium } = require('playwright');
         assert.equal(await page.evaluate(() => window.injected), undefined);
         assert.equal(await row(10).locator('.curate-stem').count(), 1);
         assert.equal(await row(11).locator('.curate-badge').count(), 0, 'V102.591: no AI-suggests badge — the Keep / Remove tab says it');
+        // V102.660: a question is ONE line until ▾ (or a click on the line) opens it — one open at a time
+        assert.deepEqual(await page.locator('.curate-question').evaluateAll(rs => [rs.every(r => r.classList.contains('compact')), Math.max(...rs.map(r => Math.round(r.getBoundingClientRect().height)))]).then(([all, h]) => [all, h <= 48]), [true, true], 'every row is one line');
+        assert.equal(await row(10).getByRole('button', { name: /^Choices/ }).isVisible(), false, 'Choices is inside the folded row');
+        await row(10).locator('.curate-row-toggle').click();
+        assert.deepEqual([await row(10).evaluate(r => r.classList.contains('open')), await row(10).locator('.curate-row-toggle').getAttribute('aria-expanded'), await page.locator('.curate-question.open').count()], [true, 'true', 1], '▾ opens that row only');
         await page.waitForFunction(() => document.querySelector('[data-question-id="10"] .curate-expand').hidden);
         assert.equal(await row(11).locator('.curate-expand').isVisible(), false, 'short question does not need More');
         const choicesToggle = row(10).getByRole('button', { name: /^Choices · 2/ });

@@ -4,6 +4,7 @@
 const SAVE = /curate-(save|apply|split|create-backup|actions-info)\b|data-save/;
 const SET = /curate-(target|suggest|instructions|reload|model|old|history|rail-fold|card|controls|keep)\b|data-mode|data-step=|data-model|audit-provider|text-ai-chips/;
 const stepOf = sel => (typeof sel !== 'string' || /curate-savepanel|curate-save-/.test(sel)) ? null : SAVE.test(sel) ? 'save' : SET.test(sel) ? 'set' : null;
+const INROW = /curate-(source-toggle|source-panel|expand|reason-details|copy|choice|key)\b|curate-question[^,]*\b(details|summary)\b/;   // V102.660: these sit inside a row that is folded to one line
 const ACTS = ['click', 'fill', 'check', 'uncheck', 'press', 'focus', 'type', 'selectOption', 'dispatchEvent', 'hover'];
 function install(page) {
     const raw = page.locator.bind(page);
@@ -19,7 +20,15 @@ function install(page) {
         if (['first', 'last', 'nth', 'filter', 'locator'].includes(k)) return (...a) => wrap(t[k](...a), step, sel);
         const v = t[k]; return typeof v === 'function' ? v.bind(t) : v;
     } });
-    page.locator = (sel, opts) => { const loc = raw(sel, opts), step = stepOf(sel); return step ? wrap(loc, step, sel) : loc; };
+    // a control inside a folded row: press that row's real ▾ first (one row is open at a time)
+    const openRow = async loc => { const el = await loc.first().elementHandle({ timeout: 2000 }).catch(() => null); if (!el) return;
+        await el.evaluate(n => { const row = n.closest('.curate-question.compact'), t = row && row.querySelector('.curate-row-toggle'); if (t && !t.disabled) t.click(); }); };
+    const wrapRow = loc => new Proxy(loc, { get(t, k) {
+        if (ACTS.includes(k)) return async (...a) => { await openRow(t); return t[k](...a); };
+        if (['first', 'last', 'nth', 'filter', 'locator'].includes(k)) return (...a) => wrapRow(t[k](...a));
+        const v = t[k]; return typeof v === 'function' ? v.bind(t) : v;
+    } });
+    page.locator = (sel, opts) => { const loc = raw(sel, opts), step = stepOf(sel); return step ? wrap(loc, step, sel) : typeof sel === 'string' && INROW.test(sel) ? wrapRow(loc) : loc; };
     return { go };
 }
 module.exports = { install, stepOf };

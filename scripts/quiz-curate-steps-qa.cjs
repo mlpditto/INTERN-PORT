@@ -74,7 +74,19 @@ const click = (page, sel) => page.locator('#quiz-curate-dialog ' + sel).first().
         ok(v.btn === '#curate-prev #curate-next' && v.next === 'Save ▸' && !v.nextOff && v.prev === '◂ Set', 'footer = ◂ Set · status · Save ▸ (the three save buttons are not here)');
         ok(await page.evaluate(() => calls) === 0, 'no AI call');
         const hReview = v.h;
+        // V102.660: one line per question, ▾ opens one in place
+        const rowsNow = () => page.evaluate(() => { const rs = [...document.querySelectorAll('#curate-rows .curate-question')]; return { n: rs.length, compact: rs.filter(r => r.classList.contains('compact')).length, open: rs.filter(r => r.classList.contains('open')).map(r => r.dataset.questionId).join(), maxH: Math.max(...rs.filter(r => r.classList.contains('compact')).map(r => Math.round(r.getBoundingClientRect().height))), twin: (rs[0].querySelector('.curate-compare') || {}).dataset ? getComputedStyle(rs[0].querySelector('.curate-compare'), '::after').content : '', choices: !!rs[0].querySelector('.curate-source-controls') && rs[0].querySelector('.curate-source-controls').getClientRects().length > 0, pin: rs[0].querySelector('.curate-pin').getClientRects().length > 0, move: rs[0].querySelector('.curate-move').textContent }; });
+        let rw = await rowsNow();
+        ok(rw.n === 10 && rw.compact === 10 && rw.maxH <= 48 && hReview <= 900, 'ten removals on ten lines: the Review step is ' + hReview + ' px (it was about 1,600)');
+        ok(/↔ Q11/.test(rw.twin) && rw.pin && rw.move === 'Keep' && !rw.choices, 'a line keeps ↔ twin · Keep · 📌; Choices / Details wait inside');
         await shot(page, 'steps-2-review');
+        await click(page, '.curate-question[data-question-id="2"] .curate-row-toggle'); rw = await rowsNow();
+        ok(rw.open === '2' && rw.compact === 9 && await page.locator('#quiz-curate-dialog .curate-question.open .curate-source-controls').isVisible(), '▾ opens Q2 in place with its Choices / copy row');
+        await shot(page, 'steps-2-review-open');
+        await page.locator('#quiz-curate-dialog .curate-question[data-question-id="3"] .curate-stem').click(); rw = await rowsNow();
+        ok(rw.open === '3', 'a click on another line opens it and folds the first (one open at a time)');
+        await click(page, '.curate-question.open .curate-row-toggle'); rw = await rowsNow();
+        ok(rw.open === '' && rw.compact === 10 && await page.evaluate(() => document.activeElement.classList.contains('curate-row-toggle')), '▴ folds it; focus stays on its ▾');
         await click(page, '[data-curate-step="set"]'); v = await view(page);
         ok(v.step === 'set' && v.card && v.h > hReview + 60 && v.focus === 'set' && v.next === 'Review ▸', '① Set brings the tools back (' + v.h + ' px vs ' + hReview + ' on Review); focus follows');
         await click(page, '#curate-next'); v = await view(page);
