@@ -14,7 +14,7 @@ const fn = grab('window.quizLivePillHtml = function');
         await page.setContent('<meta charset="utf-8"><body></body>');
         const rows = await page.evaluate(src => {
             const now = Date.now(), out = {};
-            window.QUIZ_TIMER_HOURS = [1, 24]; window.quizTimerLabel = h => h + 'h';
+            window.QUIZ_TIMER_HOURS = [1, 24]; window.quizTimerLabel = h => h + 'h'; window.quizDefaultDeadline = () => ({});   // V102.655: the off menu names the default timer (quiz-go-live-7d-qa)
             let st;
             window.quizLiveState = () => st;
             new Function(src + '; window.quizLivePillHtml = window.quizLivePillHtml;')();
