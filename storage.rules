@@ -146,6 +146,16 @@ service firebase.storage {
         && request.resource.contentType == 'video/mp4';
     }
 
+    // 🎬 Watch first story voices (admin V102.668) — one AI-voiced sound file per story line, content-addressed by
+    // SHA-256 (watch-voices/<sha256>.mp3). Same model as pk-visuals: interns play a line through the download token
+    // kept on the quiz, so only the admin needs rule access. 2 MB cap, audio only (a line is a few seconds).
+    match /watch-voices/{fileName} {
+      allow read, delete: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('audio/.*');
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

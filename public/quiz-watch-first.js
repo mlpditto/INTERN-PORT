@@ -59,7 +59,8 @@
     }
     function muted() { try { return localStorage.getItem('qwsMute') === '1'; } catch (e) { return false; } }
     var play = null;   // the story being played: { i, sound, done, t0, timer, n }
-    function stopStory() { if (play) { clearTimeout(play.timer); play.n++; } if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch (e) { /* nothing speaking */ } } }
+    function voiceUrl(x) { return x && typeof x.a === 'string' && /^https:\/\/firebasestorage\.googleapis\.com\/\S+$/.test(x.a) ? x.a : ''; }
+    function stopStory() { if (play) { clearTimeout(play.timer); play.n++; if (play.au) { try { play.au.pause(); } catch (e) { /* not playing */ } play.au = null; } } if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch (e) { /* nothing speaking */ } } }
 
     var seen = null;   // what this page saw of the film: { max, played, ended, failed }
     function record() {
@@ -123,7 +124,7 @@
     // V101.316: the voice is ON when the page opens (owner 2026-11-16) unless this phone's intern muted it before
     function storyPage(box, q, story) {
         stopStory();
-        var can = !!(window.speechSynthesis && window.SpeechSynthesisUtterance), on = can && !muted();
+        var can = !!(window.speechSynthesis && window.SpeechSynthesisUtterance) || story.lines.some(voiceUrl), on = can && !muted();
         var k = play = { i: -1, sound: on, auto: on, done: false, t0: Date.now(), timer: null, n: 0 }, ls = story.lines;
         seen = { max: 0, played: false, ended: false, failed: false };
         box.innerHTML = '<div class="lang-no-toggle qwf"><div class="qwf-h">🎬 ' + esc(L(T.head)) + '<small>· ' + esc(L(T.sub)) + '</small></div>' +
@@ -146,24 +147,38 @@
             k.i++; paint();
             var n = k.n, ms = 1100 + ls[k.i].t.length * 60, fired = false;
             var next = function () { if (fired || play !== k || k.n !== n) return; fired = true; clearTimeout(k.timer); step(); };
-            if (k.sound && window.speechSynthesis && window.SpeechSynthesisUtterance) {
+            var heard = false, quiet = function () {
+                if (fired || play !== k || k.n !== n) return;
+                k.sound = k.auto = false; face(); stopStory(); k.timer = setTimeout(function () { step(); }, Math.max(300, ms - 1500));
+            };
+            // V101.317: a line the admin voiced with AI (`a`, a Storage link) is played as that sound; a sound that will not load → the phone voice says it.
+            var src = k.sound ? voiceUrl(ls[k.i]) : '';
+            if (src && typeof Audio === 'function') {
+                try {
+                    var au = k.au = new Audio(src), fell = false, fall = function () { if (fell || fired || play !== k || k.n !== n) return; fell = true; clearTimeout(k.timer); if (k.auto) quiet(); else if (!say()) k.timer = setTimeout(next, ms); };
+                    au.onended = function () { heard = true; k.auto = false; k.timer = setTimeout(next, 250); };
+                    au.onerror = fall;
+                    var pr = au.play(); k.timer = setTimeout(next, ms + 15000);
+                    if (pr && typeof pr.then === 'function') pr.then(function () { heard = true; k.auto = false; }, fall);
+                    return;
+                } catch (e) { /* no player: the phone voice */ }
+            }
+            if (k.sound && say()) return;
+            k.timer = setTimeout(next, ms);
+            function say() {
+                if (!(window.speechSynthesis && window.SpeechSynthesisUtterance)) return false;
                 try {
                     var u = new SpeechSynthesisUtterance(ls[k.i].t); u.lang = { th: 'th-TH', en: 'en-US', ko: 'ko-KR' }[story.lang] || 'en-US';
                     // V101.316: the voice starts by itself. A phone that refuses a voice nobody tapped for (or has none) says nothing —
                     // then the page goes quiet: 🔇 Tap for sound, lines timed by their length, as before.
-                    var heard = false, quiet = function () {
-                        if (fired || play !== k || k.n !== n) return;
-                        k.sound = k.auto = false; face(); stopStory(); k.timer = setTimeout(function () { step(); }, Math.max(300, ms - 1500));
-                    };
                     u.onstart = function () { heard = true; k.auto = false; };
                     u.onend = function () { heard = true; k.auto = false; k.timer = setTimeout(next, 250); };
                     u.onerror = function () { if (k.auto) quiet(); else next(); };
                     window.speechSynthesis.speak(u); k.timer = setTimeout(next, ms + 5000);
                     if (k.auto) setTimeout(function () { if (!heard && k.auto) quiet(); }, 1500);
-                    return;
-                } catch (e) { /* no voice: fall back to the timer */ }
+                    return true;
+                } catch (e) { return false; }
             }
-            k.timer = setTimeout(next, ms);
         };
         var face = function () { snd.setAttribute('aria-pressed', String(k.sound)); snd.textContent = (k.sound ? '🔊' : '🔇 ' + L(T.sound)); };
         snd.onclick = function () {
