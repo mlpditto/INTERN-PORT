@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.661)</title>
+    <title>Nika Admin (V102.662)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -15490,6 +15490,12 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                         <textarea id="quiz-description" placeholder="Describe your quiz..." style="width:100%; padding:6px 10px; border:1px solid #334155; border-radius:8px; font-size:0.85em; background:#0f172a; color:#f1f5f9; min-height:45px; max-height:80px; resize:vertical;"></textarea>
                     </div>
 
+                    <!-- V102.662 🎬 Watch first: a short film the intern sees on one page before question 1 (intern quiz-watch-first.js) -->
+                    <div style="margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+                        <label for="quiz-watch-first" title="Watch first — a short film shown on one page before question 1. Paste a direct https video link (.mp4). Empty = no film." style="font-size:0.7em; color:#818cf8; font-weight:600; white-space:nowrap; text-transform:uppercase; letter-spacing:0.5px;">🎬 Watch first</label>
+                        <input type="url" id="quiz-watch-first" inputmode="url" placeholder="https://… .mp4 — plays before question 1" style="flex:1; min-width:0; padding:5px 8px; border:1px solid #334155; border-radius:6px; font-size:0.85em; background:#0f172a; color:#f1f5f9;">
+                    </div>
+
                     <section class="quiz-resources" aria-label="Quiz materials">
                         <header><div><strong>📚 Materials <span id="quiz-resource-count">0</span> <span id="quiz-resource-state" data-state="clean" role="status" title="บันทึกพร้อมกับ Quiz" aria-label="Saved with the quiz">✓</span></strong><p>Links for learners · Add as many resources as this quiz needs.</p></div><button type="button" onclick="quizResourceCards.add()">＋ Add link</button></header>
                         <div id="quiz-resource-grid" class="lang-no-toggle"></div>
@@ -27858,6 +27864,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             { const pc = document.getElementById('quiz-partial-credit'); if (pc) pc.checked = !!q.partialCredit; }
             { const ia = document.getElementById('quiz-instant-answer'); if (ia) ia.checked = q.instantAnswer === true; }   // V102.502
             { const ab = document.getElementById('quiz-allow-break'); if (ab) ab.checked = q.allowBreak === true; }   // V102.610 ⏸
+            { const wf = document.getElementById('quiz-watch-first'); if (wf) { wf.value = (q.watchFirst && q.watchFirst.url) || ''; wf.style.borderColor = '#334155'; } }   // V102.662 🎬
             { const ng = document.getElementById('quiz-notify-group'); if (ng) ng.checked = !!q.notifyGroup; }
             { const nd = document.getElementById('quiz-notify-deadline'); if (nd) nd.checked = q.notifyDeadline !== false; }
             toggleTimerModeUI();
@@ -27960,6 +27967,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             { const pc = document.getElementById('quiz-partial-credit'); if (pc) pc.checked = false; }
             { const ia = document.getElementById('quiz-instant-answer'); if (ia) ia.checked = false; }   // V102.502
             { const ab = document.getElementById('quiz-allow-break'); if (ab) ab.checked = false; }   // V102.610
+            { const wf = document.getElementById('quiz-watch-first'); if (wf) { wf.value = ''; wf.style.borderColor = '#334155'; } }   // V102.662
             { const ng = document.getElementById('quiz-notify-group'); if (ng) ng.checked = false; }
             { const nd = document.getElementById('quiz-notify-deadline'); if (nd) nd.checked = true; }
             toggleTimerModeUI();
@@ -28389,6 +28397,10 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const partialCredit = document.getElementById('quiz-partial-credit')?.checked || false;
             const instantAnswer = document.getElementById('quiz-instant-answer')?.checked || false;   // V102.502: practice — answer after each question
             const allowBreak = document.getElementById('quiz-allow-break')?.checked || false;   // V102.610 ⏸ break on Read first (intern quiz-break.js)
+            // V102.662 🎬 Watch first: { url } for an https link, null for none; anything else is not saved and the box turns red
+            const wfEl = document.getElementById('quiz-watch-first'), wfRaw = ((wfEl && wfEl.value) || '').trim();
+            const watchFirst = /^https:\/\/\S+$/i.test(wfRaw) ? { url: wfRaw } : null;
+            if (wfEl) wfEl.style.borderColor = wfRaw && !watchFirst ? '#ef4444' : '#334155';
             // V97.47: opt-in instant LINE push on submit (notifyQuizSubmitted).
             const notifyGroup = document.getElementById('quiz-notify-group')?.checked || false;
             const notifyDeadline = document.getElementById('quiz-notify-deadline')?.checked !== false;
@@ -28476,7 +28488,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const deadlineBeriMax = (_dbV && _dbV.value !== '') ? Math.max(0, parseInt(_dbV.value, 10) || 0) : null;
 
             return {
-                title, shortTitle, targetGroup, unlockScore, description, tags, tagList, materials, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, partialCredit, instantAnswer, allowBreak, notifyGroup, notifyDeadline, quizType, feedbackLimit, caseContent, questions, blueprint,
+                title, shortTitle, targetGroup, unlockScore, description, tags, tagList, materials, totalPoints, isPoll, oneTimeMode, isHomework, assignedUsers, timerMode, totalTimer, shuffleChoices, partialCredit, instantAnswer, allowBreak, notifyGroup, notifyDeadline, quizType, watchFirst, feedbackLimit, caseContent, questions, blueprint,
                 earlyBirdBeriFirst, deadlineBeriMax, coverUrl: QuizCover.value(), coverStyle: QuizCover.style(), coverBadge: QuizCover.badge(),
                 startTime: document.getElementById('quiz-start-time').value,
                 deadline: document.getElementById('quiz-deadline').value
@@ -31514,6 +31526,7 @@ ${JSON.stringify(sourceObj)}`;
                 partialCredit: formData.partialCredit || false,
                 instantAnswer: formData.instantAnswer === true,   // V102.502
                 allowBreak: formData.allowBreak === true,   // V102.610
+                watchFirst: formData.watchFirst || null,   // V102.662 🎬
                 notifyGroup: formData.notifyGroup || false,
                 notifyDeadline: formData.notifyDeadline !== false,
                 quizType: formData.quizType || 'standard',
