@@ -18,7 +18,7 @@ const single = grab(html, 'window._buildSingleQImprovePrompt = function(');
 assert.ok(batch.includes('${window.clinicalAngleBlock ? window.clinicalAngleBlock() : \'\'}'), 'the batch Rewrite prompt carries the block');
 assert.ok(/\$\{window\.clinicalAngleBlock \? window\.clinicalAngleBlock\(\) : ''\}\$\{steerBlock\}/.test(single), 'the single-question prompt carries the block BEFORE the admin steer');
 const toolbar = grab(html, 'window.auditToolbarHtml = function(');
-assert.ok(toolbar.includes("${isAudit ? '' : window.clinicalAngleChipHtml()}<button type=\"button\" class=\"audit-run\""), 'the chip sits right before Rewrite, rewrite mode only');
+assert.ok(toolbar.includes("${isAudit ? '' : window.clinicalAngleChipHtml()}${modelChip}<button type=\"button\" class=\"audit-run\""), 'the chip sits before the model chip and Rewrite (V102.659), rewrite mode only');
 assert.ok(html.includes('.audit-actions .clinical-angle[aria-pressed="true"]'), 'on-state style');
 
 const code = [grab(html, 'window.clinicalAngleOn = function'), grab(html, 'window.toggleClinicalAngle = function'), grab(html, 'window.clinicalAngleChipHtml = function'),
@@ -49,7 +49,7 @@ const code = [grab(html, 'window.clinicalAngleOn = function'), grab(html, 'windo
         await page.evaluate(() => { document.getElementById('host').innerHTML = window.auditToolbarHtml(false, 'rewrite'); });
         assert.equal(await page.locator('#host .clinical-angle').count(), 1, 'chip in rewrite mode');
         assert.equal(await page.$eval('#host .clinical-angle', e => e.getAttribute('aria-pressed')), 'false');
-        assert.ok(await page.$eval('#host .audit-actions', e => e.firstElementChild.classList.contains('clinical-angle') && e.children[1].classList.contains('audit-run')), 'chip sits right before Rewrite');
+        assert.ok(await page.$eval('#host .audit-actions', e => e.firstElementChild.classList.contains('clinical-angle') && e.children[1].classList.contains('audit-model-chip') && e.children[2].classList.contains('audit-run')), 'chip sits right before the model chip and Rewrite (V102.659)');
         await page.evaluate(() => { document.getElementById('host').innerHTML = window.auditToolbarHtml(false, 'audit'); });
         assert.equal(await page.locator('#host .clinical-angle').count(), 0, 'no chip in Review (audit) mode');
 

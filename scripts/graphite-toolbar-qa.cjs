@@ -39,6 +39,12 @@ const { chromium } = require('playwright');
             const popup = page.locator('#' + id);
             // V101.05 added Qwen/DeepSeek chips; V101.21 gave them provider tabs; V101.52 adds the Grok trial chip here only.
             assert.equal(await popup.locator('.text-ai-chips button').count(), 22); // V102.642: + Inkling 2 Small trial chip; V102.518: + Qwen 3.8 Omni Flash; V102.432: + Kimi K3.1 Pro trial chip; V102.365: + Gemini 4 Argon; V102.268: + Muse Spark Open; V102.242: + Gemma 4 26B A4B; V101.64: + Claude Opus 5.5; V102.76: + local Ollama trial chip
+            if (id === 'ai-analysis-popup') {   // V102.659 (owner pick D): on Rewrites the model row is folded into a chip beside ↻ Rewrite; a tap opens it
+                assert.equal(await popup.locator('.text-ai-chips button:visible').count(), 0, 'the model row starts folded');
+                assert.equal(await popup.locator('.audit-model-chip').getAttribute('aria-expanded'), 'false');
+                await popup.locator('.audit-model-chip').click();
+                assert.equal(await popup.locator('.audit-model-chip').getAttribute('aria-expanded'), 'true');
+            } else assert.equal(await popup.locator('.audit-model-chip').count(), 0, 'the Scorecard keeps its open model row');
             assert.equal(await popup.locator('.text-ai-chips button:visible').count(), 4);
             // V101.65: provider tabs are logos named by aria-label; the chips next to them carry no logo.
             assert.deepEqual(await popup.locator('.audit-provider').evaluateAll(ns => ns.map(n => n.getAttribute('aria-label'))), ['Gemini', 'GPT', 'Claude', 'Qwen', 'DeepSeek', 'Muse', 'Kimi', 'Grok', 'Ollama']);

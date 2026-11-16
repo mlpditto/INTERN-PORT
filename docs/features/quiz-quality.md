@@ -14,6 +14,7 @@ Admin: Quiz Engine ▸ a quiz ▸ Review / Compare.
 - `audit-readfirst-qa` — Read first scored as an optional 8th dimension; rule badge
 - `graphite-toolbar-qa` — audit / rewrite popup: Sakura tabs, 13 compact chips, 320–1024
 - `clinical-angle-chip-qa` — 🩺 Clinical angle block in batch + single prompts
+- `rewrites-head-lean-qa` — Rewrites header in two quiet rows: model row folded into a chip beside ↻ Rewrite (tap opens it, remembered), ✨ 🩺 ⤓ unboxed, titles ✓ ✓ · 📊 summary chip · result pill on one line
 - `compare-top-bar-qa` — Comparison controls as two top lines
 - `compare-footer-lean-qa` — Model B on one row + one icon action row
 - `compare-modelb-rail-check` — Model B chips carry owner logos; Grok trial kept

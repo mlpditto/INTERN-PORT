@@ -8,7 +8,7 @@ const html = fs.readFileSync('public/admin.html', 'utf8').replace(/\r\n/g, '\n')
 const iw = html.indexOf('improvementsHtml = `'), seg = html.slice(iw, iw + 900);
 assert.ok(!/border-top:2px solid #f8f9fa/.test(seg) && !/padding-top:20px/.test(seg) && !/margin-top:25px/.test(seg), 'the divider / 25px / 20px spacing is gone from the Improvements wrapper');
 assert.ok(/<h4 style="color:var\(--primary\); margin:0 0 8px; font-size:0\.85em;">/.test(seg), 'the heading hugs its list (8px)');
-assert.ok(/<details style="margin-bottom:10px; background:#fafafa; border:1px solid #f0f0f0/.test(html), 'the summary block leaves 10px (was 16px)');
+assert.ok(/\.rw-info \{[^}]*margin:0 2px 10px/.test(html) && /<div id="rw-sum" class="rw-sum" hidden>/.test(html), 'V102.659: the summary is a chip on the info line (10px under it); the full text opens below');
 
 (async () => {
     const browser = await chromium.launch();

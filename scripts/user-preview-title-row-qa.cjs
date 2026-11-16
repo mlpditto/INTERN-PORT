@@ -52,7 +52,7 @@ fs.writeFileSync(file, `<!doctype html><meta charset="utf-8">${styles}<body styl
         assert.deepStrictEqual([m.pw, m.ph], [28, 28], 'the 📱 icon is 28px like the other header icons');
         assert.ok(m.headerH <= 70 && m.oneRow, 'the popup header stays one row (' + m.headerH + 'px)');
         assert.ok(m.rowH <= 40, 'the 🏷️ row is ONE line (' + m.rowH + 'px; it was 2–3 lines)'); assert.ok(m.ellipsis, 'the long full title ellipsizes'); assert.ok(!m.over, 'nothing overflows the row');
-        assert.deepStrictEqual(m.btns, ['Apply full title', 'Apply short title', 'Regenerate titles'], 'buttons: ✓ ✓ 🔄 with names');
+        assert.deepStrictEqual(m.btns, ['Apply full title', 'Apply short title'], 'buttons: ✓ ✓ with names (V102.659: the 🔄 is gone — ↻ Rewrite regenerates)');
         await page.click('#titles button[aria-label="Apply full title"]'); await page.click('#titles button[aria-label="Apply short title"]');
         assert.deepStrictEqual(await page.evaluate(() => [document.getElementById('quiz-title').value, document.getElementById('quiz-short-title').value, window.__t]), [result.suggestedTitles.full, result.suggestedTitles.short, ['Title Updated', 'Short Title Updated']], '✓ still writes the title fields (apostrophes survive)');
         console.log('PASS: 📱 LIFF Preview in both user popups (hub chip + profile icon → openLiffPreview(userId)); 🏷️ titles row on one line, ✓ buttons still apply the titles');
