@@ -19,6 +19,7 @@ Admin: Quiz Engine ▸ Edit / ＋ New quiz.
 - `bulk-paste-insert-qa` — ➕ Add selected replaces the empty starter question
 - `quiz-resource-cards-qa` — one lean row per resource (domain chip, ✎, 💬, 🗑)
 - `materials-link-edit-qa` — 📎 materials modal edits the link too
+- `material-viewers-qa` — 📎 materials modal: faces of who opened each file in the 👁 chip, tap = photo · name · ×times · last opened; the row 👁 badge opens the list even for one file
 - `quiz-cover-check` — AI cover 3:4 normalisation (letterbox wide, crop tall)
 - `quiz-cover-ref-qa` — 🧬 reference strip: ≤ 2 ticked covers
 - `quiz-primer-ai-qa` — ✨ Read first draft never sends the correct answer

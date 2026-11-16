@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.667)</title>
+    <title>Nika Admin (V102.668)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -36972,9 +36972,15 @@ ${qs}`;
                     const s = stats[quizId] || (stats[quizId] = { total: 0, users: new Set(), byUrl: {} });
                     s.total++;
                     if (c.userId) s.users.add(c.userId);
-                    const u = s.byUrl[url] || (s.byUrl[url] = { count: 0, users: new Set() });
+                    const u = s.byUrl[url] || (s.byUrl[url] = { count: 0, users: new Set(), who: {} });
                     u.count++;
-                    if (c.userId) u.users.add(c.userId);
+                    if (c.userId) {
+                        u.users.add(c.userId);
+                        // V102.669: per person — times and the last time (the modal shows faces, tap = who and when)
+                        const w = u.who[c.userId] || (u.who[c.userId] = { n: 0, last: 0, name: '' });
+                        const t = c.timestamp && typeof c.timestamp.toMillis === 'function' ? c.timestamp.toMillis() : 0;
+                        w.n++; if (t >= w.last) { w.last = t; if (c.displayName) w.name = String(c.displayName); }
+                    }
                 });
                 window._matClickStats = stats;
                 if (Object.keys(stats).length) renderQuizzes();
@@ -37188,7 +37194,7 @@ ${qs}`;
                 const materialsLabel = _mats.length > 0 ? `<span class="badge" style="background:#1d4ed8; color:white; margin-left:5px; cursor:pointer;" title="Click to test-load the documents: ${escapeHtml(_mats.map((m, i) => materialDisplayName(m, i)).join(', '))}" data-th-title="คลิกเพื่อทดสอบโหลดเอกสาร: ${escapeHtml(_mats.map((m, i) => materialDisplayName(m, i)).join(', '))}" onclick="event.stopPropagation(); adminOpenQuizMaterials('${q.id}')">📎 ${_mats.length}</span>` : '';
                 // V96.62: 👁 click-analytics badge — total opens · distinct interns (from material_clicks).
                 const _mcs = window._matClickStats ? window._matClickStats[q.id] : null;
-                const clicksLabel = (_mcs && _mcs.total > 0) ? `<span class="badge" style="background:#0e7490; color:white; margin-left:5px; cursor:pointer;" title="Documents opened ${_mcs.total} times by ${_mcs.users.size} people" data-th-title="เอกสารถูกเปิด ${_mcs.total} ครั้ง โดย ${_mcs.users.size} คน" onclick="event.stopPropagation(); adminOpenQuizMaterials('${q.id}')">👁 ${_mcs.total}</span>` : '';
+                const clicksLabel = (_mcs && _mcs.total > 0) ? `<span class="badge" style="background:#0e7490; color:white; margin-left:5px; cursor:pointer;" title="Documents opened ${_mcs.total} times by ${_mcs.users.size} people" data-th-title="เอกสารถูกเปิด ${_mcs.total} ครั้ง โดย ${_mcs.users.size} คน" onclick="event.stopPropagation(); adminOpenQuizMaterials('${q.id}', null, true)">👁 ${_mcs.total}</span>` : '';
                 // V95.44: หมวด chips mirroring the Dashboard Quiz Coverage widget. Click
                 // opens the same per-system list modal (works from any tab — the modal is
                 // static and covByQuiz guarantees _qcovBuckets is fresh this render).
@@ -37666,12 +37672,14 @@ ${qs}`;
         // V96.29: editIdx (filtered-list index) renders that row as an inline name/note
         // editor instead of a link. lang-no-toggle on the shell stops lang-toggle.js from
         // blanking the Thai header/labels (which made the modal read as a bare "(N)").
-        function adminOpenQuizMaterials(quizId, editIdx) {
+        // V102.669 (owner pick C, mockup-material-viewers/): the 👁 chip of a file carries the faces of who opened it (newest first, 5 then +n);
+        // a tap on the chip unfolds photo · name · ×times · last opened. `list` = show the list even for a single file (the row's 👁 badge).
+        function adminOpenQuizMaterials(quizId, editIdx, list) {
             const q = (typeof quizzesData !== 'undefined' ? quizzesData : []).find(x => x.id === quizId);
             const mats = (q && Array.isArray(q.materials)) ? q.materials.filter(m => m && m.url) : [];
             if (!mats.length) return;
             // Single file opens directly — but not while editing (we need the list visible).
-            if (mats.length === 1 && editIdx == null) { window.open(String(mats[0].url).trim(), '_blank', 'noopener'); return; }
+            if (mats.length === 1 && editIdx == null && !list) { window.open(String(mats[0].url).trim(), '_blank', 'noopener'); return; }
             const existing = document.getElementById('adminQuizMaterialsModal');
             if (existing) existing.remove();
             const links = mats.map((m, i) => {
@@ -37697,6 +37705,19 @@ ${qs}`;
                 // V96.62: per-file click count from material_clicks (matched by trimmed URL).
                 const _fstats = window._matClickStats && window._matClickStats[quizId];
                 const _fu = _fstats ? _fstats.byUrl[String(m.url).trim()] : null;
+                const _users = typeof usersData !== 'undefined' && Array.isArray(usersData) ? usersData : [];
+                const who = _fu && _fu.who ? Object.keys(_fu.who).map(id => { const usr = _users.find(x => x && x.id === id) || {}, w = _fu.who[id]; return { n: w.n, last: w.last, name: String(usr.displayName || w.name || 'Unknown').trim() || 'Unknown', pic: usr.pictureUrl || '' }; }).sort((a, b) => b.last - a.last || b.n - a.n) : [];
+                const face = (p, px, lap) => `<span class="mv-f" title="${escapeHtml(p.name)} ×${p.n}" style="position:relative; display:inline-flex; align-items:center; justify-content:center; flex:none; width:${px}px; height:${px}px; border-radius:50%; background:#94a3b8; color:#fff; font-size:${Math.round(px * 0.45)}px; font-weight:800; ${lap ? 'margin-left:-7px; ' : ''}box-shadow:0 0 0 2px #fff; overflow:hidden;">${escapeHtml([...p.name][0] || '?')}${p.pic ? `<img src="${escapeHtml(p.pic)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover;">` : ''}</span>`;
+                const when = t => { if (!t) return ''; const d = new Date(t); return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); };
+                const openKey = quizId + '|' + i, isOpen = who.length > 0 && window._matViewersOpen === openKey;
+                const chipHtml = who.length ? `<button type="button" class="mv-chip" aria-expanded="${isOpen}" onclick="window._matViewersOpen = window._matViewersOpen === '${openKey}' ? '' : '${openKey}'; adminOpenQuizMaterials('${quizId}', null, true)" title="Opened ${_fu.count} times by ${who.length} people — tap to see who" data-th-title="เปิด ${_fu.count} ครั้ง โดย ${who.length} คน — แตะเพื่อดูรายชื่อ" style="flex:none; display:inline-flex; align-items:center; gap:6px; margin:0; width:auto; min-height:0; font-size:0.78em; font-weight:800; color:#0e7490; background:${isOpen ? '#cffafe' : '#ecfeff'}; border:1px solid #a5f3fc; padding:2px 8px; border-radius:999px; white-space:nowrap; cursor:pointer;">👁 ${_fu.count}<span style="display:inline-flex; padding-left:2px;">${who.slice(0, 5).map((p, k) => face(p, 20, k > 0)).join('')}</span>${who.length > 5 ? `<span class="mv-more">+${who.length - 5}</span>` : ''}<span aria-hidden="true" style="font-size:0.8em;">${isOpen ? '▴' : '▾'}</span></button>` : '';
+                const whoHtml = isOpen ? `<div class="mv-list" style="margin-top:8px; border-top:1px dashed #bfdbfe; padding-top:6px; max-height:230px; overflow-y:auto;">${who.map(p => `<div class="mv-row" style="display:flex; align-items:center; gap:8px; padding:3px 2px; font-size:0.82em; font-weight:600; color:#334155;">${face(p, 26, false)}<span style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(p.name)}</span><b style="color:#0e7490;">×${p.n}</b><span style="color:#94a3b8; font-weight:500; white-space:nowrap;">${when(p.last)}</span></div>`).join('')}</div>` : '';
+                if (who.length) return `<div style="display:flex; gap:8px; align-items:stretch;">
+                    <div class="mv-box" style="flex:1; min-width:0; padding:10px 14px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px;">
+                        <div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px;"><a href="${fullUrl}" target="_blank" rel="noopener noreferrer" title="${fullUrl}" style="flex:1 1 auto; min-width:0; color:#1d4ed8; font-weight:700; text-decoration:none; font-size:0.9em; word-break:break-word;">📎 ${escapeHtml(name)}</a>${chipHtml}</div>${descHtml}${whoHtml}
+                    </div>
+                    <button type="button" onclick="adminOpenQuizMaterials('${quizId}',${i})" title="Edit link / name" data-th-title="แก้ลิงก์ / ชื่อไฟล์" style="flex-shrink:0; width:42px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; color:#64748b; cursor:pointer; font-size:0.95em;">✏️</button>
+                </div>`;
                 const fileClicksHtml = _fu ? `<span style="margin-left:6px; font-size:0.78em; font-weight:800; color:#0e7490; background:#ecfeff; border:1px solid #a5f3fc; padding:1px 8px; border-radius:999px; white-space:nowrap;" title="Opened ${_fu.count} times by ${_fu.users.size} people" data-th-title="เปิด ${_fu.count} ครั้ง โดย ${_fu.users.size} คน">👁 ${_fu.count} · ${_fu.users.size} คน</span>` : '';
                 return `<div style="display:flex; gap:8px; align-items:stretch;">
                     <a href="${fullUrl}" target="_blank" rel="noopener noreferrer" title="${fullUrl}" style="flex:1; min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:0; padding:10px 14px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; border-radius:10px; font-weight:700; text-decoration:none; font-size:0.9em; word-break:break-word;"><span>📎 ${escapeHtml(name)}${fileClicksHtml}</span>${descHtml}</a>
