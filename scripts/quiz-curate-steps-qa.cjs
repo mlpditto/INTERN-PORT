@@ -1,5 +1,6 @@
 // V102.657 (owner pick C, mockup-curate-steps) — ✦ AI Curate is three steps: ① Set → ② Review → ③ Save, one on screen at a time.
 // A result opens on Review with the tools card folded into the ① chip; Save shows what will happen and ONE of three ways to save.
+// V102.665: at ≥ 1,300 px the Review step is two panes — the list left, the picked question beside its twin (or alone) right.
 // The REAL quiz-curate.js / css; 20 questions, a saved run that removes 10 (no AI call); Firestore is a recorder. SHOT=<dir> writes PNGs.
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -136,6 +137,49 @@ const click = (page, sel) => page.locator('#quiz-curate-dialog ' + sel).first().
         ({ page, errors } = await open(browser));
         await click(page, '[data-curate-step="set"]'); await page.locator('#curate-target').fill('9'); v = await view(page);
         ok(v.step === 'set' && !v.steps[1].off && v.steps[2].off && /Suggest/.test(v.steps[2].title), 'Keep changed → ③ closed until Suggest runs again; ② still shows the old result');
+        await page.context().close();
+
+        console.log('wide window: list left, detail right');
+        ({ page, errors } = await open(browser, { width: 1440 }));
+        const pane = () => page.evaluate(() => {
+            const d = document.getElementById('quiz-curate-dialog'), rv = d.querySelector('.curate-review'), cmp = d.querySelector('#curate-comparison'), r = e => e.getBoundingClientRect(), vis = e => !!e && e.getClientRects().length > 0;
+            const sel = d.querySelector('.curate-question.sel'), head = cmp.querySelector('.curate-pane-head');
+            return { two: d.classList.contains('two'), side: vis(rv) && vis(cmp) && r(rv).right <= r(cmp).left + 1 && Math.abs(r(rv).top - r(cmp).top) < 4, listW: Math.round(r(rv).width), sel: sel ? sel.dataset.questionId : null, rows: d.querySelectorAll('#curate-rows .curate-question').length,
+                pair: (cmp.querySelector('.curate-cmp-head h3') || {}).textContent || '', cards: cmp.querySelectorAll('.curate-compare-card').length, solo: !!cmp.querySelector('.curate-solo'), back: vis(cmp.querySelector('.curate-back')),
+                head: head ? head.querySelector('b').textContent : '', why: head ? head.querySelector('.curate-pane-why').textContent : '', move: head ? head.querySelector('.curate-pane-move').textContent : '', moveOff: head ? head.querySelector('.curate-pane-move').disabled : null, pin: head ? head.querySelector('.curate-pane-pin').getAttribute('aria-pressed') : null,
+                reasonInRow: [...d.querySelectorAll('.curate-question.compact .curate-reason > div')].some(vis), toggles: [...d.querySelectorAll('.curate-row-toggle')].some(e => r(e).width > 1), h: d.scrollHeight, fits: d.scrollHeight <= d.clientHeight + 1, overflowX: d.scrollWidth > d.clientWidth + 1, open: d.open,
+                tabs: [...d.querySelectorAll('[data-view]')].map(b => b.textContent).join(' | '), feedback: d.querySelector('#curate-feedback').textContent };
+        });
+        let pn = await pane();
+        ok(pn.two && pn.side && pn.listW <= 380 && !pn.overflowX, 'at 1,440 px the Review step is two panes: the list (' + pn.listW + ' px) and the detail beside it');
+        ok(pn.sel === '1' && pn.pair === 'Q1 ↔ Q11' && pn.cards === 2 && !pn.back, 'the first removal is picked and shown beside its twin (no ← back: it is the page itself)');
+        ok(pn.head === 'Q1 → Remove' && /Duplicate of Q11\./.test(pn.why) && pn.move === 'Keep' && pn.pin === 'false', 'first line of the detail: verdict · reason · Keep · 📌');
+        ok(!pn.reasonInRow && !pn.toggles && pn.rows === 10, 'the list is names only — the reason and ▾ moved to the right');
+        await shot(page, 'steps-2-review-pane');
+        ok(pn.fits, 'nothing to scroll: ' + pn.h + ' px in a 810 px window');
+        await page.locator('#quiz-curate-dialog .curate-question[data-question-id="3"] .curate-stem').click(); pn = await pane();
+        ok(pn.sel === '3' && pn.pair === 'Q3 ↔ Q20', 'a click on a line shows that question: ' + pn.pair);
+        await click(page, '.curate-question[data-question-id="6"] .curate-compare'); pn = await pane();
+        ok(pn.sel === '6' && pn.pair === 'Q6 ↔ Q19', 'so does its ↔ chip');
+        await click(page, '.curate-pane-move'); pn = await pane();
+        ok(pn.tabs === 'Keep · 11 | Remove · 9' && pn.sel === '1' && /11 selected · target 10/.test(pn.feedback), 'Keep in the detail moves Q6 to Keep; the next removal is picked; the footer says 11 for a target of 10');
+        await click(page, '[data-view="keep"]'); pn = await pane();
+        ok(pn.sel === '4' && pn.solo && pn.cards === 1 && pn.pair === '' && pn.head === 'Q4 → Keep', 'Keep tab: a question with no twin is shown alone, opened');
+        await page.locator('#quiz-curate-dialog .curate-question[data-question-id="6"] .curate-stem').click(); await click(page, '.curate-pane-move'); pn = await pane();
+        ok(pn.tabs === 'Keep · 10 | Remove · 10', 'Remove in the detail puts Q6 back');
+        await click(page, '.curate-pane-pin'); pn = await pane();
+        ok(pn.pin === 'true' && pn.moveOff === true && /1 pinned/.test(await page.locator('#curate-coverage').innerText()), '📌 in the detail pins the question (Remove is then off)');
+        await click(page, '.curate-pane-pin');
+        await click(page, '#curate-next'); pn = await pane();
+        ok(!pn.two && !pn.side, '③ Save is one pane again');
+        await click(page, '#curate-prev');
+        await page.setViewportSize({ width: 1100, height: 900 }); await page.waitForTimeout(250); pn = await pane();
+        ok(!pn.two && pn.cards === 0 && pn.reasonInRow && pn.toggles, 'narrower than 1,300 px → the one-line rows with ▾ (part 2a), no pane');
+        await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(250); pn = await pane();
+        ok(pn.two && pn.side, 'wide again → the pane is back');
+        await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+        ok(!(await pane()).open, 'Escape closes the window (in the pane there is no Compare page to go back from)');
+        ok(await page.evaluate(() => calls) === 0 && errors.length === 0, 'no AI call, no page errors: ' + errors.join(' | '));
         await page.context().close();
 
         console.log('phone');
