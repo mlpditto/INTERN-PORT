@@ -6,6 +6,7 @@ const { chromium } = require('playwright');
     const browser = await chromium.launch({ headless: true });
     try {
         const page = await browser.newPage();
+        require('./curate-step-nav.cjs').install(page);   // V102.657: go to the step a control lives in
         await page.route('https://curate.test/', r => r.fulfill({body:'<html></html>', contentType:'text/html'}));
         await page.goto('https://curate.test/');
         const errors = []; page.on('pageerror', e => errors.push(e.message));
@@ -232,10 +233,10 @@ const { chromium } = require('playwright');
         await page.setViewportSize({ width: 1000, height: 900 });
         await page.locator('[data-view="remove"]').click();
         assert.match(await page.locator('#curate-apply').innerText(), /Remove 4 from original/);
-        assert(await page.locator('#curate-apply').evaluate(b => {
+        assert(await page.locator('#curate-next').evaluate(b => {
             const r = b.getBoundingClientRect(), d = b.closest('dialog').getBoundingClientRect();
             return r.top >= d.top && r.bottom <= d.bottom;
-        }), 'original action remains visible while reviewing');
+        }), 'V102.657: the Save ▸ step button remains visible while reviewing');
         await page.screenshot({ path: 'quiz-curate-qa.png' });
         await page.locator('#curate-save').click();
         await page.waitForFunction(() => document.getElementById('curate-save').textContent === 'Saved');

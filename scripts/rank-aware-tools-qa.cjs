@@ -17,6 +17,7 @@ const CHFIX = { q: 'Improved choice stem one', type: 'choice', options: ['a', 'b
     try {
         // ======================= admin.html (real) =======================
         const page = await browser.newPage({ viewport: { width: 1360, height: 950 } });
+        require('./curate-step-nav.cjs').install(page);   // V102.657: go to the step a control lives in
         const errors = []; page.on('pageerror', e => errors.push(e.message));
         await page.route('**/*', r => {
             const u = r.request().url();
@@ -115,6 +116,7 @@ const CHFIX = { q: 'Improved choice stem one', type: 'choice', options: ['a', 'b
         assert.ok(railStart > 0 && railEnd > railStart);
         async function curate(questions) {
             const pg = await browser.newPage();
+            require('./curate-step-nav.cjs').install(pg);   // V102.657: go to the step a control lives in
             await pg.route('https://curate.test/', r => r.fulfill({ body: '<html></html>', contentType: 'text/html' }));
             await pg.goto('https://curate.test/');
             pg.on('pageerror', e => errors.push('curate: ' + e.message));

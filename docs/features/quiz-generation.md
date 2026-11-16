@@ -12,6 +12,7 @@ Admin: Quiz Editor ▸ ✨ Curate / Expand quiz / Suggested questions.
 - `quiz-curate-reopen-qa` — AI Curate opened again (V102.647): a fresh open adopts the newest saved run of the same questions (model · Keep · strategy · pins · instructions) and shows its result with no AI call; edited questions → defaults; ↻ keeps current settings
 - `quiz-curate-oldset-qa` — AI Curate "old set" (V102.648): runs keep a key per question; after questions change an amber chip `↩ old set m/n` in the tools row offers the last result; tap carries verdicts over with today's numbers (pins + comparisons follow, a changed question = kept + "not assessed"), chip turns `⚠️ old set m/n`, tap again clears
 - `quiz-curate-compact-qa` — one-row Curate controls (mockup #4)
+- `quiz-curate-steps-qa` — Curate as three steps (① Set → ② Review → ③ Save): a result opens on Review with the tools folded into the ① chip, Save = summary + one of three ways + one button; the other Curate scripts reach a control through `scripts/curate-step-nav.cjs` (presses the real step button first)
 - `quiz-curate-copy-check` — questionPlainText for the Copy button
 - `quiz-curate-evidence-check` — tolerant evidence check (snapQuote / validateProposal)
 - `quiz-curate-history-qa` — curate history: canonical keys, latest five, idempotent
