@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.655)</title>
+    <title>Nika Admin (V102.656)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -75307,7 +75307,7 @@ RULES:
                 try {
                     const prop = await window.suggestEditorVocabTags(st.model);
                     if (window._qtx !== st) return; // closed while waiting
-                    st.prop = prop; st.usedModel = st.model; st.dirty = false; st.pendingModel = null;   // V102.505: a fresh proposal has no edits
+                    st.prop = prop; st.usedModel = st.model; st.dirty = false; st.asking = false;   // V102.505: a fresh proposal has no edits
                     qtxRender('result');
                 } catch (e) {
                     if (window._qtx !== st) return;
@@ -75350,19 +75350,22 @@ RULES:
                 '<span style="position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;">' + escapeHtml(title) + '</span></h3></div>' +
                 '<div class="text-ai-chips qtx-rail lang-no-toggle" role="group" aria-label="AI model">' + window.textAIChipContents(sel, 'qtxPick(this.dataset.value)', null, window.TEXT_AI_TRIAL_MODELS || []) + '</div>';
         }
-        // a pick is remembered; on the result / error view it runs again with that model (the proposal is replaced). Browsing a vendor is the rail's own business — nothing runs.
-        // V102.505: on the result view after the admin edited the chips, ask first (↻ / ✋) — nothing runs or is stored until confirmed
-        window.qtxPick = function (id, confirmed) {
+        // V102.656 (owner 2026-11-16): a model tap only REMEMBERS the model — the dialog does not change: the proposal and the admin's edits stay, the tapped chip is ringed amber.
+        // ↻ in the footer runs again with it; only then, when the chips were edited, the dialog asks first (↻ / ✋). Browsing a vendor is the rail's own business.
+        window.qtxPick = function (id) {
             const st = window._qtx;
             if (!st || !qtxKnown(id)) return;
-            if (st.view === 'result' && st.dirty && !confirmed) { st.pendingModel = id; return qtxRender('result'); }
-            st.pendingModel = null;
             try { localStorage.setItem('quizTagAiModel', id); } catch (e) { /* none */ }
-            st.model = id;
-            if (st.view === 'result' || st.view === 'error') return window.qtxChoose('ai');
+            st.model = id; st.asking = false;
             qtxRender(st.view || 'ask');
         };
-        window.qtxKeepEdits = function () { const st = window._qtx; if (!st) return; st.pendingModel = null; qtxRender('result'); };   // V102.505
+        window.qtxRerun = function (confirmed) {
+            const st = window._qtx; if (!st) return;
+            if (st.view === 'result' && st.dirty && !confirmed) { st.asking = true; return qtxRender('result'); }
+            st.asking = false;
+            return window.qtxChoose('ai');
+        };
+        window.qtxKeepEdits = function () { const st = window._qtx; if (!st) return; st.asking = false; qtxRender('result'); };   // V102.505
         function qtxRender(view) {
             const st = window._qtx;
             if (!st) return;
@@ -75401,17 +75404,17 @@ RULES:
                 const sysSel = `<select onchange="qtxEdit('system','',this.value)" aria-label="System" title="System" style="width:auto; min-height:0; padding:3px 6px; border:1px solid #86efac; border-radius:999px; font-size:0.8em; background:#dcfce7; color:#166534;"><option value="">System —</option>${Object.keys(v.topic).map(k => `<option value="${k}"${k === p.system ? ' selected' : ''}>${escapeHtml(k)}</option>`).join('')}</select>`;
                 const aiHint = p.aiSystem && p.aiSystem !== p.system ? `<button type="button" onclick="qtxEdit('system','',${JSON.stringify(p.aiSystem).replace(/"/g, '&quot;')})" title="Use the AI system" style="width:auto; min-height:0; padding:3px 9px; border:1px dashed #f59e0b; border-radius:999px; background:#fffbeb; color:#92400e; font-size:0.8em; cursor:pointer;">AI → ${escapeHtml(p.aiSystem)}</button>` : '';
                 const after = window.quizTagCompletenessFrom(p.system, [...window.quizTagList({ tags: document.getElementById('quiz-tags')?.value || '' }), ...p.add.topic, ...p.add.skill]);
-                const pend = st.pendingModel ? JSON.stringify(st.pendingModel).replace(/"/g, '&quot;') : '';
+                const next = st.usedModel && st.model !== st.usedModel;   // V102.656: a model was tapped after this proposal — ↻ runs with it
                 body = `${qtxHead('✨', 'AI suggests · ' + window.qtxModelName(st.usedModel || st.model), st.usedModel || st.model)}
                     <div title="× removes · your existing tags are kept" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:16px;">${sysSel}${aiHint}${chips}${after.complete ? '' : after.missing.filter(k => k !== 'system').map(missChip).join('')}${addSel}</div>
-                    ${st.pendingModel
-                        ? `<div class="qtx-warn" role="alert" style="display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:8px; padding:8px 10px; margin:0 -6px; border-radius:12px; background:#fffbeb; border:1px solid #fcd34d;"><span style="margin-right:auto; font-size:0.84em; font-weight:800; color:#92400e;">Replace your edits?</span>${ib('qtxKeepEdits()', 'fa-hand', 'Keep my edits')}${ib(`qtxPick(${pend}, true)`, 'fa-rotate-right', 'Run again with ' + window.qtxModelName(st.pendingModel), 'amb')}</div>`
-                        : foot(ib("qtxChoose('back')", 'fa-arrow-left', 'Back'), ib("qtxChoose('apply')", 'fa-tags', 'Apply only (no save yet)'), ib("qtxChoose('applysave')", 'fa-floppy-disk', 'Apply & ' + lowerAction, 'pri'))}`;
+                    ${st.asking
+                        ? `<div class="qtx-warn" role="alert" style="display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:8px; padding:8px 10px; margin:0 -6px; border-radius:12px; background:#fffbeb; border:1px solid #fcd34d;"><span style="margin-right:auto; font-size:0.84em; font-weight:800; color:#92400e;">Replace your edits?</span>${ib('qtxKeepEdits()', 'fa-hand', 'Keep my edits')}${ib('qtxRerun(true)', 'fa-rotate-right', 'Run again with ' + window.qtxModelName(st.model), 'amb')}</div>`
+                        : foot(ib("qtxChoose('back')", 'fa-arrow-left', 'Back'), ib('qtxRerun()', 'fa-rotate-right', 'Run again with ' + window.qtxModelName(st.model), next ? 'amb' : ''), ib("qtxChoose('apply')", 'fa-tags', 'Apply only (no save yet)'), ib("qtxChoose('applysave')", 'fa-floppy-disk', 'Apply & ' + lowerAction, 'pri'))}`;
             }
             el.innerHTML = `<div style="background:#fff; border-radius:16px; padding:18px; max-width:440px; width:100%; max-height:90vh; overflow:auto; box-shadow:0 20px 50px rgba(0,0,0,0.35);">${body}</div>`;
             // V102.646: seat the shared rail now (not on the observer's turn), then show a pending model's vendor with its chip ringed, then focus what is visible
             if (typeof window.oneStyleModelPickers === 'function') window.oneStyleModelPickers(el);
-            const rail = el.querySelector('.qtx-rail'), pend = rail && st.pendingModel ? [...rail.querySelectorAll(':scope > button[data-value]')].find(b => b.dataset.value === st.pendingModel) : null;
+            const rail = el.querySelector('.qtx-rail'), pend = rail && view === 'result' && st.usedModel && st.model !== st.usedModel ? [...rail.querySelectorAll(':scope > button[data-value]')].find(b => b.dataset.value === st.model) : null;
             if (pend) { const ven = rail.querySelector('.mr-vendor[data-provider="' + (pend.getAttribute('aria-label') || '').split(' ')[0] + '"]'); if (ven) ven.click(); pend.classList.add('qtx-pend'); }
             const first = el.querySelector('.mr-vendor[aria-pressed="true"]') || [...el.querySelectorAll('button, select')].find(b => !b.hidden);
             if (first) first.focus();

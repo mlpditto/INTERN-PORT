@@ -9,7 +9,7 @@ Admin: Quiz Engine ▸ Tag hygiene; Learning Path strip.
 ## Scripts that drive it
 
 - `quiz-tag-hygiene-check` — computeQuizTagHygiene over every bucket
-- `quiz-tag-qtx-model-qa` — the Save-time ✨ AI suggests tag dialog: the shared model rail with every catalogue + trial model (V102.646), local by default, remembered, pick = run again, pending model ringed, icon-only footer
+- `quiz-tag-qtx-model-qa` — the Save-time ✨ AI suggests tag dialog: the shared model rail with every catalogue + trial model (V102.646), local by default, remembered; V102.656 a model tap only remembers it (amber ring, the proposal and edits stay) and ↻ in the footer runs again, asking first when the chips were edited; icon-only footer
 - `quiz-tag-normalize-check` — normaliser + autocomplete helpers
 - `quiz-taglist-mirror-check` — tagList mirror: no consumer parses tags on its own
 - `quiz-marker-fields-check` — markers out of tags (legacy migration helpers)
