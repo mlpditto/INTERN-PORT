@@ -32,6 +32,16 @@ const js = fs.readFileSync('public/jev-primer-repeats.js', 'utf8'), css = fs.rea
             await page.evaluate(() => { window.__next = { enabled: true, repeats: [], compared: 5, left: 0, errors: 0 }; });
             await page.click('#b');
             await page.waitForFunction(() => document.getElementById('pra-jev').innerText.includes('no repeats'));
+            // V102.658: while Jev works the button counts the seconds; it stops and goes back to its own text when Jev answers
+            await page.evaluate(() => { window.adminApp = { functions: () => ({ httpsCallable: () => () => new Promise(res => { window.__release = () => res({ data: window.__next }); }) }) }; });
+            await page.click('#b');
+            assert.equal(await page.locator('#b').textContent(), '⏳ Jev 0:00', 'the clock starts at once'); assert.equal(await page.locator('#b').isDisabled(), true);
+            await page.waitForFunction(() => document.getElementById('b').textContent === '⏳ Jev 0:01', null, { timeout: 3000 });
+            await page.waitForFunction(() => document.getElementById('b').textContent === '⏳ Jev 0:02', null, { timeout: 3000 });
+            await page.evaluate(() => window.__release());
+            await page.waitForFunction(() => document.getElementById('b').textContent === 'Jev repeats' && !document.getElementById('b').disabled);
+            await page.waitForTimeout(1200);
+            assert.equal(await page.locator('#b').textContent(), 'Jev repeats', 'the clock is stopped');
             assert.deepEqual(errs, []);
             await page.close();
         }

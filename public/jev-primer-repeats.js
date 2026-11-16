@@ -17,7 +17,9 @@
         const primers = window._praRead().map(x => x.primer);
         btn.disabled = true;
         const text = btn.textContent;
-        btn.textContent = '⏳ Jev';   // V102.644: the chip says who is checking
+        // V102.644: the chip says who is checking. V102.658: …and for how long (m:ss, every second) — a long list takes a while and the chip looked frozen
+        const t0 = Date.now(), clock = () => { const s = Math.floor((Date.now() - t0) / 1000); btn.textContent = '⏳ Jev ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+        clock(); const timer = setInterval(clock, 1000);
         try {
             const r = (await adminApp.functions().httpsCallable('jevPrimerRepeats')({ primers })).data || {};
             if (r.enabled === false) { showToast('Jev is switched off'); return; }
@@ -26,6 +28,7 @@
             console.warn('jevPrimerRepeats', e && e.message);
             showToast('Jev could not check: ' + (e && e.message ? e.message : 'error'));
         } finally {
+            clearInterval(timer);
             btn.disabled = false;
             btn.textContent = text;
         }
