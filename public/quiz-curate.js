@@ -513,7 +513,10 @@
             const id = i + 1, kept = s.keep.has(id);
             if (kept !== (s.view === 'keep')) return;
             const assessment = s.proposal?.find(item => item.id === id);
-            const row = document.createElement('div'); row.className = 'curate-question' + (kept ? ' kept' : '');
+            // V102.660 (owner pick C → rows of A, mockup-curate-steps): every question is ONE line — Q · stem · reason · ↔ twin · Keep / Remove · 📌.
+            // ▾ (or a click on the line) opens it in place with everything it had before; one open at a time, so the list fits a screen.
+            const open = s.openRow === id;
+            const row = document.createElement('div'); row.className = 'curate-question' + (kept ? ' kept' : '') + (open ? ' open' : ' compact');
             row.dataset.questionId = id;
             row.innerHTML = `<span class="curate-number">Q${id}</span><div class="curate-body"><div class="curate-source"></div><div class="curate-reason"></div></div><div class="curate-actions"><button type="button" class="curate-move" title="${kept ? 'ย้ายไปกลุ่มที่เสนอให้ตัด ยังไม่ลบต้นฉบับ' : 'เก็บข้อนี้ในรอบปัจจุบัน AI อาจเลือกใหม่เมื่อกด Suggest'}">${kept ? 'Remove' : 'Keep'}</button><button type="button" class="curate-pin" aria-pressed="${s.pins.has(id)}" title="บังคับเก็บข้อนี้แม้กด Suggest ใหม่ กดอีกครั้งเพื่อปลด">📌 Must keep</button></div>`;
             sourceView(row.querySelector('.curate-source'), q, false, [], s.source.missingKeys.includes(id), id);
@@ -533,7 +536,7 @@
                 bilingual(details, assessment.detail, assessment.detailTh);
                 details.append(node('strong', 'Impact if removed')); bilingual(details, assessment.impact, assessment.impactTh);
                 for (const related of assessment.related) {
-                    const compare = node('button', 'Compare Q' + id + ' ↔ Q' + related.id, 'curate-compare'); compare.type = 'button'; compare.title = 'เปรียบเทียบโจทย์ ตัวเลือก เฉลย และเหตุผลที่ AI เลือก';
+                    const compare = node('button', 'Compare Q' + id + ' ↔ Q' + related.id, 'curate-compare'); compare.type = 'button'; compare.dataset.short = '↔ Q' + related.id; compare.title = 'เปรียบเทียบโจทย์ ตัวเลือก เฉลย และเหตุผลที่ AI เลือก';
                     compare.onclick = () => { s.compare = [id, related.id]; render(); byId('curate-comparison').querySelector('button').focus(); dialog.scrollTop = 0; }; reason.append(compare);
                 }
             } else if (!s.pins.has(id)) reason.remove(); // V101.02: no per-row placeholder — the proposal label above already says to select Suggest
@@ -543,6 +546,11 @@
             };
             const move = row.querySelector('.curate-move'); move.disabled = s.pins.has(id);
             move.onclick = () => { kept ? s.keep.delete(id) : s.keep.add(id); s.message = ''; render(); };
+            const toggle = node('button', open ? '▴' : '▾', 'curate-row-toggle'); toggle.type = 'button';
+            toggle.setAttribute('aria-expanded', String(open)); toggle.setAttribute('aria-label', (open ? 'Fold Q' : 'Open Q') + id); toggle.title = open ? 'Fold this question' : 'Choices, explanation, details';
+            const flip = () => { s.openRow = open ? null : id; s.message = ''; render(); const again = rows.querySelector('[data-question-id="' + id + '"] .curate-row-toggle'); if (again) again.focus(); };
+            toggle.onclick = flip; row.querySelector('.curate-actions').append(toggle);
+            if (!open) row.onclick = event => { if (!event.target.closest('button, a, input, summary')) flip(); };
             rows.append(row);
         });
         if (!rows.children.length) rows.textContent = 'No questions in this group.';
