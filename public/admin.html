@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.654)</title>
+    <title>Nika Admin (V102.655)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -31633,7 +31633,10 @@ ${JSON.stringify(sourceObj)}`;
             }
 
             if (!(await window.confirmQuizEditorTags('Go live'))) return; // V102.22 · V102.25 dialog; formData is read below
-            if (!confirm("🚀 Launch Quiz Immediately? (Status will be set to ACTIVE)")) return;
+            // V102.655: an empty deadline is filled with 7 days from now (not for a poll / learning set); shown in the box, so the admin sees it and can edit it before the next save
+            const dflt7 = !document.getElementById('quiz-deadline').value && window.quizDefaultDeadline(getQuizFormData(), now);
+            if (!confirm(dflt7 ? "🚀 Launch Quiz Immediately? (Status will be set to ACTIVE · closes in 7d)" : "🚀 Launch Quiz Immediately? (Status will be set to ACTIVE)")) return;
+            if (dflt7) document.getElementById('quiz-deadline').value = toLocalDatetimeInputValue(dflt7.toDate());
 
             // Force Active
             const formData = getQuizFormData();
@@ -37772,11 +37775,20 @@ ${qs}`;
             return [...arr].sort((a, b) => Math.max(t(b.updatedAt), t(b.createdAt)) - Math.max(t(a.updatedAt), t(a.createdAt)));
         }
 
+        // V102.655 (owner 2026-11-16): a quiz that goes live with no timer of its own closes 7 days from now — the admin changes it afterwards from the green pill.
+        // Polls and learning sets (read_only) are left open. null = no default for this quiz.
+        const QUIZ_DEFAULT_LIVE_HOURS = 168;
+        window.quizDefaultDeadline = function (q, now) {
+            if (!q || q.isPoll === true || q.quizType === 'read_only') return null;
+            return firebase.firestore.Timestamp.fromDate(new Date((now || new Date()).getTime() + QUIZ_DEFAULT_LIVE_HOURS * 3600000));
+        };
+
         async function repostQuiz(id) {
-            if (!confirm("Repost this quiz? (Previous timers will be cleared)")) return;
+            const dflt = window.quizDefaultDeadline(quizzesData.find(x => x.id === id));
+            if (!confirm(dflt ? "Repost this quiz? (Previous timers will be cleared · closes in 7d)" : "Repost this quiz? (Previous timers will be cleared)")) return;
             await db.collection("quizzes").doc(id).update({
                 startTime: null,
-                deadline: null,
+                deadline: dflt,
                 isActive: true,
                 lastLiveAt: firebase.firestore.FieldValue.serverTimestamp(), // V95.62: 🆕 "เพิ่ง Live" tag
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -37981,7 +37993,7 @@ ${qs}`;
             const chips = QUIZ_TIMER_HOURS.map(h => `<button type="button" class="qa-chip" onclick="closeQuizMoreMenus(); setQuizDuration('${q.id}', ${h})">${quizTimerLabel(h)}</button>`).join('');
             const body = st.kind === 'off'
                 ? `<div class="qa-mh">Go live for</div><div class="qa-chips">${chips}</div>
-                   <button type="button" class="quiz-more-menu-item" onclick="closeQuizMoreMenus(); toggleQuizStatus('${q.id}', false)"><i class="fa-solid fa-play"></i> Go live · no timer</button>`
+                   <button type="button" class="quiz-more-menu-item" onclick="closeQuizMoreMenus(); toggleQuizStatus('${q.id}', false)"><i class="fa-solid fa-play"></i> Go live · ${window.quizDefaultDeadline(q) ? '7d' : 'no timer'}</button>`
                 : `<div class="qa-mh">${st.kind === 'expired' ? 'Reopen for' : 'Timer from now'}</div><div class="qa-chips">${chips}</div>
                    <div class="quiz-more-menu-divider"></div>
                    <button type="button" class="quiz-more-menu-item is-danger" onclick="closeQuizMoreMenus(); toggleQuizStatus('${q.id}', true)"><i class="fa-solid fa-stop"></i> End now</button>`;
@@ -38009,10 +38021,16 @@ ${qs}`;
                 }
             }
 
+            // V102.655: going live with no timer (none set, or the expired one just reset) → 7 days from now; an expired timer the admin chose to keep is not touched
+            if (!current) {
+                const q = quizzesData.find(x => x.id === id);
+                if (q && (!q.deadline || updates.deadline === null)) { const d = window.quizDefaultDeadline(q); if (d) updates.deadline = d; }
+            }
+
             // If ending (deactivating), mark as template
             if (current) updates.isTemplate = true;
             await db.collection("quizzes").doc(id).update(updates);
-            showToast(updates.isActive ? "Quiz Started!" : "Quiz Ended!");
+            showToast(updates.isActive ? (updates.deadline ? "Quiz Started! · closes in 7d" : "Quiz Started!") : "Quiz Ended!");
         }
         async function deleteQuiz(id) { if (confirm("Delete this quiz?")) await db.collection("quizzes").doc(id).delete(); }
 
@@ -38046,6 +38064,8 @@ ${qs}`;
                 ids.forEach(id => {
                     // mirror toggleQuizStatus: deactivating also marks the quiz as a template
                     const upd = active ? { isActive: true, lastLiveAt: firebase.firestore.FieldValue.serverTimestamp() } : { isActive: false, isTemplate: true }; // V95.62: stamp live time on bulk activate
+                    const bq = active ? quizzesData.find(x => x.id === id) : null, bd = bq && !bq.deadline ? window.quizDefaultDeadline(bq) : null;   // V102.655: no timer → 7 days
+                    if (bd) upd.deadline = bd;
                     batch.update(db.collection("quizzes").doc(id), upd);
                 });
                 await batch.commit();
