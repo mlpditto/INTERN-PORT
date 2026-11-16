@@ -20,7 +20,7 @@ console.log('admin: the Quiz Editor field');
     ok(a.includes('watchFirst: formData.watchFirst || null,'), 'saved on the quiz');
     const js = fs.readFileSync('public/quiz-watch-first.js', 'utf8');
     ok((js.match(/\.set\(/g) || []).length === 1 && /\.set\(\{ watchFirst: data \}, \{ merge: true \}\)/.test(js) && !/\.update\(|\.delete\(/.test(js) && (js.match(/\.collection\(/g) || []).length === 1, 'V101.314: the intern page writes ONE thing — watchFirst on its own attempt, merged');
-    ok(a.includes('${oohNote}${retakeNote}${breakNote}${watchNote}') && a.includes("_wf.failed ? 'did not load' : _wf.skipped ? 'skipped'"), 'the admin\'s attempt row shows 🎬 time ✓ / skipped / did not load');
+    ok(a.includes('${watchNote}${oohNote}${retakeNote}${breakNote}') && a.includes("_wf.failed ? 'did not load' : _wf.skipped ? 'skipped'"), 'the admin\'s attempt row shows 🎬 time ✓ / skipped / did not load');
     js.split('\n').forEach((l, i) => { if (/[฀-๿]/.test(l) && !/^\s*\/\//.test(l)) assert.ok(/[가-힯]/.test(l), 'Thai without Korean on quiz-watch-first.js line ' + (i + 1)); });
 }
 
