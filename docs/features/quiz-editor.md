@@ -9,6 +9,7 @@ Admin: Quiz Engine ▸ Edit / ＋ New quiz.
 ## Scripts that drive it
 
 - `quiz-editor-lean-b1-qa` — header status pill, Points / Beri as − n +
+- `quiz-editor-head-modes-qa` — header in one line: the nine modes live under ⚙ (first row of the settings panel, every one named), the ON ones show as icons beside ⚙ (tap opens it), hidden on a phone
 - `quiz-deadline-editor-qa` — the Deadline alert (LINE) chip: ON for new / legacy quizzes, OFF reads back `notifyDeadline:false`, independent of Notify LINE every submit
 - `quiz-editor-toolbar-lean-qa` — one strip: answer type | this question | whole quiz
 - `quiz-editor-toolbar-handlers-qa` — 🐑 clone and answer-type handlers do not throw
