@@ -16,6 +16,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     const browser = await chromium.launch();
     try {
         const page = await browser.newPage({ viewport: { width: 1100, height: 1000 } });
+        require('./curate-step-nav.cjs').install(page);   // V102.657: go to the step a control lives in
         const errors = []; page.on('pageerror', e => errors.push(e.message));
         page.on('dialog', d => { errors.push('native dialog opened: ' + d.message().slice(0, 60)); d.dismiss(); });
         await page.route('https://curate.test/', r => r.fulfill({ body: '<html></html>', contentType: 'text/html' }));

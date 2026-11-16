@@ -317,6 +317,8 @@
         const el = byId('curate-history-status'); el.textContent = text; el.classList.toggle('bad', kind === 'bad');
         const h = byId('curate-history'); h.classList.toggle('saved', kind === 'saved'); h.classList.toggle('warn', kind === 'bad');
         byId('curate-history-time').textContent = time || '';
+        const setStep = dialog.querySelector('[data-curate-step="set"]');   // V102.657: a problem with the saved results shows on the ① chip while the tools are folded away
+        if (setStep) { setStep.classList.toggle('warn', kind === 'bad'); setStep.dataset.warn = kind === 'bad' ? text : ''; }
     }
     function setup() {
         if (dialog) return;
@@ -408,6 +410,75 @@
         byId('curate-suggest').onclick = () => suggest();
         byId('curate-save').onclick = () => save(false);
         apply.onclick = () => save(true);
+        // V102.657 (owner pick C, mockup-curate-steps): the window is three steps — ① Set (model · Keep n · strategy; pin must-keeps) → ② Review → ③ Save.
+        // One step on screen at a time: Review hides the tools card (its settings ride on the ① chip), Save shows what will happen and ONE of the three ways to save.
+        const steps = node('div', undefined, 'curate-steps'); steps.setAttribute('role', 'group'); steps.setAttribute('aria-label', 'Steps');
+        steps.innerHTML = STEPS.map((k, i) => (i ? '<span class="curate-step-line" aria-hidden="true"></span>' : '') + '<button type="button" data-curate-step="' + k + '"><i aria-hidden="true">' + (i + 1) + '</i><span>' + STEP_NAME[k] + '</span><small></small></button>').join('');
+        dialog.querySelector('.curate-main').before(steps);
+        steps.querySelectorAll('button').forEach(b => b.onclick = () => goStep(b.dataset.curateStep));
+        const panel = node('div'); panel.id = 'curate-savepanel';
+        panel.innerHTML = '<div id="curate-save-sum"></div><div class="curate-save-opts" role="group" aria-label="How to save">' + SAVE_MODES.map(m => '<button type="button" data-save="' + m + '" aria-pressed="false"><b></b><span></span><em></em></button>').join('') + '</div>';
+        byId('curate-comparison').after(panel);
+        panel.querySelectorAll('[data-save]').forEach(b => b.onclick = () => { if (state) { state.saveMode = b.dataset.save; state.message = ''; render(); } });
+        const prev = node('button', undefined, 'curate-nav'); prev.type = 'button'; prev.id = 'curate-prev'; prev.onclick = () => goStep(STEPS[STEPS.indexOf(state.step) - 1]);
+        const next = node('button', undefined, 'curate-nav curate-primary'); next.type = 'button'; next.id = 'curate-next'; next.onclick = () => goStep(STEPS[STEPS.indexOf(state.step) + 1]);
+        const footer = dialog.querySelector('.curate-footer'); byId('curate-feedback').before(prev); footer.append(next);
+    }
+    const STEPS = ['set', 'review', 'save'], STEP_NAME = { set: 'Set', review: 'Review', save: 'Save' }, SAVE_MODES = ['new', 'remove', 'split'];
+    // a step is open when there is a result to look at; Save also needs the selection to match the target
+    function stepBlocked(s, step) {
+        if (step === 'set') return '';
+        if (!s.proposal) return 'Select Suggest first.';
+        return step === 'save' ? problem(s) : '';
+    }
+    function goStep(step) {
+        const s = state; if (!s || !STEPS.includes(step) || s.busy || s.saving || s.confirming || stepBlocked(s, step)) return;
+        s.step = step; s.compare = null; s.message = ''; render();
+        dialog.scrollTop = 0; dialog.querySelector('.curate-steps [data-curate-step="' + step + '"]').focus();
+    }
+    function renderSteps(s, count) {
+        if (!s.proposal) { s.steppedFor = null; s.step = 'set'; }
+        else if (s.proposal !== s.steppedFor) { s.steppedFor = s.proposal; s.step = 'review'; }   // a new result (Suggest, a saved run, an old set) opens on Review
+        if (s.step === 'save' && stepBlocked(s, 'save')) s.step = 'review';
+        dialog.dataset.step = s.step; dialog.dataset.save = s.saveMode;
+        const removed = count - s.keep.size, at = STEPS.indexOf(s.step), modelInfo = window.TEXT_AI_MODELS.find(m => m.id === s.model);
+        const icon = { balanced: '⚖', quality: '★', duplicates: '⇄' }[s.mode] || '';
+        dialog.querySelectorAll('[data-curate-step]').forEach((b, i) => {
+            const k = b.dataset.curateStep, blocked = stepBlocked(s, k);
+            b.classList.toggle('done', i < at); if (i === at) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
+            b.querySelector('i').textContent = i < at ? '✓' : String(i + 1);
+            b.querySelector('small').textContent = k === 'set' ? (at > 0 ? (modelInfo?.short || modelInfo?.label || s.model) + ' · ' + count + ' → ' + (target(s) || '?') + ' · ' + icon : '') : k === 'review' && s.proposal ? removed + ' to remove' : '';
+            b.title = blocked || (k === 'set' ? b.dataset.warn || 'Model, how many to keep, strategy, instructions' : k === 'review' ? 'Check what is kept and what is removed' : 'Choose how to save');
+            b.disabled = !!blocked || s.busy || s.saving || s.saved || !!s.confirming;
+        });
+        const prev = byId('curate-prev'), next = byId('curate-next');
+        prev.hidden = at === 0; prev.textContent = at > 0 ? '◂ ' + STEP_NAME[STEPS[at - 1]] : '';
+        next.hidden = at === 2 || !s.proposal; next.textContent = at < 2 ? STEP_NAME[STEPS[at + 1]] + ' ▸' : '';
+        const nextBlocked = at < 2 ? stepBlocked(s, STEPS[at + 1]) : ''; next.title = nextBlocked;
+        prev.disabled = s.busy || s.saving || s.saved || !!s.confirming; next.disabled = prev.disabled || !!nextBlocked;
+        byId('curate-savepanel').hidden = s.step !== 'save';
+        if (s.step !== 'save') return;
+        const sum = byId('curate-save-sum'); sum.replaceChildren();
+        const head = node('div'); head.append(node('b', count + ' → ' + s.keep.size + ' questions'), document.createTextNode(' · total points unchanged')); sum.append(head);
+        const gone = node('div', 'Remove ', 'curate-save-gone');
+        s.source.form.questions.forEach((_, i) => { if (!s.keep.has(i + 1)) gone.append(node('span', 'Q' + (i + 1))); });
+        if (removed) sum.append(gone);
+        const cov = byId('curate-coverage').textContent;
+        if (/^Coverage gap/.test(cov)) sum.append(node('div', '⚠ ' + cov, 'curate-save-gap'));
+        const canApply = !!s.source.sourceId && removed > 0;
+        const text = {
+            new: ['Save as new quiz', 'A new quiz with the ' + s.keep.size + ' kept questions, saved inactive.', 'original untouched'],
+            remove: ['Remove ' + removed + ' from original', 'The original keeps ' + s.keep.size + ' questions. Attempts and required history versions are preserved.', 'changes the original'],
+            split: ['Split into two quizzes', 'The original keeps the ' + s.keep.size + ' · a new quiz gets the ' + removed + ' removed · a "Before Split" copy is kept.', 'changes the original']
+        };
+        if (!canApply && s.saveMode !== 'new') { s.saveMode = 'new'; dialog.dataset.save = 'new'; }
+        dialog.querySelectorAll('[data-save]').forEach(b => {
+            const m = b.dataset.save, t = text[m];
+            b.querySelector('b').textContent = t[0]; b.querySelector('span').textContent = t[1]; b.querySelector('em').textContent = t[2];
+            b.setAttribute('aria-pressed', String(m === s.saveMode));
+            b.disabled = s.busy || s.saving || s.saved || !!s.confirming || (m !== 'new' && !canApply);
+            b.title = m !== 'new' && !canApply ? (s.source.sourceId ? 'Nothing is removed.' : 'Save this quiz first.') : '';
+        });
     }
     // V102.285: the native confirm() sat after several awaits (server reads of the quiz and its history), far from the click.
     // Browsers drop such dialogs silently (confirm() returns false), so Remove / Split reported "cancelled" or nothing at all.
@@ -519,6 +590,7 @@
         byId('curate-suggest').classList.toggle('icon', !!s.done && !s.busy);   // V102.219: icon-only ↻ after a run
         byId('curate-suggest').hidden = !!s.stale; byId('curate-reload').hidden = !s.stale;
         byId('curate-suggest').title = s.busy ? 'ความคืบหน้าตามขั้นตอนงาน API ไม่รายงานเปอร์เซ็นต์ประมวลผลจริงของโมเดล' : 'ให้ AI เสนอข้อที่ควรเก็บและตัด';
+        renderSteps(s, count);
         renderComparison(s);
         if (focusedAction && !s.compare && !s.busy && !s.saving) {
             const next = rows.querySelector('[data-question-id="' + focusedAction.id + '"] ' + focusedAction.selector);
@@ -539,7 +611,7 @@
     function startSession(source, keep = {}) {
         state = { source: JSON.parse(JSON.stringify(source)), core: core(source), model: keep.model || textAIModel('ai-analyzer-model-val'),
             keep: new Set(source.form.questions.map((_, i) => i + 1)), pins: new Set(), mode: keep.mode || 'balanced', view: 'keep',
-            busy: false, saving: false, saved: false, stale: false, needsSuggestion: true, proposal: null, message: '', oldOffer: null, oldSet: null };
+            busy: false, saving: false, saved: false, stale: false, needsSuggestion: true, proposal: null, message: '', oldOffer: null, oldSet: null, step: 'set', saveMode: 'new', steppedFor: null };
         if (source.sourceId) state.serverBaseline = db.collection('quizzes').doc(source.sourceId).get({ source: 'server' })
             .then(doc => ({ exists: doc.exists, data: doc.exists ? doc.data() : null }), error => ({ error }));
         const provider = (window.TEXT_AI_MODELS.find(m => m.id === state.model)?.label || '').split(' ')[0];

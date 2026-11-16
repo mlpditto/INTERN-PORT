@@ -11,6 +11,7 @@ assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(html));
 async function open(browser, width, saveMode) {
     const ctx = await browser.newContext({ viewport: { width, height: 900 } });
     const page = await ctx.newPage();
+    require('./curate-step-nav.cjs').install(page);   // V102.657: go to the step a control lives in
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.route('https://curate.test/', r => r.fulfill({ body: '<html></html>', contentType: 'text/html' }));
     await page.route('https://curate.test/assets/**', r => r.fulfill({ status: 404, body: '' }));
@@ -69,6 +70,7 @@ const cy = (page, sel) => page.$eval(sel, e => { const r = e.getBoundingClientRe
 
         // ---- after a saved run
         await run(page);
+        await page.evaluate(() => document.querySelector('#quiz-curate-dialog [data-curate-step="set"]').click());   // V102.657: a result opens on ② Review; the tools row is step ① Set
         const saved = await page.evaluate(() => { const h = document.getElementById('curate-history'), s = document.getElementById('curate-history-status'), b = document.getElementById('curate-suggest'), t = document.getElementById('curate-history-time');
             return { cls: h.className, time: t.textContent, border: getComputedStyle(h.querySelector('summary')).borderTopColor, statusBad: s.classList.contains('bad'), statusW: Math.round(s.getBoundingClientRect().width), statusText: s.innerText, btn: b.innerText, icon: b.classList.contains('icon'), glyph: getComputedStyle(b, '::before').content, bw: Math.round(b.getBoundingClientRect().width) }; });
         assert.ok(/saved/.test(saved.cls) && /^\d{2}:\d{2}$/.test(saved.time), 'History chip: saved + the run time: ' + JSON.stringify(saved));
@@ -83,6 +85,9 @@ const cy = (page, sel) => page.$eval(sel, e => { const r = e.getBoundingClientRe
         // ---- a run whose history could not be saved
         ({ ctx, page, errors } = await open(browser, 1100, 'fail'));
         await run(page);
+        const chip = await page.evaluate(() => { const b = document.querySelector('#quiz-curate-dialog [data-curate-step="set"]'); return { warn: b.classList.contains('warn'), title: b.title, border: getComputedStyle(b).borderTopColor, step: document.getElementById('quiz-curate-dialog').dataset.step }; });
+        assert.ok(chip.step === 'review' && chip.warn && /could not be saved/.test(chip.title) && chip.border === 'rgb(245, 158, 11)', 'V102.657: on Review the ① chip is amber and says why: ' + JSON.stringify(chip));
+        await page.evaluate(() => document.querySelector('#quiz-curate-dialog [data-curate-step="set"]').click());
         const bad = await page.evaluate(() => { const h = document.getElementById('curate-history'), s = document.getElementById('curate-history-status'); return { cls: h.className, border: getComputedStyle(h.querySelector('summary')).borderTopColor, bad: s.classList.contains('bad'), w: Math.round(s.getBoundingClientRect().width), text: s.innerText }; });
         assert.ok(/warn/.test(bad.cls) && !/saved/.test(bad.cls) && bad.border === 'rgb(245, 158, 11)', 'amber chip when it could not be saved: ' + JSON.stringify(bad));
         assert.ok(bad.bad && bad.w > 300 && /could not be saved/.test(bad.text), 'and the warning line comes back, full width: ' + JSON.stringify(bad));
