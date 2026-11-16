@@ -63,7 +63,7 @@ assert.ok(!/class="pra-all"/.test(admin) && !/_praModelRail/.test(admin), 'the �
         assert.equal(r.r1.value, 'gpt-6-luna', 'first time = the (normalised) toolbar model');
         assert.deepEqual([r.strip.hidden, r.strip.go, r.strip.all], [false, true, false], 'the strip in the window: shown, ⚡, no 📖 All');
         assert.match(r.strip.text, /📖 Read first ?1\/3 .*▾ 2$/, 'n/N · model ▾ · ⚡ 2 (no 📖 All — it is that window): ' + r.strip.text);
-        assert.equal(r.chip, '📖 1/3 · 2', 'the chip beside Review');
+        assert.equal(r.chip, '📖 1/3 · 2🎬 ＋', 'the chip beside Review (V102.670: with its 🎬 Watch first half)');
         assert.deepEqual([r.open.rail, r.open.chips], [true, true], 'the logo opens the rail under the box');
         assert.deepEqual([r.afterPick.value, r.afterPick.own, r.afterPick.rail], [r.picked, true, false], 'a row pick: that question\'s model, amber ring, rail closes');
         assert.deepEqual([r.row2.value, r.row2.own], ['gpt-6-luna', false], 'other rows keep the strip model');

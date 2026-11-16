@@ -62,6 +62,7 @@
     function touch() { if (typeof window.triggerAutoSave === 'function') { try { window.triggerAutoSave(); } catch (e) { /* the editor's own business */ } } }
     function stop() { clearTimeout(S.timer); S.play = -1; if (S.au) { try { S.au.pause(); } catch (e) { /* not playing */ } S.au = null; } }
     function paint() {
+        if (typeof window._qeWatchChip === 'function') window._qeWatchChip();   // V102.670: the 🎬 half of the chip beside Review follows the story
         var el = box(), btn = document.getElementById('qws-make'); if (!el) return;
         if (btn) { btn.disabled = S.busy; btn.textContent = S.busy && !S.voicing ? '✨ ' + Math.floor((Date.now() - S.t0) / 1000) + ' s' : '✨ From Read first'; }
         var st = S.story;

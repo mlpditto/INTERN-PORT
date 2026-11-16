@@ -32,6 +32,7 @@ const SHOT = process.env.SHOT; let pass = 0; const ok = (c, m) => { assert.ok(c,
             const c = document.getElementById('quiz-questions-container'); c.innerHTML = '';
             primers.forEach((p, i) => addQuestionUI({ q: 'Question ' + (i + 1) + ' text', type: 'choice', options: ['a', 'b'], correct: [0], primer: p }));
             document.getElementById('quiz-watch-first').value = ''; QuizWatchStory.set(null);
+            if (primers.length) { localStorage.setItem('praTab', 'watch'); _qPrimerReviewAll(); }   // V102.670: the Watch first block lives in the 📖 │ 🎬 window's Watch first tab
             window.__ai = []; window.__reply = 'Q [1]: What is body-identical?\nRX [1]: The same molecule as 17β-estradiol.\n**KEY [1,2]:** Start within 10 years, before age 60\nnoise line\nRX [2]: Use 75 mg daily\n';
             window.callUniversalAI = (model, prompt, isJson, a, b, opts) => { window.__ai.push({ model, prompt, isJson, feature: opts && opts.feature }); return window.__fail ? Promise.reject(new Error('boom')) : Promise.resolve({ text: window.__reply }); };
         }, primers);
