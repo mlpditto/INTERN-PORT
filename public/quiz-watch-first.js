@@ -1,7 +1,10 @@
 // V101.313 🎬 Watch first (owner pick A 2026-11-16, mockup-watch-first/): a quiz that carries a short film (`watchFirst.url`, set in the
 // Quiz Editor) opens on ONE page before question 1 — the film, the quiz's topics, then the quiz. 📖 Read first of each question follows as before.
 // Nothing is counted while this page is up (it sits where Read first sits: before the timer). The film can be skipped. Shown once per run
-// (the flag rides on the runner's `primerSeen`, which is reset for every run). Nothing is written to Firestore.
+// (the flag rides on the runner's `primerSeen`, which is reset for every run).
+// V101.314 (owner: "บันทึกว่าใครดู"): leaving the page stamps the intern's own attempt (quiz_attempts/{quizId}_{userId}, merge) with
+// `watchFirst: { at, seconds, ended, skipped, failed }` — seconds = the furthest point reached. Not in practice mode, and only when the
+// run has its started attempt, so no stray document is made. A failed write never holds the quiz back.
 (function () {
     'use strict';
     var T = {
@@ -31,7 +34,22 @@
     // the film of a quiz: an https link only (anything else is treated as "no film")
     function urlOf(q) { var u = q && q.watchFirst && typeof q.watchFirst.url === 'string' ? q.watchFirst.url.trim() : ''; return /^https:\/\/\S+$/i.test(u) ? u : ''; }
 
+    var seen = null;   // what this page saw of the film: { max, played, ended, failed }
+    function record() {
+        try {
+            var q = currentQuiz, s = seen || {};
+            if (!q || typeof userId === 'undefined' || !userId || typeof db === 'undefined') return;
+            if (typeof isPracticeMode !== 'undefined' && isPracticeMode) return;
+            var att = typeof quizAttemptsCache !== 'undefined' && quizAttemptsCache ? quizAttemptsCache[q.id] : null;
+            if (!att || att.status !== 'started') return;
+            var data = { at: Date.now(), seconds: Math.max(0, Math.round(s.max || 0)), ended: !!s.ended, skipped: !s.played, failed: !!s.failed };
+            quizAttemptsCache[q.id] = Object.assign({}, att, { watchFirst: data });
+            var w = db.collection('quiz_attempts').doc(q.id + '_' + userId).set({ watchFirst: data }, { merge: true });
+            if (w && typeof w.catch === 'function') w.catch(function (e) { console.warn('[qzWatch] not recorded', e && e.message); });
+        } catch (e) { console.warn('[qzWatch] not recorded', e && e.message); }
+    }
     function done() {
+        record();
         try { primerSeen.watch = true; stepStartTimestamp = Date.now(); } catch (e) { /* the runner's own state */ }
         var v = document.querySelector('.qwf-v'); if (v) { try { v.pause(); } catch (e) { /* not playing */ } }
         renderQuizStep(currentQuiz.timerMode === 'total_time');
@@ -55,8 +73,11 @@
             '<button type="button" class="qwf-skip">' + esc(L(T.skip)) + '</button></div>';
         var v = box.querySelector('.qwf-v'), go = box.querySelector('.qwf-go'), skip = box.querySelector('.qwf-skip'), note = box.querySelector('.qwf-n');
         var ready = function () { go.dataset.state = 'go'; go.textContent = L(T.go); skip.hidden = true; };
-        v.addEventListener('play', ready);     // also when the intern uses the player's own ▶
-        v.addEventListener('error', function () { note.textContent = L(T.fail); note.classList.add('bad'); ready(); });
+        seen = { max: 0, played: false, ended: false, failed: false };
+        v.addEventListener('play', function () { seen.played = true; ready(); });     // also when the intern uses the player's own ▶
+        v.addEventListener('timeupdate', function () { if (v.currentTime > seen.max) seen.max = v.currentTime; });
+        v.addEventListener('ended', function () { seen.ended = true; if (v.duration && isFinite(v.duration)) seen.max = Math.max(seen.max, v.duration); });
+        v.addEventListener('error', function () { seen.failed = true; note.textContent = L(T.fail); note.classList.add('bad'); ready(); });
         go.onclick = function () {
             if (go.dataset.state === 'go') return done();
             var p; try { p = v.play(); } catch (e) { p = null; }
