@@ -55,7 +55,7 @@ const IDS = ['quiz-system-select', 'quiz-campaign-chips', 'quiz-campaign', 'quiz
     await page.evaluate(() => setQuizTargetGroupValue('Public'));
 
     // Modes: real checkboxes, grey off, coloured on, no visible box
-    assert.equal(await page.evaluate(() => document.getElementById('qe-modes').closest('.qe-head') !== null), true, 'V102.561: on the title row');
+    assert.equal(await page.evaluate(() => !document.getElementById('qe-modes').closest('.qe-head') && document.getElementById('qe-modes').closest('#quiz-editor-settings .quiz-editor-fold-body') !== null), true, 'V102.664 (owner pick D): under ⚙, in the settings panel — no longer on the title row');
     await page.evaluate(() => { const m = document.getElementById('qe-modes'); document.body.appendChild(m); m.style.setProperty('display', 'inline-flex', 'important'); });   // this harness shows the Audience block alone
     const shuffle = page.locator('label.logic-chip:has(#quiz-shuffle-choices)'), poll = page.locator('label.logic-chip:has(#quiz-is-poll)');
     assert.equal(await page.locator('#qe-modes .logic-chip').count(), 9);   // V102.610 + ⏸ Break assert.equal(await page.locator('#qe-aud .logic-chip').count(), 0);
