@@ -11,6 +11,9 @@
 // V101.318 (owner pick C 2026-11-17, mockup-watch-first-choice/): the story page is lean — the 🎬 chip in the runner's header already says what
 // this page is, so its own heading, the quiz title in the card and the caption under it are gone. A second button, 📖 Read it, shows the whole
 // story at once (no voice, no waiting); 🎬 Play goes back. The attempt stamp says `read: true` when the intern used it.
+// V101.319 (owner pick A 2026-11-17, mockup-watch-first-voices/): the intern picks the pharmacist's voice — 🔇 │ 🗣 Kaitom │ 🗣 Kaidang, kept on this
+// phone. A THAI story is shown only when every line has its AI voice (`a`; RX / KEY lines also `b`) — until the admin has voiced it all there is
+// no Watch first page. Other languages have no AI voice and play with the phone voice as before.
 (function () {
     'use strict';
     var T = {
@@ -21,6 +24,7 @@
         go: { en: 'Start the quiz ▸', th: 'เริ่มทำควิซ ▸', ko: '퀴즈 시작 ▸', ja: 'クイズ開始 ▸', zh: '开始测验 ▸' },
         skip: { en: 'Skip the film', th: 'ข้ามหนัง', ko: '영상 건너뛰기', ja: '映像をスキップ', zh: '跳过短片' },
         read: { en: '📖 Read it', th: '📖 อ่านเอง', ko: '📖 직접 읽기', ja: '📖 自分で読む', zh: '📖 自己读' },
+        va: { en: 'Kaitom', th: 'ไข่ต้ม', ko: '카이톰', ja: 'カイトム', zh: 'Kaitom' }, vb: { en: 'Kaidang', th: 'ไข่แดง', ko: '카이댕', ja: 'カイデーン', zh: 'Kaidang' },
         play: { en: '🎬 Play', th: '🎬 ดูเรื่อง', ko: '🎬 재생', ja: '🎬 再生', zh: '🎬 播放' },
         sound: { en: 'Tap for sound', th: 'แตะเพื่อเปิดเสียง', ko: '눌러서 소리 켜기', ja: 'タップで音声', zh: '点击开启声音' },
         who: { en: 'Intern', th: 'น้องฝึกงาน', ko: '인턴', ja: '実習生', zh: '实习生' },
@@ -48,7 +52,10 @@
         '.qws-top{min-height:36px}.qws-top .qws-prog{flex:1;margin:0 2px}' +
         '.qwf-two{display:flex;gap:8px;margin:14px 0 0}.qwf-two .qwf-go{flex:1;width:auto;margin:0}' +
         '.qwf-read{flex:none;width:auto;min-height:48px;margin:0;padding:0 14px;border:0;border-radius:12px;background:#eef2ff;color:#3730a3;font:inherit;font-size:.95em;font-weight:800;cursor:pointer;white-space:nowrap}' +
-        '.qws.read .qws-chat{justify-content:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch}.qws.read .qws-chat>*{flex:none}.qws.read .qws-snd{display:none}';
+        '.qws.read .qws-chat{justify-content:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch}.qws.read .qws-chat>*{flex:none}.qws.read .qws-snd{display:none}' +
+        // V101.319: the voice rail
+        '.qws-rail{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 2px}.qws-rail button{flex:none;width:auto;min-height:36px;margin:0;padding:0 12px;border:0;border-radius:999px;background:#fff;color:#475569;font:800 12px/1 Kanit,sans-serif;cursor:pointer}' +
+        '.qws-rail button[aria-pressed="true"]{background:#4361ee;color:#fff}.qws.read .qws-rail{display:none}';
 
     function lang() {
         try {
@@ -64,11 +71,14 @@
     // the story of a quiz: text lines only, each said by q (the intern), rx (the pharmacist) or key (a point to remember)
     function storyOf(q) {
         var st = q && q.watchFirst && q.watchFirst.story, ls = st && Array.isArray(st.lines) ? st.lines.filter(function (x) { return x && /^(q|rx|key)$/.test(x.w) && typeof x.t === 'string' && x.t.trim(); }).slice(0, 24) : [];
-        return ls.length ? { lang: /^(th|en|ko)$/.test(st.lang) ? st.lang : 'en', lines: ls } : null;
+        var lg = ls.length ? (/^(th|en|ko)$/.test(st.lang) ? st.lang : 'en') : '';
+        if (lg === 'th' && !ls.every(function (x) { return voiceUrl(x) && (x.w === 'q' || voiceUrl(x, 'b')); })) return null;   // V101.319: a Thai story waits for all its AI voices
+        return ls.length ? { lang: lg, lines: ls, pick: lg === 'th' } : null;
     }
     function muted() { try { return localStorage.getItem('qwsMute') === '1'; } catch (e) { return false; } }
     var play = null;   // the story being played: { i, sound, done, t0, timer, n }
-    function voiceUrl(x) { return x && typeof x.a === 'string' && /^https:\/\/firebasestorage\.googleapis\.com\/\S+$/.test(x.a) ? x.a : ''; }
+    function voiceUrl(x, f) { var u = x && x[f || 'a']; return typeof u === 'string' && /^https:\/\/firebasestorage\.googleapis\.com\/\S+$/.test(u) ? u : ''; }
+    function voicePick() { try { return localStorage.getItem('qwsVoice') === 'b' ? 'b' : 'a'; } catch (e) { return 'a'; } }
     function stopStory() { if (play) { clearTimeout(play.timer); play.n++; if (play.au) { try { play.au.pause(); } catch (e) { /* not playing */ } play.au = null; } } if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch (e) { /* nothing speaking */ } } }
 
     var seen = null;   // what this page saw of the film: { max, played, ended, failed }
@@ -133,11 +143,13 @@
     // V101.316: the voice is ON when the page opens (owner 2026-11-16) unless this phone's intern muted it before
     function storyPage(box, q, story) {
         stopStory();
-        var can = !!(window.speechSynthesis && window.SpeechSynthesisUtterance) || story.lines.some(voiceUrl), on = can && !muted();
-        var k = play = { i: -1, sound: on, auto: on, done: false, t0: Date.now(), timer: null, n: 0 }, ls = story.lines;
+        var can = !!(window.speechSynthesis && window.SpeechSynthesisUtterance) || story.lines.some(function (x) { return voiceUrl(x); }), on = can && !muted();
+        var k = play = { i: -1, sound: on, auto: on, done: false, t0: Date.now(), timer: null, n: 0, vf: voicePick() }, ls = story.lines;
+        var vb = function (v, label) { return '<button type="button" data-v="' + v + '" aria-pressed="' + (v === 'off' ? !on : on && k.vf === v) + '">' + label + '</button>'; };
         seen = { max: 0, played: false, ended: false, failed: false };
         box.innerHTML = '<div class="lang-no-toggle qwf">' +
-            '<div class="qws"><div class="qws-top"><div class="qws-prog">' + ls.map(function () { return '<i></i>'; }).join('') + '</div><button type="button" class="qws-snd" aria-pressed="' + on + '">' + (on ? '🔊' : '🔇 ' + esc(L(T.sound))) + '</button></div>' +
+            '<div class="qws"><div class="qws-top"><div class="qws-prog">' + ls.map(function () { return '<i></i>'; }).join('') + '</div>' + (story.pick ? '' : '<button type="button" class="qws-snd" aria-pressed="' + on + '">' + (on ? '🔊' : '🔇 ' + esc(L(T.sound))) + '</button>') + '</div>' +
+            (story.pick ? '<div class="qws-rail" role="group" aria-label="Voice">' + vb('off', '🔇') + vb('a', '🗣 ' + esc(L(T.va))) + vb('b', '🗣 ' + esc(L(T.vb))) + '</div>' : '') +
             '<div class="qws-chat" aria-live="polite"></div></div>' +
             '<div class="qwf-two"><button type="button" class="qwf-read" aria-pressed="false">' + esc(L(T.read)) + '</button><button type="button" class="qwf-go" data-state="go">' + esc(L(T.go)) + '</button></div></div>';
         var chat = box.querySelector('.qws-chat'), snd = box.querySelector('.qws-snd'), dots = box.querySelectorAll('.qws-prog i'), card = box.querySelector('.qws'), rd = box.querySelector('.qwf-read');
@@ -161,7 +173,7 @@
                 k.sound = k.auto = false; face(); stopStory(); k.timer = setTimeout(function () { step(); }, Math.max(300, ms - 1500));
             };
             // V101.317: a line the admin voiced with AI (`a`, a Storage link) is played as that sound; a sound that will not load → the phone voice says it.
-            var src = k.sound ? voiceUrl(ls[k.i]) : '';
+            var src = k.sound ? (ls[k.i].w !== 'q' && k.vf === 'b' && voiceUrl(ls[k.i], 'b')) || voiceUrl(ls[k.i]) : '';
             if (src && typeof Audio === 'function') {
                 try {
                     var au = k.au = new Audio(src), fell = false, fall = function () { if (fell || fired || play !== k || k.n !== n) return; fell = true; clearTimeout(k.timer); if (k.auto) quiet(); else if (!say()) k.timer = setTimeout(next, ms); };
@@ -189,13 +201,23 @@
                 } catch (e) { return false; }
             }
         };
-        var face = function () { snd.setAttribute('aria-pressed', String(k.sound)); snd.textContent = (k.sound ? '🔊' : '🔇 ' + L(T.sound)); };
-        snd.onclick = function () {
-            k.sound = !k.sound; k.auto = false; face();
+        var rail = box.querySelectorAll('.qws-rail button');
+        var face = function () {
+            if (snd) { snd.setAttribute('aria-pressed', String(k.sound)); snd.textContent = (k.sound ? '🔊' : '🔇 ' + L(T.sound)); }
+            for (var r = 0; r < rail.length; r++) { var v = rail[r].getAttribute('data-v'); rail[r].setAttribute('aria-pressed', String(v === 'off' ? !k.sound : k.sound && k.vf === v)); }
+        };
+        var setSound = function (want) {
+            k.sound = want; k.auto = false; face();
             try { if (k.sound) localStorage.removeItem('qwsMute'); else localStorage.setItem('qwsMute', '1'); } catch (e) { /* private window */ }   // a tap is remembered on this phone
             stopStory();
             if (k.sound) { if (k.done) { k.done = false; k.i = -1; } else if (k.i > -1) k.i--; step(); }   // say the line on screen (from the top once it has ended)
             else if (!k.done) k.timer = setTimeout(function () { step(); }, 900);
+        };
+        if (snd) snd.onclick = function () { setSound(!k.sound); };
+        for (var ri = 0; ri < rail.length; ri++) rail[ri].onclick = function () {   // V101.319: 🔇 │ 🗣 Kaitom │ 🗣 Kaidang — the pick is kept on this phone
+            var v = this.getAttribute('data-v'); if (v === 'off') return setSound(false);
+            k.vf = v; try { localStorage.setItem('qwsVoice', v); } catch (e) { /* private window */ }
+            setSound(true);
         };
         // V101.318 📖 Read it: the whole story at once, no voice; 🎬 Play starts the story again from its first line
         rd.onclick = function () {

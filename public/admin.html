@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.671)</title>
+    <title>Nika Admin (V102.672)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -5940,7 +5940,7 @@
         .qe-rf[hidden] { display:none; }
         .qe-rf.ok { border-color:#86efac; background:#f0fdf4; color:#166534; }
         /* V102.670 (owner pick A2): one chip = 📖 n/N │ 🎬 m; the colour says the state (no ✓): 📖 amber → green when every question has one, 🎬 grey ＋ → magenta when a story or a film is set */
-        .qe-rf .rf-w, .pra-tab .rf-w { color:#94a3b8; } .qe-rf .rf-w.on, .pra-tab .rf-w.on { color:#a21caf; }
+        .qe-rf .rf-w, .pra-tab .rf-w { color:#94a3b8; } .qe-rf .rf-w.on, .pra-tab .rf-w.on { color:#a21caf; } .qe-rf .rf-w.wait { color:#b45309; } .pra-tab .rf-w.wait { color:#f59e0b; }   /* V102.672 amber = a story whose AI voices are not all ready: interns do not see it yet */
         .qe-rf .rf-w { margin-left:3px; padding-left:7px; border-left:1px solid rgba(100,116,139,.35); }
         .pra-tabs { display:flex; align-items:flex-end; gap:4px; padding:6px 12px 0; background:#f1f5f9; border-bottom:1px solid #e2e8f0; }
         .pra-tab { min-height:0; width:auto; margin:0 0 -1px; padding:7px 14px; border-radius:10px 10px 0 0; border:1px solid transparent; border-bottom:0; background:transparent; font:800 13px/1 Inter,Kanit,sans-serif; color:#64748b; cursor:pointer; white-space:nowrap; }
@@ -8956,7 +8956,7 @@
     <link rel="stylesheet" href="jev-quiz-check.css?v=V102.619">
     <link rel="stylesheet" href="jev-primer-repeats.css?v=V102.563">
     <script src="jev-primer-repeats.js?v=V102.658"></script>
-    <script src="quiz-watch-story.js?v=V102.671"></script>
+    <script src="quiz-watch-story.js?v=V102.672"></script>
     <link rel="stylesheet" href="case-card-multi.css?v=V102.583">
     <script src="case-card-multi.js?v=V102.592"></script>
     <link rel="stylesheet" href="quiz-compact-toolbar.css?v=V102.406">
@@ -26769,11 +26769,14 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
         // The window reopens on the tab used last. The Watch first block (link · ✨ From Read first · the story box) keeps its ids; it is only moved.
         window._qeWatchState = function () {
             const u = String((document.getElementById('quiz-watch-first') || {}).value || '').trim(), st = window.QuizWatchStory && typeof window.QuizWatchStory.get === 'function' ? window.QuizWatchStory.get() : null;
-            const n = st && Array.isArray(st.lines) ? st.lines.length : 0, v = n ? st.lines.filter(x => x && x.a).length : 0, link = /^https:\/\/\S+$/.test(u);
-            return { on: link || n > 0, label: link ? '▶' : n ? String(n) : '＋', title: link ? 'Watch first: a film link' : n ? 'Watch first: a story of ' + n + ' lines' + (v ? ', ' + v + ' with an AI voice' : '') : 'No Watch first yet — tap to add one' };
+            const n = st && Array.isArray(st.lines) ? st.lines.length : 0, link = /^https:\/\/\S+$/.test(u);
+            // V102.672 (owner pick A): a Thai story reaches interns only when every line has its AI voice(s) — until then the 🎬 half is amber 🗣 have/need
+            const V = n && window.QuizWatchStory && typeof window.QuizWatchStory.voice === 'function' ? window.QuizWatchStory.voice() : null, wait = !link && !!V && V.th && V.have < V.need;
+            return { on: link || (n > 0 && !wait), wait: wait, label: link ? '▶' : wait ? '🗣 ' + V.have + '/' + V.need : n ? String(n) : '＋',
+                title: link ? 'Watch first: a film link' : wait ? 'Watch first: a story of ' + n + ' lines — AI voices ' + V.have + ' of ' + V.need + '. Interns do not see it until every line is voiced: open 🎬 and tap 🗣' : n ? 'Watch first: a story of ' + n + ' lines' + (V && V.th ? ', every line voiced' : '') : 'No Watch first yet — tap to add one' };
         };
         window._qeWatchChip = function () {
-            const W = window._qeWatchState(), set = (el, text) => { if (!el) return; el.textContent = text; el.classList.toggle('on', W.on); el.title = W.title; };
+            const W = window._qeWatchState(), set = (el, text) => { if (!el) return; el.textContent = text; el.classList.toggle('on', W.on); el.classList.toggle('wait', !!W.wait); el.title = W.title; };
             set(document.querySelector('#qe-rf-chip .rf-w'), '🎬 ' + W.label);
             set(document.querySelector('#praOverlay .pra-tab[data-t="watch"] .rf-w'), '🎬 Watch first' + (W.on ? ' · ' + W.label : ''));
         };
