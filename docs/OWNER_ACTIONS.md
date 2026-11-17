@@ -25,6 +25,16 @@
 
 ## 2. Actions in priority order
 
+### PAXA — third voice for 🎬 Watch first (after the PR is merged; admin V102.674)
+
+The `paxa_tts` route needs a secret that does not exist yet — **`callAIProxy` will not deploy until it does**:
+
+1. `firebase functions:secrets:set PAXA_API_KEY --project intern-port-edfa7` (paste the key from paxalabs.com ▸ API keys at the prompt; never in chat or in a file).
+2. `firebase deploy --only functions:callAIProxy --project intern-port-edfa7`.
+3. Quiz Editor ▸ 📖 │ 🎬 ▸ 🎬 Watch first ▸ **＋ Paxa** → pick a voice → tap the button again. Free plan: 100 credits (≈ 10,000 characters), 10 requests a minute, not for commercial use.
+
+Story lines only — never send personal data to Paxa (it may keep inputs).
+
 ### DEADLINE-ALERTS — quiz deadline LINE alerts (after the PR is merged)
 **What it does:** every hour `notifyQuizDeadlines` looks at active quizzes with a deadline in the next 24 h. One bubble to the LINE group at about T-24 h, then a personal bubble at T-3 h to each intern who has not submitted. On for every quiz with a deadline; the quiz editor chip **Deadline alert (LINE)** turns one off. Quiet hours 22:00–07:00; max 15 personal pushes a day; personal pushes stop at 270/300 for the month.
 **Deploy (owner, nothing auto-deploys):** `firebase deploy --only firestore:rules` then `firebase deploy --only functions:notifyQuizDeadlines,functions:notifyQuizDigest,functions:notifyQuizDigestEvening,functions:sendQuizDigestNow,functions:previewQuizDigest` (the digest callers share the refactored pending scan).
