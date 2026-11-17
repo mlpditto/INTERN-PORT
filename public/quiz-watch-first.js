@@ -8,6 +8,9 @@
 // V101.315 (owner pick C1, mockup-watch-first/c.html): a quiz with no film link but a STORY (`watchFirst.story.lines`, written in the Quiz Editor
 // from its own Read first notes) plays it here as a chat — an intern asks, a pharmacist answers, 💡 key lines — one line at a time, muted with
 // its text; a tap turns the phone's voice on. No video file. A film link wins when a quiz has both.
+// V101.318 (owner pick C 2026-11-17, mockup-watch-first-choice/): the story page is lean — the 🎬 chip in the runner's header already says what
+// this page is, so its own heading, the quiz title in the card and the caption under it are gone. A second button, 📖 Read it, shows the whole
+// story at once (no voice, no waiting); 🎬 Play goes back. The attempt stamp says `read: true` when the intern used it.
 (function () {
     'use strict';
     var T = {
@@ -17,7 +20,8 @@
         watch: { en: '▶ Watch', th: '▶ ดูหนัง', ko: '▶ 보기', ja: '▶ 見る', zh: '▶ 观看' },
         go: { en: 'Start the quiz ▸', th: 'เริ่มทำควิซ ▸', ko: '퀴즈 시작 ▸', ja: 'クイズ開始 ▸', zh: '开始测验 ▸' },
         skip: { en: 'Skip the film', th: 'ข้ามหนัง', ko: '영상 건너뛰기', ja: '映像をスキップ', zh: '跳过短片' },
-        snote: { en: 'A short story from this quiz\'s Read first notes.', th: 'เรื่องเล่าสั้นจาก Read first ของควิซนี้', ko: '이 퀴즈의 Read first 내용을 담은 짧은 이야기', ja: 'このクイズの Read first からの短い話', zh: '来自本测验 Read first 的小故事' },
+        read: { en: '📖 Read it', th: '📖 อ่านเอง', ko: '📖 직접 읽기', ja: '📖 自分で読む', zh: '📖 自己读' },
+        play: { en: '🎬 Play', th: '🎬 ดูเรื่อง', ko: '🎬 재생', ja: '🎬 再生', zh: '🎬 播放' },
         sound: { en: 'Tap for sound', th: 'แตะเพื่อเปิดเสียง', ko: '눌러서 소리 켜기', ja: 'タップで音声', zh: '点击开启声音' },
         who: { en: 'Intern', th: 'น้องฝึกงาน', ko: '인턴', ja: '実習生', zh: '实习生' },
         rx: { en: 'Pharmacist', th: 'เภสัชกร', ko: '약사', ja: '薬剤師', zh: '药师' },
@@ -30,7 +34,7 @@
         '.qwf-go{display:block;width:100%;min-height:48px;margin:14px 0 0;border:0;border-radius:12px;background:var(--primary,#4361ee);color:#fff;font:inherit;font-size:1em;font-weight:800;cursor:pointer}' +
         '.qwf-skip{display:block;width:auto;min-height:44px;margin:4px auto 0;padding:0 12px;border:0;background:none;color:#64748b;font:inherit;font-size:.82em;text-decoration:underline;cursor:pointer}.qwf-skip[hidden]{display:none}' +
         // the story — the look of the article clips (articles.js .clp-*)
-        '.qws{display:flex;flex-direction:column;height:min(46vh,340px);margin:0 0 8px;background:#e9edf5;border-radius:16px;padding:10px 10px 8px;box-sizing:border-box}' +
+        '.qws{display:flex;flex-direction:column;height:min(54vh,410px);margin:0 0 8px;background:#e9edf5;border-radius:16px;padding:10px 10px 8px;box-sizing:border-box}' +
         '.qws-top{display:flex;align-items:center;gap:8px}.qws-t{flex:1;min-width:0;font:800 13px/1.3 Kanit,sans-serif;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
         '.qws-snd{flex:none;width:auto;min-height:36px;margin:0;padding:0 12px;border:0;border-radius:999px;background:rgba(15,23,42,.72);color:#fff;font:800 12px/1 Kanit,sans-serif;cursor:pointer}.qws-snd[aria-pressed="true"]{background:#4361ee}' +
         '.qws-prog{display:flex;gap:3px;margin:8px 2px 6px}.qws-prog i{flex:1;height:3px;border-radius:2px;background:#cbd5e1}.qws-prog i.on{background:#4361ee}' +
@@ -39,7 +43,12 @@
         '.qws-m{max-width:82%;padding:9px 13px;border-radius:16px;font:600 15px/1.4 Kanit,sans-serif;overflow-wrap:anywhere}' +
         '.qws-m.q{align-self:flex-start;background:#fff;color:#1e293b;border-bottom-left-radius:4px}.qws-m.rx{align-self:flex-end;background:#4361ee;color:#fff;border-bottom-right-radius:4px}' +
         '.qws-key{align-self:center;max-width:90%;background:#fef3c7;color:#92400e;border-radius:999px;padding:7px 14px;font:800 14px/1.35 Kanit,sans-serif;text-align:center}' +
-        '.qws-m.now,.qws-key.now{box-shadow:0 0 0 2px #facc15}';
+        '.qws-m.now,.qws-key.now{box-shadow:0 0 0 2px #facc15}' +
+        // V101.318: progress and 🔊 share one row; 📖 Read it beside Start the quiz; reading = every line, scrollable
+        '.qws-top{min-height:36px}.qws-top .qws-prog{flex:1;margin:0 2px}' +
+        '.qwf-two{display:flex;gap:8px;margin:14px 0 0}.qwf-two .qwf-go{flex:1;width:auto;margin:0}' +
+        '.qwf-read{flex:none;width:auto;min-height:48px;margin:0;padding:0 14px;border:0;border-radius:12px;background:#eef2ff;color:#3730a3;font:inherit;font-size:.95em;font-weight:800;cursor:pointer;white-space:nowrap}' +
+        '.qws.read .qws-chat{justify-content:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch}.qws.read .qws-chat>*{flex:none}.qws.read .qws-snd{display:none}';
 
     function lang() {
         try {
@@ -70,9 +79,9 @@
             if (typeof isPracticeMode !== 'undefined' && isPracticeMode) return;
             var att = typeof quizAttemptsCache !== 'undefined' && quizAttemptsCache ? quizAttemptsCache[q.id] : null;
             if (!att || att.status !== 'started') return;
-            if (play) { s.max = (Date.now() - play.t0) / 1000; s.played = play.i >= 1; s.ended = play.done; }   // a story: time on the page; "watched" = went past its first line
+            if (play) { s.max = (Date.now() - play.t0) / 1000; s.played = play.i >= 1 || !!play.readUsed; s.ended = play.done; }   // a story: time on the page; "watched" = went past its first line
             var data = { at: Date.now(), seconds: Math.max(0, Math.round(s.max || 0)), ended: !!s.ended, skipped: !s.played, failed: !!s.failed };
-            if (play) data.kind = 'story';
+            if (play) { data.kind = 'story'; if (play.readUsed) data.read = true; }
             quizAttemptsCache[q.id] = Object.assign({}, att, { watchFirst: data });
             var w = db.collection('quiz_attempts').doc(q.id + '_' + userId).set({ watchFirst: data }, { merge: true });
             if (w && typeof w.catch === 'function') w.catch(function (e) { console.warn('[qzWatch] not recorded', e && e.message); });
@@ -127,19 +136,19 @@
         var can = !!(window.speechSynthesis && window.SpeechSynthesisUtterance) || story.lines.some(voiceUrl), on = can && !muted();
         var k = play = { i: -1, sound: on, auto: on, done: false, t0: Date.now(), timer: null, n: 0 }, ls = story.lines;
         seen = { max: 0, played: false, ended: false, failed: false };
-        box.innerHTML = '<div class="lang-no-toggle qwf"><div class="qwf-h">🎬 ' + esc(L(T.head)) + '<small>· ' + esc(L(T.sub)) + '</small></div>' +
-            '<div class="qws"><div class="qws-top"><span class="qws-t">🎬 ' + esc(q.title || '') + '</span><button type="button" class="qws-snd" aria-pressed="' + on + '">' + (on ? '🔊' : '🔇 ' + esc(L(T.sound))) + '</button></div>' +
-            '<div class="qws-prog">' + ls.map(function () { return '<i></i>'; }).join('') + '</div><div class="qws-chat" aria-live="polite"></div></div>' +
-            '<p class="qwf-n">' + esc(L(T.snote)) + '</p><button type="button" class="qwf-go" data-state="go">' + esc(L(T.go)) + '</button></div>';
-        var chat = box.querySelector('.qws-chat'), snd = box.querySelector('.qws-snd'), dots = box.querySelectorAll('.qws-prog i');
+        box.innerHTML = '<div class="lang-no-toggle qwf">' +
+            '<div class="qws"><div class="qws-top"><div class="qws-prog">' + ls.map(function () { return '<i></i>'; }).join('') + '</div><button type="button" class="qws-snd" aria-pressed="' + on + '">' + (on ? '🔊' : '🔇 ' + esc(L(T.sound))) + '</button></div>' +
+            '<div class="qws-chat" aria-live="polite"></div></div>' +
+            '<div class="qwf-two"><button type="button" class="qwf-read" aria-pressed="false">' + esc(L(T.read)) + '</button><button type="button" class="qwf-go" data-state="go">' + esc(L(T.go)) + '</button></div></div>';
+        var chat = box.querySelector('.qws-chat'), snd = box.querySelector('.qws-snd'), dots = box.querySelectorAll('.qws-prog i'), card = box.querySelector('.qws'), rd = box.querySelector('.qwf-read');
         var paint = function () {
-            chat.innerHTML = ls.slice(0, k.i + 1).map(function (x, i, all) {
-                var now = i === k.i && !k.done ? ' now' : '';
+            chat.innerHTML = ls.slice(0, k.read ? ls.length : k.i + 1).map(function (x, i, all) {
+                var now = i === k.i && !k.done && !k.read ? ' now' : '';
                 if (x.w === 'key') return '<div class="qws-key' + now + '">💡 ' + esc(x.t) + '</div>';
                 var w = x.w === 'q' ? 'q' : 'rx';
                 return (i === 0 || all[i - 1].w !== x.w ? '<span class="qws-who ' + w + '">' + (w === 'q' ? '🙋 ' + esc(L(T.who)) : '🧑‍⚕️ ' + esc(L(T.rx))) + '</span>' : '') + '<div class="qws-m ' + w + now + '">' + esc(x.t) + '</div>';
             }).join('');
-            for (var d = 0; d < dots.length; d++) dots[d].className = d <= k.i ? 'on' : '';
+            for (var d = 0; d < dots.length; d++) dots[d].className = k.read || d <= k.i ? 'on' : '';
         };
         var step = function () {
             if (play !== k || !document.body.contains(chat)) return stopStory();   // the page is gone (quiz closed)
@@ -187,6 +196,13 @@
             stopStory();
             if (k.sound) { if (k.done) { k.done = false; k.i = -1; } else if (k.i > -1) k.i--; step(); }   // say the line on screen (from the top once it has ended)
             else if (!k.done) k.timer = setTimeout(function () { step(); }, 900);
+        };
+        // V101.318 📖 Read it: the whole story at once, no voice; 🎬 Play starts the story again from its first line
+        rd.onclick = function () {
+            k.read = !k.read; k.auto = false; stopStory();
+            card.classList.toggle('read', k.read); rd.setAttribute('aria-pressed', String(k.read)); rd.textContent = L(k.read ? T.play : T.read);
+            if (k.read) { k.readUsed = true; paint(); chat.scrollTop = 0; }
+            else { k.done = false; k.i = -1; step(); }
         };
         box.querySelector('.qwf-go').onclick = done;
         step();
