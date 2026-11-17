@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.321)</title>
+    <title>Internship Portfolio (V101.322)</title>
     <link rel="stylesheet" href="nika-ask.css?v=V101.308">
     <link rel="stylesheet" href="daily-canvas.css?v=V101.266">
     <link rel="stylesheet" href="halloween.css?v=V101.249">
@@ -3614,6 +3614,12 @@
                 .dc-head-grp { display: inline-flex; align-items: stretch; height: 34px; }
                 /* V101.225: copy (whole entry in the head, one section in each summary), a section rail you can reach with a mouse too */
                 .dc-detail-copy, .dc-sec-copy { width: 34px; min-height: 0; height: 34px; padding: 0; border: 1px solid #c7d2fe; border-radius: 999px; background: #eef2ff; font-size: 15px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex: none; color: #334155; }
+                .dc-story { display: flex; gap: 12px; align-items: center; margin: 10px 14px 4px; padding: 10px; border: 1.5px solid #fed7aa; background: #fff7ed; border-radius: 14px; }
+                .dc-story-thumb { width: 64px; height: 90px; object-fit: cover; object-position: top; border-radius: 6px; border: 1px solid #fdba74; flex: none; background: #fff; }
+                .dc-story-icon { display: inline-flex; align-items: center; justify-content: center; font-size: 26px; color: var(--mk, #dc2626); }
+                .dc-story-text { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+                .dc-story-text b { color: #9a3412; overflow-wrap: anywhere; } .dc-story-text small { color: #9a3412; opacity: .8; font-size: 12px; }
+                .dc-story-dl { margin-top: 4px; background: #ea580c; color: #fff; border-radius: 999px; padding: 5px 14px; font-weight: 700; font-size: 13px; text-decoration: none; }
                 .dc-sec-copy { width: 28px; height: 28px; font-size: 13px; margin-left: auto; margin-right: 10px; background: #fff; border-color: #e2e8f0; }
                 .dc-detail-copy:hover, .dc-sec-copy:hover { background: #dbeafe; }
                 .dc-detail-copy.ok, .dc-sec-copy.ok { background: #16a34a; border-color: #16a34a; color: #fff; font-weight: 800; }
@@ -19294,7 +19300,8 @@
             'class', 'indication', 'dosing', 'contraindication', 'sideEffects',
             'interactions', 'mechanism', 'absorption', 'distribution',
             'metabolism', 'excretion', 'toxicity', 'pharmacokinetics',
-            'monitoring', 'patientCounseling', 'pearls'
+            'monitoring', 'patientCounseling', 'pearls',
+            'indicationThFda', 'redFlags'   // V101.322
         ];
         const DC_SOURCE_BADGES = {
             cached:  '💾 cached',
@@ -20976,6 +20983,15 @@
         }
 
         // V101.73: one chip per download file, coloured by type; built from the ORIGINAL doc (file names are not translated).
+        // V101.322 (owner pick B, mockup-drug-story): the FIRST file of an entry is a card at the top — thumbnail (m.thumb) or the file icon,
+        // its name, the note (m.desc), one ⬇ Download. The other files stay chips in the head.
+        function dcStoryCardHtml(drug) {
+            const m = dcMaterialsOf(drug)[0]; if (!m) return '';
+            const k = materialKind(m.url), name = escapeHtml(materialDisplayName(m, 0)), url = escapeHtml(String(m.url).trim());
+            const thumb = /^https?:\/\//i.test(String(m.thumb || '')) ? `<img class="dc-story-thumb" src="${escapeHtml(m.thumb)}" alt="" loading="lazy">` : `<span class="dc-story-thumb dc-story-icon" style="--mk:${k.color}"><i class="${k.icon}" aria-hidden="true"></i></span>`;
+            const desc = String(m.desc || '').trim();
+            return `<div class="dc-story lang-no-toggle">${thumb}<div class="dc-story-text"><b>${name}</b>${desc ? `<small>${escapeHtml(desc)}</small>` : `<small>${escapeHtml(k.label)}</small>`}<a class="dc-story-dl" href="${url}" target="_blank" rel="noopener noreferrer" title="Download (${escapeHtml(k.label)}): ${name}" data-th-title="ดาวน์โหลด (${escapeHtml(k.label)}): ${name}" data-kr-title="다운로드 (${escapeHtml(k.label)}): ${name}">⬇ Download</a></div></div>`;
+        }
         function dcFileChipsHtml(drug) {
             return dcMaterialsOf(drug).map((m, i) => {
                 const k = materialKind(m.url), name = escapeHtml(materialDisplayName(m, i)), url = escapeHtml(String(m.url).trim());
@@ -21206,7 +21222,7 @@
                     chips.push(`<span class="dc-detail-chip" title="${escapeHtml(eff.brandNames.join(' · '))}">© ${escapeHtml(eff.brandNames[0])}${eff.brandNames.length > 1 ? ` +${eff.brandNames.length - 1}` : ''}</span>`);   // V101.199: first + N
                 }
                 if (eff.aiDrafted) chips.push('<span class="dc-detail-chip dc-detail-chip-ai" title="AI-drafted entry — admin still curates">🤖 AI draft</span>');
-                chips.push(...dcFileChipsHtml(drug));   // V101.73: admin-added download files
+                chips.push(...dcFileChipsHtml(drug).slice(1));   // V101.73: admin-added download files · V101.322: the first one is the card in the body
                 chipsEl.innerHTML = chips.join('');
             }
             // Body: 6 sections (V94.94: 5 → 6 after splitting Pharmacology into MoA + ADMET-PK).
@@ -21248,6 +21264,7 @@
                     title: T('💊 ให้ยังไง|💊 How to give|💊 투여 방법'),
                     open: false, // V95.79: rail auto-opens the first section
                     fields: [
+                        [T('ข้อบ่งใช้ตามทะเบียน อย.|Indication (Thai FDA)|적응증 (태국 FDA)'), eff.indicationThFda, 'safe'],   // V101.322: what the Thai registration says, when written
                         [T('ข้อบ่งใช้|Indication|적응증'), eff.indication, 'safe'],
                         [T('ขนาดยา|Dosing|용량'), dcDosingLines(eff.dosing), 'reference']   // V101.199
                     ]
@@ -21258,6 +21275,14 @@
                     open: false,
                     fields: [
                         [T('ข้อห้ามใช้|Contraindication|금기'), eff.contraindication, 'hard-no']
+                    ]
+                },
+                {   // V101.322 (owner pick B, mockup-drug-story): who to send on before giving anything; left out when empty
+                    key: 'refer',
+                    title: T('🚩 ส่งต่อทันที|🚩 Refer now|🚩 즉시 의뢰'),
+                    open: false,
+                    fields: [
+                        [T('อาการที่ต้องส่งต่อ|Red flags|위험 신호'), eff.redFlags, 'hard-no']
                     ]
                 },
                 {
@@ -21388,6 +21413,7 @@
             dcRenderLangChip(eff);   // V101.199: TH ⌄ in the head (was a 6-flag bar at the top of the body)
             body.innerHTML = (html || '<div class="dc-empty-state" style="padding:20px;">No details for this drug yet — the entry may still be in draft ยานี้ยังไม่มีรายละเอียด</div>') + creditHtml + discussionHtml;
             codexBuildSectionRail(body); // V95.79: sticky jump-rail + auto-open first
+            body.insertAdjacentHTML('afterbegin', dcStoryCardHtml(drug));   // V101.322: the first file as a card above the rail
             dcLeanHead();   // V101.199: compact head on scroll, rail under it, the section in view lit
             // Wire discussion onSnapshot on first toggle-open (lazy — interns
             // who never expand the section pay zero read cost).
@@ -21506,7 +21532,8 @@
                 bodyEl.addEventListener('click', e => {
                     const b = e.target.closest('.dc-sec-copy'); if (!b) return;
                     e.preventDefault(); e.stopPropagation();   // a summary toggles its section — a copy must not
-                    const sec = b.closest('.dc-detail-section'); dcCopyText(dcSectionText(sec), b);
+                    const sec = b.closest('.dc-detail-section'), who = ((sec.closest('.modal') || document).querySelector('.dc-detail-name') || {}).textContent;
+                    dcCopyText((who && who.trim() ? '# ' + who.trim() + '\n\n' : '') + dcSectionText(sec), b);   // V101.322 (owner): a section copy says which drug / disease it is
                 });
             }
         }
