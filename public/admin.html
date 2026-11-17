@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.679)</title>
+    <title>Nika Admin (V102.680)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -17386,6 +17386,12 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                         <div class="dca-form-grid">
                             <label class="dc-cat-label dc-field-safe" for="dca-f-indication">Indication</label>
                             <textarea id="dca-f-indication" rows="3" placeholder="Approved clinical uses…"></textarea>
+
+                            <label class="dc-cat-label dc-field-safe" for="dca-f-indicationThFda" title="Copy the wording from the Thai FDA registration / product information. Leave empty if you do not have it — AI does not fill this." data-th-title="คัดลอกจากทะเบียนหรือเอกสารกำกับยาของ อย. เว้นว่างถ้าไม่มี AI ไม่เติมช่องนี้" data-kr-title="태국 FDA 등록 문구를 그대로 옮겨 적으세요. 없으면 비워 두세요 — AI는 이 칸을 채우지 않습니다">🇹🇭 Indication (Thai FDA)</label>
+                            <textarea id="dca-f-indicationThFda" rows="2" placeholder="From the Thai FDA registration…" data-th-placeholder="ตามทะเบียน อย.…" data-kr-placeholder="태국 FDA 등록 기준…"></textarea>
+
+                            <label class="dc-cat-label dc-field-hard-no" for="dca-f-redFlags" title="Signs that mean refer now, one per line. Interns see them as 🚩 Refer now." data-th-title="อาการที่ต้องส่งต่อทันที บรรทัดละข้อ ผู้เรียนเห็นเป็นหัวข้อ 🚩 ส่งต่อทันที" data-kr-title="즉시 의뢰가 필요한 증상, 한 줄에 하나. 인턴에게는 🚩 즉시 의뢰로 보입니다">🚩 Red flags</label>
+                            <textarea id="dca-f-redFlags" rows="3" placeholder="One per line…" data-th-placeholder="บรรทัดละข้อ…" data-kr-placeholder="한 줄에 하나…"></textarea>
 
                             <label class="dc-cat-label dc-field-reference" for="dca-f-dosing">Dosing</label>
                             <textarea id="dca-f-dosing" rows="4" placeholder="Adult / pediatric / renal adjustment…"></textarea>
@@ -48558,6 +48564,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             'monitoring', 'patientCounseling', 'pearls',
             'references'
         ];
+        // V102.680 (owner pick B): two text fields kept OUT of DCA_FIELD_KEYS on purpose — AI Auto-Draft, the completeness % and the
+        // verify gate never touch them (a Thai FDA indication must be copied from the registration, not guessed). Saved with the form.
+        const DCA_EXTRA_TEXT_FIELDS = ['indicationThFda', 'redFlags'];
         // brandNames + references stored as arrays in Firestore; UI input is
         // comma-separated (brandNames) or newline-separated (references).
         const DCA_ARRAY_FIELDS = { brandNames: 'csv', references: 'lines' };
@@ -50560,6 +50569,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // V94.75: sync the lookup button enabled-state to the (possibly empty)
             // Generic Name once the form is populated. Deferred so the field is set.
             setTimeout(dcaNdiSyncBtnState, 0);
+            DCA_EXTRA_TEXT_FIELDS.forEach(key => { const el = document.getElementById('dca-f-' + key); if (el) el.value = data && data[key] != null ? String(data[key]) : ''; });   // V102.680
             // data may be from drug_codex, drug_codex_drafts, or {} for Add.
             // V94.50: rebuild Edu i18n state BEFORE the textarea loop so the
             // Edu fields read from state (per current chip lang) instead of
@@ -50692,6 +50702,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // from the in-memory state so post-collect edits don't mutate
             // the payload that's about to be written.
             payload.educationI18n = JSON.parse(JSON.stringify(dcaEduI18nState.data || {}));
+            DCA_EXTRA_TEXT_FIELDS.forEach(key => { const el = document.getElementById('dca-f-' + key); if (el) payload[key] = String(el.value || '').trim(); });   // V102.680
             return payload;
         }
 

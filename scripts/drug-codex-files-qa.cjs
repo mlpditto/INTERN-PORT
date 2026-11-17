@@ -24,7 +24,7 @@ assert.match(admin, /id="dca-mat-list"/);
 assert.match(admin, /payload\.materials = drugMaterials\.read\(document\.getElementById\('dca-mat-list'\)\)/);
 assert.match(admin, /\$\{dcaMatBtnHtml\(drug\)\}/);
 assert.match(admin, /drugMaterials\.paint\(document\.getElementById\('dca-mat-list'\), data && data\.materials\)/);
-assert.match(intern, /chips\.push\(\.\.\.dcFileChipsHtml\(drug\)\)/);
+assert.match(intern, /chips\.push\(\.\.\.dcFileChipsHtml\(drug\)\.slice\(1\)\)/);   // V101.322: the first drug file is the 📄 card in the body (drug-story-card-qa)
 // Disease Codex mirrors it
 assert.match(admin, /id="dxa-mat-list" data-count="dxa-mat-count"/);
 assert.match(admin, /payload\.materials = drugMaterials\.read\(document\.getElementById\('dxa-mat-list'\)\)/);

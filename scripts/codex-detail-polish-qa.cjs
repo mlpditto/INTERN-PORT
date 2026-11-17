@@ -44,7 +44,7 @@ async function open(browser, width) {
         assert.deepEqual(info.btns.slice(0, -1).every(Boolean), true, 'every section has its 📋'); assert.equal(info.btns[info.keys.indexOf('discussion')], false, '…except the discussion');
         await page.evaluate(() => { window.__clip.length = 0; document.querySelector('#dc-detail-body .dc-detail-section[data-section-key="why"] .dc-sec-copy').click(); });
         c = await page.evaluate(() => ({ clip: window.__clip.slice(), open: document.querySelector('#dc-detail-body .dc-detail-section[data-section-key="why"]').open }));
-        assert.equal(c.clip[0], '## 🧬 Why it works\n\n**Mechanism**\nInhibits ergosterol synthesis\n\n**Pharmacokinetics**\nAbsorption improves with food'); assert.equal(c.open, info.moaOpen, 'copying does not toggle the section');
+        assert.equal(c.clip[0], '# Itraconazole\n\n## 🧬 Why it works\n\n**Mechanism**\nInhibits ergosterol synthesis\n\n**Pharmacokinetics**\nAbsorption improves with food'); assert.equal(c.open, info.moaOpen, 'copying does not toggle the section');
         // the rail labels were not polluted by the added buttons
         assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#drugCodexDetailModal .dc-sec-chip')].map(x => x.textContent.trim())), ['💊 How to give', '⛔ Who must not', '⚠️ What to watch', '🗣 Tell the patient', '🧬 Why it works', '🔗 References', '💬 Discussion'], 'chip labels unchanged by the added buttons');
         // no Clipboard API (some WebViews): the execCommand fallback copies
