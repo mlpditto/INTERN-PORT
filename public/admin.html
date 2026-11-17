@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.674)</title>
+    <title>Nika Admin (V102.675)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -2230,6 +2230,13 @@
         #dcaPkVisualModal .pv-frame { position: relative; width: 100%; }
         #dcaPkVisualModal .pv-frame .dca-pk-visual-preview-img { display: block; width: 100%; height: auto; max-height: none; }
         #dcaPkVisualModal .pv-ft { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+        /* V102.675 (owner pick C, mockup-admet-modal-fit/): the window is as tall as its content (the flex overlay used to stretch it to 90vh);
+           the A D M E T dots sit in the header in place of the word; the options used now and then fold behind ⚙; one language chip */
+        #dcaPkVisualModal .modal-content { align-self: center; }
+        #dcaPkVisualModal .pv-hd { flex-wrap: nowrap; } #dcaPkVisualModal .pv-hd .pv-adm { margin: 0; flex: none; gap: 4px; font-size: 0.78em; white-space: nowrap; }
+        #dcaPkVisualModal .pv-hd .pv-mdl { white-space: nowrap; } #dcaPkVisualModal .pv-fill { white-space: nowrap; }
+        #dcaPkVisualModal .pv-more { margin: 0 0 6px; } #dcaPkVisualModal .pv-more[hidden] { display: none; }
+        #dcaPkVisualModal button.pv-c { min-height: 0; width: auto; margin: 0; font-family: inherit; line-height: inherit; }
         #dcaPkVisualModal .pv-ft .sp { flex: 1; }
         #dcaPkVisualModal .pv-ft small { color: #64748b; font-size: 0.78em; }
         #dcaPkVisualModal .pv-ib { border: 1px solid #e2e8f0; background: #fff; border-radius: 10px; padding: 5px 10px; font-weight: 800; font-size: 0.85em; color: #334155; cursor: pointer; }
@@ -17924,7 +17931,7 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
             <!-- V102.641 (owner pick A + B, mockup-admet-visual-lean): one header row (model ▾), one chip row, A D M E T dots,
                  Generate in the middle of the picture. 🔤 on (default) = the picture has no text and the PK words are laid over it
                  (tap a label to change it — no new picture needed); off = the old picture with its own text. -->
-            <div class="pv-hd">🎨 <span>ADMET</span>
+            <div class="pv-hd" aria-label="ADMET visual">🎨 <div class="pv-adm" id="dcaPkVisualAdmet" role="group" aria-label="ADMET — the PK fields the picture is built from"></div>
                 <span class="pv-mdl-wrap">
                     <button type="button" id="dcaPkVisualModelBtn" class="pv-mdl lang-no-toggle" onclick="dcaPkVisualToggleModels()" aria-haspopup="true">🍌 Nano Banana ▾</button>
                     <div class="pv-menu" id="dcaPkVisualModelRail" hidden>
@@ -17939,16 +17946,18 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                 <button type="button" class="dca-pk-visual-chip" data-value="anatomical" onclick="dcaSelectPkVisualStyle(this)" title="Anatomical · GI tract, liver, kidneys">🫀</button>
                 <button type="button" class="dca-pk-visual-chip" data-value="diagram" onclick="dcaSelectPkVisualStyle(this)" title="Diagram · boxes and arrows">🔀</button>
                 <span class="pv-sep"></span>
-                <label class="pv-c lang-no-toggle" title="Add Mechanism to the prompt"><input type="checkbox" id="dca-pv-inc-mechanism">+MoA</label>
-                <label class="pv-c lang-no-toggle" title="Add Class to the prompt"><input type="checkbox" id="dca-pv-inc-class">+Class</label>
-                <label class="pv-c lang-no-toggle" title="Add Indication to the prompt"><input type="checkbox" id="dca-pv-inc-indication">+Ind</label>
-                <span class="pv-sep"></span>
                 <label class="pv-c lang-no-toggle" title="Picture without text + the PK words laid over it"><input type="checkbox" id="dca-pv-overlay" checked onchange="dcaPkVisualRenderPreview()">🔤</label>
-                <label class="pv-c lang-no-toggle" title="Labels in Thai"><input type="radio" name="dca-pv-lang" value="th" checked>🇹🇭</label>
-                <label class="pv-c lang-no-toggle" title="Labels in English"><input type="radio" name="dca-pv-lang" value="en">EN</label>
-                <label class="pv-c lang-no-toggle" title="Extra instructions"><input type="checkbox" id="dca-pv-extra-on" onchange="document.getElementById('dca-pv-extra-box').hidden = !this.checked">✏️</label>
+                <span hidden><input type="radio" name="dca-pv-lang" value="th" checked><input type="radio" name="dca-pv-lang" value="en"></span>
+                <button type="button" class="pv-c lang-no-toggle" id="dca-pv-lang-btn" onclick="dcaPkVisualLang(true)" title="Labels in Thai — tap for English" aria-label="Labels in Thai — tap for English">🇹🇭</button>
+                <span class="pv-sep"></span>
+                <button type="button" class="pv-c lang-no-toggle" id="dca-pv-more-btn" onclick="dcaPkVisualMore(true)" aria-expanded="false" aria-controls="dca-pv-more" title="More: +MoA · +Class · +Ind · ✏️ extra instructions" aria-label="More options">⚙</button>
             </div>
-            <div class="pv-adm" id="dcaPkVisualAdmet"></div>
+            <div class="pv-one pv-more" id="dca-pv-more" hidden>
+                <label class="pv-c lang-no-toggle" title="Add Mechanism to the prompt"><input type="checkbox" id="dca-pv-inc-mechanism" onchange="dcaPkVisualMore()">+MoA</label>
+                <label class="pv-c lang-no-toggle" title="Add Class to the prompt"><input type="checkbox" id="dca-pv-inc-class" onchange="dcaPkVisualMore()">+Class</label>
+                <label class="pv-c lang-no-toggle" title="Add Indication to the prompt"><input type="checkbox" id="dca-pv-inc-indication" onchange="dcaPkVisualMore()">+Ind</label>
+                <label class="pv-c lang-no-toggle" title="Extra instructions"><input type="checkbox" id="dca-pv-extra-on" onchange="document.getElementById('dca-pv-extra-box').hidden = !this.checked; dcaPkVisualMore()">✏️</label>
+            </div>
             <div class="pv-extra" id="dca-pv-extra-box" hidden>
                 <textarea id="dca-pv-extra" rows="2" placeholder="e.g. 'emphasise CYP3A4' · 'cool tones'…" data-th-placeholder="เช่น 'เน้น CYP3A4' · 'โทนสีเย็น'…" style="width:100%; box-sizing:border-box; border:1.5px solid #c7d2fe; border-radius:10px; padding:8px 10px; font-family:inherit; font-size:0.86em; resize:vertical;"></textarea>
                 <label id="dca-pv-refine-row" style="display:none; align-items:center; gap:8px; margin-top:6px; cursor:pointer; font-weight:700; font-size:0.84em; color:#5b21b6;">
@@ -49567,8 +49576,22 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!el) return;
             const empty = DCA_PK_KEYS.filter(([, f]) => !(drug[f] && String(drug[f]).trim())).length;
             el.innerHTML = DCA_PK_KEYS.map(([k, f]) => '<b class="' + (drug[f] && String(drug[f]).trim() ? '' : 'e') + '" title="' + f + '">' + k.toUpperCase() + '</b>').join('')
-                + (empty ? '<span class="pv-warn">' + empty + ' empty</span>'
-                    + '<button type="button" class="pv-fill" onclick="dcaClosePkVisualModal(); dcaAiFillEmptyFields();" title="AI fills the empty fields in the form">🤖 Fill</button>' : '');
+                + (empty ? '<button type="button" class="pv-fill" onclick="dcaClosePkVisualModal(); dcaAiFillEmptyFields();" title="' + empty + ' PK field' + (empty > 1 ? 's are' : ' is') + ' empty — AI fills ' + (empty > 1 ? 'them' : 'it') + ' in the form" aria-label="' + empty + ' empty — AI fill">🤖 ' + empty + '</button>' : '');   // V102.675: one short chip (was "n empty" + "🤖 Fill") — it sits in the header now
+        }
+        // V102.675 (owner pick C): the label language is ONE chip that flips 🇹🇭 ⇄ EN (the two radios stay, hidden — everything else still reads them)
+        function dcaPkVisualLang(flip) {
+            const th = document.querySelector('input[name="dca-pv-lang"][value="th"]'), en = document.querySelector('input[name="dca-pv-lang"][value="en"]'), b = document.getElementById('dca-pv-lang-btn');
+            if (!th || !en) return;
+            if (flip === true) { if (en.checked) th.checked = true; else en.checked = true; }
+            if (b) { b.textContent = en.checked ? 'EN' : '🇹🇭'; b.title = en.checked ? 'Labels in English — tap for Thai' : 'Labels in Thai — tap for English'; b.setAttribute('aria-label', b.title); }
+        }
+        // V102.675: ⚙ = the options used now and then (+MoA · +Class · +Ind · ✏️). true flips the row, false closes it; the chip counts what is on
+        function dcaPkVisualMore(flip) {
+            const box = document.getElementById('dca-pv-more'), b = document.getElementById('dca-pv-more-btn');
+            if (!box || !b) return;
+            if (flip === true) box.hidden = !box.hidden; else if (flip === false) box.hidden = true;
+            const n = ['dca-pv-inc-mechanism', 'dca-pv-inc-class', 'dca-pv-inc-indication', 'dca-pv-extra-on'].filter(function (id) { return (document.getElementById(id) || {}).checked; }).length;
+            b.setAttribute('aria-expanded', String(!box.hidden)); b.classList.toggle('on', n > 0); b.textContent = n ? '⚙ ' + n : '⚙';
         }
         // Quick labels straight from the fields (first sentence, ≤ 60 characters) — shown at once, the AI's shorter ones replace them
         function dcaPkVisualQuickLabels(drug) {
@@ -49722,6 +49745,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 const ov = document.getElementById('dca-pv-overlay'); if (ov) ov.checked = !!savedPv.labels;
                 const st = document.querySelector('#dcaPkVisualStyleRail [data-value="' + savedPv.style + '"]'); if (st) dcaSelectPkVisualStyle(st);
             }
+            dcaPkVisualLang(); dcaPkVisualMore(false);   // V102.675: the language chip shows the saved language; ⚙ closed, nothing on
             dcaPkVisualUpdateRefineVisibility();
             dcaPkVisualRenderPreview();
             const modal = document.getElementById('dcaPkVisualModal');
