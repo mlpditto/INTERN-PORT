@@ -42,12 +42,16 @@
     function want(n) { return Math.max(12, Math.min(MAX, n * 2)); }
     function prompt(ns, L) {
         var NAME = { en: 'English', th: 'Thai', ko: 'Korean' }, N = want(ns.length);
+        // V102.671 (owner pick A): the story used to start in the middle of note 1 — it now opens like a conversation: a greeting + the quiz topic
+        var title = String((document.getElementById('quiz-title') || {}).value || '').replace(/[\s"]+/g, ' ').trim().slice(0, 80);
         return 'These are the "Read first" notes pharmacy interns see before each question of one quiz. Turn them into ONE short CHAT STORY that prepares the intern for the whole quiz, in ' + NAME[L] + '.\n' +
             'Write ' + (N - 4) + ' to ' + N + ' lines, one per line, each starting with a speaker tag and the note number(s) it comes from in square brackets:\n' +
             'Q [1]: a pharmacy intern asks\nRX [1]: the pharmacist answers\nKEY [1,2]: one key point to remember (' + Math.round(N / 6) + ' to ' + Math.round(N / 4) + ' of these)\n' +
             'Rules: follow the order of the notes; cover every note that has content. Keep each line short (under 80 characters; under 60 for Thai or Korean). ' +
             'Every RX and KEY line must TEACH one concrete fact taken from its note — a drug name, a number, a rule, a reason. Never write a line that only names a topic or says something should be reviewed, checked or understood. ' +
             'Every Q line is a real question an intern would ask, ending with a question mark. The last line is a KEY line. ' +
+            'OPEN like a real conversation: the FIRST line is a Q line where the intern greets the pharmacist, says they are about to do ' + (title ? 'the quiz on "' + title + '"' : 'this quiz') + ' and asks where to start (tag it with the first note\'s number); ' +
+            'the SECOND line is the RX reply that leads into the first note. The opening adds no patient, no number and no fact that the notes do not say. ' +
             'Copy every number, dose, strength and drug name EXACTLY as the notes write it — never add a number or a fact the notes do not say. ' +
             'Do not give away which choice is correct in any question. No markdown, no emoji at the start, nothing else.\n\n' +
             ns.map(function (x) { return 'NOTE ' + x.n + ' (question: ' + x.q.slice(0, 140) + ')\n' + x.primer.slice(0, 900); }).join('\n\n');
