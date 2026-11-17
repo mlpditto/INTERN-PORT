@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const src = fs.readFileSync(require('node:path').join(__dirname, '../functions/index.js'), 'utf8').replace(/\r/g, '');
 
 assert.match(src, /exports\.callAIProxy = onRequest\(\{ cors: true, secrets: \[[^\]]*"IAPP_API_KEY"[^\]]*\]/, 'IAPP_API_KEY is one of callAIProxy\'s secrets');
-assert.match(src, /provider !== "cloud_tts" && provider !== "iapp_tts" && provider !== "jev" && !prompt/, 'iapp_tts needs no prompt');
+assert.match(src, /provider !== "cloud_tts" && provider !== "iapp_tts" && provider !== "paxa_tts" && provider !== "jev" && !prompt/, 'iapp_tts needs no prompt');
 assert.ok(src.indexOf('if (!callerIsAdmin && provider !== "typhoon")') < src.indexOf('if (provider === "iapp_tts")'), 'the admin gate runs before the route');
 const a = src.indexOf('        if (provider === "iapp_tts") {'), b = src.indexOf('\n        }\n', a) + 10;
 const branch = src.slice(a, b);

@@ -990,7 +990,7 @@ function orVideoUrl(data, id) {
  * 🤖 AI Proxy Function (V89.19)
  * Handles: Gemini, OpenAI, Anthropic, OpenRouter, AI Studio, ThaiLLM, Typhoon, Cloud TTS, iApp Chinda TTS
  */
-exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEY", "TYPHOON_API_KEY", "THAILLM_API_KEY", "JEV_AI_API_KEY", "IAPP_API_KEY"], timeoutSeconds: 540, memory: "512MiB" }, async (req, res) => { // V101.09: 300 -> 540, see postWithRetry
+exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEY", "TYPHOON_API_KEY", "THAILLM_API_KEY", "JEV_AI_API_KEY", "IAPP_API_KEY", "PAXA_API_KEY"], timeoutSeconds: 540, memory: "512MiB" }, async (req, res) => { // V101.09: 300 -> 540, see postWithRetry
     try {
         // 1. Auth: Firebase ID token (replaces the public x-mlp-secret gate).
         const decoded = await verifyIdTokenFromHeader(req, res);
@@ -1012,7 +1012,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             };
             model = googleModelAliases[model] || model;
         }
-        if (!provider || (provider !== "cloud_tts" && provider !== "iapp_tts" && provider !== "jev" && !prompt)) {
+        if (!provider || (provider !== "cloud_tts" && provider !== "iapp_tts" && provider !== "paxa_tts" && provider !== "jev" && !prompt)) {
             return res.status(400).json({ error: "Missing provider or prompt" });
         }
 
@@ -1085,6 +1085,24 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 responseType: "arraybuffer", timeout: 60000
             });
             return res.json({ audioContent: Buffer.from(response.data).toString("base64"), mimeType: "audio/mpeg", model: "chinda-tts", provider: "iapp_tts", usage: { characters: t.length } });
+        }
+
+        // --- V102.674: Paxa Labs TTS — an optional third voice of the 🎬 Watch first story (admin-only like every route but Typhoon).
+        // The key lives only here (secret PAXA_API_KEY, sent as a Bearer header); the reply is MP3, sent back as base64 like iapp_tts.
+        // The model is fixed (paxa-tts-flash-v2: Thai / English / Mandarin); the voice id comes from Paxa's public GET /v1/voices list.
+        // Story lines only — no personal data may be sent here (Paxa may keep inputs).
+        if (provider === "paxa_tts") {
+            const t = String(req.body.text || "").trim();
+            const voice = String(req.body.voice || "").trim().toLowerCase();
+            if (!t || t.length > 1200) return res.status(400).json({ error: "Paxa text must be 1-1200 characters" });
+            if (!/^[a-z0-9_]{1,60}$/.test(voice)) return res.status(400).json({ error: "Unknown Paxa voice" });
+            if (!process.env.PAXA_API_KEY) return res.status(500).json({ error: "Paxa key unavailable" });
+            const response = await postWithRetry("https://api.paxalabs.com/v1/tts", { text: t, voice, model: "paxa-tts-flash-v2", format: "mp3" }, {
+                headers: { Authorization: "Bearer " + process.env.PAXA_API_KEY, "Content-Type": "application/json" },
+                responseType: "arraybuffer", timeout: 60000
+            });
+            const credits = Number((response.headers || {})["x-credits-charged"]);
+            return res.json({ audioContent: Buffer.from(response.data).toString("base64"), mimeType: "audio/mpeg", model: "paxa-tts-flash-v2", provider: "paxa_tts", usage: { characters: t.length, credits: Number.isFinite(credits) ? credits : null } });
         }
 
         // Image models use the Images API, never the chat completion fallback.

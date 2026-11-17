@@ -118,6 +118,40 @@ const SHOT = process.env.SHOT; let pass = 0; const ok = (c, m) => { assert.ok(c,
         ok(/Thai stories only/.test(w.err) && w.tts.length === 6 && w.chip === '1|true|false', 'an English story: no call — Thai only for now, it says so; its chip is not held back (the phone voice reads it)');
         await page.evaluate(() => QuizWatchStory.set({ lang: 'th', lines: [{ w: 'q', t: 'ก', q: [1], a: 'https://evil.test/x.mp3' }, { w: 'rx', t: 'ข', q: [1], a: 'https://firebasestorage.googleapis.com/v0/b/x/o/ok.mp3?alt=media' }] })); w = await vv();
         ok(w.a[0] === '' && /ok\.mp3/.test(w.a[1]) && w.n === '1/3', 'a saved story keeps only Storage links as sounds');
+        console.log('🗣 Paxa — the optional third pharmacist voice (V102.674)');
+        await page.evaluate(() => {
+            window.__vf = 0; window.__t0 = window.__tts.length;
+            window.fetch = async u => { window.__vf++; if (String(u) !== 'https://api.paxalabs.com/v1/voices') throw new Error('unexpected fetch ' + u);
+                return { ok: true, json: async () => ({ voices: [{ id: 'khanomkrok', name: 'Khanom Krok', gender: 'm', model: 'paxa-tts-flash-v1', description: 'the v1 twin' }, { id: 'khanomkrok', name: 'Khanom Krok', gender: 'm', model: 'paxa-tts-flash-v2', description: 'Calm elder voice' },
+                    { id: 'nomyen', name: 'Nom Yen', gender: 'f', model: 'paxa-tts-flash-v2', description: 'Bright young voice' }, { id: 'bad id', name: 'Bad', gender: 'f', model: 'paxa-tts-flash-v2' }, { id: 'testy', name: 'Testy', gender: 'm', model: 'paxa-tts-flash-v2', experimental: true }] }) }; };
+            QuizWatchStory._S.pxGap = 10; QuizWatchStory._S.pxVoices = null;
+            QuizWatchStory.set({ lang: 'th', lines: [{ w: 'q', t: 'ถาม', q: [1] }, { w: 'rx', t: 'ตอบ', q: [1] }, { w: 'key', t: 'จำ', q: [1] }] });
+        });
+        const px = () => page.evaluate(() => { const b = document.getElementById('qws-paxa'), st = (getQuizFormData().watchFirst || {}).story || { lines: [] };
+            return { btn: b ? b.textContent.replace(/\s+/g, ' ').trim() : null, all: !!b && b.classList.contains('all'), open: !!document.getElementById('qws-pxp'), names: [...document.querySelectorAll('#qws-pxp .qws-pxl button')].map(x => x.textContent.trim() + (x.getAttribute('aria-pressed') === 'true' ? '*' : '')),
+                tips: [...document.querySelectorAll('#qws-pxp .qws-pxl button')].map(x => x.title), filt: [...document.querySelectorAll('#qws-pxp .qws-pxf button')].map(x => x.textContent.trim()), pv: st.pv || null, c: st.lines.map(x => x.c ? 1 : 0).join(''), err: (document.querySelector('#qws-box .qws-err') || {}).textContent || '',
+                tts: window.__tts.slice(window.__t0).map(p => [p.provider, p.voice, p.text, p.feature].join('|')), vf: window.__vf, v: QuizWatchStory.voice(), wide: (e => !!e && e.scrollWidth > e.clientWidth + 1)(document.querySelector('#praOverlay .pra')) }; });
+        let p = await px();
+        ok(p.btn === '＋ Paxa' && !p.open && p.pv === null && p.vf === 0 && p.v.px === null, 'a Thai story has a ＋ Paxa button beside 🗣; nothing is fetched until it is tapped');
+        await page.click('#qws-paxa'); await page.waitForSelector('#qws-pxp .qws-pxl button'); p = await px();
+        ok(p.vf === 1 && p.names.join(' | ') === '♂ Khanom Krok | ♀ Nom Yen' && p.tips[0] === 'Calm elder voice' && p.filt.join(' | ') === 'All 2 | ♀ 1 | ♂ 1', 'tap → every Paxa v2 voice from Paxa\'s public list, as chips with what each sounds like (the v1 twin, a bad id and an experimental voice are left out)');
+        await page.click('#qws-pxp .qws-pxf button:nth-child(2)'); p = await px();
+        ok(p.names.join() === '♀ Nom Yen', 'the ♀ / ♂ filter narrows the chips');
+        await page.click('#qws-pxp .qws-pxl button'); p = await px();
+        ok(!p.open && p.btn === '🗣 Nom Yen 0/2' && p.pv && p.pv.id === 'nomyen' && p.pv.name === 'Nom Yen' && p.tts.length === 0 && !p.wide, 'pick a voice → the button becomes 🗣 Nom Yen 0/2 (the two pharmacist lines); it is saved with the story; no call yet');
+        ok(p.v.need === 5 && p.v.have === 0 && p.v.px.need === 2, 'Paxa is not part of the "all voiced" count (Chinda still needs 5 sounds)');
+        await page.click('#qws-paxa'); await page.waitForFunction(() => /2\/2$/.test(document.getElementById('qws-paxa').textContent.trim()) && !QuizWatchStory._S.busy); p = await px();
+        ok(p.tts.join(' ; ') === 'paxa_tts|nomyen|ตอบ|quiz_watch_voice ; paxa_tts|nomyen|จำ|quiz_watch_voice' && p.c === '011' && p.all && !p.err, 'tap again → one paxa_tts call per pharmacist line with the picked voice; the sounds ride on the lines as `c`; the button fills');
+        await page.click('#qws-paxa'); await page.waitForSelector('#qws-box .qws-err'); p = await px();
+        ok(p.tts.length === 2 && /already has its Nom Yen sound/.test(p.err), 'all made → no call, it says so');
+        await page.fill('#qws-box .qws-l:nth-of-type(2) input, #qws-box .qws-l + .qws-l input', 'ตอบใหม่'); p = await px();
+        ok(p.c === '001' && p.btn === '🗣 Nom Yen 1/2' && !p.all, 'retyping a pharmacist line drops its Paxa sound too');
+        await page.click('#qws-paxa-pick'); await page.waitForSelector('#qws-pxp .qws-pxl button'); p = await px();
+        ok(p.vf === 1 && p.names.join(' | ') === '♂ Khanom Krok | ♀ Nom Yen*', '▾ reopens the list (kept, not fetched again) with the picked voice lit');
+        await page.click('#qws-pxp .qws-pxl button'); p = await px();
+        ok(p.pv.id === 'khanomkrok' && p.c === '000' && p.btn === '🗣 Khanom Krok 0/2', 'another voice → the old voice\'s sounds are dropped');
+        ok(await page.evaluate(() => { const U = 'https://firebasestorage.googleapis.com/v0/b/x/o/c.mp3?alt=media'; QuizWatchStory.set({ lang: 'th', lines: [{ w: 'rx', t: 'ข', q: [1], c: U }] }); const a = QuizWatchStory.get().lines[0].c; QuizWatchStory.set({ lang: 'th', pv: { id: 'nomyen', name: 'Nom <b>Yen' }, lines: [{ w: 'rx', t: 'ข', q: [1], c: U }, { w: 'q', t: 'ก', q: [1], c: U }] }); const g = QuizWatchStory.get(); QuizWatchStory.set({ lang: 'en', lines: [{ w: 'rx', t: 'Why', q: [1] }] }); const en = !document.getElementById('qws-paxa'); QuizWatchStory.set({ lang: 'th', lines: [{ w: 'q', t: 'ก', q: [1] }] }); return a === undefined && g.lines[0].c === U && g.lines[1].c === undefined && g.pv.name === 'Nom bYen' && en; }),
+            'a saved story keeps `c` only with a picked voice and only on pharmacist lines; the name is cleaned; an English story has no Paxa button');
         const rules = fs.readFileSync(path.join(__dirname, '..', 'storage.rules'), 'utf8').replace(/\r\n/g, '\n');
         ok(/match \/watch-voices\/\{fileName\} \{\n\s+allow read, delete: if isAdmin\(\);\n\s+allow create, update: if isAdmin\(\)\n\s+&& request\.resource\.size < 2 \* 1024 \* 1024\n\s+&& request\.resource\.contentType\.matches\('audio\/\.\*'\);/.test(rules), 'storage.rules: watch-voices/ is admin-only, audio, under 2 MB');
         await page.click('#qws-box .qws-b[aria-label="Remove the story"]'); v = await view();

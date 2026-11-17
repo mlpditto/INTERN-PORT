@@ -14,6 +14,8 @@
 // V101.319 (owner pick A 2026-11-17, mockup-watch-first-voices/): the intern picks the pharmacist's voice — 🔇 │ 🗣 Kaitom │ 🗣 Kaidang, kept on this
 // phone. A THAI story is shown only when every line has its AI voice (`a`; RX / KEY lines also `b`) — until the admin has voiced it all there is
 // no Watch first page. Other languages have no AI voice and play with the phone voice as before.
+// V101.321 (owner pick A, mockup-watch-first-paxa/): an OPTIONAL third pharmacist voice from Paxa Labs — when the admin picked one (`story.pv`
+// = { id, name }) and every RX / KEY line carries its sound (`c`), the rail gains a third chip with that voice's name. Not part of the gate.
 (function () {
     'use strict';
     var T = {
@@ -73,12 +75,14 @@
         var st = q && q.watchFirst && q.watchFirst.story, ls = st && Array.isArray(st.lines) ? st.lines.filter(function (x) { return x && /^(q|rx|key)$/.test(x.w) && typeof x.t === 'string' && x.t.trim(); }).slice(0, 24) : [];
         var lg = ls.length ? (/^(th|en|ko)$/.test(st.lang) ? st.lang : 'en') : '';
         if (lg === 'th' && !ls.every(function (x) { return voiceUrl(x) && (x.w === 'q' || voiceUrl(x, 'b')); })) return null;   // V101.319: a Thai story waits for all its AI voices
-        return ls.length ? { lang: lg, lines: ls, pick: lg === 'th' } : null;
+        var pv = st && st.pv && typeof st.pv.name === 'string' && st.pv.name.trim() ? st.pv.name.trim().slice(0, 40) : '';
+        var third = lg === 'th' && !!pv && ls.every(function (x) { return x.w === 'q' || voiceUrl(x, 'c'); }) && ls.some(function (x) { return x.w !== 'q'; });
+        return ls.length ? { lang: lg, lines: ls, pick: lg === 'th', third: third ? pv : '' } : null;
     }
     function muted() { try { return localStorage.getItem('qwsMute') === '1'; } catch (e) { return false; } }
     var play = null;   // the story being played: { i, sound, done, t0, timer, n }
     function voiceUrl(x, f) { var u = x && x[f || 'a']; return typeof u === 'string' && /^https:\/\/firebasestorage\.googleapis\.com\/\S+$/.test(u) ? u : ''; }
-    function voicePick() { try { return localStorage.getItem('qwsVoice') === 'b' ? 'b' : 'a'; } catch (e) { return 'a'; } }
+    function voicePick() { try { var v = localStorage.getItem('qwsVoice'); return v === 'b' || v === 'c' ? v : 'a'; } catch (e) { return 'a'; } }
     function stopStory() { if (play) { clearTimeout(play.timer); play.n++; if (play.au) { try { play.au.pause(); } catch (e) { /* not playing */ } play.au = null; } } if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch (e) { /* nothing speaking */ } } }
 
     var seen = null;   // what this page saw of the film: { max, played, ended, failed }
@@ -145,11 +149,12 @@
         stopStory();
         var can = !!(window.speechSynthesis && window.SpeechSynthesisUtterance) || story.lines.some(function (x) { return voiceUrl(x); }), on = can && !muted();
         var k = play = { i: -1, sound: on, auto: on, done: false, t0: Date.now(), timer: null, n: 0, vf: voicePick() }, ls = story.lines;
+        if (k.vf === 'c' && !story.third) k.vf = 'a';   // V101.321: this story has no Paxa voice
         var vb = function (v, label) { return '<button type="button" data-v="' + v + '" aria-pressed="' + (v === 'off' ? !on : on && k.vf === v) + '">' + label + '</button>'; };
         seen = { max: 0, played: false, ended: false, failed: false };
         box.innerHTML = '<div class="lang-no-toggle qwf">' +
             '<div class="qws"><div class="qws-top"><div class="qws-prog">' + ls.map(function () { return '<i></i>'; }).join('') + '</div>' + (story.pick ? '' : '<button type="button" class="qws-snd" aria-pressed="' + on + '">' + (on ? '🔊' : '🔇 ' + esc(L(T.sound))) + '</button>') + '</div>' +
-            (story.pick ? '<div class="qws-rail" role="group" aria-label="Voice">' + vb('off', '🔇') + vb('a', '🗣 ' + esc(L(T.va))) + vb('b', '🗣 ' + esc(L(T.vb))) + '</div>' : '') +
+            (story.pick ? '<div class="qws-rail" role="group" aria-label="Voice">' + vb('off', '🔇') + vb('a', '🗣 ' + esc(L(T.va))) + vb('b', '🗣 ' + esc(L(T.vb))) + (story.third ? vb('c', '🗣 ' + esc(story.third)) : '') + '</div>' : '') +
             '<div class="qws-chat" aria-live="polite"></div></div>' +
             '<div class="qwf-two"><button type="button" class="qwf-read" aria-pressed="false">' + esc(L(T.read)) + '</button><button type="button" class="qwf-go" data-state="go">' + esc(L(T.go)) + '</button></div></div>';
         var chat = box.querySelector('.qws-chat'), snd = box.querySelector('.qws-snd'), dots = box.querySelectorAll('.qws-prog i'), card = box.querySelector('.qws'), rd = box.querySelector('.qwf-read');
@@ -173,7 +178,7 @@
                 k.sound = k.auto = false; face(); stopStory(); k.timer = setTimeout(function () { step(); }, Math.max(300, ms - 1500));
             };
             // V101.317: a line the admin voiced with AI (`a`, a Storage link) is played as that sound; a sound that will not load → the phone voice says it.
-            var src = k.sound ? (ls[k.i].w !== 'q' && k.vf === 'b' && voiceUrl(ls[k.i], 'b')) || voiceUrl(ls[k.i]) : '';
+            var src = k.sound ? (ls[k.i].w !== 'q' && k.vf !== 'a' && voiceUrl(ls[k.i], k.vf)) || voiceUrl(ls[k.i]) : '';
             if (src && typeof Audio === 'function') {
                 try {
                     var au = k.au = new Audio(src), fell = false, fall = function () { if (fell || fired || play !== k || k.n !== n) return; fell = true; clearTimeout(k.timer); if (k.auto) quiet(); else if (!say()) k.timer = setTimeout(next, ms); };

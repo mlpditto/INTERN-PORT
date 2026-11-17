@@ -202,6 +202,17 @@ console.log('admin: the Quiz Editor field');
         await start({ watchFirst: { story: VO } }); await three();
         ok(await page.evaluate(n => __au.length === 3 && __said.slice(n).map(x => x[0]).join(' | ') === 'What is body-identical? | The same molecule the ovary makes. | Start within 10 years', s0), 'a sound that will not load → the phone voice says that line instead');
         await page.evaluate(() => { window.__au = []; window.__auMode = 'ok'; });
+        // V101.321 (owner pick A, mockup-watch-first-paxa/): an optional third pharmacist voice from Paxa — story.pv + `c` on every RX / KEY line
+        const C1 = A0.replace('a0', 'c1'), C2 = A0.replace('a0', 'c2'), VP = JSON.parse(JSON.stringify(VO)); VP.pv = { id: 'nomyen', name: 'Nom Yen' }; VP.lines[1].c = C1; VP.lines[2].c = C2;
+        ok(await page.evaluate(vp => { const S = st => qzWatch.storyOf({ watchFirst: { story: st } }), cut = JSON.parse(JSON.stringify(vp)); delete cut.lines[2].c; const nopv = JSON.parse(JSON.stringify(vp)); delete nopv.pv; return S(vp).third === 'Nom Yen' && S(cut).third === '' && !!S(cut) && S(nopv).third === ''; }, VP), 'the third voice shows only when the admin picked one AND every pharmacist line has its sound — a missing one does not hide the story, only the chip');
+        await tap('.qwf-go'); await start({ watchFirst: { story: VP } }); await three(); st = await sv();
+        ok(await rail() === '🔇 | 🗣 Kaitom* | 🗣 Kaidang | 🗣 Nom Yen' && !st.overflow && await page.evaluate(([a, b, c]) => __au.join() === [a, b, c].join(), [A0, A1, A2]), 'a story with Paxa sounds: a third chip with the voice\'s name; Kaitom still the default; nothing overflows at 390 px');
+        await shot('watch-story-paxa');
+        await tap('.qws-rail [data-v="c"]'); await page.waitForFunction(() => __au.length === 6, null, { timeout: 15000 }); await three();
+        ok(await rail() === '🔇 | 🗣 Kaitom | 🗣 Kaidang | 🗣 Nom Yen*' && await page.evaluate(([a, b, c]) => __au.slice(3).join() === [a, b, c].join() && localStorage.getItem('qwsVoice') === 'c', [A0, C1, C2]), '🗣 Nom Yen → the pharmacist lines play the Paxa sounds (the intern line keeps its own); kept on this phone');
+        await tap('.qwf-go'); await page.evaluate(() => { window.__au = []; }); await start({ watchFirst: { story: VO } }); await three();
+        ok(await rail() === '🔇 | 🗣 Kaitom* | 🗣 Kaidang' && await page.evaluate(([a, b, c]) => __au.join() === [a, b, c].join() && localStorage.getItem('qwsVoice') === 'c', [A0, A1, A2]), 'a story with no Paxa voice, on a phone that picked it: Kaitom plays; the pick is kept for stories that have it');
+        await page.evaluate(() => { localStorage.removeItem('qwsVoice'); window.__au = []; });
         await tap('.qwf-go');
         await start({ watchFirst: { url: 'https://film.test/meno.mp4', story: STORY }, __quiet: true }); st = await sv();
         ok(st.video && !st.story, 'a quiz with both: the film link wins');
