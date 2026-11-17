@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.677)</title>
+    <title>Nika Admin (V102.678)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -21796,6 +21796,7 @@ RULES:
                 3. Output ONLY a valid JSON object whose "questions" array holds ALL the improved questions.
                 4. Do NOT wrap in markdown code blocks.
                 5. Output in Thai (or keeping original language mix).
+                6. ${window.LIST_STEM_RULE || ''}
 
                 JSON SCHEMA EXAMPLE:
                 {"questions": [
@@ -26333,6 +26334,7 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                    - bullet lists ("- ") for symptoms, criteria, lab parameters, or differentials
                    - "\\n\\n" for paragraph breaks (e.g., between vignette and question stem)
                    Keep markdown light and purposeful — do not over-format. For the "options" array (V92.47): if you apply any markdown (e.g., **bold** for the key term, *italic* for Latin/anatomical terms), you MUST apply it CONSISTENTLY across ALL options or NONE — never format only some options, as inconsistent formatting could let users infer the correct answer from formatting cues.
+                7. ${(window.LIST_STEM_RULE || '').replace('; the reasoning goes in "explanation".', '.')}
 
                 Original Question: "${questionText}"
                 Original Options: ${JSON.stringify(options)}
@@ -73523,6 +73525,8 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
         window.RANK_PROMPT_NOTE = 'RANK QUESTIONS (type "rank"): the intern first TYPES an answer with no options on screen, then RANKS every option from best to worst. There is no single correct option — each option has a LEVEL: 0 = BEST, 1 = OK (acceptable), 2 = AVOID. Options on the same level can swap places freely. "unsafe" = 1 marks an option that could harm the patient if it were ranked above a BEST option. "accepted" lists the ways an intern may type the BEST answer (Thai, English, generic, brand).';
         window.RANK_AUDIT_NOTE = 'RANK QUESTIONS (type "rank") are ranking questions: the intern types an answer first, then ranks all options best → worst. The LEVELS (BEST / OK / AVOID, UNSAFE flag) are the key, NOT a single correct option, and several options share a level on purpose. Do NOT penalise "multiple correct answers" or a missing single key for them; judge instead whether the levels are clinically defensible, the options plausible and clearly separable, the stem short and the flags right.';
         window.RANK_IMPROVED_SHAPE = '{"q":"<<<short stem, max 120 characters>>>","type":"rank","accepted":["<<<2-5 ways an intern may type the BEST answer>>>"],"options":["<<<4-5 plausible options, NOT listed best-first>>>"],"tiers":[<<<one number per option: 0 best, 1 acceptable, 2 avoid>>>],"unsafe":[<<<one number per option: 1 only if ranking it above a BEST option could harm the patient, else 0>>>],"why":["<<<one line per option, max 60 characters>>>"],"timer":60,"explanation":"<<<learner-facing rationale>>>"}';
+        // V102.678: a stem that lists items (ก ข ค ง …) reads as a list on the phone — one item per line, the question last in bold, options = the labels only (owner pick C, mockup-quiz-list-stem)
+        window.LIST_STEM_RULE = 'LIST IN THE STEM: when the stem gives 3 or more items to judge (products, drugs, patients or statements labelled ก ข ค ง / a b c d / 1 2 3 4), write the stem as one short context line, a blank line, then EACH item on ITS OWN LINE starting with its label (e.g. "ก. ..."), a blank line, and the actual question LAST in **bold**. Use \\n newlines inside the JSON string. The options then name only the labels (e.g. "ก และ ค") with NO reasons ("เพราะ..." / "because...") inside the options; the reasoning goes in "explanation".';
         window.RANK_IMPROVE_RULES = 'FOR A RANK SOURCE QUESTION the improved question MUST stay type "rank" with exactly the fields shown (never convert it to "choice", never add a "correct" field): every array is as long as "options"; at least one BEST (0) and at least two different levels; 3 to 6 options; keep the topic and the clinical logic of the levels unless the finding says they are wrong; do NOT list the options best-first (mix the order); the stem stays short (max 120 characters).';
         window.rankLevelName = function (q, i) {
             const t = Number(((q && q.tiers) || [])[i]);
@@ -73704,6 +73708,7 @@ ${stories.map((s, i) => `${i+1}. "${s}"`).join('\n')}
                 4b. NO SELF-ELIMINATING STEM: the stem must never name, describe, or rule out any of the options. Writing "the patient is already taking X" or "X was tried and failed" while X is also an option destroys that option — a candidate deletes it with zero knowledge and the question quietly becomes 3-choice. This is the single most common way a richer vignette makes a question EASIER instead of harder, so check every option against the stem before you finish. If a treatment has to be named in the story, it must NOT appear among the options.
                 5. "explanation" is shown to LEARNERS after they submit — write it as concise teaching, NOT as a critique. "suggestion" stays admin-facing.
                 6. If the original question has only 2 options (True/False), upgrade "options" to 4 well-reasoned, plausible distractors instead of keeping it at 2 — a 2-choice format caps guessability at 50% and is one of the easiest formats to game.
+                7. ${window.LIST_STEM_RULE || ''}
 ${window.clinicalAngleBlock ? window.clinicalAngleBlock() : ''}${steerBlock}
                 Question to improve: ${JSON.stringify(originalQ)}
                 Identified Issue: ${issue || ''}
@@ -74232,7 +74237,7 @@ OUTPUT — MANDATORY JSON, NO MARKDOWN FENCES, NO COMMENTARY:
                     </span>
                 </div>
                 <div style="background:rgba(255,255,255,0.85); border:1.5px solid rgba(0,0,0,0.05); border-top:none; border-radius:0 0 16px 16px; padding:18px; flex:1; box-shadow:0 10px 30px rgba(0,0,0,0.05); display:flex; flex-direction:column;">
-                    <div style="font-weight:700; color:#1e293b; margin-bottom:14px; font-size:1.02em; line-height:1.5;">${stemHtml}</div>
+                    <div style="font-weight:700; color:#1e293b; margin-bottom:14px; font-size:1.02em; line-height:1.5; white-space:pre-line;">${stemHtml}</div>
                     <div style="margin-bottom:10px;">${optionsHtml || '<div style="color:#94a3b8; font-style:italic;">No options provided</div>'}${isRankQ ? window._rankAcceptedHtml(q) : ''}</div>
                     <div style="font-size:0.72em; color:#64748b; display:flex; gap:14px; align-items:center; padding-top:10px; margin-top:auto; border-top:1px dashed #e2e8f0;"><span>⏱️ <b>${q.timer || 60}s</b></span><span>📊 <b>${(q.options || []).length}</b> Options</span>${footer}</div>
                 </div>
