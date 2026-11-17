@@ -27,10 +27,20 @@
     // silently: the old whole-form check blocked Suggest whenever an unrelated field moved (e.g. a merge in another tab).
     const core = snap => JSON.stringify({ sourceId: snap.sourceId, missingKeys: snap.missingKeys, caseContent: snap.form.caseContent,
         blueprint: snap.form.blueprint, questions: snap.form.questions });
-    function unchanged(s) {
-        const current = snapshot(), now = core(current);
-        if (now === s.core) { s.source = JSON.parse(JSON.stringify(current)); return true; }
-        const was = JSON.parse(s.core), is = JSON.parse(now);
+    // V102.679: what the editor should hold once the questions 🗑 deleted in Review are gone (ids stay the original numbers).
+    function expectedCore(s) {
+        if (!s.deleted || !s.deleted.size) return s.core;
+        const was = JSON.parse(s.core), live = id => !s.deleted.has(id), renumber = {};
+        let n = 0; was.questions.forEach((_, i) => { if (live(i + 1)) renumber[i + 1] = ++n; });
+        was.missingKeys = was.missingKeys.filter(live).map(id => renumber[id]);
+        was.questions = was.questions.filter((_, i) => live(i + 1));
+        return JSON.stringify(was);
+    }
+    // allowDeleted: Save / Remove / Split work from the snapshot, so deletions made here are expected; a new Suggest needs ↻ fresh questions.
+    function unchanged(s, allowDeleted) {
+        const current = snapshot(), now = core(current), expected = allowDeleted ? expectedCore(s) : s.core;
+        if (now === expected) { if (expected === s.core) s.source = JSON.parse(JSON.stringify(current)); return true; }
+        const was = JSON.parse(expected), is = JSON.parse(now);
         const fields = Object.keys(is).filter(k => JSON.stringify(was[k]) !== JSON.stringify(is[k])).map(k => k !== 'questions' ? k
             : 'questions (' + [...Array(Math.max(was.questions.length, is.questions.length)).keys()].filter(i => JSON.stringify(was.questions[i]) !== JSON.stringify(is.questions[i])).map(i => 'Q' + (i + 1)).join(' ') + ')');
         console.warn('[curate] editor changed since Curate opened:', fields.join(', '));
@@ -271,8 +281,37 @@
         move.onclick = () => { kept ? s.keep.delete(id) : s.keep.add(id); s.message = ''; render(); };
         const pin = node('button', '📌 Must keep', 'curate-pane-pin'); pin.type = 'button'; pin.setAttribute('aria-pressed', String(s.pins.has(id))); pin.disabled = s.busy || s.saving || s.saved;
         pin.onclick = () => { if (s.pins.has(id)) s.pins.delete(id); else { s.pins.add(id); s.keep.add(id); } s.message = ''; render(); };
+        const gone = s.deleted.has(id); if (gone) { move.disabled = pin.disabled = true; move.dataset.gone = pin.dataset.gone = '1'; }
+        if (!kept) {   // V102.679 (owner pick A, mockup-curate-delete): delete this question from the editor form right here; ↶ Undo puts it back
+            const del = node('button', gone ? '↶ Undo' : '🗑 Delete Q' + id, 'curate-pane-del'); del.type = 'button'; del.disabled = s.busy || s.saving || s.saved;
+            del.title = gone ? 'Put Q' + id + ' back in the form' : 'Delete Q' + id + ' from the form now. Nothing is saved until Save Quiz.';
+            del.dataset.thTitle = gone ? 'ใส่ Q' + id + ' กลับเข้าฟอร์ม' : 'ลบ Q' + id + ' ออกจากฟอร์มเลย ยังไม่บันทึกจนกด Save Quiz'; del.dataset.krTitle = gone ? 'Q' + id + ' 문항을 양식에 되돌립니다' : 'Q' + id + ' 문항을 지금 양식에서 삭제합니다. Save Quiz를 눌러야 저장됩니다';
+            del.onclick = () => gone ? undoDelete(s, id) : deleteQuestion(s, id);
+            head.append(del);
+        }
         head.append(move, pin); panel.append(head);
     }
+    // V102.679: the editor's .quiz-q-item for each original id is captured when Curate opens, so deleting one never renumbers the others here.
+    function editorChanged() {
+        if (typeof updateQuizPagination === 'function') updateQuizPagination();
+        if (typeof triggerAutoSave === 'function') triggerAutoSave();
+    }
+    function deleteQuestion(s, id) {
+        const el = s.items[id - 1];
+        if (!el || !el.isConnected || s.deleted.has(id) || s.keep.has(id) || s.busy || s.saving || s.saved) return;
+        if (document.querySelectorAll('.quiz-q-item').length <= 1) { s.message = 'A quiz needs at least 1 question.'; return render(); }
+        s.deleted.set(id, el.parentNode); el.remove(); editorChanged();
+        const next = removeIds(s).find(x => x < id && !s.deleted.has(x));   // the list runs last → first, so the next one is the next lower number
+        if (next) { s.sel = next; s.twin = 0; if (s.openRow === id) s.openRow = next; }
+        s.message = '🗑 Q' + id + ' deleted from the form · Save Quiz to keep it'; render();
+    }
+    function undoDelete(s, id) {
+        const parent = s.deleted.get(id); if (!parent) return;
+        const after = s.items.slice(id).find(e => e.isConnected && e.parentNode === parent);
+        parent.insertBefore(s.items[id - 1], after || null); s.deleted.delete(id); editorChanged();
+        s.sel = id; s.message = '↶ Q' + id + ' is back in the form'; render();
+    }
+    function removeIds(s) { return s.source.form.questions.map((_, i) => i + 1).filter(id => !s.keep.has(id)).reverse(); }
     function renderComparison(s) {
         const panel = byId('curate-comparison'); panel.replaceChildren();
         const pane = dialog.classList.contains('two') && !!s.sel;   // V102.665: the Review step's right side
@@ -543,7 +582,12 @@
         const two = paneOn(s); dialog.classList.toggle('two', two);
         if (two) {
             const ids = s.source.form.questions.map((_, i) => i + 1).filter(id => s.keep.has(id) === (s.view === 'keep'));
-            if (!ids.includes(s.sel)) { s.sel = ids.length ? ids[0] : null; s.twin = 0; }
+            if (s.view === 'remove') ids.reverse();   // V102.679: removals run last first
+            if (!ids.includes(s.sel)) {   // V102.679: a question that just left this tab hands over to the next one down the list, not back to the top
+                const next = s.sel && s.selView === s.view ? ids.find(x => s.view === 'remove' ? x < s.sel : x > s.sel) : undefined;
+                s.sel = next ?? (ids.length ? ids[0] : null); s.twin = 0;
+            }
+            s.selView = s.view;
             const picked = s.sel && s.proposal.find(q => q.id === s.sel), twins = picked && !picked.notAssessed ? picked.related : [];
             if (!(s.twin < twins.length)) s.twin = 0;
             s.compare = twins.length ? [s.sel, twins[s.twin].id] : null; s.auto = true; s.openRow = null;
@@ -559,8 +603,9 @@
             b.textContent = b.dataset.view === 'keep' ? 'Keep · ' + s.keep.size : 'Remove · ' + (count - s.keep.size);
         });
         const rows = byId('curate-rows'); rows.replaceChildren();
-        s.source.form.questions.forEach((q, i) => {
-            const id = i + 1, kept = s.keep.has(id);
+        const order = [...s.source.form.questions.keys()]; if (s.view === 'remove') order.reverse();   // V102.679 (owner): removals last first, so a 🗑 never renumbers the ones still to read
+        order.forEach(i => {
+            const q = s.source.form.questions[i], id = i + 1, kept = s.keep.has(id);
             if (kept !== (s.view === 'keep')) return;
             const assessment = s.proposal?.find(item => item.id === id);
             // V102.660 (owner pick C → rows of A, mockup-curate-steps): every question is ONE line — Q · stem · reason · ↔ twin · Keep / Remove · 📌.
@@ -596,6 +641,14 @@
             };
             const move = row.querySelector('.curate-move'); move.disabled = s.pins.has(id);
             move.onclick = () => { kept ? s.keep.delete(id) : s.keep.add(id); s.message = ''; render(); };
+            if (s.deleted.has(id)) {   // V102.679: a deleted question stays in the list, struck, with ↶ Undo in place of Keep
+                row.classList.add('deleted'); move.textContent = '↶ Undo'; move.title = 'Put Q' + id + ' back in the form'; move.dataset.thTitle = 'ใส่ Q' + id + ' กลับเข้าฟอร์ม'; move.dataset.krTitle = 'Q' + id + ' 문항을 양식에 되돌립니다'; move.onclick = () => undoDelete(s, id);
+                row.querySelector('.curate-pin').dataset.gone = '1';
+            } else if (open && !kept) {   // V102.679: a narrow window has no right pane, so the opened row carries 🗑 Delete Qn beside Keep
+                const del = node('button', '🗑 Delete Q' + id, 'curate-pane-del curate-row-del'); del.type = 'button';
+                del.title = 'Delete Q' + id + ' from the form now. Nothing is saved until Save Quiz.'; del.dataset.thTitle = 'ลบ Q' + id + ' ออกจากฟอร์มเลย ยังไม่บันทึกจนกด Save Quiz'; del.dataset.krTitle = 'Q' + id + ' 문항을 지금 양식에서 삭제합니다. Save Quiz를 눌러야 저장됩니다';
+                del.onclick = () => deleteQuestion(s, id); move.before(del);
+            }
             const toggle = node('button', open ? '▴' : '▾', 'curate-row-toggle'); toggle.type = 'button';
             toggle.setAttribute('aria-expanded', String(open || (two && s.sel === id))); toggle.setAttribute('aria-label', (two ? 'Show Q' : open ? 'Fold Q' : 'Open Q') + id); toggle.title = open ? 'Fold this question' : 'Choices, explanation, details';
             const flip = () => { if (two) { s.sel = id; s.twin = 0; } else s.openRow = open ? null : id; s.message = ''; render(); const again = rows.querySelector('[data-question-id="' + id + '"] .curate-row-toggle'); if (again) again.focus(); };
@@ -632,7 +685,7 @@
         dialog.querySelectorAll('button, input, textarea').forEach(el => {
             if (el.closest('#curate-confirm')) el.disabled = !s.confirming;
             else if (el.classList.contains('curate-close')) el.disabled = s.saving;
-            else if (!el.classList.contains('curate-move')) el.disabled = s.busy || s.saving || s.saved;
+            else if (!el.classList.contains('curate-move')) el.disabled = s.busy || s.saving || s.saved || el.dataset.gone === '1';   // V102.679: gone = a 🗑 deleted question
             else el.disabled = el.disabled || s.busy || s.saving || s.saved;
         });
         byId('curate-save').disabled = s.busy || s.saving || s.saved || !!problem(s);
@@ -669,7 +722,8 @@
     function startSession(source, keep = {}) {
         state = { source: JSON.parse(JSON.stringify(source)), core: core(source), model: keep.model || textAIModel('ai-analyzer-model-val'),
             keep: new Set(source.form.questions.map((_, i) => i + 1)), pins: new Set(), mode: keep.mode || 'balanced', view: 'keep',
-            busy: false, saving: false, saved: false, stale: false, needsSuggestion: true, proposal: null, message: '', oldOffer: null, oldSet: null, step: 'set', saveMode: 'new', steppedFor: null };
+            busy: false, saving: false, saved: false, stale: false, needsSuggestion: true, proposal: null, message: '', oldOffer: null, oldSet: null, step: 'set', saveMode: 'new', steppedFor: null,
+            items: [...document.querySelectorAll('.quiz-q-item')], deleted: new Map() };   // V102.679: editor items by original id · 🗑 deleted id → its parent
         if (source.sourceId) state.serverBaseline = db.collection('quizzes').doc(source.sourceId).get({ source: 'server' })
             .then(doc => ({ exists: doc.exists, data: doc.exists ? doc.data() : null }), error => ({ error }));
         const provider = (window.TEXT_AI_MODELS.find(m => m.id === state.model)?.label || '').split(' ')[0];
@@ -937,7 +991,7 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
         ]);
         const history = [...attempts.docs, ...sessions.docs].filter(doc => !doc.data().quizRevisionId);   // V102.556 (owner): a split keeps them the way Remove does, on the Before Split version
         if (history.length > 450) throw new Error('This quiz has too many history records for one atomic removal. No changes saved.');
-        if (!unchanged(s)) { s.stale = true; throw new Error('The editor changed since Curate opened. Select ↻ Use latest questions.'); }
+        if (!unchanged(s, true)) { s.stale = true; throw new Error('The editor changed since Curate opened. Select ↻ Use latest questions.'); }
         const removed = s.source.form.questions.map((_, i) => i + 1).filter(id => !s.keep.has(id));
         const createBackup = split || (operation.createBackup ?? byId('curate-create-backup').checked);
         const preserveVersion = createBackup || history.length > 0;
@@ -956,7 +1010,7 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
             const newQuiz = split ? await tx.get(operation.newRef) : null;
             const historyNow = await Promise.all(history.map(doc => tx.get(doc.ref)));
             if (current.exists && current.data().curation?.applyOperationId === operation.backupRef.id) return;
-            if (!current.exists || fingerprint(current.data()) !== fingerprint(original) || !unchanged(s)) throw new Error('The quiz changed before applying. Close Curate and review the latest version.');
+            if (!current.exists || fingerprint(current.data()) !== fingerprint(original) || !unchanged(s, true)) throw new Error('The quiz changed before applying. Close Curate and review the latest version.');
             historyNow.forEach((doc, i) => { if (!doc.exists || fingerprint(doc.data()) !== fingerprint(history[i].data())) throw new Error('Quiz history changed while reviewing. Retry Remove.'); });
             if (backup.exists || newQuiz?.exists) throw new Error('Backup ID already exists. Close Curate and retry.');
             if (preserveVersion) tx.set(operation.backupRef, { ...original, isHistoryRevision: !createBackup, title: (original.title || 'Quiz') + (split ? ' (Before Split)' : ' (Before Curate)'), isActive: false, isTemplate: true,
@@ -981,7 +1035,7 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
     async function save(apply = false, split = false) {
         const s = state; if (!s || s.busy || s.saving || s.saved) return;
         try {
-            s.stale = !unchanged(s);
+            s.stale = !unchanged(s, true);
             if (problem(s)) { s.message = ''; render(); return; }
             const ids = selectedIds(s), form = s.source.form;
             if (!form.title.trim()) throw new Error('Add a quiz title in the editor, then reopen Curate.');
@@ -993,7 +1047,7 @@ Source: ${JSON.stringify({ title: form.title, blueprint: form.blueprint, caseCon
             if (apply && (!s.source.sourceId || ids.length === form.questions.length)) throw new Error('Select fewer questions from a saved quiz before applying.');
             s.saving = true; s.applying = apply; s.splitting = split; s.message = apply ? 'Checking the original quiz and its history…' : 'Saving a new inactive quiz…'; render();
             if (!await ensureAuthForQuizWrite(6000)) throw new Error('Sign in with your admin account, then retry.');
-            if (!unchanged(s)) { s.stale = true; throw new Error('The editor changed since Curate opened. Select ↻ Use latest questions.'); }
+            if (!unchanged(s, true)) { s.stale = true; throw new Error('The editor changed since Curate opened. Select ↻ Use latest questions.'); }
             const timestamp = firebase.firestore.FieldValue.serverTimestamp();
             if (apply) {
                 if (await applyToCurrent(s, ids, timestamp, split) === false) { s.message = 'Apply cancelled. No changes saved.'; return; }

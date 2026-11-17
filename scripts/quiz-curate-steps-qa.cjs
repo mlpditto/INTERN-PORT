@@ -76,7 +76,7 @@ const click = (page, sel) => page.locator('#quiz-curate-dialog ' + sel).first().
         ok(await page.evaluate(() => calls) === 0, 'no AI call');
         const hReview = v.h;
         // V102.660: one line per question, ▾ opens one in place
-        const rowsNow = () => page.evaluate(() => { const rs = [...document.querySelectorAll('#curate-rows .curate-question')]; return { n: rs.length, compact: rs.filter(r => r.classList.contains('compact')).length, open: rs.filter(r => r.classList.contains('open')).map(r => r.dataset.questionId).join(), maxH: Math.max(...rs.filter(r => r.classList.contains('compact')).map(r => Math.round(r.getBoundingClientRect().height))), twin: (rs[0].querySelector('.curate-compare') || {}).dataset ? getComputedStyle(rs[0].querySelector('.curate-compare'), '::after').content : '', choices: !!rs[0].querySelector('.curate-source-controls') && rs[0].querySelector('.curate-source-controls').getClientRects().length > 0, pin: rs[0].querySelector('.curate-pin').getClientRects().length > 0, move: rs[0].querySelector('.curate-move').textContent }; });
+        const rowsNow = () => page.evaluate(() => { const rs = [...document.querySelectorAll('#curate-rows .curate-question')]; return { n: rs.length, compact: rs.filter(r => r.classList.contains('compact')).length, open: rs.filter(r => r.classList.contains('open')).map(r => r.dataset.questionId).join(), maxH: Math.max(...rs.filter(r => r.classList.contains('compact')).map(r => Math.round(r.getBoundingClientRect().height))), twin: (rs[rs.length - 1].querySelector('.curate-compare') || {}).dataset ? getComputedStyle(rs[rs.length - 1].querySelector('.curate-compare'), '::after').content : '', choices: !!rs[rs.length - 1].querySelector('.curate-source-controls') && rs[rs.length - 1].querySelector('.curate-source-controls').getClientRects().length > 0, pin: rs[rs.length - 1].querySelector('.curate-pin').getClientRects().length > 0, move: rs[rs.length - 1].querySelector('.curate-move').textContent }; });
         let rw = await rowsNow();
         ok(rw.n === 10 && rw.compact === 10 && rw.maxH <= 48 && hReview <= 900, 'ten removals on ten lines: the Review step is ' + hReview + ' px (it was about 1,600)');
         ok(/↔ Q11/.test(rw.twin) && rw.pin && rw.move === 'Keep' && !rw.choices, 'a line keeps ↔ twin · Keep · 📌; Choices / Details wait inside');
@@ -113,7 +113,7 @@ const click = (page, sel) => page.locator('#quiz-curate-dialog ' + sel).first().
         ok(v.step === 'review' && v.focus === 'review', '◂ Review goes back');
 
         console.log('the selection must match the target before ③');
-        await click(page, '.curate-question .curate-move'); v = await view(page);
+        await click(page, '.curate-question[data-question-id="1"] .curate-move'); v = await view(page);   // V102.679: Q1 is now the LAST line of Remove
         ok(v.steps[2].off && v.nextOff && /11 selected · target 10/.test(v.nextTitle) && /11 selected · target 10/.test(v.feedback), '11 kept for a target of 10 → ③ is closed and says why');
         await click(page, '[data-view="keep"]'); await page.locator('#quiz-curate-dialog .curate-question[data-question-id="1"] .curate-move').click(); v = await view(page);
         ok(!v.steps[2].off && !v.nextOff, 'back to 10 → ③ opens again');
@@ -150,9 +150,13 @@ const click = (page, sel) => page.locator('#quiz-curate-dialog ' + sel).first().
                 reasonInRow: [...d.querySelectorAll('.curate-question.compact .curate-reason > div')].some(vis), toggles: [...d.querySelectorAll('.curate-row-toggle')].some(e => r(e).width > 1), h: d.scrollHeight, fits: d.scrollHeight <= d.clientHeight + 1, overflowX: d.scrollWidth > d.clientWidth + 1, open: d.open,
                 tabs: [...d.querySelectorAll('[data-view]')].map(b => b.textContent).join(' | '), feedback: d.querySelector('#curate-feedback').textContent };
         });
+        // V102.679 (owner): the Remove list runs last first and the LAST removal opens first; the checks below then pick Q1 by hand
+        const order = await page.evaluate(() => ({ ids: [...document.querySelectorAll('#curate-rows .curate-question')].map(r => +r.dataset.questionId), sel: +(document.querySelector('#curate-rows .sel') || {}).dataset?.questionId }));
+        ok(order.ids.every((id, i) => !i || id < order.ids[i - 1]) && order.sel === order.ids[0], 'Remove runs last → first and the last one opens: ' + order.ids.join(' ') + ' · sel ' + order.sel);
+        await page.locator('#curate-rows .curate-question[data-question-id="1"]').click();
         let pn = await pane();
         ok(pn.two && pn.side && pn.listW <= 380 && !pn.overflowX, 'at 1,440 px the Review step is two panes: the list (' + pn.listW + ' px) and the detail beside it');
-        ok(pn.sel === '1' && pn.pair === 'Q1 ↔ Q11' && pn.cards === 2 && !pn.back, 'the first removal is picked and shown beside its twin (no ← back: it is the page itself)');
+        ok(pn.sel === '1' && pn.pair === 'Q1 ↔ Q11' && pn.cards === 2 && !pn.back, 'Q1 picked → shown beside its twin (no ← back: it is the page itself)');
         ok(pn.head === 'Q1 → Remove' && /Duplicate of Q11\./.test(pn.why) && pn.move === 'Keep' && pn.pin === 'false', 'first line of the detail: verdict · reason · Keep · 📌');
         ok(!pn.reasonInRow && !pn.toggles && pn.rows === 10, 'the list is names only — the reason and ▾ moved to the right');
         await shot(page, 'steps-2-review-pane');
@@ -162,7 +166,7 @@ const click = (page, sel) => page.locator('#quiz-curate-dialog ' + sel).first().
         await click(page, '.curate-question[data-question-id="6"] .curate-compare'); pn = await pane();
         ok(pn.sel === '6' && pn.pair === 'Q6 ↔ Q19', 'so does its ↔ chip');
         await click(page, '.curate-pane-move'); pn = await pane();
-        ok(pn.tabs === 'Keep · 11 | Remove · 9' && pn.sel === '1' && /11 selected · target 10/.test(pn.feedback), 'Keep in the detail moves Q6 to Keep; the next removal is picked; the footer says 11 for a target of 10');
+        ok(pn.tabs === 'Keep · 11 | Remove · 9' && pn.sel === '3' && /11 selected · target 10/.test(pn.feedback), 'Keep in the detail moves Q6 to Keep; the next removal down the list (Q3) is picked; the footer says 11 for a target of 10');
         await click(page, '[data-view="keep"]'); pn = await pane();
         ok(pn.sel === '4' && pn.solo && pn.cards === 1 && pn.pair === '' && pn.head === 'Q4 → Keep', 'Keep tab: a question with no twin is shown alone, opened');
         await page.locator('#quiz-curate-dialog .curate-question[data-question-id="6"] .curate-stem').click(); await click(page, '.curate-pane-move'); pn = await pane();

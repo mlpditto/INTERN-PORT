@@ -91,8 +91,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.equal(await tabs(), 'Keep · 8 | Remove · 3');
         assert.deepEqual(await page.evaluate(() => [document.getElementById('curate-target').value, document.getElementById('curate-suggest').hidden, calls.length]), ['8', false, n2], 'Keep shows what is kept now; still no AI call');
         let r = await rows();   // the Remove tab is the one shown
-        assert.deepEqual(r.map(x => x.id), ['3', '6', '8'], 'old Q4 / Q7 / Q9 are today\'s Q3 / Q6 / Q8: ' + JSON.stringify(r.map(x => x.id)));
-        assert.ok(/Remove reason 4/.test(r[0].text) && /Remove reason 7/.test(r[1].text) && /Remove reason 9/.test(r[2].text), 'each keeps its own reason: ' + JSON.stringify(r.map(x => x.text.slice(0, 30))));
+        assert.deepEqual(r.map(x => x.id), ['8', '6', '3'], 'old Q9 / Q7 / Q4 are today\'s Q8 / Q6 / Q3 (Remove runs last first, V102.679): ' + JSON.stringify(r.map(x => x.id)));
+        assert.ok(/Remove reason 9/.test(r[0].text) && /Remove reason 7/.test(r[1].text) && /Remove reason 4/.test(r[2].text), 'each keeps its own reason: ' + JSON.stringify(r.map(x => x.text.slice(0, 30))));
         assert.deepEqual([r[0].compare, r[1].compare], [[], ['Compare Q6 ↔ Q1']], 'a comparison follows both questions (old Q7 ↔ Q1); one with a deleted question (old Q4 ↔ Q2) is dropped');
         await tab('Keep'); await frame(); r = await rows();
         assert.deepEqual(r.map(x => x.id), ['1', '2', '4', '5', '7', '9', '10', '11']);
