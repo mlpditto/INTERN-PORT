@@ -94,6 +94,15 @@ const DAY7 = 7 * 24 * 3600000;
         r = await run('goLiveNow', [], false);
         ok(r.writes.length === 0 && await page.evaluate(() => !document.getElementById('quiz-deadline').value), 'cancel → nothing written, the box stays empty');
         ok(errors.length === 0, 'no page errors: ' + errors.join(' | '));
+        // V102.677: Save on a NEW quiz creates it live — that path gets the 7 days too (it was missed in V102.655)
+        const nl = await page.evaluate(() => { const now = new Date(2026, 10, 17, 12, 0, 0), ms = d => d ? d.ms - now.getTime() : null, in10 = TS(new Date(now.getTime() + 10 * 86400000)), was = TS(new Date(now.getTime() - 86400000));
+            return { plain: ms(quizNewLiveDeadline({ deadline: null, startTime: null }, now)), own: quizNewLiveDeadline({ deadline: in10 }, now), poll: quizNewLiveDeadline({ deadline: null, isPoll: true }, now), read: quizNewLiveDeadline({ deadline: null, quizType: 'read_only' }, now),
+                later: ms(quizNewLiveDeadline({ deadline: null, startTime: in10 }, now)), started: ms(quizNewLiveDeadline({ deadline: null, startTime: was }, now)) }; });
+        ok(nl.plain === DAY7 && nl.started === DAY7, 'a new quiz saved with no deadline closes 7 days from now (also when its start time has passed)');
+        ok(nl.own === null && nl.poll === null && nl.read === null, 'not when it has its own deadline, and not for a poll or a learning set');
+        ok(nl.later === 10 * 86400000 + DAY7, 'a new quiz that starts in 10 days closes 7 days AFTER it starts, not before it opens');
+        { const i = html.indexOf('                    data.isActive = true;\n'), seg = html.slice(i, i + 900);
+          ok(i > -1 && /const newD7 = window\.quizNewLiveDeadline\(data\);\n\s+if \(newD7\) \{ data\.deadline = newD7;/.test(seg) && seg.indexOf('quizNewLiveDeadline') < seg.indexOf('db.collection("quizzes").add(data)') && /closes in 7d/.test(seg), 'saveQuiz: the new-quiz branch sets that deadline before the document is created, shows it in the deadline box, and the toast says so'); }
         console.log('\nquiz-go-live-7d-qa: ' + pass + ' checks passed');
     } finally { await browser.close(); }
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });
