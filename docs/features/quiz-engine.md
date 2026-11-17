@@ -9,7 +9,7 @@ Admin: Assignments ▸ Quiz Engine.
 ## Scripts that drive it
 
 - `quiz-row-lean-qa` — row = title + badges, icon chips line, actions
-- `quiz-go-live-7d-qa` — going live with no timer of its own (pill ▸ Go live · 7d, Repost, Activate several, editor Launch) sets the deadline 7 days from now; polls and learning sets stay open; an own or kept-expired timer is not touched
+- `quiz-go-live-7d-qa` — going live with no timer of its own (pill ▸ Go live · 7d, Repost, Activate several, editor Launch) sets the deadline 7 days from now; polls and learning sets stay open; an own or kept-expired timer is not touched V102.677: Save on a NEW quiz (created live) gets the 7 days too, counted from a start time that is still ahead.
 - `quiz-deadline-check` — LINE deadline alerts (`notifyQuizDeadlines`): T-3 h personal bubble to interns who have not submitted (the T-24 h group bubble is off, the Sun / Thu digest carries it), quiet hours 22:00–07:00, idempotent markers, daily cap, quota guard, truthful Beri line; the digest shares `scanQuizPending`
 - `quiz-chips-fit-qa` — chips fold into "+n" only when the line has no room
 - `quiz-tools-rail-qa` — row tools as one icon grid > 1100 px, ⋯ below

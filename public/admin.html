@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.676)</title>
+    <title>Nika Admin (V102.677)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -31707,10 +31707,13 @@ ${JSON.stringify(sourceObj)}`;
                 } else {
                     data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                     data.isActive = true;
+                    // V102.677: a new quiz is live at once — no timer of its own → 7 days (shown in the deadline box so it can be changed)
+                    const newD7 = window.quizNewLiveDeadline(data);
+                    if (newD7) { data.deadline = newD7; const dlEl = document.getElementById('quiz-deadline'); if (dlEl && typeof toLocalDatetimeInputValue === 'function') dlEl.value = toLocalDatetimeInputValue(newD7.toDate()); }
                     Object.assign(data, window.quizSystemFieldsFromEditor(false)); // V101.08
                     const docRef = await db.collection("quizzes").add(data);
                     savedQuizId = docRef.id;
-                    showToast("Quiz Saved!");
+                    showToast(newD7 ? "Quiz Saved! · live · closes in 7d" : "Quiz Saved!");
                     if (data.diseaseCodexId && typeof dxaLinkQuizBack === 'function') dxaLinkQuizBack(savedQuizId, data.title).catch(e => console.warn('[codex quiz] link back:', e));   // V102.380
                     quizResourceCards.saved(); // V102.09
                 }
@@ -37974,6 +37977,15 @@ ${qs}`;
         window.quizDefaultDeadline = function (q, now) {
             if (!q || q.isPoll === true || q.quizType === 'read_only') return null;
             return firebase.firestore.Timestamp.fromDate(new Date((now || new Date()).getTime() + QUIZ_DEFAULT_LIVE_HOURS * 3600000));
+        };
+
+        // V102.677: Save on a NEW quiz creates it live. With no deadline of its own it gets the same 7 days — counted from its start time when that is
+        // still ahead (a quiz scheduled for next week must not close before it opens). null = it has a deadline, or is a poll / learning set.
+        window.quizNewLiveDeadline = function (data, now) {
+            if (!data || data.deadline) return null;
+            now = now || new Date();
+            const st = data.startTime && typeof data.startTime.toDate === 'function' ? data.startTime.toDate() : null;
+            return window.quizDefaultDeadline(data, st && st > now ? st : now);
         };
 
         async function repostQuiz(id) {
