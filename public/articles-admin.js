@@ -85,7 +85,8 @@
             audience: { divisions: (a.audience && a.audience.divisions || []).slice(), groups: (a.audience && a.audience.groups || []).slice() },
             links: (a.links || []).map(function (l) { return { kind: l.kind, id: l.id, label: l.label }; }),
             source: a.source && /^https?:\/\//i.test(a.source.url) ? { url: a.source.url, site: a.source.site } : null,   // V102.570: the page the draft came from
-            tags: tagsOf(a.tags), rerun: a.rerun === 'off' ? 'off' : 'any', long: !!a.long, readMin: readMin(body.en || body.th || body.ko || '')
+            tags: tagsOf(a.tags), rerun: a.rerun === 'off' ? 'off' : 'any', long: !!a.long, readMin: readMin(body.en || body.th || body.ko || ''),
+            prev: a.prev && a.prev.id ? { id: a.prev.id, title: pick((S.list.find(function (x) { return x.id === a.prev.id; }) || a.prev).title), recap: (function (r) { Object.keys(r).forEach(function (k) { r[k] = r[k].slice(0, RECAP_MAX); }); return r; })(pick(a.prev.recap)) } : null
         }, c = clipOf(a.clip);
         if (c) o.clip = c;
         var rd = clipReadingOf(a);   // V102.639: how the Thai voice reads the English words of the clip
@@ -148,12 +149,16 @@
     }
     function blank(now) {
         var w = defaultWindow(now);
-        return { id: null, title: {}, body: {}, cover: { emoji: '📰' }, status: 'draft', startAt: w.start, endAt: w.end, audience: { divisions: [], groups: [] }, links: [], source: null, tags: [], rerun: 'any', long: false, clip: {} };
+        return { id: null, title: {}, body: {}, cover: { emoji: '📰' }, status: 'draft', startAt: w.start, endAt: w.end, audience: { divisions: [], groups: [] }, links: [], source: null, tags: [], rerun: 'any', long: false, clip: {}, prev: null };
     }
+    // V102.673 (owner pick B 2026-11-17, mockup-article-sequel/): ⏪ the previous part of a sequel — articles/{id}.prev = { id, title {lang}, recap {lang} }.
+    // `title` is a copy of the previous part's titles (the intern's strip shows it when no recap is written); `recap` = one line per language, 120 characters at most.
+    var RECAP_MAX = 120;
+    function prevIn(p) { return p && typeof p.id === 'string' && p.id ? { id: p.id, title: Object.assign({}, p.title), recap: Object.assign({}, p.recap) } : null; }
     function fromDoc(id, d) {
         return { id: id, title: Object.assign({}, d.title), body: Object.assign({}, d.body), cover: Object.assign({ emoji: '📰' }, d.cover), status: d.status === 'scheduled' ? 'scheduled' : 'draft',
             startAt: msOf(d.startAt), endAt: msOf(d.endAt), audience: { divisions: ((d.audience || {}).divisions || []).slice(), groups: ((d.audience || {}).groups || []).slice() },
-            links: (d.links || []).slice(), tags: tagsOf(d.tags), rerun: d.rerun === 'off' ? 'off' : 'any', long: !!d.long, clip: JSON.parse(JSON.stringify(clipOf(d.clip) || {})), clipReading: JSON.parse(JSON.stringify(d.clipReading || {})), createdAt: msOf(d.createdAt), source: d.source || null, dx: d.dx || null, dc: d.dc || null };   // V102.374: dc = the Drug Codex twin of dx   // V102.371: dx = {draftId, publishedId, name} once sent to the Disease Codex
+            links: (d.links || []).slice(), tags: tagsOf(d.tags), rerun: d.rerun === 'off' ? 'off' : 'any', long: !!d.long, clip: JSON.parse(JSON.stringify(clipOf(d.clip) || {})), clipReading: JSON.parse(JSON.stringify(d.clipReading || {})), createdAt: msOf(d.createdAt), source: d.source || null, dx: d.dx || null, dc: d.dc || null, prev: prevIn(d.prev) };   // V102.374: dc = the Drug Codex twin of dx   // V102.371: dx = {draftId, publishedId, name} once sent to the Disease Codex
     }
 
     // ---- data
@@ -355,6 +360,10 @@
             '.art-tb>button{opacity:.7}.art-tb>button:hover{opacity:1}' +
             '.art-tw{position:relative;display:flex}.art-tw .art-in{padding-left:48px;padding-right:122px}.art-tw .art-cv{position:absolute;left:5px;top:50%;transform:translateY(-50%);width:34px!important;height:30px}' +
             '.art-tw .art-xr{position:absolute;right:5px;top:50%;transform:translateY(-50%);flex-wrap:nowrap;gap:4px}.art-tw .art-xc{width:34px;height:30px;padding:0;display:grid;place-items:center;font-size:15px;border-radius:9px;position:relative}' +
+            '.art-tw .art-in{padding-right:160px}' +   // V102.673: a fourth chip (⏪) at the end of the title box
+            '.art-pp{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:6px 0 0;font:600 12.5px/1.3 Kanit,sans-serif;color:#334155}.art-pp b{font-weight:800;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+            '.art-pp input{flex:1 1 220px;min-width:0;width:auto;margin:0;padding:6px 9px;border:1.5px solid #e2e8f0;border-radius:9px;font:400 13px Kanit,sans-serif}.art-pp button{min-height:0;width:auto;margin:0;padding:4px 9px;border:1.5px solid #e2e8f0;border-radius:999px;background:#fff;font:700 12px Kanit,sans-serif;color:#334155;cursor:pointer}' +
+            '.art-pp small{color:#64748b;font-weight:600;white-space:nowrap}.art-pp .o{flex:1 1 100%;text-align:left;border-radius:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
             '.art-tw .art-xc .n{position:absolute;right:-5px;top:-6px;min-width:15px;height:15px;border-radius:999px;background:#16a34a;color:#fff;font-size:9.5px;line-height:15px;padding:0 3px}' +
             '.art-covers{display:flex;gap:4px;flex-wrap:wrap}' +
             '.art-ft{white-space:nowrap;align-items:center}.art-ft .ai{overflow:hidden;text-overflow:ellipsis;min-width:0}.art-ft .near{color:#d97706;font-weight:800}' +
@@ -713,10 +722,32 @@
             return '<button type="button" class="art-xc' + state + '" onclick="Articles.topicTo(' + String.fromCharCode(39) + k + String.fromCharCode(39) + ')" title="' + tip + '" aria-label="' + word + ' Codex"' + (busy ? ' disabled' : '') + '>' + lab + '</button>';
         };
         var nq = (a.links || []).filter(function (l) { return l.kind === 'quiz'; }).length;
-        return '<div class="art-xr">' + cx('dx', S.dxBusy, '🩺', 'Disease') + cx('dc', S.dcBusy, '💊', 'Drug') +
+        var pv = '<button type="button" class="art-xc' + (a.prev && a.prev.id ? ' ring ok' : '') + '" onclick="Articles.prevPick()" title="' + (a.prev && a.prev.id ? 'This is a sequel — its previous part and the one-line recap are under the title' : 'A sequel? Pick the previous part — interns get a ⏪ line that opens it') + '" aria-label="Previous part">⏪</button>';   // V102.673
+        return '<div class="art-xr">' + pv + cx('dx', S.dxBusy, '🩺', 'Disease') + cx('dc', S.dcBusy, '💊', 'Drug') +
             '<button type="button" class="art-xc' + (nq ? ' ring ok' : '') + '" onclick="Articles.quizPick()" title="Links: a quiz, a drug, the source" aria-label="Links">🔗' + (nq ? '<span class="n">' + nq + '</span>' : '') + '</button></div>';
     }
     // V102.606 (owner pick A): phones cannot hover the grey language chip — an empty TH / KO body says what the intern sees and what to tap
+    // V102.673 ⏪ the row under the title: the picked previous part + its one-line recap in the language being edited; or the picker
+    function ttlOf(x, L) { var t = (x && x.title) || {}; return String(t[L] || t.en || t.th || t.ko || '').trim(); }
+    function prevCands(a) {
+        var L = S.lang, strip = function (s) { return s.replace(/\s*\(\d+\)\s*$/, '').toLowerCase(); }, base = strip(ttlOf(a, L)), q = String(S.prevQ || '').trim().toLowerCase();
+        return S.list.filter(function (x) { return x.id && x.id !== a.id && (!q || ['en', 'th', 'ko'].some(function (l) { return String((x.title || {})[l] || '').toLowerCase().indexOf(q) >= 0; })); })
+            .map(function (x) { return { x: x, same: base && strip(ttlOf(x, L)) === base ? 1 : 0 }; })
+            .sort(function (p, r) { return (r.same - p.same) || ((r.x.startAt || 0) - (p.x.startAt || 0)); }).slice(0, 6).map(function (o) { return o.x; });
+    }
+    function prevHtml(a) {
+        var L = S.lang;
+        if (a.prev && a.prev.id) {
+            var p = S.list.find(function (x) { return x.id === a.prev.id; }), name = ttlOf(p || a.prev, L) || 'an article that is gone', rc = String((a.prev.recap || {})[L] || '');
+            return '<div class="art-pp" id="art-pp"><span>⏪</span><b title="The previous part">' + esc(name) + '</b><button type="button" aria-label="Remove the previous part" title="Not a sequel" onclick="Articles.prevDrop()">✕</button>' +
+                '<input id="art-recap" maxlength="' + RECAP_MAX + '" placeholder="One line: what happened before (' + L.toUpperCase() + ') · empty = interns see the title above" value="' + esc(rc) + '" oninput="Articles.recap(this.value)" aria-label="Recap of the previous part">' +
+                '<button type="button" id="art-recap-ai" onclick="Articles.recapAi()"' + (S.recapBusy ? ' disabled' : '') + ' title="Write the line from the previous part (' + esc(modelName(modelId())) + ')" aria-label="Write the recap with AI">' + (S.recapBusy ? '…' : '✨') + '</button><small id="art-recap-n">' + rc.length + '/' + RECAP_MAX + '</small></div>';
+        }
+        if (!S.prevOpen) return '';
+        var cs = prevCands(a);
+        return '<div class="art-pp" id="art-pp"><span>⏪ Previous part</span><input id="art-pv-q" placeholder="Find an article" value="' + esc(S.prevQ || '') + '" oninput="Articles.prevQ(this.value)" aria-label="Find the previous part">' +
+            (cs.length ? cs.map(function (x) { return '<button type="button" class="o" onclick="Articles.prevSet(' + esc(JSON.stringify(x.id)) + ')">' + esc(((x.cover && x.cover.emoji) || '📰') + ' ' + ttlOf(x, L)) + '</button>'; }).join('') : '<small>No other article' + (S.prevQ ? ' matches' : '') + '</small>') + '</div>';
+    }
     function bodyPh(a) {
         if (S.lang !== 'en' && trFrom(a) === 'en') return 'ว่าง · intern เห็นฉบับ ' + FLAG.en + ' · กด ✨ From EN ด้านบน&#10;Empty · interns see the ' + FLAG.en + ' version · tap ✨ From EN';
         return 'A short story the reader can picture and use at work — up to 2000 characters; longer material becomes episodes. Markdown works.';
@@ -734,6 +765,7 @@
             '<div class="art-tw"><button type="button" class="art-emo art-cv on" onclick="Articles.coverPick()" aria-label="Change the cover" title="Cover · tap to change">' + esc(a.cover.emoji) + '</button>' +
                 '<input class="art-in" id="art-title" onpaste="Articles.paste(event)" ondragover="Articles.dragOver(event)" ondrop="Articles.drop(event)" maxlength="' + MAX_TITLE + '" placeholder="Title (' + L.toUpperCase() + ')" value="' + esc(t) + '" oninput="Articles.text(\'title\',this.value)">' + topicRowHtml(a) + '</div>',
             S.coverOpen ? '<div class="art-covers">' + COVERS.map(function (e) { return '<button type="button" class="art-emo' + (a.cover.emoji === e ? ' on' : '') + '" onclick="Articles.cover(\'' + e + '\')" aria-label="Cover ' + e + '" title="Cover">' + e + '</button>'; }).join('') + '</div>' : '',
+            prevHtml(a),   // V102.673
             imgHtml(a),
             sugHtml(a),
             '<div class="art-md"><div class="art-tb"><button type="button" title="Bold" onclick="Articles.wrap(\'**\',\'**\')">B</button><button type="button" title="Italic" onclick="Articles.wrap(\'*\',\'*\')"><i>I</i></button><button type="button" title="Strikethrough" onclick="Articles.wrap(\'~~\',\'~~\')"><s>S</s></button>' +
@@ -758,6 +790,12 @@
         ];
         return '<div class="art-ed" data-status="' + st + '">' + lines.join('') + '</div>';
     }
+    // V102.673: the ⏪ line as the intern gets it — the recap in this language, else the previous part's title
+    function pvPrevHtml(a, L) {
+        if (!a.prev || !a.prev.id) return '';
+        var p = S.list.find(function (x) { return x.id === a.prev.id; }) || a.prev, tx = String((a.prev.recap || {})[L] || '').trim() || ttlOf(p, L);
+        return tx ? '<div class="pvp" style="display:flex;gap:6px;margin:0 0 6px;padding:5px 8px;border-radius:9px;background:#f1f5f9;font:600 11px/1.35 Kanit,sans-serif;color:#334155"><b style="color:#4361ee;white-space:nowrap">⏪</b><span>' + esc(tx) + '</span></div>' : '';
+    }
     function previewHtml() {
         if (S.clipOpen) return clipHtml();
         var a = S.cur, L = S.lang, t = (a.title || {})[L] || (a.title || {}).en || '', b = (a.body || {})[L] || (a.body || {}).en || '';
@@ -767,7 +805,7 @@
             '<div class="art-pvb"><span class="art-st ' + st + '">' + { draft: 'Draft', scheduled: 'Scheduled', live: 'Live', ended: 'Ended' }[st] + '</span>' + (st === 'draft' ? 'Interns do not see drafts' : 'Interns see it ' + dateLong(a.startAt) + ' – ' + dateLong(a.endAt)) + '</div>' +
             '<div class="art-phone"><div class="home"><div></div><div></div><div></div><div></div></div><div class="art-sh' + (S.pvMore ? ' more' : '') + '" id="art-sheet">' +
             '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span class="cv" title="Article · ' + readMin(b) + ' min">' + esc(a.cover.emoji) + '</span><span class="x2" style="margin-left:auto">✕</span></div>' +
-            '<div class="tt">' + esc(t || 'Title') + '</div><div class="b">' + (md || '<span style="color:#94a3b8">The body shows here.</span>') + '</div>' +
+            '<div class="tt">' + esc(t || 'Title') + '</div>' + pvPrevHtml(a, L) + '<div class="b">' + (md || '<span style="color:#94a3b8">The body shows here.</span>') + '</div>' +
             (a.source ? '<div class="src">Source: <u>' + esc(a.source.site) + ' ↗</u></div>' : '') +
             ((a.links || []).length ? '<div class="lks">' + a.links.map(function (l) { return '<span>' + (l.kind === 'quiz' ? '🧪 ' : '💊 ') + esc(l.label) + (l.kind === 'quiz' ? ' · 🪙 +1' : '') + '</span>'; }).join('') + '</div>' : '') +
             '<div style="display:flex;gap:5px;align-items:center;margin-top:6px"><span class="gb">🔖</span><span class="gb">🔕</span><button type="button" class="rm" id="art-pv-more" onclick="Articles.pvMore()" aria-expanded="' + !!S.pvMore + '">' + (S.pvMore ? 'Show less ▴' : 'Read more ▾') + '</button><span class="ok2">👍 Got it</span></div></div></div>' + statsHtml(a) + '</div>';
@@ -1218,7 +1256,7 @@
     function edit(id) {
         var a = id ? S.list.find(function (x) { return x.id === id; }) : null;
         S.cur = a ? fromDoc(a.id, Object.assign({}, a)) : blank(Date.now());
-        S.imgs = []; S.paste = null; S.tagOpen = false; S.linksShow = false; clipStopNow(); S.clipErr = ''; S.clipWas = S.cur.id && clipOf(S.cur.clip) ? S.cur.id : ''; S.lang = 'en'; S.err = ''; S.del = false; S.pick = ''; S.base = JSON.stringify(S.cur); S.savedAt = 0; S.hint = null; S.titleSug = null; S.hintOff = S.hintOff || {}; S.open = secOpen(); S.who = false; S.whoF = 'all'; S.qs = false; S.qsF = 'open'; S.qErr = ''; S.qAiErr = ''; S.aiNote = ''; S.modelOpen = false; S.pvMore = false;
+        S.imgs = []; S.paste = null; S.tagOpen = false; S.linksShow = false; S.prevOpen = false; S.prevQ = ''; S.recapBusy = false; clipStopNow(); S.clipErr = ''; S.clipWas = S.cur.id && clipOf(S.cur.clip) ? S.cur.id : ''; S.lang = 'en'; S.err = ''; S.del = false; S.pick = ''; S.base = JSON.stringify(S.cur); S.savedAt = 0; S.hint = null; S.titleSug = null; S.hintOff = S.hintOff || {}; S.open = secOpen(); S.who = false; S.whoF = 'all'; S.qs = false; S.qsF = 'open'; S.qErr = ''; S.qAiErr = ''; S.aiNote = ''; S.modelOpen = false; S.pvMore = false;
         render();
     }
     var api = {
@@ -1341,7 +1379,7 @@
             var L = src.L, n = src.n + 1, base = String(a.title[L] || a.title.en || '').replace(/\s*\(\d+\)\s*$/, '').trim();
             var imgs = imgList(a).map(function (m) { return Object.assign({}, m); }), prevBody = String(a.body[L] || '');
             edit(null);
-            var b = S.cur; b.title[L] = (base + ' (' + n + ')').slice(0, MAX_TITLE); b.cover = Object.assign({}, a.cover); b.audience = { divisions: (a.audience.divisions || []).slice(), groups: (a.audience.groups || []).slice() }; b.tags = (a.tags || []).slice(); b.rerun = a.rerun;
+            var b = S.cur; b.title[L] = (base + ' (' + n + ')').slice(0, MAX_TITLE); b.cover = Object.assign({}, a.cover); b.audience = { divisions: (a.audience.divisions || []).slice(), groups: (a.audience.groups || []).slice() }; b.tags = (a.tags || []).slice(); b.rerun = a.rerun; b.prev = { id: a.id, title: Object.assign({}, a.title), recap: {} };   // V102.673: episode n+1 knows its previous part
             S.lang = L; S.imgs = imgs.map(function (m) { m.a = b; return m; });
             S.ep = { a: b, n: n, topic: src.topic, notes: src.notes, prev: src.prev.concat([prevBody]), next: src.next };
             render();
@@ -1541,6 +1579,31 @@
         },
         // V102.399: 🔗 Quiz chip → the Links section opens on the quiz picker
         quizPick: function () { S.open.links = true; S.linksShow = true; S.pick = 'quiz'; S.q = ''; render(); },
+        // V102.673 ⏪ previous part + its recap
+        prevPick: function () { var a = S.cur; if (!a) return; if (a.prev && a.prev.id) { var i = document.getElementById('art-recap'); if (i) i.focus(); return; } S.prevOpen = !S.prevOpen; S.prevQ = ''; render(); if (S.prevOpen) { var q = document.getElementById('art-pv-q'); if (q) q.focus(); } },
+        prevQ: function (v) { S.prevQ = v; render(); var i = document.getElementById('art-pv-q'); if (i) { i.focus(); i.setSelectionRange(v.length, v.length); } },
+        prevSet: function (id) { var a = S.cur, p = S.list.find(function (x) { return x.id === id; }); if (!a || !p || p.id === a.id) return; a.prev = { id: p.id, title: Object.assign({}, p.title), recap: {} }; S.prevOpen = false; S.err = ''; render(); },
+        prevDrop: function () { if (!S.cur) return; S.cur.prev = null; S.prevOpen = false; render(); },
+        recap: function (v) {   // no repaint: the caret stays where it is
+            var a = S.cur; if (!a || !a.prev) return; a.prev.recap = a.prev.recap || {}; a.prev.recap[S.lang] = String(v).slice(0, RECAP_MAX);
+            var n = document.getElementById('art-recap-n'); if (n) n.textContent = a.prev.recap[S.lang].length + '/' + RECAP_MAX; paintLive();
+        },
+        recapAi: function () {
+            var a = S.cur, L = S.lang; if (!a || !a.prev || !a.prev.id || S.recapBusy) return Promise.resolve();
+            var p = S.list.find(function (x) { return x.id === a.prev.id; }), body = p ? String((p.body || {})[L] || (p.body || {}).en || (p.body || {}).th || (p.body || {}).ko || '').trim() : '';
+            if (!body) { S.err = '✨ The previous part has no text to read — write the line yourself.'; render(); return Promise.resolve(); }
+            if (typeof window.callUniversalAI !== 'function') { S.err = '✨ AI is not available on this page.'; render(); return Promise.resolve(); }
+            var NAME = { en: 'English', th: 'Thai', ko: 'Korean' };
+            var prompt = 'Below is PART ONE of a short article for pharmacy interns. A second part continues it. Write ONE sentence in ' + NAME[L] + ', at most 100 characters, for a reader who has NOT read part one: ' +
+                'who is in it and the question or situation it left, so that part two makes sense. Use only what the text says — no new fact, no number the text does not have. ' +
+                'Send the sentence only: no label such as "Part 1:", no quotation marks, no markdown, no emoji.\n\nTITLE: ' + ttlOf(p, L) + '\n\n' + body.slice(0, 2500);
+            S.recapBusy = true; S.err = ''; render();
+            return window.callUniversalAI(modelId(), prompt, false, null, '', { feature: 'article_recap', maxTokens: 300 }).then(function (r) {
+                var line = aiText(r && r.resp !== undefined ? r.resp : r).split(/\n+/).map(function (x) { return x.replace(/\*\*/g, '').replace(/^[\s"'“”‘’\-•]+|[\s"'“”‘’]+$/g, ''); }).filter(Boolean)[0] || '';
+                if (!line) throw new Error('the model sent nothing — try again or another model');
+                if (S.cur === a && a.prev) { a.prev.recap = a.prev.recap || {}; a.prev.recap[L] = line.slice(0, RECAP_MAX); }
+            }).catch(function (e) { S.err = '✨ ' + (e && e.message || e); }).then(function () { S.recapBusy = false; render(); });
+        },
         // V102.625 🎬 Clip
         clip: function () { clipStopNow(); S.clipOpen = !S.clipOpen; S.clipErr = ''; render(); },
         clipWho: function (i) { var l = clipLines(S.cur)[i]; if (!l) return; l.w = CLIP_W[(CLIP_W.indexOf(l.w) + 1) % CLIP_W.length]; clipPaint(); },

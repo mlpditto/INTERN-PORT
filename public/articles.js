@@ -192,6 +192,9 @@
             '.art-md ul,.art-md ol{padding-left:20px}.art-md a{color:#4361ee}' +
             '#art-sheet .art-md.clamp{max-height:7.1em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 65%,transparent);mask-image:linear-gradient(#000 65%,transparent)}' +   // 4 lines × 1.6; line-clamp left half a line showing when the body has several paragraphs
             '#art-sheet .more{min-height:0;margin:0 0 0 auto;width:auto;border:0;background:none;font:700 13px/1 Kanit,sans-serif;color:#4361ee;padding:12px 4px;cursor:pointer;white-space:nowrap}' +
+            // V101.320 ⏪ the previous part of a sequel (owner pick B, mockup-article-sequel/)
+            '.art-prev{display:flex;align-items:center;gap:8px;width:100%;min-height:0;margin:0 0 10px;padding:8px 11px;border:0;border-radius:12px;background:#f1f5f9;font:600 13px/1.4 Kanit,sans-serif;color:#334155;text-align:left;box-sizing:border-box}' +
+            'button.art-prev{cursor:pointer}.art-prev b{flex:none;color:#4361ee;white-space:nowrap}.art-prev span{flex:1;min-width:0;overflow-wrap:anywhere}.art-prev i{flex:none;font-style:normal;color:#64748b}' +
             '.art-src{margin:0 0 10px;font:400 12.5px/1.4 Kanit,sans-serif;color:#64748b}.art-src button{display:inline;width:auto;min-height:0;margin:0;padding:4px 2px;border:0;background:none;box-shadow:none;color:#4361ee;font:600 12.5px/1.4 Kanit,sans-serif;text-decoration:underline;cursor:pointer}' +
             '.art-links{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 12px}.art-link{min-height:0;margin:0;width:auto;display:inline-flex;align-items:center;gap:6px;font:600 12.5px/1 Kanit,sans-serif;padding:8px 11px;border-radius:999px;border:1px solid #c7d2fe;background:#eef2ff;color:#3730a3;cursor:pointer}' +
             '.art-link.codex{border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8}.art-link b{font-weight:800;color:#b45309}' +
@@ -257,6 +260,26 @@
         var u = a.source && a.source.url;
         if (!/^https?:\/\//i.test(u || '')) return '';
         return '<div class="art-src">' + (T[lang] || T.en).source + ': <button type="button" onclick="internArticles.openSrc(' + esc(JSON.stringify(u)) + ')">' + esc(a.source.site || u) + ' ↗</button></div>';
+    }
+    // V101.320 (owner pick B 2026-11-17): a sequel names its previous part (articles/{id}.prev = { id, title, recap }) — one ⏪ line under the title:
+    // the admin's one-line recap in the reader's language, else that part's title. A tap opens the previous part in the same sheet (a look, not a read:
+    // nothing is written), when the intern may read it (it is among the scheduled articles).
+    var PT = { en: { prev: 'Before', back: 'Back' }, th: { prev: 'ภาคก่อน', back: 'กลับ' }, ko: { prev: '이전 편', back: '돌아가기' } };
+    function prevOf(a) { var p = a && a.prev; return p && typeof p.id === 'string' && p.id ? p : null; }
+    function prevHtml(a, lang) {
+        var p = prevOf(a); if (!p) return '';
+        var at = function (o, l) { return String(((o || {})[l]) || '').trim(); }, any = function (o) { return at(o, 'en') || at(o, 'th') || at(o, 'ko'); };
+        var tx = at(p.recap, lang) || at(p.title, lang) || any(p.recap) || any(p.title); if (!tx) return '';
+        var can = (S.list || []).some(function (x) { return x.id === p.id; }), tag = can ? 'button' : 'div';
+        return '<' + tag + (can ? ' type="button" onclick="internArticles.prev()"' : '') + ' class="art-prev"><b>⏪ ' + (PT[lang] || PT.en).prev + '</b><span>' + esc(tx) + '</span>' + (can ? '<i aria-hidden="true">›</i>' : '') + '</' + tag + '>';
+    }
+    function renderPeek(sh) {
+        var a = S.peek, tx = textOf(a, S.lang), pt = PT[S.lang] || PT.en;
+        sh.innerHTML = '<div class="band"><span class="cov">' + esc((a.cover && a.cover.emoji) || '📰') + '</span><button type="button" class="x" onclick="internArticles.prevBack()" aria-label="' + pt.back + '">✕</button></div>' +
+            '<h3 id="art-title">' + esc(tx.title) + '</h3>' + prevHtml(a, tx.lang).replace(/<button type="button" onclick="internArticles\.prev\(\)" class="art-prev">([\s\S]*)<i aria-hidden="true">›<\/i><\/button>/, '<div class="art-prev">$1</div>') +
+            '<div class="art-md" id="art-text">' + md(tx.body) + '</div>' +
+            '<div class="foot"><button type="button" class="ok" onclick="internArticles.prevBack()">‹ ' + pt.back + '</button></div>';
+        sh.scrollTop = 0;
     }
     function linksHtml(a) {
         // V101.301 (owner): a Codex entry named like the article itself just repeated the title on a pill — call it by its kind then
@@ -414,11 +437,12 @@
         var sh = document.getElementById('art-sheet'); if (!sh) return;
         if (S.clip) return renderClip(sh);
         if (S.ask) return renderAsk(sh, t);
+        if (S.peek) return renderPeek(sh);   // V101.320: looking at the previous part
         var info = (c.kind === 'rerun' ? '🔁 ' + t.rerun : t.kicker) + ' · ' + (a.readMin || 1) + ' ' + t.min;
         sh.innerHTML = '<div class="band"><span class="cov" title="' + esc(info) + '" aria-label="' + esc(info) + '">' + esc((a.cover && a.cover.emoji) || '📰') + (c.kind === 'rerun' ? '<small>🔁</small>' : '') + '</span>' +
             (have.length > 1 ? langBtn(have, tx.lang, 'internArticles.lang()') : '') +
             '<button type="button" class="x" onclick="internArticles.close(\'x\')" aria-label="' + t.close + '">✕</button></div>' +
-            '<h3 id="art-title">' + esc(tx.title) + '</h3><div class="art-md' + (S.more ? '' : ' clamp') + '" id="art-text">' + md(tx.body) + '</div>' +
+            '<h3 id="art-title">' + esc(tx.title) + '</h3>' + prevHtml(a, tx.lang) + '<div class="art-md' + (S.more ? '' : ' clamp') + '" id="art-text">' + md(tx.body) + '</div>' +
             srcHtml(a, S.lang) + linksHtml(a) + (S.nk ? nkHtml() : '') +
             '<div class="foot"><button type="button" class="bm" onclick="internArticles.save()" aria-pressed="' + saved + '" title="' + (saved ? t.saved : t.save) + '" aria-label="' + (saved ? t.saved : t.save) + '">🔖</button>' +
             '<button type="button" class="bm mute" onclick="internArticles.mute()" title="' + t.mute + '" aria-label="' + t.mute + '">🔕</button>' +
@@ -493,7 +517,7 @@
     }
     function show(c) {
         css();
-        S.cur = c; S.lang = S.cl; S.more = false; S.got = false; S.ask = null; S.nk = null; S.think = null; S.clip = clipFor(c.a, S.cl);
+        S.cur = c; S.peek = null; S.lang = S.cl; S.more = false; S.got = false; S.ask = null; S.nk = null; S.think = null; S.clip = clipFor(c.a, S.cl);
         var back = document.createElement('div'); back.id = 'art-back'; back.onclick = function () { close('x'); };
         var sh = document.createElement('div'); sh.id = 'art-sheet'; sh.className = 'lang-no-toggle'; sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-modal', 'true'); sh.setAttribute('aria-labelledby', 'art-title');
         document.body.appendChild(back); document.body.appendChild(sh);
@@ -509,7 +533,7 @@
     function onKey(e) { if (e.key === 'Escape') close('x'); }
     function close(act) {
         var c = S.cur; if (!c) return Promise.resolve();
-        S.cur = null; clearTimeout(S.gotTimer); S.got = false; S.ask = null; S.nk = null; S.think = null; if (S.clip) { S.clip = null; clipStopSpeak(); }
+        S.cur = null; S.peek = null; clearTimeout(S.gotTimer); S.got = false; S.ask = null; S.nk = null; S.think = null; if (S.clip) { S.clip = null; clipStopSpeak(); }
         ['art-back', 'art-sheet'].forEach(function (id) { var el = document.getElementById(id); if (el) el.remove(); });
         document.removeEventListener('keydown', onKey);
         var p = act === 'x' ? (isDone((me().articleSeen || {})[c.a.id]) ? Promise.resolve() : setSeen(c.a.id, { act: 'x' })) : markRead(c.a.id, act);
@@ -771,6 +795,8 @@
         },
         mute: function () { if (window.myUserDoc) window.myUserDoc.articlesMuted = true; write({ articlesMuted: true }); close('x'); if (typeof showToast === 'function') showToast('🔕 Articles stay in History'); },
         // from the popup (closes it, = read) or from a History row (= read)
+        prev: function () { var c = S.cur, p = c && prevOf(c.a), a = p && (S.list || []).find(function (x) { return x.id === p.id; }); if (!a) return; S.peek = a; render(); },   // V101.320 ⏪
+        prevBack: function () { if (!S.peek) return; S.peek = null; render(); },
         openSrc: function (url) {
             if (window.liff && liff.isInClient && liff.isInClient()) liff.openWindow({ url: url, external: true });
             else window.open(url, '_blank', 'noopener');

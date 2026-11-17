@@ -20,6 +20,7 @@ Admin: Dashboard ▸ 📰 Articles. Intern: the daily popup, History row, Codex 
 - `articles-nika-gaps-qa` — admin ❔ n (V102.630): questions Nika could not answer (30 days, ×n alike), ✨ Draft = new article titled with the question, 🙈 hide (app_settings/nika_gaps)
 - `nika-think-admin-qa` — admin 💭 n (V102.632, nika-think-admin.js): n = answers with no 👍 / reply; write 🌅 day / 📰 open article / 💭 general → app_settings/nika_think; ✨ 3 from the open article; answers with names, 👍, ↵ reply; 🗑
 - `articles-copy-qa` — 📋 left of ✨ Draft copies title + body as typed (V102.605)
+- `articles-sequel-qa` — ⏪ a sequel names its previous part (V102.673 / V101.320): the chip + picker + one-line recap (✨, per language, 120 characters) in the editor, saved as `articles/{id}.prev = { id, title, recap }`, set by ✨ Ep n+1; the intern popup shows one ⏪ line under the title and opens the previous part in the same sheet (a look — nothing written).
 - `articles-editor-hints-qa` — empty TH/KO body says interns see 🇬🇧 · ✨ From EN; Saved n h / d ago; When & who remembers open/folded per browser (V102.606)
 - `articles-share-qa` — History row: language pill after the title; Source line `· 📤 LINE f` (FB only with a link); +0.1 score once per article; only the tapped icon turns wave blue; admin sees 📤 n (V101.291 / V102.612)
 - `articles-intern-qa` — intern sheet on a 390 px phone with a fake Firestore

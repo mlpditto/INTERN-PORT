@@ -50,7 +50,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
             // 6A
             const ti = document.getElementById('art-title').getBoundingClientRect(), xr = q('.art-tw .art-xr').getBoundingClientRect();
             out.topics = [qa('.art-tw .art-xc').map(b => b.textContent.trim()), xr.right <= ti.right && xr.left > ti.left + ti.width / 2, qa('details.art-sec summary b').map(b => b.textContent)];
-            qa('.art-tw .art-xc')[2].click(); out.topics.push(qa('details.art-sec summary b').map(b => b.textContent), S.pick);
+            qa('.art-tw .art-xc')[3].click(); out.topics.push(qa('details.art-sec summary b').map(b => b.textContent), S.pick);
             // 7A
             Articles.edit('a1'); const when = q('details.art-sec'); when.open = true;
             out.when = [when.textContent.includes('Bangkok time'), !!when.querySelector('.art-bkk'), /Later/.test(when.textContent), getComputedStyle(when.querySelector('summary > span')).visibility];
@@ -73,7 +73,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.deepEqual(r.calm, ['1500 / 2000 · ~2 min', '']);
         assert.deepEqual(r.tb, ['0.7', true], '4C: formatting softer, AI pushed right');
         assert.deepEqual(r.cover, [true, '💊', false, true, 10, '🫁', true], '5B: cover in the title box; no "Schedule when ready"; the ten open under it, a pick folds them');
-        assert.deepEqual(r.topics, [['🩺', '💊', '🔗'], true, ['When & who'], ['When & who', 'Links'], 'quiz'], '6A: icons at the end of the title box; Links appears from 🔗: ' + JSON.stringify(r.topics));
+        assert.deepEqual(r.topics, [['⏪', '🩺', '💊', '🔗'], true, ['When & who'], ['When & who', 'Links'], 'quiz'], '6A: icons at the end of the title box; Links appears from 🔗: ' + JSON.stringify(r.topics));
         assert.deepEqual(r.when, [false, true, false, 'hidden', '🔁 New interns', 'true', 'Audience', 'off', 'false', 'any'], '7A: BKK, 🔁 chip in Audience toggles, summary hidden while open: ' + JSON.stringify(r.when));
         assert.deepEqual(r.tags, [false, true], '7A: no tag → 🏷 + by 🗑');
         assert.deepEqual(r.need.slice(0, 2), [false, true], '8C: the dot only while EN is not written');
