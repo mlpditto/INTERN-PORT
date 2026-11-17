@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.675)</title>
+    <title>Nika Admin (V102.676)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -2249,6 +2249,15 @@
         .pv-l:focus-within { outline: 2px solid #a78bfa; }
         .pv-l-a { left: 2%; top: 3%; } .pv-l-d { left: 2%; top: 42%; } .pv-l-t { left: 2%; bottom: 3%; }
         .pv-l-m { right: 2%; top: 3%; } .pv-l-e { right: 2%; bottom: 14%; }
+        /* V102.676 (owner pick C, mockup-admet-steps/): the saved-picture thumbnail draws the same words, small; a step strip says what to press next */
+        #dca-pk-visual-current-link { position: relative; }
+        #dca-pk-visual-current-labels .pv-l { font-size: 7.5px; padding: 1px 3px; border-radius: 5px; line-height: 1.3; max-width: 46%; } #dca-pk-visual-current-labels .pv-l i { margin-right: 2px; }
+        .dca-pks { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin: 0 0 8px; } .dca-pks[hidden] { display: none; }
+        .dca-pks span { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 3px 9px; font-size: 0.74em; font-weight: 800; background: #f1f5f9; color: #94a3b8; white-space: nowrap; }
+        .dca-pks span.done { background: #dcfce7; color: #166534; } .dca-pks span.next { background: #4f46e5; color: #fff; } .dca-pks em { font-style: normal; color: #cbd5e1; }
+        @keyframes dcaPulse { 0% { box-shadow: 0 0 0 0 rgba(79,70,229,.55); } 70% { box-shadow: 0 0 0 9px rgba(79,70,229,0); } 100% { box-shadow: 0 0 0 0 rgba(79,70,229,0); } }
+        .dca-pulse { animation: dcaPulse 1.4s ease-out infinite; }
+        @media (prefers-reduced-motion: reduce) { .dca-pulse { animation: none; box-shadow: 0 0 0 3px rgba(79,70,229,.45); } }
         /* Draft view */
         .dca-draft-row {
             background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
@@ -17417,7 +17426,7 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                                  for image gen via OpenRouter (GPT-5.4 Image 2 / Nano Banana 2.1 / Grok).
                                  Save is disabled in Phase 1 — preview only. Phase 2 (V94.56) wires
                                  SHA-256 + Storage upload + Firestore persistence. -->
-                            <button type="button" class="dca-pk-visual-btn" onclick="dcaOpenPkVisualModal()" title="Generate an ADMET infographic / anatomical / diagram via AI image gen (preview only — save coming in Phase 2)">🎨 Visual</button>
+                            <button type="button" class="dca-pk-visual-btn" id="dca-pk-visual-open" onclick="dcaOpenPkVisualModal()" title="Generate an ADMET infographic / anatomical / diagram via AI image gen (preview only — save coming in Phase 2)">🎨 Visual</button>
                             <button type="button" class="dca-form-copy-btn" onclick="dcaCopyDrugAsMarkdown('pk', this)" title="Copy this section as Markdown">📋</button>
                         </span>
                     </div>
@@ -17444,6 +17453,8 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                              dcaFillForm + refreshed after dcaSavePkVisual. -->
                         <!-- V102.652 (🧠 PK flash cards, step 1): five one-line facts the intern card shows. 🤖 shortens the fields above, the admin
                              edits, 💾 writes drug_codex/{id}.pkCard on its own (not part of Save Drug). Published drugs only. -->
+                        <!-- V102.676 (owner pick C): what to press next — 🧠 Card lines › 🎨 Visual › 💾. Done steps are green, the next one is blue and its real button pulses; gone when all three are done. -->
+                        <div id="dca-pk-steps" class="dca-pks lang-no-toggle" hidden role="status" aria-label="Steps to an ADMET picture with words"></div>
                         <div id="dca-pk-card" class="dca-pkc lang-no-toggle" hidden>
                             <div class="dca-pkc-head">
                                 <b title="One short line per letter — shown on the intern's PK flash card">🧠 Card lines</b>
@@ -17462,7 +17473,7 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                         <div id="dca-pk-visual-current" style="display:none; margin-top:12px;">
                             <div class="dca-pk-visual-section-label">🎨 Saved ADMET Visual</div>
                             <a id="dca-pk-visual-current-link" href="#" target="_blank" rel="noopener noreferrer" style="display:inline-block; max-width:260px; border-radius:10px; overflow:hidden; border:1px solid #e2e8f0; box-shadow:0 1px 4px rgba(15,23,42,0.08);">
-                                <img id="dca-pk-visual-current-img" src="" alt="Saved ADMET visual" style="display:block; width:100%; height:auto; background:#f8fafc;">
+                                <img id="dca-pk-visual-current-img" src="" alt="Saved ADMET visual" style="display:block; width:100%; height:auto; background:#f8fafc;"><span id="dca-pk-visual-current-labels" class="lang-no-toggle"></span>
                             </a>
                             <div id="dca-pk-visual-current-meta" class="dca-pk-visual-meta"></div>
                         </div>
@@ -49625,6 +49636,30 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const el = document.getElementById('dca-pkc-state'); if (!el) return;
             el.dataset.s = st || '';
             el.textContent = st === 'saved' ? '✓ saved' : st === 'dirty' ? '● not saved' : st === 'busy' ? '⏳' : '';
+            dcaPkSteps();
+        }
+        // V102.676 (owner pick C, mockup-admet-steps/): the lines typed in 🧠 Card lines right now (saved or not) — the picture's words are these when there are any
+        function dcaPkCardLines() {
+            const box = document.getElementById('dca-pk-card'); if (!box || box.hidden) return null;
+            const out = {}; DCA_PK_KEYS.forEach(([k]) => { const v = String((document.getElementById('dca-pkc-' + k) || {}).value || '').replace(/\s+/g, ' ').trim(); if (v) out[k] = v.slice(0, 60); });
+            return Object.keys(out).length ? { lines: out, lang: ((document.querySelector('input[name="dca-pkc-lang"]:checked') || {}).value) === 'en' ? 'en' : 'th' } : null;
+        }
+        // The step strip: 1 🧠 Card lines saved · 2 🎨 a picture made · 3 💾 the picture saved on the drug. Published drugs only; hidden once all are done.
+        function dcaPkSteps() {
+            const el = document.getElementById('dca-pk-steps'); if (!el) return;
+            const can = !!dcaState.editingId && !dcaState.isDraftEdit, doc = can ? (dcaState.codex || []).find(d => d._id === dcaState.editingId) : null;
+            const st = (document.getElementById('dca-pkc-state') || { dataset: {} }).dataset.s || '';
+            const savedPic = !!(doc && doc.pkVisual && doc.pkVisual.downloadUrl) || !!(dcaState.pkVisual && dcaState.pkVisual.downloadUrl && can);
+            const freshPic = !!(typeof dcaPkVisualState !== 'undefined' && dcaPkVisualState.lastImageDataUrl && !dcaPkVisualState.fromSaved && dcaPkVisualState.lastImageDataUrl !== dcaPkVisualState.savedData);
+            const done = [st === 'saved', savedPic || freshPic, savedPic && !freshPic], next = done.indexOf(false);
+            const targets = ['dca-pkc-ai', 'dca-pkc-save', 'dca-pk-visual-open', 'dcaPkVisualGenerateBtn', 'dcaPkVisualSaveBtn'];
+            targets.forEach(id => { const b = document.getElementById(id); if (b) b.classList.remove('dca-pulse'); });
+            if (!can || next < 0) { el.hidden = true; el.innerHTML = ''; return; }
+            const name = ['🧠 Card lines', '🎨 Visual', '💾 Save the picture'], tip = ['🤖 Shorten writes the five lines, then 💾 beside it', 'Open 🎨 Visual and tap Generate — the picture carries the Card lines as its words', 'In 🎨 Visual, tap 💾 Save — interns then see the picture'];
+            el.hidden = false;
+            el.innerHTML = name.map((n, i) => '<span class="' + (done[i] ? 'done' : i === next ? 'next' : '') + '" title="' + tip[i] + '">' + (done[i] ? '✓ ' : (i + 1) + ' ') + n + '</span>').join('<em>›</em>');
+            const pulse = next === 0 ? [dcaPkCardLines() ? 'dca-pkc-save' : 'dca-pkc-ai'] : next === 1 ? ['dca-pk-visual-open', 'dcaPkVisualGenerateBtn'] : ['dca-pk-visual-open', 'dcaPkVisualSaveBtn'];
+            pulse.forEach(id => { const b = document.getElementById(id); if (b) b.classList.add('dca-pulse'); });
         }
         function dcaPkCardTouch(input) {
             if (input) { const c = input.parentElement.querySelector('small'); if (c) c.textContent = input.value.length ? String(input.value.length) : ''; }
@@ -49767,7 +49802,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const meta = document.getElementById('dca-pk-visual-current-meta');
             if (!wrap || !img || !link) return;
             const url = pv && pv.downloadUrl ? String(pv.downloadUrl) : '';
-            if (!url) { wrap.style.display = 'none'; img.src = ''; return; }
+            if (!url) { wrap.style.display = 'none'; img.src = ''; const l0 = document.getElementById('dca-pk-visual-current-labels'); if (l0) l0.innerHTML = ''; dcaPkSteps(); return; }
             img.src = url;
             link.href = url;
             if (meta) {
@@ -49777,7 +49812,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 ].filter(Boolean).join(' · ');
                 meta.textContent = bits ? ('Generated · ' + bits) : '';
             }
+            // V102.676: the words saved with the picture (pkVisual.labels) are drawn over the thumbnail in the same slots as the intern page —
+            // a picture made without text no longer looks as if it had none
+            const lay = document.getElementById('dca-pk-visual-current-labels'), L = pv.labels && typeof pv.labels === 'object' ? pv.labels : null;
+            const have = L ? DCA_PK_KEYS.filter(([k]) => L[k] && String(L[k]).trim()) : [];
+            if (lay) lay.innerHTML = have.map(([k]) => '<span class="pv-l pv-l-' + k + '"><i>' + k.toUpperCase() + '</i>' + dcaEscapeHtml(String(L[k])) + '</span>').join('');
+            if (meta) meta.textContent += (meta.textContent ? ' · ' : '') + (have.length ? '🔤 ' + have.length + ' word' + (have.length > 1 ? 's' : '') + ' over it' : pv.labels === undefined ? '' : '');
             wrap.style.display = 'block';
+            dcaPkSteps();
         }
 
         // V96.01: image-to-image "Refine" helpers. The base image to edit is the
@@ -49854,6 +49896,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const meta = document.getElementById('dcaPkVisualMeta');
             const errBox = document.getElementById('dcaPkVisualErrorBox');
             if (!placeholder || !spinner || !img) return;
+            dcaPkSteps();   // V102.676: the step strip and the pulsing button follow the picture
             if (errBox) errBox.style.display = 'none';
             if (dcaPkVisualState.generating) {
                 placeholder.style.display = 'none';
@@ -50232,9 +50275,12 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 dcaPkVisualState.lastModelLabel = modelLabel;
                 dcaPkVisualState.fromSaved = false;
                 // V102.641 (pick B): words over the picture — quick ones from the fields at once, the AI's short ones replace them
-                dcaPkVisualState.labels = pvOverlay ? dcaPkVisualQuickLabels(current) : null;
-                dcaPkVisualState.labelLang = pvLang;
-                if (pvOverlay) {
+                // V102.676 (owner pick C): one set of words — the 🧠 Card lines the admin wrote go over the picture as they are (no second AI shortening)
+                const pvCard = pvOverlay ? dcaPkCardLines() : null;
+                dcaPkVisualState.labels = pvCard ? Object.assign({}, pvCard.lines) : pvOverlay ? dcaPkVisualQuickLabels(current) : null;
+                dcaPkVisualState.labelLang = pvCard ? pvCard.lang : pvLang;
+                if (pvCard) { const lr = document.querySelector('input[name="dca-pv-lang"][value="' + pvCard.lang + '"]'); if (lr) lr.checked = true; dcaPkVisualLang(); }
+                if (pvOverlay && !pvCard) {
                     dcaPkVisualMakeLabels(current, pvLang).then(L => {
                         if (L && dcaPkVisualState.lastImageDataUrl === dataUrl) { dcaPkVisualState.labels = L; dcaPkVisualRenderPreview(); }
                     }).catch(e => console.warn('[pk-visual labels]', e));
@@ -50380,6 +50426,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // keep the list copy in step so reopening shows the saved words
                 const pvDoc = (dcaState.codex || []).find(d => d._id === dcaState.editingId);
                 if (pvDoc) pvDoc.pkVisual = Object.assign({}, dcaState.pkVisual);
+                dcaPkVisualState.savedData = dcaPkVisualState.lastImageDataUrl;   // V102.676: this picture is saved now (the step strip)
                 dcaRenderCurrentPkVisual(dcaState.pkVisual);
                 // V96.05 Evaluation pillar: the generated visual was kept (saved) —
                 // the positive signal for PK Visual keep-rate (kept / generated).
