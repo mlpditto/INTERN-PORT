@@ -19,6 +19,7 @@ Admin: Quiz Engine ▸ a quiz ▸ Review / Compare.
 - `compare-footer-lean-qa` — Model B on one row + one icon action row
 - `compare-modelb-rail-check` — Model B chips carry owner logos; Grok trial kept
 - `quiz-compare-close-qa` — Compare modal closes and reopens by click / Enter / Space
+- `quiz-list-stem-qa` — AI rewrites put listed items (ก ข ค ง) one per line, question last in bold, options = labels; Compare keeps the line breaks
 - `jev-compare-check` — Jev "same fact?" scoring: batching, cache, symmetry
 - `jev-chip-qa` — Jev chip beside each n-gram match
 - `jev-quiz-check` — Jev check engine: what is asked, thresholds, stale translations, cache, languages present, no quizId = questions on screen
