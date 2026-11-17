@@ -90,6 +90,7 @@ const REMOVE = [2, 4, 5, 7, 8, 9, 15, 17, 19, 20];
         assert.equal(await page.$$eval('.curate-row-del', b => b.length), 0, 'no 🗑 on folded lines');
         await page.click('#curate-rows [data-question-id="17"] .curate-row-toggle');
         assert.equal(await page.$eval('#curate-rows [data-question-id="17"] .curate-row-del', b => b.textContent), '🗑 Delete Q17', 'the opened row offers 🗑');
+        assert.equal(await page.$eval('#curate-rows .curate-row-del', b => getComputedStyle(b).backgroundColor), 'rgb(127, 29, 29)', 'the row 🗑 is red like the pane one');
         await page.click('#curate-rows [data-question-id="17"] .curate-row-del'); v = await view();
         assert.ok(!v.editor.includes(17) && v.editor.length === 18, 'Q17 left the form (Q19 still deleted): ' + v.editor.join(' '));
         assert.deepEqual(v.deletedRows.sort((x, y) => x - y), [17, 19], 'the row stays, struck');
