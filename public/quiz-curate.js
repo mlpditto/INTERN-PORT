@@ -285,7 +285,7 @@
         if (!kept) {   // V102.679 (owner pick A, mockup-curate-delete): delete this question from the editor form right here; ↶ Undo puts it back
             const del = node('button', gone ? '↶ Undo' : '🗑 Delete Q' + id, 'curate-pane-del'); del.type = 'button'; del.disabled = s.busy || s.saving || s.saved;
             del.title = gone ? 'Put Q' + id + ' back in the form' : 'Delete Q' + id + ' from the form now. Nothing is saved until Save Quiz.';
-            del.dataset.thTitle = gone ? 'ใส่ Q' + id + ' กลับเข้าฟอร์ม' : 'ลบ Q' + id + ' ออกจากฟอร์มเลย ยังไม่บันทึกจนกด Save Quiz';
+            del.dataset.thTitle = gone ? 'ใส่ Q' + id + ' กลับเข้าฟอร์ม' : 'ลบ Q' + id + ' ออกจากฟอร์มเลย ยังไม่บันทึกจนกด Save Quiz'; del.dataset.krTitle = gone ? 'Q' + id + ' 문항을 양식에 되돌립니다' : 'Q' + id + ' 문항을 지금 양식에서 삭제합니다. Save Quiz를 눌러야 저장됩니다';
             del.onclick = () => gone ? undoDelete(s, id) : deleteQuestion(s, id);
             head.append(del);
         }
@@ -642,11 +642,11 @@
             const move = row.querySelector('.curate-move'); move.disabled = s.pins.has(id);
             move.onclick = () => { kept ? s.keep.delete(id) : s.keep.add(id); s.message = ''; render(); };
             if (s.deleted.has(id)) {   // V102.679: a deleted question stays in the list, struck, with ↶ Undo in place of Keep
-                row.classList.add('deleted'); move.textContent = '↶ Undo'; move.title = 'Put Q' + id + ' back in the form'; move.onclick = () => undoDelete(s, id);
+                row.classList.add('deleted'); move.textContent = '↶ Undo'; move.title = 'Put Q' + id + ' back in the form'; move.dataset.thTitle = 'ใส่ Q' + id + ' กลับเข้าฟอร์ม'; move.dataset.krTitle = 'Q' + id + ' 문항을 양식에 되돌립니다'; move.onclick = () => undoDelete(s, id);
                 row.querySelector('.curate-pin').dataset.gone = '1';
             } else if (open && !kept) {   // V102.679: a narrow window has no right pane, so the opened row carries 🗑 Delete Qn beside Keep
                 const del = node('button', '🗑 Delete Q' + id, 'curate-pane-del curate-row-del'); del.type = 'button';
-                del.title = 'Delete Q' + id + ' from the form now. Nothing is saved until Save Quiz.'; del.dataset.thTitle = 'ลบ Q' + id + ' ออกจากฟอร์มเลย ยังไม่บันทึกจนกด Save Quiz';
+                del.title = 'Delete Q' + id + ' from the form now. Nothing is saved until Save Quiz.'; del.dataset.thTitle = 'ลบ Q' + id + ' ออกจากฟอร์มเลย ยังไม่บันทึกจนกด Save Quiz'; del.dataset.krTitle = 'Q' + id + ' 문항을 지금 양식에서 삭제합니다. Save Quiz를 눌러야 저장됩니다';
                 del.onclick = () => deleteQuestion(s, id); move.before(del);
             }
             const toggle = node('button', open ? '▴' : '▾', 'curate-row-toggle'); toggle.type = 'button';
