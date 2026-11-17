@@ -48,8 +48,7 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAJCAIAAAC0SDtlA
         const open = await page.evaluate(() => ({
             shown: getComputedStyle(document.getElementById('dcaPkVisualModal')).display,
             dots: [...document.querySelectorAll('#dcaPkVisualAdmet b')].map(b => b.textContent + (b.classList.contains('e') ? '○' : '●')).join(''),
-            warn: (document.querySelector('#dcaPkVisualAdmet .pv-warn') || {}).textContent,
-            fill: !!document.querySelector('#dcaPkVisualAdmet .pv-fill'),
+            fill: (document.querySelector('#dcaPkVisualAdmet .pv-fill') || {}).textContent,
             gen: !!document.querySelector('#dcaPkVisualPlaceholder #dcaPkVisualGenerateBtn') && getComputedStyle(document.getElementById('dcaPkVisualPlaceholder')).display !== 'none',
             foot: ['dcaPkVisualRegenBtn', 'dcaPkVisualDownloadBtn', 'dcaPkVisualSaveBtn'].map(id => document.getElementById(id).hidden),
             model: document.getElementById('dcaPkVisualModelBtn').textContent, menu: document.getElementById('dcaPkVisualModelRail').hidden,
@@ -57,7 +56,7 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAJCAIAAAC0SDtlA
             meta: document.getElementById('dcaPkVisualMeta').textContent, oldText: /Phase 2|Generates an ADMET infographic/.test(document.getElementById('dcaPkVisualModal').textContent),
         }));
         assert.equal(open.shown, 'flex');
-        assert.equal(open.dots, 'A●D○M○E○T○'); assert.equal(open.warn, '4 empty'); assert.ok(open.fill, '🤖 Fill offered for the empty fields');
+        assert.equal(open.dots, 'A●D○M○E○T○'); assert.equal(open.fill, '🤖 4', 'one short chip offers to fill the 4 empty fields (V102.675: was "4 empty" + "🤖 Fill")');
         assert.ok(open.gen, 'Generate sits in the middle of the empty picture'); assert.deepEqual(open.foot, [true, true, true], '🔁 ⬇ 💾 wait for a picture');
         assert.equal(open.model, '🍌 Nano Banana ▾'); assert.equal(open.menu, true); assert.equal(open.extra, true); assert.equal(open.overlay, true, '🔤 on by default');
         assert.equal(open.meta, '~15 s'); assert.equal(open.oldText, false, 'no developer badge / 3-line description');
@@ -68,9 +67,31 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAJCAIAAAC0SDtlA
         await page.click('#dcaPkVisualModelRail [data-value="or/openai/gpt-image-2.6-sunburst"]');
         assert.deepEqual(await page.evaluate(() => [document.getElementById('dcaPkVisualModelBtn').textContent, document.getElementById('dcaPkVisualModelRail').hidden, dcaPkVisualState.model]),
             ['☀️ GPT Image 2.6 ▾', true, 'or/openai/gpt-image-2.6-sunburst']);
+        // V102.675 (owner pick C, mockup-admet-modal-fit/): the window is as tall as its content; A D M E T dots in the header; one language chip; ⚙ folds the rest
+        const fit = () => page.evaluate(() => { const m = document.getElementById('dcaPkVisualModal'), c = m.querySelector('.modal-content'), r = c.getBoundingClientRect(), vis = e => !!e && e.getClientRects().length > 0, q = s => m.querySelector(s);
+            const hd = q('.pv-hd').getBoundingClientRect(), last = q('.pv-ft').getBoundingClientRect(), tops = [...q('.pv-hd').children].filter(vis).map(e => Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2));
+            return { h: Math.round(r.height), slack: Math.round(r.bottom - last.bottom), centred: Math.abs((r.top + r.bottom) / 2 - innerHeight / 2) < 3, hdH: Math.round(hd.height), oneLine: Math.max(...tops) - Math.min(...tops) < 6, inHd: !!q('.pv-hd #dcaPkVisualAdmet'), word: [...q('.pv-hd').children].some(e => e.tagName === 'SPAN' && e.textContent.trim() === 'ADMET'),
+                row: [...q('#dcaPkVisualStyleRail').children].filter(vis).map(e => e.textContent.trim() || '|').join(' '), rowH: Math.round(q('#dcaPkVisualStyleRail').getBoundingClientRect().height), more: vis(q('#dca-pv-more')), gear: q('#dca-pv-more-btn').textContent + '|' + q('#dca-pv-more-btn').getAttribute('aria-expanded') + '|' + q('#dca-pv-more-btn').classList.contains('on'),
+                lang: q('#dca-pv-lang-btn').textContent + '|' + (document.querySelector('input[name="dca-pv-lang"]:checked') || {}).value, wide: c.scrollWidth > c.clientWidth + 1 }; });
+        let f = await fit();
+        assert.ok(f.h < 420 && f.slack <= 24 && f.centred, 'the window is as tall as its content and sits in the middle (was stretched to 90% of the screen): ' + JSON.stringify([f.h, f.slack, f.centred]));
+        assert.ok(f.inHd && !f.word && f.oneLine && f.hdH <= 36, 'the A D M E T dots sit in the header in place of the word, on one line: ' + f.hdH);
+        assert.equal(f.row, '📊 🫀 🔀 | 🔤 🇹🇭 | ⚙', 'ONE chip row: 3 styles │ 🔤 · one language chip │ ⚙'); assert.ok(f.rowH <= 30 && !f.more && f.gear === '⚙|false|false' && f.lang === '🇹🇭|th');
+        await page.setViewportSize({ width: 464, height: 864 }); f = await fit();
+        assert.ok(f.h < 420 && f.centred && f.oneLine && f.rowH <= 30 && !f.wide, 'at 464 px (the owner\'s screen): still one header line and one chip row, nothing overflows: ' + JSON.stringify([f.h, f.hdH, f.rowH]));
+        if (process.env.SHOT) { require('node:fs').mkdirSync(process.env.SHOT, { recursive: true }); await page.screenshot({ path: path.join(process.env.SHOT, 'admet-fit-464.png') }); }
+        await page.click('#dca-pv-lang-btn'); f = await fit();
+        assert.equal(f.lang, 'EN|en', 'a tap on the language chip flips it to EN (the hidden radios follow)');
+        await page.click('#dca-pv-lang-btn'); f = await fit(); assert.equal(f.lang, '🇹🇭|th', 'and back');
+        await page.click('#dca-pv-more-btn'); f = await fit();
+        assert.ok(f.more && f.gear === '⚙|true|false', '⚙ opens the row with +MoA · +Class · +Ind · ✏️');
         // +Class chip is a checkbox behind a chip
         await page.click('label:has(#dca-pv-inc-class)');
         assert.equal(await page.evaluate(() => document.getElementById('dca-pv-inc-class').checked), true);
+        await page.click('#dca-pv-more-btn'); f = await fit();
+        assert.ok(!f.more && f.gear === '⚙ 1|false|true', 'closed again, ⚙ says one option is on');
+        if (process.env.SHOT) await page.screenshot({ path: path.join(process.env.SHOT, 'admet-fit-464-gear.png') });
+        await page.setViewportSize({ width: 900, height: 900 });
 
         // Generate → picture with no text, quick words at once, AI words after
         await page.click('#dcaPkVisualGenerateBtn');
