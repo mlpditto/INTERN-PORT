@@ -302,7 +302,7 @@
         if (document.querySelectorAll('.quiz-q-item').length <= 1) { s.message = 'A quiz needs at least 1 question.'; return render(); }
         s.deleted.set(id, el.parentNode); el.remove(); editorChanged();
         const next = removeIds(s).find(x => x < id && !s.deleted.has(x));   // the list runs last → first, so the next one is the next lower number
-        if (next) { s.sel = next; s.twin = 0; }
+        if (next) { s.sel = next; s.twin = 0; if (s.openRow === id) s.openRow = next; }
         s.message = '🗑 Q' + id + ' deleted from the form · Save Quiz to keep it'; render();
     }
     function undoDelete(s, id) {
@@ -644,6 +644,10 @@
             if (s.deleted.has(id)) {   // V102.679: a deleted question stays in the list, struck, with ↶ Undo in place of Keep
                 row.classList.add('deleted'); move.textContent = '↶ Undo'; move.title = 'Put Q' + id + ' back in the form'; move.onclick = () => undoDelete(s, id);
                 row.querySelector('.curate-pin').dataset.gone = '1';
+            } else if (open && !kept) {   // V102.679: a narrow window has no right pane, so the opened row carries 🗑 Delete Qn beside Keep
+                const del = node('button', '🗑 Delete Q' + id, 'curate-pane-del curate-row-del'); del.type = 'button';
+                del.title = 'Delete Q' + id + ' from the form now. Nothing is saved until Save Quiz.'; del.dataset.thTitle = 'ลบ Q' + id + ' ออกจากฟอร์มเลย ยังไม่บันทึกจนกด Save Quiz';
+                del.onclick = () => deleteQuestion(s, id); move.before(del);
             }
             const toggle = node('button', open ? '▴' : '▾', 'curate-row-toggle'); toggle.type = 'button';
             toggle.setAttribute('aria-expanded', String(open || (two && s.sel === id))); toggle.setAttribute('aria-label', (two ? 'Show Q' : open ? 'Fold Q' : 'Open Q') + id); toggle.title = open ? 'Fold this question' : 'Choices, explanation, details';

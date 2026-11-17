@@ -84,6 +84,20 @@ const REMOVE = [2, 4, 5, 7, 8, 9, 15, 17, 19, 20];
         assert.equal(v.rows[0], 1, 'the Keep list keeps its order'); assert.equal(v.del, null, 'a kept question has no 🗑');
         await page.click('[data-view="remove"]');
 
+        // narrow window (no right pane): the opened row carries 🗑 Delete Qn beside Keep
+        await page.setViewportSize({ width: 900, height: 1000 }); await page.click('[data-view="remove"]');
+        assert.equal(await page.$eval('#quiz-curate-dialog', d => d.classList.contains('two')), false, 'one column at 900 px');
+        assert.equal(await page.$$eval('.curate-row-del', b => b.length), 0, 'no 🗑 on folded lines');
+        await page.click('#curate-rows [data-question-id="17"] .curate-row-toggle');
+        assert.equal(await page.$eval('#curate-rows [data-question-id="17"] .curate-row-del', b => b.textContent), '🗑 Delete Q17', 'the opened row offers 🗑');
+        await page.click('#curate-rows [data-question-id="17"] .curate-row-del'); v = await view();
+        assert.ok(!v.editor.includes(17) && v.editor.length === 18, 'Q17 left the form (Q19 still deleted): ' + v.editor.join(' '));
+        assert.deepEqual(v.deletedRows.sort((x, y) => x - y), [17, 19], 'the row stays, struck');
+        assert.equal(await page.$eval('#curate-rows .curate-question.open', r => r.dataset.questionId), '15', 'the next one down (Q15) opens');
+        await page.click('#curate-rows [data-question-id="17"] .curate-move'); v = await view();   // ↶ Undo
+        assert.ok(v.editor.includes(17) && v.editor.length === 19, 'Q17 is back');
+        await page.setViewportSize({ width: 1400, height: 1000 }); await page.click('[data-view="remove"]');
+
         // Save as new still works: the deletions were made here, so they are not "the editor changed"
         await page.click('[data-curate-step="save"]'); await page.click('button[data-save="new"]');
         assert.equal(await page.$eval('#curate-save', b => b.disabled), false, 'Save is not blocked by the deletion');
