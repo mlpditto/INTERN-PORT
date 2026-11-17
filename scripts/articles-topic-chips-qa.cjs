@@ -43,42 +43,42 @@ assert.ok(/match \/disease_codex_drafts\/\{draftId\} \{[\s\S]*?allow create: if 
       out.flags = qa('.art-ed .art-ln')[0] ? qa('.art-ed .art-ln')[0].querySelectorAll('.art-c').length && qa('.art-ed .art-ln .art-c').slice(0, 3).map(b => [b.textContent.trim(), b.getAttribute('aria-label'), b.getAttribute('title')]) : null;
       out.rowFlags = qa('.art-row .art-lg').slice(0, 3).map(s => [s.textContent, s.title]);
       // 2. the chip row under the title, before anything is sent
-      const chips = () => qa('.art-xr .art-xc').map(b => b.textContent.trim());
-      out.row0 = [chips(), q('#art-title').nextElementSibling && q('#art-title').nextElementSibling.className, qa('.art-xr .art-xc').map(b => b.className.replace('art-xc', '').trim())];
+      const chips = () => qa('.art-xr .art-xc:not([aria-label="Previous part"])').map(b => b.textContent.trim());
+      out.row0 = [chips(), q('#art-title').nextElementSibling && q('#art-title').nextElementSibling.className, qa('.art-xr .art-xc:not([aria-label="Previous part"])').map(b => b.className.replace('art-xc', '').trim())];
       // 3. 🩺 once → an empty draft: the name without "(…)" and emoji, MPS as the synonym, the TH title, nothing else, no AI
-      qa('.art-xr .art-xc')[0].click(); await wait(120);
+      qa('.art-xr .art-xc:not([aria-label="Previous part"])')[0].click(); await wait(120);
       const add = writes.find(w => w[0] === 'add'), d = add && add[2];
       out.dxDraft = d && [add[1], d.status, d.submittedBy, d.submittedByName, d.sourceArticleId, d.sourceArticleTitle, d.diseaseName, d.thaiName, d.synonyms, d.aiDrafted, d.topicOnly, d.createdAt, d.etiology, Array.isArray(d.references)];
       out.dxArt = writes.find(w => w[0] === 'update' && w[1] === 'articles');
-      out.after = [chips()[0], qa('.art-xr .art-xc')[0].className.replace('art-xc', '').trim(), S.cur.dx, JSON.stringify(S.cur) === S.base, S.list[0].dx && S.list[0].dx.draftId, toasts[toasts.length - 1], ai];
+      out.after = [chips()[0], qa('.art-xr .art-xc:not([aria-label="Previous part"])')[0].className.replace('art-xc', '').trim(), S.cur.dx, JSON.stringify(S.cur) === S.base, S.list[0].dx && S.list[0].dx.draftId, toasts[toasts.length - 1], ai];
       // 4. a ringed chip opens the Codex at Pending Drafts — no second draft
       let opened = 0; const views = []; window.openDiseaseCodexAdmin = () => { opened++; }; window.dxaSwitchView = v => views.push(v);
-      const w1 = writes.length; qa('.art-xr .art-xc')[0].click(); await wait(250);
+      const w1 = writes.length; qa('.art-xr .art-xc:not([aria-label="Previous part"])')[0].click(); await wait(250);
       out.linked = [opened, [...new Set(views)], writes.length - w1, document.getElementById('articlesModal').style.display];
       // 4b. published → the entry
       const edits = []; window.dxaEdit = id => edits.push(id);
       Articles.open(); Articles.edit('a1'); S.list[0].dx = { draftId: 'd9', publishedId: 'pub1', name: 'Myofascial Pain Syndrome' }; Articles.close(); Articles.open(); Articles.edit('a1');
-      out.pubChip = [chips()[0], qa('.art-xr .art-xc')[0].className.replace('art-xc', '').trim()];
-      qa('.art-xr .art-xc')[0].click(); await wait(250); out.pubOpen = edits;
+      out.pubChip = [chips()[0], qa('.art-xr .art-xc:not([aria-label="Previous part"])')[0].className.replace('art-xc', '').trim()];
+      qa('.art-xr .art-xc:not([aria-label="Previous part"])')[0].click(); await wait(250); out.pubOpen = edits;
       // 5. unsaved edits are SAVED first (a scheduled article stays scheduled), then the draft is made
       Articles.open(); Articles.edit('a2'); S.cur.title.en = 'Dengue fever'; const w2 = writes.length;
-      qa('.art-xr .art-xc')[0].click(); await wait(250);
+      qa('.art-xr .art-xc:not([aria-label="Previous part"])')[0].click(); await wait(250);
       const seq = writes.slice(w2).map(w => [w[0], w[1], w[0] === 'update' ? (w[3].status || Object.keys(w[3]).join()) : w[2].diseaseName]);
       out.dirtySend = seq;
       // 6. a name already in the Codex is refused, nothing written
       dxaState.codex = [{ _id: 'x1', diseaseName: 'Hypertension' }];
       Articles.open(); Articles.edit('a1'); S.cur.dx = {}; S.base = JSON.stringify(S.cur); S.cur.title.en = 'Hypertension'; S.base = JSON.stringify(S.cur); const w3 = writes.length;
-      qa('.art-xr .art-xc')[0].click(); await wait(120);
-      out.dup = [(q('.art-err') || {}).textContent, writes.length - w3, qa('.art-xr .art-xc')[0].disabled];
+      qa('.art-xr .art-xc:not([aria-label="Previous part"])')[0].click(); await wait(120);
+      out.dup = [(q('.art-err') || {}).textContent, writes.length - w3, qa('.art-xr .art-xc:not([aria-label="Previous part"])')[0].disabled];
       // 7. 💊: the generic name, the "(…)" names as brand names
       Articles.open(); Articles.edit('a3'); const w4 = writes.length;
-      qa('.art-xr .art-xc')[1].click(); await wait(120);
+      qa('.art-xr .art-xc:not([aria-label="Previous part"])')[1].click(); await wait(120);
       const dadd = writes.slice(w4).find(w => w[0] === 'add'), dd = dadd && dadd[2];
       out.dcDraft = dd && [dadd[1], dd.status, dd.genericName, dd.brandNames, dd.aiDrafted, dd.topicOnly, dd.sourceArticleId];
       out.dcArt = writes.slice(w4).find(w => w[0] === 'update' && w[1] === 'articles' && w[3].dc);
-      out.dcChip = [chips()[1], qa('.art-xr .art-xc')[1].className.replace('art-xc', '').trim()];
+      out.dcChip = [chips()[1], qa('.art-xr .art-xc:not([aria-label="Previous part"])')[1].className.replace('art-xc', '').trim()];
       // 8. 🔗 Quiz opens the Links section on the quiz picker
-      Articles.open(); Articles.edit('a2'); qa('.art-xr .art-xc')[2].click(); await wait(30);
+      Articles.open(); Articles.edit('a2'); qa('.art-xr .art-xc:not([aria-label="Previous part"])')[2].click(); await wait(30);
       out.quiz = [S.open.links, S.pick, !!q('.art-pk, #art-pk-q')];
       out.ai = ai;
       return out;
