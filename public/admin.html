@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.683)</title>
+    <title>Nika Admin (V102.684)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -5981,6 +5981,16 @@
         .pra-fs { display:inline-flex; gap:6px; align-items:center; } .pra-fs:empty { display:none; }
         .pra-chip.pra-f { border-color:#fcd34d; background:#fffbeb; color:#92400e; } .pra-chip.pra-f[aria-pressed="true"] { background:#b45309; border-color:#b45309; color:#fff; }
         .pra-chip.pra-ico { padding:4px 9px; }
+        /* V102.682 (owner pick A, mockup-read-first-inline): ONE row — the 🔁 repeated terms are header chips (the band under it is gone); the card frame
+           says the state (green = done · amber = repeats · grey = empty), so no ✅ pill and no ▾; ✎ appears on hover (always on touch); Jev = its logo */
+        .pra-rt { color:#b45309; font-size:0.85em; margin-left:2px; }
+        .pra-fs .pra-tchip { font-size:0.74em; padding:3px 9px; white-space:nowrap; }
+        .pra-none .pra-fs .pra-chip.pra-f { width:auto; height:auto; padding:4px 10px; border-radius:999px; font-size:0.78em; }
+        .pra-card { border-left:4px solid #22c55e; } .pra-card.has-dup { border-left-color:#f59e0b; } .pra-card.is-empty { border-left-color:#e2e8f0; }
+        .pra-pill.ok, .pra-tg { display:none; }
+        @media (hover:hover) { .pra-card .pra-go { opacity:0; transition:opacity .12s; } .pra-card:hover .pra-go, .pra-card:focus-within .pra-go { opacity:1; } }
+        .pra-chip.pra-jev { display:inline-flex; align-items:center; gap:5px; height:30px; padding:0 7px; border-color:#0f172a; background:#0f172a; color:#5eead4; font-variant-numeric:tabular-nums; white-space:nowrap; }
+        .pra-chip.pra-jev .jev-mark { border-radius:4px; }
         /* V102.646 (owner pick A, mockup-tag-dialog-picker): the ✨ AI suggests tag dialog uses the shared model rail; it wraps in the 440 px dialog; a model waiting for ↻ is ringed amber */
         #qtx-overlay .qtx-rail { flex-wrap:wrap; margin:0 0 12px; }
         #qtx-overlay .qtx-rail > button.qtx-pend { outline:2px solid #d97706; outline-offset:1px; }
@@ -26791,8 +26801,9 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const H = window._praHead(qs, A, parts), title = String((document.getElementById('quiz-title') || {}).value || '').trim();
             // V102.517: no Read first anywhere → one message + ✨ All instead of n empty cards; some missing → a strip above the cards
             const emptyN = qs.filter(x => !x.primer.trim()).length, allEmpty = emptyN === qs.length;
-            const emptyRow = '<div class="pra-hd pra-none"><h3>📖 Read first</h3><span class="pra-sum"><span class="pra-sum-n">' + H.sum + '</span></span>' +   // V102.631: ✨ All + the model rail live in the strip above the questions now
-                '<button type="button" class="pra-chip" onclick="_praClose()" title="Write by hand" data-th-title="เขียนเอง" aria-label="Write by hand">✎</button><button type="button" class="pra-x" onclick="_praClose()" title="Close" aria-label="Close">✕</button></div>';
+            // V102.682 (owner pick A, mockup-read-first-inline): the strip (model · ⚡ m, then dots · ■ m:ss while drafting) sits in this header too — one count, the header's
+            const emptyRow = '<div class="pra-hd pra-none"><h3>📖 Read first</h3><span class="pra-sum"><span class="pra-sum-n">' + H.sum + '</span></span><span class="pra-fs lang-no-toggle" id="pra-filters">' + H.filters + '</span>' +   // V102.631: ✨ All + the model rail live in the strip above the questions now
+                '<span class="pra-chips"><span id="pra-tools"></span><button type="button" class="pra-chip" onclick="_praClose()" title="Write by hand" data-th-title="เขียนเอง" aria-label="Write by hand">✎</button><button type="button" class="pra-x" onclick="_praClose()" title="Close" aria-label="Close">✕</button></span></div>';
             const body = allEmpty ? ''
                 : cards;   // V102.633: n/N + ⚡ are in the strip under the header
             window._praParkStrip(); if (typeof window._praParkWatch === 'function') window._praParkWatch(); const old = document.getElementById('praOverlay'); if (old) old.remove();
@@ -26800,13 +26811,12 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             ov.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:100000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);';
             ov.innerHTML = '<div class="pra" role="dialog" aria-label="Read first of every question">' +
                 '<div class="pra-tabs lang-no-toggle" role="tablist"><button type="button" class="pra-tab" role="tab" data-t="read" aria-selected="true" onclick="_praTab(\'read\')">📖 Read first</button><button type="button" class="pra-tab" role="tab" data-t="watch" aria-selected="false" onclick="_praTab(\'watch\')" title="A short story or film the intern sees before question 1"><span class="rf-w">🎬 Watch first</span></button><button type="button" class="pra-x" onclick="_praClose()" title="Close" aria-label="Close">✕</button></div>' +   // V102.670 (owner pick A2)
-                (allEmpty ? emptyRow : '<div class="pra-hd pra-one"><h3 title="Read first" aria-label="Read first">📖' + (title ? '' : ' Read first') + '</h3><span class="pra-sum">' + (title ? '<b class="pra-title">' + escapeHtml(title) + '</b> · ' : '') + '<span class="pra-sum-n">' + H.sum + '</span></span><span class="pra-fs" id="pra-filters">' + H.filters + '</span>' +   // V102.644 (pick A): one row
+                (allEmpty ? emptyRow : '<div class="pra-hd pra-one"><h3 title="Read first" aria-label="Read first">📖' + (title ? '' : ' Read first') + '</h3><span class="pra-sum">' + (title ? '<b class="pra-title">' + escapeHtml(title) + '</b> · ' : '') + '<span class="pra-sum-n">' + H.sum + '</span></span><span class="pra-fs lang-no-toggle" id="pra-filters">' + H.filters + '</span>' +   // V102.644 (pick A): one row · V102.682: the 🔁 term chips (user text) live here, never hidden by the EN/TH toggle
                 '<span class="pra-chips"><span id="pra-tools"></span>' +   // V102.644: the strip (model · ⚡ m) is seated here; the ⚠️ / ≡ counts on the left are the filters
-                '<button type="button" class="pra-chip" id="pra-jev-btn" onclick="jevPrimerRepeats.run(this)" title="Jev compares the term lines across questions and lists the same content under different terms. Nothing changes" data-th-title="Jev เทียบบรรทัดคำศัพท์ข้ามข้อ แล้วบอกเนื้อหาซ้ำที่ใช้คำต่างกัน ไม่แก้อะไรให้" aria-label="Jev repeats">Jev</button>' +
+                '<button type="button" class="pra-chip pra-jev" id="pra-jev-btn" onclick="jevPrimerRepeats.run(this)" title="Jev compares the term lines across questions and lists the same content under different terms. Nothing changes" data-th-title="Jev เทียบบรรทัดคำศัพท์ข้ามข้อ แล้วบอกเนื้อหาซ้ำที่ใช้คำต่างกัน ไม่แก้อะไรให้" aria-label="Jev repeats">' + (typeof window.jevMarkHtml === 'function' ? window.jevMarkHtml(16) : 'Jev') + '</button>' +   // V102.682: Jev = its logo (owner rule V102.444)
                 '<button type="button" class="pra-chip pra-xa pra-ico" aria-pressed="false" onclick="_praOpenAll()" title="Open every card — the Read first boxes, editable here · เปิดทุกข้อ แก้ได้ทันที" aria-label="Open all">⤢</button>' +
                 '<button type="button" class="pra-x" onclick="_praClose()" title="Close" aria-label="Close">✕</button></span></div>') +
-                '<div id="pra-model-row" class="pra-model-row lang-no-toggle" hidden></div>' +
-                '<div class="pra-terms lang-no-toggle"' + (H.chips ? '' : ' hidden') + '><span class="lab" title="Repeated most">🔁</span>' + H.chips + '</div>' +
+                '<div id="pra-model-row" class="pra-model-row lang-no-toggle" hidden></div>' +   // V102.682: the 🔁 band is gone — its chips are in the header (#pra-filters)
                 '<div id="pra-jev" class="jpr-box lang-no-toggle" hidden></div><div class="pra-body">' + body + '</div><div id="pra-watch" class="lang-no-toggle" role="tabpanel"></div></div>';
             ov.addEventListener('click', e => { if (e.target === ov) window._praClose(); });
             document.body.appendChild(ov);
@@ -26866,8 +26876,11 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const filledN = qs.filter(x => x.primer.trim()).length, qRt = parts.filter(P => P.rt).length, qEq = parts.filter(P => P.eq).length, pl = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
             const sum = allEmpty ? qs.length + ' Q' : '<span class="pra-nn' + (filledN === qs.length ? ' ok' : '') + '" title="Questions with a Read first · ข้อที่มี Read first แล้ว">' + filledN + '/' + qs.length + (filledN === qs.length ? ' ✓' : '') + '</span> · <span title="Terms in bold · คำศัพท์ตัวหนา">🔤 ' + A.groups.length + '</span>';
             const fchip = (f, label, n, tip) => n ? '<button type="button" class="pra-chip pra-f" data-f="' + f + '" aria-pressed="false" onclick="_praFilter(\'' + f + '\')" title="' + tip + ' — tap to show only those, tap again for all" aria-label="' + tip + '">' + label + ' ' + n + '</button>' : '';
-            const filters = fchip('dup', '⚠️', dupG.length, pl(dupG.length, 'term') + ' repeated in ' + pl(qRt, 'question')) + fchip('eq', '≡', eqLines, pl(eqLines, 'identical line') + ' in ' + pl(qEq, 'question'));
-            const chips = dupG.slice(0, 8).map(g => '<button type="button" class="pra-tchip" data-g="' + g.i + '" aria-pressed="false" onclick="_praTerm(this)" title="' + escapeHtml([...g.forms].join(' / ')) + '"><b>' + escapeHtml(g.label) + '</b> ×' + g.qs.length + '<span>' + qref(g.qs) + '</span></button>').join('');
+            // V102.682 (owner pick A, mockup-read-first-inline): the 🔁 band moved into this row — the top 3 repeated terms are the filters (tap = only their
+            // questions), "+n" = every question that repeats a term (the old ⚠️ n); ≡ n stays
+            const chips = dupG.slice(0, 3).map(g => '<button type="button" class="pra-tchip" data-g="' + g.i + '" aria-pressed="false" onclick="_praTerm(this)" title="' + escapeHtml([...g.forms].join(' / ')) + ' — tap to show only ' + qref(g.qs) + ', tap again for all"><b>' + escapeHtml(g.label) + '</b> ×' + g.qs.length + '<span>' + qref(g.qs) + '</span></button>').join('');
+            const rt = dupG.length ? '<span class="pra-rt" title="' + pl(dupG.length, 'term') + ' repeated in ' + pl(qRt, 'question') + '" aria-hidden="true">🔁</span>' + chips + (dupG.length > 3 ? '<button type="button" class="pra-chip pra-f" data-f="dup" aria-pressed="false" onclick="_praFilter(\'dup\')" title="' + pl(dupG.length, 'term') + ' repeated in ' + pl(qRt, 'question') + ' — tap to show only those, tap again for all" aria-label="' + pl(dupG.length, 'term') + ' repeated">+' + (dupG.length - 3) + '</button>' : '') : '';
+            const filters = rt + fchip('eq', '≡', eqLines, pl(eqLines, 'identical line') + ' in ' + pl(qEq, 'question'));
             return { sum, chips, dupN: dupG.length, filters };
         };
         // V102.520: open / close a card (✎ opens and focuses its box); ⤢ Open all / ⤡ Close all
@@ -26905,11 +26918,13 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
                 const tl = c.querySelector('.pra-tl'); if (tl) tl.innerHTML = parts[i].tl;
             });
             const sum = ov.querySelector('.pra-sum-n'); if (sum) sum.innerHTML = H.sum;
+            const wasG = ((ov.querySelector('.pra-tchip[aria-pressed="true"]') || {}).dataset || {}).g;   // V102.682: a 🔁 term filter survives the repaint
             const fs = ov.querySelector('#pra-filters'), was = ((ov.querySelector('.pra-f[aria-pressed="true"]') || {}).dataset || {}).f || 'all'; if (fs) fs.innerHTML = H.filters;   // V102.644: the filter chips follow the counts
             const emptyN = qs.filter(x => !x.primer.trim()).length, strip = ov.querySelector('.pra-strip');
             if (strip) { const n = strip.firstChild; if (n && n.nodeType === 3) n.textContent = '⚪ ' + emptyN + ' of ' + qs.length + ' empty'; strip.hidden = !emptyN; }
-            const terms = ov.querySelector('.pra-terms'); if (terms) { terms.innerHTML = '<span class="lab" title="Repeated most">🔁</span>' + H.chips; terms.hidden = !H.chips; }
-            window._praFilter(ov.querySelector('.pra-f[data-f="' + was + '"]') ? was : 'all', true);   // keep the filter that was on; it falls back to all when its count reached 0
+            const tc = wasG != null && ov.querySelector('.pra-tchip[data-g="' + wasG + '"]');
+            if (tc) window._praTerm(tc);
+            else window._praFilter(ov.querySelector('.pra-f[data-f="' + was + '"]') ? was : 'all', true);   // keep the filter that was on; it falls back to all when its count reached 0
         };
         window._praEsc = function (e) { if (e.key === 'Escape') window._praClose(); };
         window._praClose = function () { window._praParkStrip(); if (typeof window._praParkWatch === 'function') window._praParkWatch(); const ov = document.getElementById('praOverlay'); if (ov) ov.remove(); document.removeEventListener('keydown', window._praEsc); };
@@ -26918,13 +26933,19 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             const cur = ((document.querySelector('#praOverlay .pra-f[aria-pressed="true"]') || {}).dataset || {}).f || 'all'; if (!keep && f === cur) f = 'all';
             const cls = { dup: 'has-rt', eq: 'has-eq' }[f];
             document.querySelectorAll('#praOverlay .pra-f').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.f === f)));
+            document.querySelectorAll('#praOverlay .pra-tchip').forEach(c => c.setAttribute('aria-pressed', 'false'));   // V102.682: one filter at a time
+            document.querySelectorAll('#praOverlay .pra-t.dup.on').forEach(m => m.classList.remove('on'));
             document.querySelectorAll('#praOverlay .pra-card').forEach(c => { c.hidden = !!cls && !c.classList.contains(cls); });
             if (typeof window._praOpenAllSync === 'function') window._praOpenAllSync();
         };
+        // V102.682 (owner pick A): a 🔁 chip in the header marks its term AND shows only the questions that use it; tap again = all
         window._praTerm = function (btn) {
-            const on = btn.getAttribute('aria-pressed') !== 'true';
+            const on = btn.getAttribute('aria-pressed') !== 'true', g = btn.dataset.g;
+            document.querySelectorAll('#praOverlay .pra-f').forEach(c => c.setAttribute('aria-pressed', 'false'));
             document.querySelectorAll('#praOverlay .pra-tchip').forEach(c => c.setAttribute('aria-pressed', String(on && c === btn)));
-            document.querySelectorAll('#praOverlay .pra-t.dup').forEach(m => m.classList.toggle('on', on && m.dataset.g === btn.dataset.g));
+            document.querySelectorAll('#praOverlay .pra-t.dup').forEach(m => m.classList.toggle('on', on && m.dataset.g === g));
+            document.querySelectorAll('#praOverlay .pra-card').forEach(c => { c.hidden = on && !c.querySelector('.pra-t.dup[data-g="' + g + '"]'); });
+            if (typeof window._praOpenAllSync === 'function') window._praOpenAllSync();
         };
         window._praGo = function (i) {
             window._praClose();
@@ -27107,7 +27128,8 @@ SELF-CHECK before responding: re-read the LANGUAGE CONTRACT above. If any string
             // V102.514 (owner): the button counts the time the AI has used — "⏳ 4/10 · 0:47" — and the toast gives the total
             const fmt = ms => { const sec = Math.round(ms / 1000); return sec < 60 ? sec + ' s' : Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); };
             let done = 0, failed = 0, leaks = 0, i = 0, pos = '';
-            const paint = () => { if (_qPrimerAllRunning && !_qPrimerAllStop) btn.innerHTML = `${strip ? '■' : '<i class="fa-solid fa-spinner fa-spin"></i>'} ${pos} · ${fmt(Date.now() - t0)}`; };
+            // V102.682 (owner pick A): in the 📖 window the dots already say which question — the strip button is ■ and the time only
+            const paint = () => { if (_qPrimerAllRunning && !_qPrimerAllStop) btn.innerHTML = strip ? `■ ${fmt(Date.now() - t0)}` : `<i class="fa-solid fa-spinner fa-spin"></i> ${pos} · ${fmt(Date.now() - t0)}`; };
             const tick = setInterval(paint, 1000);
             try {
                 for (; i < todo.length; i++) {

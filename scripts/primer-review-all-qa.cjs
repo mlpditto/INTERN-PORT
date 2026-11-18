@@ -55,7 +55,9 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
         const sum = (await ov.locator('.pra-sum').innerText()).replace(/\s+/g, ' ');
         // V102.644 (owner pick A, one row): n/N instead of "N Q" (said once), no zeros; ⚠️ n / ≡ n are filter chips beside it and exist only above 0; no "All" chip
         assert.match(sum, /^E4 sample · 3\/4 · 🔤 4$/, 'header: title · n/N · terms: ' + sum);
-        assert.deepEqual(await ov.locator('#pra-filters .pra-f').evaluateAll(bs => bs.map(b => [b.textContent.trim(), b.dataset.f, b.getAttribute('aria-pressed'), b.getAttribute('aria-label')])), [['⚠️ 1', 'dup', 'false', '1 term repeated in 3 questions'], ['≡ 1', 'eq', 'false', '1 identical line in 2 questions']], 'the counts are the filters');
+        // V102.682 (owner pick A, mockup-read-first-inline): the 🔁 term chips are IN the header row (no band, no ⚠️ n when ≤ 3 terms repeat); ≡ n stays
+        assert.deepEqual(await ov.locator('#pra-filters .pra-f').evaluateAll(bs => bs.map(b => [b.textContent.trim(), b.dataset.f, b.getAttribute('aria-pressed'), b.getAttribute('aria-label')])), [['≡ 1', 'eq', 'false', '1 identical line in 2 questions']], 'the counts are the filters');
+        assert.deepEqual(await ov.evaluate(o => [o.querySelectorAll('.pra-terms').length, o.querySelectorAll('.pra-hd #pra-filters .pra-tchip').length, o.querySelector('#pra-filters .pra-rt').title]), [0, 1, '1 term repeated in 3 questions'], 'the 🔁 chip sits in the header; the band under it is gone');
         assert.deepEqual([await ov.locator('.pra-chip[data-f="all"]').count(), await ov.locator('.pra-nn').evaluate(n => n.classList.contains('ok')), await ov.locator('.pra-hd h3').evaluate(h => [h.textContent.trim(), h.getAttribute('aria-label')])], [0, false, ['📖', 'Read first']], 'no All chip; n/N not green yet; the title is the icon when the quiz has a name');
         const cards = await ov.locator('.pra-card').evaluateAll(cs => cs.map(c => ({ q: c.dataset.q, dup: c.classList.contains('has-dup'), pill: c.querySelector('.pra-pill').textContent.trim(), pillTitle: c.querySelector('.pra-pill').title, marks: [...c.querySelectorAll('.pra-t.dup')].map(m => m.firstChild.textContent + '|' + m.querySelector('i').textContent), eq: [...c.querySelectorAll('.pra-t.eq')].map(e => e.textContent), terms: [...c.querySelectorAll('.pra-t:not(.hint)')].length, open: c.classList.contains('open'), noToggle: c.classList.contains('lang-no-toggle'), empty: c.classList.contains('is-empty') && !c.querySelector('.pra-md'), stem: c.querySelector('.pra-stem').textContent })));
         assert.deepEqual(cards.map(c => [c.q, c.dup, c.pill, c.marks, c.eq, c.empty]), [
@@ -69,31 +71,31 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
         assert.deepEqual(cards.map(c => [c.terms, c.open, c.noToggle]), [[2, false, true], [3, false, true], [3, false, true], [0, false, true]], 'closed strips: ' + JSON.stringify(cards.map(c => [c.terms, c.open])));
         assert.equal((await ov.locator('.pra-card[data-q="3"] .pra-t.hint').innerText()).trim(), '⚡ above or write it here');
         assert.equal(await ov.locator('.pra-card .pra-ed').evaluateAll(es => es.every(e => getComputedStyle(e).display === 'none')), true, 'no box is open');
-        assert.equal(await ov.locator('.pra-terms').evaluate(t => t.classList.contains('lang-no-toggle')), true, 'the 🔁 chips carry user terms — never hidden by the EN/TH toggle');
+        assert.equal(await ov.locator('#pra-filters').evaluate(t => t.classList.contains('lang-no-toggle')), true, 'the 🔁 chips carry user terms — never hidden by the EN/TH toggle');
         // V102.633: the strip (n/N · model · ⚡ m) sits under the window's header
         assert.deepEqual(await ov.evaluate(o => { const s = o.querySelector('#q-primer-strip'); return s && [s.hidden, s.parentElement.id, !!s.closest('.pra-hd .pra-chips'), getComputedStyle(s.querySelector('.qps-n')).display, getComputedStyle(s).borderTopWidth, s.querySelector('.qps-go').textContent.trim(), !!s.querySelector('.qps-model'), o.querySelectorAll('.pra-strip').length]; }), [false, 'pra-tools', true, 'none', '0px', '1', true, 0], 'V102.644: the strip (model · ⚡ m) sits in the header row without its frame; its n/N is not shown a second time');
         assert.ok(await ov.locator('.pra-hd').evaluate(h => h.getBoundingClientRect().height <= 56), 'the header is ONE row at 1200 px');
         assert.equal(await ov.locator('.pra-none').count(), 0, 'no empty state while some have a Read first');
-        assert.equal(await ov.locator('.pra-f[data-f="dup"]').isDisabled(), false, 'the ⚠️ filter is live when something repeats');
+        assert.equal(await ov.locator('.pra-f[data-f="dup"]').count(), 0, 'V102.682: no "+n" chip while 3 or fewer terms repeat');
         assert.ok(!cards[0].marks.some(m => /ศัพท์สำคัญ|ความรู้พื้นฐาน/.test(m)), 'bold headings are not terms');
         assert.equal(cards[3].stem, 'Empty one?');
         const chips = await ov.locator('.pra-tchip').evaluateAll(cs => cs.map(c => c.textContent.replace(/\s+/g, ' ').trim()));
         assert.deepEqual(chips, ['Estetrol (E4) ×3Q1 Q2 Q3'], 'one repeated-term chip (the alias forms merged): ' + JSON.stringify(chips));
 
         // filter + term chip
-        await ov.locator('.pra-chip[data-f="dup"]').evaluate(b => b.click());
-        assert.deepEqual(await ov.locator('.pra-card').evaluateAll(cs => cs.map(c => c.hidden)), [false, false, false, true], '⚠️ hides the unique / empty card');
-        assert.deepEqual(await ov.locator('#pra-filters .pra-f').evaluateAll(bs => bs.map(b => b.getAttribute('aria-pressed'))), ['true', 'false']);
+        await ov.locator('.pra-tchip').first().evaluate(b => b.click());   // V102.682: a 🔁 chip = only the questions that use its term
+        assert.deepEqual(await ov.locator('.pra-card').evaluateAll(cs => cs.map(c => c.hidden)), [false, false, false, true], '🔁 hides the card without the term');
+        assert.equal(await ov.locator('.pra-tchip').first().getAttribute('aria-pressed'), 'true');
         await ov.locator('.pra-f[data-f="eq"]').evaluate(b => b.click());
         assert.deepEqual(await ov.locator('.pra-card').evaluateAll(cs => cs.map(c => c.hidden)), [true, false, false, true], '≡ shows only the questions that share an identical line');
-        assert.deepEqual(await ov.locator('#pra-filters .pra-f').evaluateAll(bs => bs.map(b => b.getAttribute('aria-pressed'))), ['false', 'true'], 'one filter at a time');
+        assert.deepEqual([await ov.locator('#pra-filters .pra-f').evaluateAll(bs => bs.map(b => b.getAttribute('aria-pressed'))), await ov.locator('.pra-tchip').first().getAttribute('aria-pressed'), await ov.locator('.pra-t.dup.on').count()], [['true'], 'false', 0], 'one filter at a time');
         await ov.locator('.pra-f[data-f="eq"]').evaluate(b => b.click());   // V102.644: tapping the pressed filter again = all
         assert.deepEqual(await ov.locator('.pra-card').evaluateAll(cs => cs.map(c => c.hidden)), [false, false, false, false]);
-        assert.deepEqual([await ov.locator('#pra-filters .pra-f[aria-pressed="true"]').count(), await ov.locator('.pra-xa').getAttribute('aria-pressed'), await ov.locator('#pra-jev-btn').evaluate(b => [b.textContent.trim(), b.getAttribute('aria-label'), b.hasAttribute('aria-pressed')])], [0, 'false', ['Jev', 'Jev repeats', false]], 'a filter tap presses only filter chips');
+        assert.deepEqual([await ov.locator('#pra-filters .pra-f[aria-pressed="true"]').count(), await ov.locator('.pra-xa').getAttribute('aria-pressed'), await ov.locator('#pra-jev-btn').evaluate(b => [b.textContent.trim(), !!b.querySelector('img.jev-mark'), b.getAttribute('aria-label'), b.hasAttribute('aria-pressed')])], [0, 'false', ['', true, 'Jev repeats', false]], 'a filter tap presses only filter chips; V102.682: Jev is its logo, named in aria-label');
         await ov.locator('.pra-tchip').first().evaluate(b => b.click());
         assert.equal(await ov.locator('.pra-t.dup.on').count(), 3, 'the term chip outlines its three strip chips');
         await ov.locator('.pra-tchip').first().evaluate(b => b.click());
-        assert.equal(await ov.locator('.pra-t.dup.on').count(), 0, 'and toggles off');
+        assert.deepEqual([await ov.locator('.pra-t.dup.on').count(), await ov.locator('.pra-card').evaluateAll(cs => cs.filter(c => c.hidden).length)], [0, 0], 'and toggles off: every card again');
 
         // V102.520: ✎ Q3 opens the card HERE (the popup stays), its box has the focus and the question's Read first; the header toggles
         await ov.locator('.pra-card[data-q="2"] .pra-go').evaluate(b => b.click());   // the handler is what is under test; pointer geometry inside the fixed overlay is flaky headless
@@ -112,7 +114,7 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
         // ⤢ Open all opens every visible card and becomes ⤡ Close all; the filter keeps it honest
         await ov.locator('.pra-xa').evaluate(b => b.click());
         assert.deepEqual(await page.evaluate(() => [[...document.querySelectorAll('#praOverlay .pra-card')].every(c => c.classList.contains('open')), document.querySelector('#praOverlay .pra-xa').textContent.trim() + '|' + document.querySelector('#praOverlay .pra-xa').getAttribute('aria-label'), document.querySelector('#praOverlay .pra-xa').getAttribute('aria-pressed')]), [true, '⤡|Close all', 'true']);
-        assert.deepEqual(await ov.locator('#pra-filters .pra-f').evaluateAll(bs => bs.map(b => b.textContent.trim())), ['⚠️ 1', '≡ 1'], 'the filter chips follow the live re-check (Q3 no longer repeats the term: still 1 term, in 2 questions)');
+        assert.deepEqual(await ov.locator('#pra-filters').evaluate(f => [[...f.querySelectorAll('.pra-f')].map(b => b.textContent.trim()), f.querySelector('.pra-rt').title]), [['≡ 1'], '1 term repeated in 2 questions'], 'the filter chips follow the live re-check (Q3 no longer repeats the term: still 1 term, in 2 questions)');
         await ov.locator('.pra-xa').evaluate(b => b.click());
         assert.deepEqual(await page.evaluate(() => [[...document.querySelectorAll('#praOverlay .pra-card')].some(c => c.classList.contains('open')), document.querySelector('#praOverlay .pra-xa').textContent.trim()]), [false, '⤢']);
         // the pager was never touched
@@ -135,20 +137,21 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
         assert.deepEqual([await page.locator('#praOverlay').count(), await page.locator('#praOverlay .pra-card').count()], [1, 0], 'the window, no cards yet');
         const strip = page.locator('#praOverlay #q-primer-strip');
         assert.equal((await strip.locator('.qps-go').innerText()).trim(), '4'); assert.equal(await strip.locator('.qps-go').getAttribute('aria-label'), 'Draft Read first for 4 questions');
+        assert.deepEqual(await page.evaluate(() => { const s = document.querySelector('#praOverlay #q-primer-strip'), hd = document.querySelector('#praOverlay .pra-none'); return [s.parentElement.id, !!s.closest('.pra-none'), getComputedStyle(s.querySelector('.qps-n')).display, hd.getBoundingClientRect().height <= 60]; }), ['pra-tools', true, 'none', true], 'V102.682: nothing written yet → the strip sits in the header too (one row, its own n/N never shown)');
         {
             await strip.locator('.qps-model').evaluate(b => b.click());
-            assert.ok(await strip.locator('.pra-model .text-ai-chips button').count() > 0, 'the model rail opens in the strip');
-            const next = await page.evaluate(() => { const cur = document.querySelector('.q-primer-model').value; const b = [...document.querySelectorAll('#q-primer-strip .text-ai-chips button')].find(x => x.dataset.value !== cur); window._praPickModel(b.dataset.value); return b.dataset.value; });
+            assert.ok(await page.locator('#praOverlay #pra-model-row .text-ai-chips button').count() > 0, 'V102.682: the strip is in the header, so the model rail opens as the row under it');
+            const next = await page.evaluate(() => { const cur = document.querySelector('.q-primer-model').value; const b = [...document.querySelectorAll('#pra-model-row .text-ai-chips button')].find(x => x.dataset.value !== cur); window._praPickModel(b.dataset.value); return b.dataset.value; });
             const after = await page.evaluate(() => ({ rows: [...new Set([...document.querySelectorAll('#quizManageModal .q-primer-model')].map(i => i.value))], stored: localStorage.getItem('ai_primer_model') }));
             assert.deepEqual(after, { rows: [next], stored: next }, 'one pick everywhere: ' + JSON.stringify(after));
-            assert.equal(await strip.locator('.pra-model').count(), 0, 'the rail closes on a pick');
+            assert.equal(await page.locator('#praOverlay #pra-model-row').evaluate(r => r.hidden), true, 'the rail closes on a pick');
         }
         // a run: dots and ■ i/n, a press stops, the rest stays to do; a full run ends green with Review
         await page.evaluate(() => { window.__gate = []; window._qPrimerDraft = btn => new Promise(res => window.__gate.push(() => { btn.closest('.quiz-q-item').querySelector('.q-primer').value = '**T** x'; res('ok'); })); });
         await strip.locator('.qps-go').evaluate(b => b.click());
         await page.waitForFunction(() => window.__gate.length === 1);
         assert.equal(await strip.locator('.qps-slot i').count(), 4); assert.equal(await strip.locator('.qps-model').count(), 0, 'dots replace the model');
-        assert.match((await strip.locator('.qps-go').innerText()).trim(), /^■ 1\/4 · \d+ s$/);
+        assert.match((await strip.locator('.qps-go').innerText()).trim(), /^■ \d+ s$/, 'V102.682: ■ and the time only — the dots say which question');
         await strip.locator('.qps-go').evaluate(b => b.click());
         await page.evaluate(() => window.__gate.shift()());
         await page.waitForFunction(() => document.querySelector('#praOverlay #q-primer-strip .qps-model'));
@@ -167,7 +170,7 @@ const P3 = '**ศัพท์สำคัญ**\n- **HPO axis** — hypothalamic-
         await page.evaluate(() => _praClose());
         // V102.644: nothing repeated → no filter chips at all (zeros are not drawn); the model rail opens as a row UNDER the one-row header and closes on a pick
         await page.evaluate(() => { document.querySelectorAll('.quiz-q-item .q-primer').forEach((t, i) => { t.value = '**Only' + i + '** x'; }); _qPrimerStrip(); _qPrimerReviewAll(); });
-        assert.deepEqual(await page.evaluate(() => { const f = document.querySelector('#praOverlay #pra-filters'); return [f.children.length, getComputedStyle(f).display, document.querySelector('#praOverlay .pra-sum').innerText.replace(/\s+/g, ' '), document.querySelector('#praOverlay .pra-terms').hidden]; }), [0, 'none', 'E4 sample · 4/4 ✓ · 🔤 4', true], 'all written, nothing repeated: title · 4/4 ✓ · 🔤 4 and nothing else on the left');
+        assert.deepEqual(await page.evaluate(() => { const f = document.querySelector('#praOverlay #pra-filters'); return [f.children.length, getComputedStyle(f).display, document.querySelector('#praOverlay .pra-sum').innerText.replace(/\s+/g, ' '), document.querySelectorAll('#praOverlay .pra-terms').length === 0]; }), [0, 'none', 'E4 sample · 4/4 ✓ · 🔤 4', true], 'all written, nothing repeated: title · 4/4 ✓ · 🔤 4 and nothing else on the left');
         await page.locator('#praOverlay .pra-hd .qps-model').evaluate(b => b.click());
         assert.deepEqual(await page.evaluate(() => { const r = document.getElementById('pra-model-row'), hd = document.querySelector('#praOverlay .pra-hd'); return [r.hidden, r.querySelectorAll('.text-ai-chips button').length > 0, !!document.querySelector('#q-primer-strip .pra-model'), r.getBoundingClientRect().top >= hd.getBoundingClientRect().bottom - 1, hd.getBoundingClientRect().height <= 56]; }), [false, true, false, true, true], 'the rail is a row under the header; the header stays one row');
         { const next = await page.evaluate(() => { const cur = document.querySelector('.q-primer-model').value; const b = [...document.querySelectorAll('#pra-model-row .text-ai-chips button')].find(x => x.dataset.value !== cur); window._praPickModel(b.dataset.value); return b.dataset.value; });

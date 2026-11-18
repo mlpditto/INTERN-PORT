@@ -18,7 +18,7 @@ const js = fs.readFileSync('public/jev-primer-repeats.js', 'utf8'), css = fs.rea
                 window._praOpen = (i, f) => window.__open.push([i, f]);
                 window.showToast = () => {};
                 window.adminApp = { functions: () => ({ httpsCallable: n => async d => { window.__calls.push([n, d]); return { data: window.__next }; } }) };
-                document.getElementById('b').onclick = e => jevPrimerRepeats.run(e.target);
+                document.getElementById('b').onclick = e => jevPrimerRepeats.run(e.currentTarget);   // the button (admin.html passes `this`), never the logo inside it
             });
             await page.click('#b');
             await page.waitForSelector('.jpr-row');
@@ -33,15 +33,16 @@ const js = fs.readFileSync('public/jev-primer-repeats.js', 'utf8'), css = fs.rea
             await page.click('#b');
             await page.waitForFunction(() => document.getElementById('pra-jev').innerText.includes('no repeats'));
             // V102.658: while Jev works the button counts the seconds; it stops and goes back to its own text when Jev answers
-            await page.evaluate(() => { window.adminApp = { functions: () => ({ httpsCallable: () => () => new Promise(res => { window.__release = () => res({ data: window.__next }); }) }) }; });
+            // V102.682: the button is Jev's logo — the logo stays beside the clock, and the button gets its own html back after
+            await page.evaluate(() => { window.jevMarkHtml = () => '<img class="jev-mark" alt="Jev">'; document.getElementById('b').innerHTML = '<img class="jev-mark" alt="Jev">'; window.adminApp = { functions: () => ({ httpsCallable: () => () => new Promise(res => { window.__release = () => res({ data: window.__next }); }) }) }; });
             await page.click('#b');
-            assert.equal(await page.locator('#b').textContent(), '⏳ Jev 0:00', 'the clock starts at once'); assert.equal(await page.locator('#b').isDisabled(), true);
-            await page.waitForFunction(() => document.getElementById('b').textContent === '⏳ Jev 0:01', null, { timeout: 3000 });
-            await page.waitForFunction(() => document.getElementById('b').textContent === '⏳ Jev 0:02', null, { timeout: 3000 });
+            assert.deepEqual([await page.locator('#b').textContent(), await page.locator('#b img.jev-mark').count()], [' ⏳ 0:00', 1], 'the clock starts at once, beside the logo'); assert.equal(await page.locator('#b').isDisabled(), true);
+            await page.waitForFunction(() => document.getElementById('b').textContent === ' ⏳ 0:01', null, { timeout: 3000 });
+            await page.waitForFunction(() => document.getElementById('b').textContent === ' ⏳ 0:02', null, { timeout: 3000 });
             await page.evaluate(() => window.__release());
-            await page.waitForFunction(() => document.getElementById('b').textContent === 'Jev repeats' && !document.getElementById('b').disabled);
+            await page.waitForFunction(() => document.getElementById('b').innerHTML === '<img class="jev-mark" alt="Jev">' && !document.getElementById('b').disabled);
             await page.waitForTimeout(1200);
-            assert.equal(await page.locator('#b').textContent(), 'Jev repeats', 'the clock is stopped');
+            assert.equal(await page.locator('#b').innerHTML(), '<img class="jev-mark" alt="Jev">', 'the clock is stopped, the logo alone again');
             assert.deepEqual(errs, []);
             await page.close();
         }
