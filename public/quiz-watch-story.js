@@ -116,7 +116,7 @@
     function paint() {
         if (typeof window._qeWatchChip === 'function') window._qeWatchChip();   // V102.670: the 🎬 half of the chip beside Review follows the story
         var el = box(), btn = document.getElementById('qws-make'); if (!el) return;
-        if (btn) { btn.disabled = S.busy; btn.textContent = S.busy && !S.voicing ? '✨ ' + Math.floor((Date.now() - S.t0) / 1000) + ' s' : '✨ From Read first'; }
+        if (btn) { btn.disabled = S.busy; btn.textContent = S.busy && !S.voicing && !S.pxing ? '✨ ' + Math.floor((Date.now() - S.t0) / 1000) + ' s' : '✨ From Read first'; }
         var st = S.story;
         if (!st && !S.err) { el.hidden = true; el.innerHTML = ''; return; }
         el.hidden = false;

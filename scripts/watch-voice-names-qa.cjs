@@ -70,6 +70,11 @@ const U = k => 'https://firebasestorage.googleapis.com/v0/b/x/o/' + k + '.mp3?al
   await page.waitForFunction(() => document.querySelector('#qws-box .qws-sv'));
   ok(/^qws-sv new\|💾 save the quiz once$/.test(await sv()) && (await page.evaluate(() => window.__writes.length)) === 4, 'a quiz never saved (no id): no write, the header asks for one Save first');
 
+  console.log('✨ button while Paxa voices (V102.685)');
+  await page.evaluate(() => { const S = QuizWatchStory._S; S.t0 = 0; S.busy = true; S.pxing = { done: 1, total: 4 }; QuizWatchStory.paxaFilter(''); });
+  ok((await page.$eval('#qws-make', b => b.textContent)) === '✨ From Read first', 'a Paxa run is not a story being written — ✨ keeps its name (it showed seconds since 1970)');
+  await page.evaluate(() => { const S = QuizWatchStory._S; S.busy = false; S.pxing = null; QuizWatchStory.paxaFilter(''); });
+
   console.log('other languages');
   await page.evaluate(() => QuizWatchStory.set({ lang: 'en', lines: [{ w: 'q', t: 'Why?', q: [1] }, { w: 'rx', t: 'Because.', q: [1] }] }));
   ok((await rows()).every(x => x === ''), 'an English story names no AI voice (the phone voice reads it)');
