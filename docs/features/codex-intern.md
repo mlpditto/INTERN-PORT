@@ -14,6 +14,7 @@ Intern: home ▸ DD Codex; Poneglyph ▸ My Path; Submit New ▸ ⋯ ▸ Drug / 
 - `drug-page-lean-qa` — Drug entry: TH ⌄ | ✨ pill, full-width chips, sticky folding head, lit rail, dosing lines
 - `drug-detail-c-qa` — V101.309 owner pick C (mockup-drug-detail-lean): the drug entry is grouped by the counter questions — 💊 How to give · ⛔ Who must not · ⚠️ What to watch · 🗣 Tell the patient · 🧬 Why it works · 🔗 (👶 first when there is a peds dose); same fields regrouped, Thai titles + field names on a Thai page, an empty question is left out
 - `drug-story-card-qa` — V101.322 owner pick B (mockup-drug-story): the first file of an entry is a card at the top of the body (⬇ Download), other files stay head chips; 🚩 Refer now (`redFlags`) after ⛔; 🇹🇭 Indication (Thai FDA) (`indicationThFda`) first under 💊; a section 📋 starts with the drug name; admin textareas for both fields, kept out of DCA_FIELD_KEYS (no AI draft, no %)
+- `ir-calculator-qa` — 🧮 insulin resistance (ir-calc.js): first section on ATC A10 drugs only; FBS · HbA1c · TG · HDL · insulin → ADA bands + TyG / HOMA-IR / TG/HDL chips as you type, tap a chip for formula + source; numbers kept for the visit; nothing saved or sent
 - `disease-page-lean-qa` — Disease entry gets the same lean head (codexLeanHead)
 - `drug-submit-lean-qa` — Drug + Disease submit forms: one header row, hidden empty preview
 - `nika-links-qa` — 🌞 Nika tab: 🫘 Kidney risk screening one-click link (V101.303), TH/EN label, new tab in a browser / LINE external window, stays while Nika is paused
