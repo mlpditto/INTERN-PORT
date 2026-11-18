@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.680)</title>
+    <title>Nika Admin (V102.681)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -9275,6 +9275,15 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                     <div style="margin-top:6px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">
                         <span id="line-usage-note" style="font-size:0.72em; color:#94a3b8;"></span>
                         <span id="line-digest-now-status" style="font-size:0.74em; color:#64748b; margin-left:auto; text-align:right;"></span>
+                    </div>
+                    <!-- 2026-11-18 (owner pick B): users tracked in the digest. Group bubble: 💤 those away 3 d+; Telegram: everyone tracked. -->
+                    <div id="digest-seen-row" class="lang-no-toggle" style="margin-top:8px; display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
+                        <span style="font-size:0.74em; font-weight:700; color:#475569;" title="Group: 💤 away 3 d+ · Telegram: all">👀 Last seen in digest</span>
+                        <span id="digest-seen-chips" style="display:contents;"></span>
+                        <select id="digest-seen-add" onchange="digestSeenAdd(this)" aria-label="Add a user to Last seen"
+                            style="padding:3px 8px; border:1px dashed #94a3b8; border-radius:999px; background:#fff; color:#64748b; font-size:0.74em; cursor:pointer; max-width:150px;">
+                            <option value="">＋ Add</option>
+                        </select>
                     </div>
                     <div id="line-digest-preview-box" class="lang-no-toggle" style="display:none; margin-top:10px; border:1px solid #d8dee7; border-radius:10px; background:#f8fafc; padding:10px 12px;">
                         <div id="line-digest-preview-meta" style="font-size:0.72em; color:#64748b; margin-bottom:8px;"></div>
@@ -40035,11 +40044,73 @@ RULES:
                         note.textContent += ` · คาดว่าสิ้นเดือน ~${api.projected}${api.runOutDay ? ` · จะเต็มวันที่ ${api.runOutDay}` : ''}`;
                     }
                     panel.style.display = 'block';
+                    if (typeof window.loadDigestSeen === 'function') window.loadDigestSeen();   // 👀 row; never hides the quota card
                 } catch (e) {
                     // Never let an observability widget break the dashboard.
                     console.warn('loadLineUsage failed:', e && e.message);
                     panel.style.display = 'none';
                 }
+            };
+
+            // 👀 Last seen in digest (2026-11-18). _meta/digest_seen.uids — admin-only doc, read by runQuizDigest.
+            window._digestSeenUids = [];
+            const digestSeenUsers = async () => {
+                if (typeof usersData !== 'undefined' && usersData.length) return usersData;
+                if (!window._digestSeenUserCache) window._digestSeenUserCache = await db.collection('users').get().then(s => s.docs.map(d => ({ id: d.id, ...d.data() }))).catch(() => []);
+                return window._digestSeenUserCache;
+            };
+            const digestSeenAgo = (u) => {
+                const v = u && u.lastSeen;
+                const ms = v && typeof v.toMillis === 'function' ? v.toMillis() : (v && v.seconds ? v.seconds * 1000 : (v ? Date.parse(v) : NaN));
+                if (!Number.isFinite(ms)) return 'never seen';
+                const d = Math.floor((Date.now() - ms) / 864e5);
+                return d <= 0 ? 'seen today' : `seen ${d} d ago`;
+            };
+            window.renderDigestSeen = async function () {
+                const box = document.getElementById('digest-seen-chips'), sel = document.getElementById('digest-seen-add');
+                if (!box || !sel) return;
+                const users = await digestSeenUsers();
+                const esc = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                const byId = new Map(users.map(u => [u.id, u]));
+                box.innerHTML = window._digestSeenUids.map(id => {
+                    const u = byId.get(id) || { id: id, displayName: id.slice(0, 8) };
+                    const pic = u.pictureUrl ? `<img src="${esc(u.pictureUrl)}" alt="" style="width:16px;height:16px;border-radius:50%;object-fit:cover;">` : '';
+                    return `<span class="digest-seen-chip" data-uid="${esc(id)}" title="${esc(digestSeenAgo(u))}" style="display:inline-flex;align-items:center;gap:4px;border:1px solid #99f6e4;background:#f0fdfa;color:#0f766e;border-radius:999px;padding:2px 4px 2px 6px;font-size:0.74em;">${pic}${esc(u.displayName || id)}<button onclick="digestSeenRemove(this.parentNode.dataset.uid)" aria-label="Remove" style="border:none;background:none;color:#64748b;cursor:pointer;padding:0 2px;font-size:1em;">✕</button></span>`;
+                }).join('');
+                const picked = new Set(window._digestSeenUids);
+                const opts = users.filter(u => !u.isIgnored && !picked.has(u.id))
+                    .sort((a, b) => String(a.displayName || '').localeCompare(String(b.displayName || '')))
+                    .map(u => `<option value="${esc(u.id)}">${esc(u.displayName || u.id.slice(0, 8))}</option>`).join('');
+                sel.innerHTML = '<option value="">＋ Add</option>' + opts;
+            };
+            window.loadDigestSeen = async function () {
+                try {
+                    const d = await db.collection('_meta').doc('digest_seen').get();
+                    window._digestSeenUids = (d.exists && Array.isArray((d.data() || {}).uids)) ? d.data().uids : [];
+                    await renderDigestSeen();
+                } catch (e) { console.warn('[digest-seen] load', e && e.message); }
+            };
+            const digestSeenSave = async (uids) => {
+                const prev = window._digestSeenUids;
+                window._digestSeenUids = uids;
+                renderDigestSeen();
+                try {
+                    await db.collection('_meta').doc('digest_seen').set({ uids: uids, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+                } catch (e) {
+                    console.warn('[digest-seen] save', e && e.message);
+                    window._digestSeenUids = prev;
+                    renderDigestSeen();
+                    alert('Could not save Last seen: ' + ((e && e.message) || 'unknown'));
+                }
+            };
+            window.digestSeenAdd = function (sel) {
+                const id = sel && sel.value;
+                if (!id) return;
+                sel.value = '';
+                if (!window._digestSeenUids.includes(id)) digestSeenSave(window._digestSeenUids.concat(id));
+            };
+            window.digestSeenRemove = function (id) {
+                digestSeenSave(window._digestSeenUids.filter(x => x !== id));
             };
 
             // V97.64: digest preview. Walks the very Flex body the server would push and
@@ -40099,6 +40170,11 @@ RULES:
                             + lines + `</div>`;
                     }).join('');
 
+                    if (data.telegram) {   // 2026-11-18: the 👀 lines only Telegram (admin) gets
+                        copies.innerHTML += `<div style="flex:1 1 200px; min-width:200px; border:1px solid #bfdbfe; border-radius:8px; background:#fff; padding:10px;">`
+                            + `<div style="font-size:0.7em; font-weight:800; color:#2563eb; margin-bottom:6px; letter-spacing:0.03em;">Telegram (admin) · adds</div>`
+                            + `<div style="font-size:0.76em; line-height:1.5; white-space:pre-line;">${esc(String(data.telegram).trim())}</div></div>`;
+                    }
                     window._digestPreviewData = data; // V98.28: for copyDigestText()
 
                     const c = data.counts || {};

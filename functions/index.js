@@ -3102,7 +3102,7 @@ async function recordLinePush(tag, okCount) {
     }
 }
 
-async function pushLineFlex(tag, targets, buildFlex, logSuffix) {
+async function pushLineFlex(tag, targets, buildFlex, logSuffix, telegramExtra) {
     const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     const results = [];
     for (const target of targets) {
@@ -3135,7 +3135,8 @@ async function pushLineFlex(tag, targets, buildFlex, logSuffix) {
     // sent even when LINE refused (quota), when the copy matters most. Flood sends its own from sendFloodMail.
     const tgTarget = targets.find(t => t.label === 'group') || targets.find(t => t.label === 'admin-1on1');
     if (tgTarget && !/^flood|^notifyQuizSubmitted$/.test(tag)) {   // these send their own line
-        try { const f = buildFlex(tgTarget) || {}; await sendTelegram(tag, f.altText || f.text); }
+        // telegramExtra (2026-11-18): admin-only lines that must never reach LINE, e.g. the digest's 👀 Last seen list.
+        try { const f = buildFlex(tgTarget) || {}; await sendTelegram(tag, (f.altText || f.text || '') + (telegramExtra || '')); }
         catch (e) { console.warn(`[telegram] ${tag} skipped:`, e && e.message); }
     }
     // One counter write per run, not per target — the increment carries the count.
@@ -3704,6 +3705,21 @@ function bkkDayGap(fromKey, toKey) {
     return Math.round((Date.parse(toKey + 'T12:00:00Z') - Date.parse(fromKey + 'T12:00:00Z')) / 86400000);
 }
 
+// 👀 Last seen (2026-11-18, owner pick B): the admin picks users in Admin ▸ LINE card (_meta/digest_seen.uids).
+// The group bubble names only the ones not seen for DIGEST_SEEN_AWAY_DAYS or more; the Telegram copy (admin) lists all of them.
+const DIGEST_SEEN_AWAY_DAYS = 3;
+function digestSeenLabel(ms, nowMs) {
+    if (!Number.isFinite(ms)) return 'never';
+    const days = bkkDayGap(bkkDayKey(ms), bkkDayKey(nowMs));
+    const clock = new Date(ms).toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
+    if (days <= 0) return 'today ' + clock;
+    if (days === 1) return 'yesterday ' + clock;
+    return days + ' d (' + digestSeenDate(ms) + ')';
+}
+function digestSeenDate(ms) {
+    return Number.isFinite(ms) ? new Date(ms).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short' }) : 'never';
+}
+
 // How a deadline is phrased in the digest.
 //
 // Deadlines are real timestamps — the editor's field is `datetime-local`, and
@@ -3798,7 +3814,8 @@ async function runQuizDigest(kind, options) {
                 name: name,
                 group: u.group || 'Public',
                 active: Number.isFinite(lastSeenMs) && lastSeenMs >= activeCutoffMs,
-                ignored: u.isIgnored === true
+                ignored: u.isIgnored === true,
+                lastSeenMs: Number.isFinite(lastSeenMs) ? lastSeenMs : null
             });
         });
         activeUsers = activeCohort(users);
@@ -4068,6 +4085,23 @@ async function runQuizDigest(kind, options) {
             .map(([name, count]) => ({ name, count })));
     }
 
+    // 👀 tracked users (see DIGEST_SEEN_AWAY_DAYS). A failed read only drops this section.
+    const seenRows = [];
+    try {
+        const cfg = await db.collection('_meta').doc('digest_seen').get();
+        const uids = (cfg.exists && Array.isArray((cfg.data() || {}).uids)) ? cfg.data().uids : [];
+        uids.forEach(uid => { const u = users.find(x => x.id === uid); if (u) seenRows.push({ name: u.name, ms: u.lastSeenMs }); });
+    } catch (err) {
+        console.warn('[notifyQuizDigest] digest_seen read failed:', err.message);
+    }
+    const awayCutoffMs = now.toMillis() - DIGEST_SEEN_AWAY_DAYS * 24 * 60 * 60 * 1000;
+    seenRows.forEach(r => { r.away = !Number.isFinite(r.ms) || r.ms < awayCutoffMs; });
+    seenRows.sort((a, b) => (a.ms || 0) - (b.ms || 0));   // longest away first
+    const awayRows = seenRows.filter(r => r.away);
+    const seenTelegram = seenRows.length
+        ? '\n\n👀 Last seen\n' + seenRows.map(r => `• ${r.away ? '💤 ' : ''}${r.name} — ${digestSeenLabel(r.ms, now.toMillis())}`).join('\n')
+        : '';
+
     const buildFlex = (target) => {
         const body = [];
 
@@ -4280,6 +4314,18 @@ async function runQuizDigest(kind, options) {
             });
         }
 
+        // 💤 Only tracked users away DIGEST_SEEN_AWAY_DAYS+ are named here; no one away = no section.
+        if (awayRows.length) {
+            body.push({ type: 'separator', margin: 'md' });
+            body.push({ type: 'text', text: `💤 Not seen ${DIGEST_SEEN_AWAY_DAYS} d+ · ${awayRows.length}`, size: 'xs', weight: 'bold', color: '#64748b', margin: 'md' });
+            body.push({
+                type: 'text',
+                text: awayRows.slice(0, DIGEST_MAX_ROWS).map(r => `${r.name} · last ${digestSeenDate(r.ms)}`).join(' · ')
+                    + (awayRows.length > DIGEST_MAX_ROWS ? ` +${awayRows.length - DIGEST_MAX_ROWS} more` : ''),
+                size: 'sm', color: '#1f2937', wrap: true, margin: 'xs'
+            });
+        }
+
         // V97.76: the Behind tally. ADMIN COPY ONLY, and that is the whole point of
         // the privacy split this file has carried since the group push shipped —
         // the group chat is read by every intern, so a ranked list of who is
@@ -4407,11 +4453,12 @@ async function runQuizDigest(kind, options) {
                 withScores: t.withScores === true,
                 body: buildFlex(t).contents.body.contents
             })),
+            telegram: seenTelegram,
             counts: counts
         };
     }
 
-    const results = await pushLineFlex(tag, sendTargets, buildFlex, `kind=${kind}  newlyLive=${newlyLive.length}  doneQuizzes=${doneQuizzes.length} donePeople=${donePeopleCount} (attempts=${doneRows.length})  products=${productRows.length} (pending=${productPendingCount})  urgent=${urgentBlocks.length}  later=${laterBlocks.length}  waitingOnAdmin=${adminQueueTotal} (req=${queueCounts.requests} esc=${queueCounts.escalated} fu=${queueCounts.followUp})  cohort=${activeUsers.length}/${users.length}`);
+    const results = await pushLineFlex(tag, sendTargets, buildFlex, `kind=${kind}  newlyLive=${newlyLive.length}  doneQuizzes=${doneQuizzes.length} donePeople=${donePeopleCount} (attempts=${doneRows.length})  products=${productRows.length} (pending=${productPendingCount})  urgent=${urgentBlocks.length}  later=${laterBlocks.length}  waitingOnAdmin=${adminQueueTotal} (req=${queueCounts.requests} esc=${queueCounts.escalated} fu=${queueCounts.followUp})  cohort=${activeUsers.length}/${users.length}`, seenTelegram);
     const pushed = results.filter(r => r.ok).length;
 
     // Marks the day as sent so the manual button can warn about a duplicate.
