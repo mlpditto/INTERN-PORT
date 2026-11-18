@@ -76,7 +76,42 @@
             return { w: w, t: m[3].replace(/\*\*/g, '').trim().slice(0, LEN), q: (m[2] || '').split(',').map(function (n) { return parseInt(n, 10); }).filter(function (n) { return n > 0; }).slice(0, 6) };
         }).filter(function (x) { return x && x.t; }).slice(0, MAX);
     }
-    function touch() { if (typeof window.triggerAutoSave === 'function') { try { window.triggerAutoSave(); } catch (e) { /* the editor's own business */ } } }
+    function touch() { if (typeof window.triggerAutoSave === 'function') { try { window.triggerAutoSave(); } catch (e) { /* the editor's own business */ } } autoSave(); }
+    // V102.683 (owner 2026-11-18 "ควร save ให้แบบ auto"): the story and its paid sounds were only kept when the whole quiz was saved. Now, a second
+    // after any change, ONLY `watchFirst` is written to this quiz (never the rest of the form: half-edited questions must not reach interns).
+    // A quiz that was never saved has no id yet → the header asks for one Save first.
+    var SAVE_MS = 1000;
+    function quizId() { return String((document.getElementById('edit-quiz-id') || {}).value || '').trim(); }
+    function watchFirstNow() {
+        var raw = String((document.getElementById('quiz-watch-first') || {}).value || '').trim(), url = /^https:\/\/\S+$/i.test(raw) ? raw : '', story = clean(S.story);
+        return url || story ? Object.assign({}, url ? { url: url } : {}, story ? { story: story } : {}) : null;
+    }
+    function savedHtml() {
+        var v = S.saved; if (!v) return '';
+        if (v.state === 'new') return '<span class="qws-sv new" title="This quiz has no id yet — Save it once, then the story saves itself">💾 save the quiz once</span>';
+        if (v.state === 'saving') return '<span class="qws-sv" title="Writing the story to this quiz">☁ saving…</span>';
+        if (v.state === 'err') return '<span class="qws-sv err" title="' + esc(v.msg) + '">⚠️ not saved</span>';
+        return '<span class="qws-sv ok" title="The story and its voices are on this quiz">☁ saved ' + new Date(v.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + '</span>';
+    }
+    function paintSaved() { var el = box(), s = el && el.querySelector('.qws-sv'), h = el && el.querySelector('.qws-h small'); if (s) s.outerHTML = savedHtml(); else if (h && S.saved) h.insertAdjacentHTML('afterend', savedHtml()); }
+    function autoSave() {
+        clearTimeout(S.saveT);
+        S.saveT = setTimeout(function () {
+            var id = quizId(), db = window.db;
+            if (!id) { S.saved = { state: 'new' }; return paintSaved(); }
+            if (!db || typeof db.collection !== 'function') return;
+            S.saved = { state: 'saving' }; paintSaved();
+            db.collection('quizzes').doc(id).update({ watchFirst: watchFirstNow() })
+                .then(function () { if (quizId() === id) { S.saved = { state: 'ok', at: Date.now() }; paintSaved(); } })
+                .catch(function (e) { S.saved = { state: 'err', msg: String(e && e.message || e) }; paintSaved(); });
+        }, SAVE_MS);
+    }
+    // V102.683 (owner pick A, mockup-watch-voice-names/): each line names its voices — green = the sound is there, grey = not yet
+    function voiceNames(x, st) {
+        if (!st || st.lang !== 'th') return '';   // AI voices are Thai only; other languages use the phone voice
+        var pv = pvOf(st), ns = x.w === 'q' ? [['Kaimook', x.a, '']] : [['Kaitom', x.a, ''], ['Kaidang', x.b, '']].concat(pv ? [[pv.name, x.c, ' px']] : []);
+        return '<span class="qws-vns">' + ns.map(function (n) { var ok = okUrl(n[1]); return '<i class="qws-vnm' + n[2] + (ok ? ' ok' : '') + '" title="' + esc(n[0]) + (ok ? ' — ready' : ' — not voiced yet') + '">' + esc(n[0]) + '</i>'; }).join('') + '</span>';
+    }
     function stop() { clearTimeout(S.timer); S.play = -1; if (S.au) { try { S.au.pause(); } catch (e) { /* not playing */ } S.au = null; } }
     function paint() {
         if (typeof window._qeWatchChip === 'function') window._qeWatchChip();   // V102.670: the 🎬 half of the chip beside Review follows the story
@@ -87,7 +122,7 @@
         el.hidden = false;
         if (!st) { el.innerHTML = '<div class="qws-err" role="alert">' + esc(S.err) + '</div>'; return; }
         var flagged = st.lines.reduce(function (n, x) { return n + bad(x.t).length; }, 0);
-        el.innerHTML = '<div class="qws-h"><b>🎬 from Read first</b><small>' + st.lines.length + ' lines · ~' + secs(st.lines) + ' s · ' + st.lang.toUpperCase() + '</small>' +
+        el.innerHTML = '<div class="qws-h"><b>🎬 from Read first</b><small>' + st.lines.length + ' lines · ~' + secs(st.lines) + ' s · ' + st.lang.toUpperCase() + '</small>' + savedHtml() +
             '<span class="' + (flagged ? 'qws-warn' : 'qws-ok') + '">' + (flagged ? '⚠️ ' + flagged + ' number' + (flagged > 1 ? 's' : '') + ' not in Read first' : '✓ every number is in Read first') + '</span>' +
             '<button type="button" class="qws-b qws-v' + (voiced() && voiced() === needed() ? ' all' : '') + '" id="qws-voice" onclick="QuizWatchStory.voices()"' + (S.busy ? ' disabled' : '') + ' aria-label="AI voices" title="AI voices (Chinda): intern = Kaimook; pharmacist = Kaitom AND Kaidang — the intern picks which one to hear. Interns see a Thai story only when every sound is ready. Each sound is one paid voice call.">🗣 <span class="qws-vn">' + (S.voicing ? S.voicing.done + '/' + S.voicing.total + ' …' : voiced() + '/' + needed()) + '</span></button>' +
             pxBtnHtml(st) +
@@ -100,7 +135,7 @@
                 return '<div class="qws-l' + (x.w === 'key' ? ' k' : '') + (i === S.play ? ' now' : '') + '"><button type="button" class="qws-w" onclick="QuizWatchStory.who(' + i + ')" title="Who says it — tap to change" aria-label="Speaker: ' + WHO[x.w][1] + '">' + WHO[x.w][0] + ' ' + WHO[x.w][1] + '</button>' +
                     '<input type="text" maxlength="' + LEN + '" value="' + esc(x.t) + '" oninput="QuizWatchStory.edit(' + i + ', this.value)" aria-label="Line ' + (i + 1) + '">' +
                     (b.length ? '<span class="qws-warn" title="Not in any Read first note: ' + esc(b.join(', ')) + '">⚠️ ' + esc(b.join(', ')) + '</span>' : '') +
-                    (lineDone(x) ? '<i class="qws-a" title="AI voice ready">♪</i>' : '') +
+                    voiceNames(x, st) +
                     '<em>' + (x.q.length ? 'Q' + x.q.join(' · ') : '') + '</em>' +
                     '<button type="button" class="qws-x" onclick="QuizWatchStory.del(' + i + ')" aria-label="Remove line ' + (i + 1) + '">×</button></div>';
             }).join('') +
@@ -135,7 +170,7 @@
     }
     var api = {
         get: function () { return clean(S.story); },
-        set: function (story) { stop(); S.story = clean(story); S.err = ''; S.busy = false; paint(); },
+        set: function (story) { stop(); clearTimeout(S.saveT); S.saved = null; S.story = clean(story); S.err = ''; S.busy = false; paint(); },
         make: function () {
             if (S.busy) return Promise.resolve();
             var ns = notes().filter(function (x) { return x.primer; });
@@ -156,8 +191,9 @@
             var x = S.story && S.story.lines[i]; if (!x) return; x.t = String(v).slice(0, LEN);
             if (x.a || x.b || x.c) {   // new words: the old sounds no longer say this line
                 var hadC = !!x.c; delete x.a; delete x.b; delete x.c; if (hadC) { var pn = box().querySelector('.qws-pn'), pb = document.getElementById('qws-paxa'); if (pn) pn.textContent = pxHave() + '/' + pxLines().length; if (pb) pb.classList.remove('all'); }
-                var row = box().querySelectorAll('.qws-l')[i], a = row && row.querySelector('.qws-a'), n = box().querySelector('.qws-vn'), b = document.getElementById('qws-voice');
-                if (a) a.remove(); if (n) n.textContent = voiced() + '/' + needed(); if (b) b.classList.remove('all');
+                var row = box().querySelectorAll('.qws-l')[i], n = box().querySelector('.qws-vn'), b = document.getElementById('qws-voice');
+                if (row) row.querySelectorAll('.qws-vnm.ok').forEach(function (m) { m.classList.remove('ok'); m.title = m.textContent + ' — not voiced yet'; });   // the names go grey
+                if (n) n.textContent = voiced() + '/' + needed(); if (b) b.classList.remove('all');
                 if (typeof window._qeWatchChip === 'function') window._qeWatchChip();
             }
             touch();
@@ -175,7 +211,7 @@
                 return window.callTtsProxy({ provider: 'iapp_tts', text: said, voice: job.f === 'b' ? VOICE2 : VOICE[w], style: VSTYLE[w], feature: 'quiz_watch_voice' }).then(function (r) {
                     if (!r || !r.audioContent) throw new Error('no audio came back');
                     var mime = r.mimeType || 'audio/mpeg'; return store(blobOf(r.audioContent, mime), mime);
-                }).then(function (url) { if (x.t === said && x.w === w && okUrl(url)) x[job.f] = url; S.voicing.done++; paint(); });
+                }).then(function (url) { if (x.t === said && x.w === w && okUrl(url)) x[job.f] = url; S.voicing.done++; paint(); autoSave(); });   // each paid sound is kept at once
             };
             return todo.reduce(function (p, x) { return p.then(function () { return one(x); }); }, Promise.resolve())
                 .catch(function (e) { S.err = '🗣 stopped at sound ' + (S.voicing.done + 1) + ' of ' + S.voicing.total + ': ' + (e && e.message || e) + ' — the sounds already made are kept; tap 🗣 to go on.'; })
@@ -207,7 +243,7 @@
                 }).then(function (r) {
                     if (!r || !r.audioContent) throw new Error('no audio came back');
                     var mime = r.mimeType || 'audio/mpeg'; return store(blobOf(r.audioContent, mime), mime);
-                }).then(function (url) { var now = pvOf(S.story); if (x.t === said && x.w === w && now && now.id === pv.id && okUrl(url)) x.c = url; S.pxing.done++; paint(); });
+                }).then(function (url) { var now = pvOf(S.story); if (x.t === said && x.w === w && now && now.id === pv.id && okUrl(url)) x.c = url; S.pxing.done++; paint(); autoSave(); });
             };
             return todo.reduce(function (p, x, i) { return p.then(function () { return one(x, i === 0); }); }, Promise.resolve())
                 .catch(function (e) { S.err = '🗣 Paxa stopped at sound ' + (S.pxing.done + 1) + ' of ' + S.pxing.total + ': ' + (e && e.message || e) + ' — the sounds already made are kept; tap the Paxa button to go on.'; })
