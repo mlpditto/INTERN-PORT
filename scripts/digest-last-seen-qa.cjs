@@ -37,7 +37,7 @@ ok(fn.indexOf('const seenTelegram') > 0 && fn.indexOf('const seenTelegram') < fl
 
 // --- 3. admin chip row in a real browser ------------------------------------------------------
 ok(adm.includes('id="digest-seen-row"') && adm.includes('id="digest-seen-add"'), 'chip row + ＋ Add in the LINE card');
-ok(/panel\.style\.display = 'block';\s*loadDigestSeen\(\);/.test(adm), 'loads when the LINE card draws');
+ok(/panel\.style\.display = 'block';\s*if \(typeof window\.loadDigestSeen === 'function'\) window\.loadDigestSeen\(\);/.test(adm), 'loads when the LINE card draws, guarded so the quota card never hides');
 ok(/\/\/ V\d+\.\d+|Nika Admin \(V102\.681\)/.test(adm) && adm.includes('<title>Nika Admin (V102.681)</title>'), 'admin title V102.681');
 const block = grab(adm, '// 👀 Last seen in digest (2026-11-18)', '// V97.64: digest preview.');
 const row = grab(adm, '<div id="digest-seen-row"', '</select>') + '</select></div>';
