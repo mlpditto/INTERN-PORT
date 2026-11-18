@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Watch first how-to</title>
+<style>
+:root{--bg:#0b1222;--card:#111a2e;--ink:#e2e8f0;--mut:#94a3b8;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 Inter,Kanit,system-ui,sans-serif;padding:16px}
+h1{font-size:18px;margin:0 0 4px} .lead{color:var(--mut);margin:0 0 16px;font-size:13px}
+.opt{background:var(--card);border:1px solid #1e293b;border-radius:14px;padding:12px;margin:0 0 18px;max-width:900px}
+.opt>h2{font-size:15px;margin:0 0 2px} .opt>p{margin:0 0 10px;color:var(--mut);font-size:12.5px}
+.stage{position:relative;overflow:hidden;border-radius:12px;background:#0f172a;padding:10px;min-height:330px}
+/* ---- the real panel's look (copied from admin.html .qws-*) ---- */
+.row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.lbl{font-size:.7em;color:#818cf8;font-weight:600;white-space:nowrap;text-transform:uppercase;letter-spacing:.5px}
+.url{flex:1;min-width:0;padding:5px 8px;border:1px solid #334155;border-radius:6px;font-size:.85em;background:#0f172a;color:#64748b}
+.make{height:30px;padding:0 10px;border-radius:8px;border:1px solid #f1b55e;background:#f1b55e;color:#211a10;font-size:12.5px;font-weight:700;white-space:nowrap}
+.box{padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#cbd5e1;font-size:12.5px}
+.box[hidden]{display:none}
+.h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px;color:#e2e8f0}
+.h small{color:#94a3b8} .warn{color:#fcd34d;font-weight:800;white-space:nowrap} .h .warn{margin-left:auto}
+.b,.w,.x,.add{border-radius:8px;border:1px solid #475569;background:transparent;color:#e2e8f0;font-size:12.5px;font-weight:700}
+.b{height:30px;min-width:34px;padding:0 8px} .v{font-size:12px;font-weight:800;white-space:nowrap} .v.all{border-color:#34d399;color:#6ee7b7}
+.l{display:flex;gap:8px;align-items:center;padding:3px 0;transition:opacity .3s,transform .3s}
+.l.in{opacity:0;transform:translateY(6px)}
+.w{flex:none;width:64px;height:28px;padding:0;font-size:11px;color:#cbd5e1}
+.t{flex:1;min-width:0;padding:4px 8px;border-radius:7px;background:#0f172a;border:1px solid #334155;color:#f1f5f9;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.l.k .t{border-color:#b45309;color:#fcd34d} .l.now .t{box-shadow:0 0 0 2px #facc15}
+.l em{flex:none;min-width:30px;font-style:normal;font-size:11px;color:#7c8aa5;text-align:right}
+.x{width:26px;height:26px;padding:0;border-color:transparent;color:#94a3b8}
+.add{margin-top:6px;height:28px;padding:0 10px;border-style:dashed;color:#94a3b8}
+.help{border-color:#818cf8;color:#c7d2fe}
+.caret{display:inline-block;width:1px;height:1em;background:#f1f5f9;vertical-align:-2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+/* ---- tutorial layers ---- */
+.cur{position:absolute;left:0;top:0;width:22px;height:22px;pointer-events:none;z-index:9;transition:transform .7s cubic-bezier(.4,.1,.2,1);font-size:20px;filter:drop-shadow(0 2px 2px #000)}
+.cur.tap::after{content:"";position:absolute;left:-6px;top:-6px;width:22px;height:22px;border-radius:50%;border:2px solid #facc15;animation:tap .45s ease-out}
+@keyframes tap{from{transform:scale(.3);opacity:1}to{transform:scale(1.6);opacity:0}}
+.spot{position:absolute;z-index:7;border-radius:10px;box-shadow:0 0 0 2px #facc15,0 0 0 9999px rgba(2,6,23,.62);transition:all .5s ease;pointer-events:none}
+.bub{position:absolute;z-index:8;max-width:300px;background:#facc15;color:#1c1917;font-weight:700;font-size:12.5px;padding:6px 10px;border-radius:10px;transition:all .5s ease;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.bub b{opacity:.6;margin-right:4px}
+.bub .nav{display:inline-flex;gap:4px;margin-left:8px;vertical-align:middle}
+.bub .nav span{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:6px;background:rgba(0,0,0,.12)}
+.pulse{animation:pulse 1s ease-in-out 2;position:relative;z-index:6}
+@keyframes pulse{50%{box-shadow:0 0 0 4px #facc15}}
+.tip{position:absolute;z-index:8;background:#1e293b;border:1px solid #facc15;color:#fde68a;font-size:11.5px;font-weight:700;padding:3px 8px;border-radius:999px;white-space:nowrap;opacity:0;transition:opacity .3s,transform .3s;transform:translateY(4px);pointer-events:none}
+.tip.on{opacity:1;transform:none}
+.rail{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
+.rail span{padding:3px 9px;border-radius:999px;border:1px solid #334155;color:#64748b;font-size:12px;font-weight:700;transition:all .3s}
+.rail span.on{border-color:#facc15;color:#fde68a;background:rgba(250,204,21,.12)}
+.mini{transform:scale(.72);transform-origin:top left;width:138.9%;pointer-events:none}
+.empty{border:1px dashed #334155;border-radius:12px;padding:8px;background:rgba(255,255,255,.02)}
+.empty .stage{min-height:0;height:250px;padding:8px}
+.note{font-size:12px;color:var(--mut);margin-top:8px}
+.note code{color:#c7d2fe}
+@media (max-width:600px){.w{width:52px}.l em{display:none}.bub{max-width:220px}}
+</style></head><body>
+<h1>🎬 Watch first ▸ ✨ story — how-to animation</h1>
+<p class="lead">Mockup only. Same panel, same classes as <code>.qws-*</code> in admin.html; all three loop by themselves here. Pick one (or mix).</p>
+
+<section class="opt"><h2>A · ❓ tour on the real panel</h2>
+<p>A ❓ button in the panel header (and on the ✨ row before a story exists). Tap → the screen dims, a 👆 hand walks the 5 steps on <i>your own</i> story; ‹ › ✕ in the yellow bubble. Nothing is saved — the edits it shows are undone at the end.</p>
+<div class="stage" id="A"></div></section>
+
+<section class="opt"><h2>B · Looping demo in the empty box</h2>
+<p>Before a story exists, a small silent loop plays under the ✨ row with a 5-chip step rail. It goes away once the story is made; ❓ in the header replays it.</p>
+<div class="stage" id="B" style="min-height:0"></div></section>
+
+<section class="opt"><h2>C · Pulse hints (first open only)</h2>
+<p>No hand, no dimming. The first time the panel opens, each control glows once in order with a 2–3-word tag. ❓ replays. Lightest; teaches <i>where</i>, less <i>how</i>.</p>
+<div class="stage" id="C"></div></section>
+
+<p class="note">New emoji: <code>❓</code> = how to use (animated tour) → a row in DESIGN.md §5 before use. Captions EN visible, Thai in <code>data-th-*</code>.</p>
+
+<script>
+var LINES=[['q','สวัสดีครับ ผมจะทำควิซ "วิตามินดี: ชีวเคมี กลไก ระบาดวิทยา"','Q1'],
+['rx','D2 จากยีสต์หรือเห็ด เหมาะกับวีแกน ส่วน D3 มักจาก lanolin','Q1'],
+['key','25(OH)D คือตัวชี้วัดวิตามินดีสะสมหลักในร่างกาย','Q1'],
+['rx','ไตใช้ CYP27B1 สร้าง calcitriol; PTH กระตุ้นเมื่อแคลเซียมต่ำ 27','Q2'],
+['q','ผู้ใหญ่สุขภาพดีควรตรวจ 25(OH)D คัดกรองทุกคนไหม?','Q4'],
+['key','เด็กเกิด Rickets; ผู้ใหญ่เกิด Osteomalacia','Q6']];
+var WHO={q:'🙋 Q',rx:'🧑‍⚕️ RX',key:'💡 KEY'};
+function panel(story){
+  return '<div class="row"><span class="lbl">🎬 Watch first</span><span class="url">https://… .mp4 — plays before question 1</span>'+
+  (story?'':'<button class="b help" data-k="help">❓</button>')+'<button class="make" data-k="make">✨ From Read first</button></div>'+
+  '<div class="box" data-k="box"'+(story?'':' hidden')+'><div class="h"><b>🎬 from Read first</b><small>6 lines · ~40 s · TH</small>'+
+  '<span class="warn" data-k="hw">⚠️ 1 number not in Read first</span>'+
+  '<button class="b v" data-k="voice">🗣 <span data-k="vn">0/10</span></button><button class="b" data-k="play">▶</button><button class="b">↻</button><button class="b">🗑</button>'+
+  (story?'<button class="b help" data-k="help">❓</button>':'')+'</div>'+
+  LINES.map(function(x,i){return '<div class="l'+(x[0]=='key'?' k':'')+'" data-l="'+i+'"><button class="w" data-k="w'+i+'">'+WHO[x[0]]+'</button><span class="t" data-k="t'+i+'">'+x[1]+'</span>'+(i==3?'<span class="warn" data-k="lw">⚠️ 27</span>':'')+'<em>'+x[2]+'</em><button class="x">×</button></div>';}).join('')+
+  '<button class="add">＋ line</button></div>';
+}
+function Demo(root,story){
+  this.root=root;root.innerHTML='<div class="body">'+panel(story)+'</div>';this.story=story;
+  this.cur=el('div','cur','👆');root.appendChild(this.cur);
+}
+function el(t,c,h){var e=document.createElement(t);e.className=c;if(h)e.innerHTML=h;return e;}
+Demo.prototype.q=function(k){return this.root.querySelector('[data-k="'+k+'"]');};
+Demo.prototype.rect=function(k){var a=this.q(k).getBoundingClientRect(),r=this.root.getBoundingClientRect(),z=r.width/this.root.offsetWidth||1;return {x:(a.left-r.left)/z,y:(a.top-r.top)/z,w:a.width/z,h:a.height/z};};
+Demo.prototype.move=function(k){var r=this.rect(k);this.cur.style.transform='translate('+(r.x+r.w/2-4)+'px,'+(r.y+r.h/2-2)+'px)';};
+Demo.prototype.tap=function(){var c=this.cur;c.classList.remove('tap');void c.offsetWidth;c.classList.add('tap');};
+var wait=function(ms){return new Promise(function(r){setTimeout(r,ms);});};
+// the 5 steps: each = target + caption + what happens
+function steps(d){return [
+ {k:'make',cap:'✨ AI writes a chat story from every Read first note',th:'AI เขียนบทสนทนาจาก Read first ทุกข้อ',run:async function(){d.tap();var b=d.q('make');b.textContent='✨ writing…';await wait(700);b.textContent='✨ From Read first';var box=d.q('box');box.hidden=false;var ls=box.querySelectorAll('.l');ls.forEach(function(l){l.classList.add('in');});for(var i=0;i<ls.length;i++){await wait(160);ls[i].classList.remove('in');}}},
+ {k:'lw',cap:'⚠️ a number Read first never says — fix the line',th:'ตัวเลขที่ไม่มีใน Read first — แก้ในบรรทัด',run:async function(){await wait(500);d.move('t3');await wait(700);d.tap();var t=d.q('t3'),s=t.textContent;for(var i=0;i<3;i++){s=s.slice(0,-1);t.innerHTML=s+'<span class="caret"></span>';await wait(160);}t.textContent=s;d.q('lw').style.display='none';d.q('hw').style.visibility='hidden';}},
+ {k:'w4',cap:'🙋 tap the speaker to switch Q → RX → 💡 KEY',th:'แตะผู้พูดเพื่อสลับ Q → RX → KEY',run:async function(){d.tap();var w=d.q('w4');w.textContent=WHO.rx;await wait(600);d.tap();w.textContent=WHO.key;w.parentNode.classList.add('k');}},
+ {k:'voice',cap:'🗣 AI voices every line — green when all are ready',th:'AI พากย์ทุกบรรทัด — เขียวเมื่อครบ',run:async function(){d.tap();var n=d.q('vn');for(var i=1;i<=10;i++){n.textContent=i+'/10';await wait(110);}d.q('voice').classList.add('all');}},
+ {k:'play',cap:'▶ play it here — what the intern sees before Q1',th:'เล่นดูก่อน — ที่ intern เห็นก่อนข้อ 1',run:async function(){d.tap();var p=d.q('play');p.textContent='⏹';var ls=d.root.querySelectorAll('.l');for(var i=0;i<ls.length;i++){ls[i].classList.add('now');await wait(450);ls[i].classList.remove('now');}p.textContent='▶';}}
+];}
+function reset(d,story){d.root.querySelector('.body').innerHTML=panel(story);}
+// A: tour — dim + spotlight + hand + bubble
+async function runA(root){var d=new Demo(root,false),spot=el('div','spot'),bub=el('div','bub');root.appendChild(spot);root.appendChild(bub);
+ while(true){reset(d,false);spot.style.opacity=bub.style.opacity=0;d.move('help');await wait(900);d.tap();await wait(300);
+  var S=steps(d);spot.style.opacity=bub.style.opacity=1;
+  for(var i=0;i<S.length;i++){var r=d.rect(S[i].k),pad=5;
+   Object.assign(spot.style,{left:r.x-pad+'px',top:r.y-pad+'px',width:r.w+2*pad+'px',height:r.h+2*pad+'px'});
+   bub.innerHTML='<b>'+(i+1)+'/5</b>'+S[i].cap+'<span class="nav"><span>‹</span><span>›</span><span>✕</span></span>';bub.title=S[i].th;
+   var bx=Math.min(Math.max(8,r.x+r.w/2-150),root.clientWidth-bub.offsetWidth-8),by=r.y+r.h+12;if(by+60>root.clientHeight)by=r.y-bub.offsetHeight-12;
+   bub.style.left=bx+'px';bub.style.top=by+'px';d.move(S[i].k);await wait(900);await S[i].run();
+   if(i==0){await wait(200);}await wait(1100);}
+  spot.style.opacity=bub.style.opacity=0;await wait(1500);}
+}
+// B: mini loop in the empty box + step rail
+async function runB(root){root.innerHTML='<div class="row"><span class="lbl">🎬 Watch first</span><span class="url">https://… .mp4 — plays before question 1</span><button class="make">✨ From Read first</button></div><div class="empty"><div class="stage" id="Bm"></div><div class="rail" id="Br"></div></div>';
+ var m=root.querySelector('#Bm'),rail=root.querySelector('#Br'),inner=el('div','mini');m.appendChild(inner);var d=new Demo(inner,false);
+ var S=steps(d);rail.innerHTML=S.map(function(s){return '<span title="'+s.th+'">'+s.cap.split(' ').slice(0,1)+' '+['write','fix ⚠️','speaker','voice','play'][S.indexOf(s)]+'</span>';}).join('');
+ while(true){reset(d,false);var S2=steps(d);d.move('make');await wait(800);
+  for(var i=0;i<S2.length;i++){[].forEach.call(rail.children,function(c,j){c.classList.toggle('on',j==i);});d.move(S2[i].k);await wait(800);await S2[i].run();await wait(900);}
+  [].forEach.call(rail.children,function(c){c.classList.remove('on');});await wait(1200);}
+}
+// C: pulse hints, no hand, on a finished story
+async function runC(root){var d=new Demo(root,true);d.cur.style.display='none';var tip=el('div','tip');root.appendChild(tip);
+ var H=[['make','✨ write again from Read first'],['lw','⚠️ fix this number'],['w0','🙋 tap = change speaker'],['voice','🗣 voice every line'],['play','▶ play it here']];
+ while(true){for(var i=0;i<H.length;i++){var e=d.q(H[i][0]),r=d.rect(H[i][0]);e.classList.remove('pulse');void e.offsetWidth;e.classList.add('pulse');
+  tip.textContent=H[i][1];tip.style.left=Math.min(Math.max(6,r.x),root.clientWidth-tip.offsetWidth-6)+'px';tip.style.top=(r.y+r.h+6)+'px';tip.classList.add('on');await wait(1900);tip.classList.remove('on');await wait(300);}
+  await wait(1500);}
+}
+runA(document.getElementById('A'));runB(document.getElementById('B'));runC(document.getElementById('C'));
+</script>
+</body></html>
