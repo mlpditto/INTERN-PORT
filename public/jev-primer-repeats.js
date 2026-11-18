@@ -16,9 +16,11 @@
         const box = document.getElementById('pra-jev');
         const primers = window._praRead().map(x => x.primer);
         btn.disabled = true;
-        const text = btn.textContent;
+        const html0 = btn.innerHTML;
         // V102.644: the chip says who is checking. V102.658: …and for how long (m:ss, every second) — a long list takes a while and the chip looked frozen
-        const t0 = Date.now(), clock = () => { const s = Math.floor((Date.now() - t0) / 1000); btn.textContent = '⏳ Jev ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+        // V102.682: the chip is Jev's logo now (owner rule V102.444) — the logo stays and the clock goes beside it
+        const mark = typeof window.jevMarkHtml === 'function' ? window.jevMarkHtml(16) : 'Jev';
+        const t0 = Date.now(), clock = () => { const s = Math.floor((Date.now() - t0) / 1000); btn.innerHTML = mark + ' ⏳ ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
         clock(); const timer = setInterval(clock, 1000);
         try {
             const r = (await adminApp.functions().httpsCallable('jevPrimerRepeats')({ primers })).data || {};
@@ -30,7 +32,7 @@
         } finally {
             clearInterval(timer);
             btn.disabled = false;
-            btn.textContent = text;
+            btn.innerHTML = html0;
         }
     }
 
