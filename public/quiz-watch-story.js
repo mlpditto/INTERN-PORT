@@ -118,6 +118,7 @@
         var el = box(), btn = document.getElementById('qws-make'); if (!el) return;
         if (btn) { btn.disabled = S.busy; btn.textContent = S.busy && !S.voicing && !S.pxing ? '✨ ' + Math.floor((Date.now() - S.t0) / 1000) + ' s' : '✨ From Read first'; }
         var st = S.story;
+        if (S.fixEl) S.fixEl.remove();   // V102.687: the 🪄 panel is kept (its model rail is bound once) and seated again below
         if (!st && !S.err) { el.hidden = true; el.innerHTML = ''; return; }
         el.hidden = false;
         if (!st) { el.innerHTML = '<div class="qws-err" role="alert">' + esc(S.err) + '</div>'; return; }
@@ -132,14 +133,73 @@
             (S.err ? '<div class="qws-err" role="alert">' + esc(S.err) + '</div>' : '') + pxPickHtml(st) +
             st.lines.map(function (x, i) {
                 var b = bad(x.t);
-                return '<div class="qws-l' + (x.w === 'key' ? ' k' : '') + (i === S.play ? ' now' : '') + '"><button type="button" class="qws-w" onclick="QuizWatchStory.who(' + i + ')" title="Who says it — tap to change" aria-label="Speaker: ' + WHO[x.w][1] + '">' + WHO[x.w][0] + ' ' + WHO[x.w][1] + '</button>' +
+                return '<div class="qws-l' + (x.w === 'key' ? ' k' : '') + (i === S.play ? ' now' : '') + (x._p ? ' pk' : '') + (S.fixing && S.fixing.indexOf(x) > -1 ? ' fxb' : '') + '"><button type="button" class="qws-w" onclick="QuizWatchStory.who(' + i + ')" title="Who says it — tap to change" aria-label="Speaker: ' + WHO[x.w][1] + '">' + WHO[x.w][0] + ' ' + WHO[x.w][1] + '</button>' +
                     '<input type="text" maxlength="' + LEN + '" value="' + esc(x.t) + '" oninput="QuizWatchStory.edit(' + i + ', this.value)" aria-label="Line ' + (i + 1) + '">' +
                     (b.length ? '<span class="qws-warn" title="Not in any Read first note: ' + esc(b.join(', ')) + '">⚠️ ' + esc(b.join(', ')) + '</span>' : '') +
                     voiceNames(x, st) +
-                    '<em>' + (x.q.length ? 'Q' + x.q.join(' · ') : '') + '</em>' +
-                    '<button type="button" class="qws-x" onclick="QuizWatchStory.del(' + i + ')" aria-label="Remove line ' + (i + 1) + '">×</button></div>';
+                    '<button type="button" class="qws-fx' + (b.length ? '' : ' dim') + '" onclick="QuizWatchStory.fixOpen(' + i + ')"' + (S.fixing ? ' disabled' : '') + ' aria-expanded="' + (S.fixAt === x) + '" aria-label="Fix line ' + (i + 1) + ' with AI" title="🪄 AI rewrites just this line from its Read first note — you pick the model and what to change">🪄</button>' +
+                    '<em role="button" tabindex="0" aria-pressed="' + !!x._p + '" onclick="QuizWatchStory.pick(' + i + ')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();QuizWatchStory.pick(' + i + ')}" title="Pick this line — 🪄 several lines in one call">' + (x.q.length ? 'Q' + x.q.join(' · ') : '') + '</em>' +
+                    '<button type="button" class="qws-x" onclick="QuizWatchStory.del(' + i + ')" aria-label="Remove line ' + (i + 1) + '">×</button></div>' + sugHtml(x, i);
             }).join('') +
             (st.lines.length < MAX ? '<button type="button" class="qws-add" onclick="QuizWatchStory.add()">＋ line</button>' : '');
+        seatFix();
+    }
+    // V102.687 🪄 fix lines with AI (owner pick B + C, mockups/watch-first-line-fix.html). 🪄 on a line opens the panel right under it (B);
+    // tapping Q tags picks several lines and the same panel sits on top as a bar (C). One call for all picked lines, with the model the admin
+    // picks here (the house vendor-first rail, kept in ai_watch_fix_model). Only the picked lines and their own Read first notes are sent.
+    // Each answer waits under its line: tap it to use it (that line's voices go, as when it is retyped), ↩️ keeps the old line.
+    var ASKS = [['num', '🔢 fix numbers', 'Fix every number its note does not say: use the number the note says, or drop it.'], ['short', '✂ shorter', 'Make each line shorter.'], ['plain', '💬 plainer', 'Use plainer words an intern understands at once.']];
+    function picked() { return S.story ? S.story.lines.filter(function (x) { return x._p; }) : []; }
+    function sugHtml(x, i) {
+        if (!x._s) return '';
+        var b = bad(x._s.t);
+        return '<div class="qws-sug"><button type="button" class="qws-sn" onclick="QuizWatchStory.use(' + i + ')" title="Use this line (from ' + esc(x._s.m) + ')' + (fields(x).some(function (f) { return okUrl(x[f]); }) ? ' — its voices are made again' : '') + '" aria-label="Use: ' + esc(x._s.t) + '">🪄 ' + esc(x._s.t) + '</button>' +
+            (b.length ? '<span class="qws-warn" title="Not in any Read first note: ' + esc(b.join(', ')) + '">⚠️ ' + esc(b.join(', ')) + '</span>' : '') +
+            '<button type="button" class="qws-x" onclick="QuizWatchStory.drop(' + i + ')" aria-label="Keep the old line" title="Keep the old line">↩️</button></div>';
+    }
+    function fixEl() {
+        if (S.fixEl) return S.fixEl;
+        var d = document.createElement('div'); d.id = 'qws-fix'; d.className = 'qws-fix';
+        d.innerHTML = '<div class="qws-fr"><b class="qws-fn"></b><input type="hidden" id="qws-fix-model"></div>' +
+            '<div class="qws-fr">' + ASKS.map(function (a) { return '<button type="button" class="qws-qk" data-ask="' + a[0] + '" aria-pressed="false">' + a[1] + '</button>'; }).join('') +
+            '<input type="text" class="qws-fh" maxlength="160" placeholder="or say what to change…" aria-label="What to change">' +
+            '<button type="button" class="qws-go" onclick="QuizWatchStory.fix()">🪄 Go</button><button type="button" class="qws-x" onclick="QuizWatchStory.fixClose()" aria-label="Close" title="Close">✕</button></div>';
+        d.addEventListener('click', function (e) { var k = e.target.closest && e.target.closest('.qws-qk'); if (!k) return; S.ask = S.ask === k.dataset.ask ? '' : k.dataset.ask; askPaint(); });
+        d.querySelector('.qws-fh').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); api.fix(); } });
+        return (S.fixEl = d);
+    }
+    function askPaint() { if (S.fixEl) S.fixEl.querySelectorAll('.qws-qk').forEach(function (k) { k.setAttribute('aria-pressed', String(k.dataset.ask === S.ask)); }); }
+    function seatFix() {
+        var el = box(); if (!S.fixAt || !S.story || !el) return;
+        var d = fixEl(), rows = el.querySelectorAll('.qws-l'), n = picked().length, at = S.fixAt === 'top' ? null : rows[S.story.lines.indexOf(S.fixAt)];
+        if (S.fixAt !== 'top' && !at) { S.fixAt = null; return; }
+        if (at) at.after(d); else if (rows[0]) rows[0].before(d); else return;
+        d.classList.toggle('top', !at);
+        d.querySelector('.qws-fn').textContent = at ? '' : '🪄 ' + n + ' line' + (n > 1 ? 's' : '');
+        var go = d.querySelector('.qws-go'); go.disabled = !!S.fixing || !n; go.textContent = S.fixing ? '⏳' : '🪄 Go';
+        askPaint();
+        if (!S.bound) {
+            var inp = d.querySelector('#qws-fix-model');
+            inp.value = typeof window.textAIModel === 'function' ? window.textAIModel('ai-analyzer-model-val') : 'gemini-3.8-flash';   // until one is picked here: the AI Settings model
+            if (typeof window.bindRegistryModelInput === 'function') { window.bindRegistryModelInput('qws-fix-model', 'ai_watch_fix_model'); S.bound = true; }
+        }
+    }
+    function fixPrompt(ls, L, ask, hint) {
+        var NAME = { en: 'English', th: 'Thai', ko: 'Korean' }, ns = notes(), A = ASKS.filter(function (a) { return a[0] === ask; })[0];
+        return 'These lines come from a short chat story that prepares pharmacy interns for a quiz (Q = the intern asks, RX = the pharmacist answers, KEY = a key point to remember). Rewrite ONLY these lines, in ' + NAME[L] + '.\n' +
+            (A ? A[2] + '\n' : '') + (hint ? 'The editor asks: "' + hint.replace(/["\s]+/g, ' ').trim() + '"\n' : '') + (!A && !hint ? 'Make each line clearer, and make sure each RX / KEY line teaches one concrete fact from its note.\n' : '') +
+            'Rules: keep each line\'s speaker (a Q line stays a real question ending with a question mark). Copy every number, dose, strength and drug name EXACTLY as its note writes it — never add a number or a fact its note does not say. ' +
+            'Keep each line short (under 80 characters; under 60 for Thai or Korean). Do not give away which choice is correct in any question. No markdown, no emoji at the start.\n' +
+            'Answer with one line per line below, as L<number>: the new text — nothing else.\n\n' +
+            ls.map(function (x) {
+                var own = x.q.map(function (n) { return ns[n - 1]; }).filter(function (o) { return o && o.primer; }), use = own.length ? own : ns.filter(function (o) { return o.primer; });
+                return 'L' + (S.story.lines.indexOf(x) + 1) + ' (' + WHO[x.w][1] + '): ' + x.t + '\n' + use.map(function (o) { return 'NOTE ' + o.n + ': ' + o.primer.slice(0, 900); }).join('\n');
+            }).join('\n\n');
+    }
+    function fixParse(txt) {
+        var out = {};
+        String(txt || '').split(/\n+/).forEach(function (r) { var m = r.match(/^[\s\-*•_]*L\s*(\d+)\s*\**\s*[:：]\s*\**\s*(.+)$/i); if (m) out[parseInt(m[1], 10)] = m[2].replace(/\*\*/g, '').trim().slice(0, LEN); });
+        return out;
     }
     // V102.674 the Paxa button(s): no voice yet → "＋ Paxa" opens the picker; with a voice → "<name> n/m" voices what is missing, ▾ changes the voice
     function pxBtnHtml(st) {
@@ -249,6 +309,43 @@
                 .catch(function (e) { S.err = '🗣 Paxa stopped at sound ' + (S.pxing.done + 1) + ' of ' + S.pxing.total + ': ' + (e && e.message || e) + ' — the sounds already made are kept; tap the Paxa button to go on.'; })
                 .then(function () { S.busy = false; S.pxing = null; touch(); paint(); });
         },
+        fixOpen: function (i) {   // B: 🪄 on a line → the panel right under it, for that line only
+            var x = S.story && S.story.lines[i]; if (!x || S.fixing) return;
+            var open = S.fixAt === x; S.story.lines.forEach(function (y) { delete y._p; });
+            if (!open) { x._p = true; S.fixAt = x; S.ask = bad(x.t).length ? 'num' : ''; } else S.fixAt = null;   // each open starts from the line: ⚠️ → 🔢
+            paint(); if (S.fixAt && S.fixEl) S.fixEl.querySelector('.qws-go').focus();
+        },
+        pick: function (i) {   // C: tap Q tags → several lines, the panel as a bar on top
+            var x = S.story && S.story.lines[i]; if (!x || S.fixing) return;
+            if (S.fixAt && S.fixAt !== 'top') S.story.lines.forEach(function (y) { if (y !== x) delete y._p; });
+            if (x._p) delete x._p; else x._p = true;
+            var was = S.fixAt; S.fixAt = picked().length ? 'top' : null; if (S.fixAt && was !== 'top') S.ask = picked().some(function (y) { return bad(y.t).length; }) ? 'num' : '';
+            paint();
+        },
+        fixClose: function () { if (S.story) S.story.lines.forEach(function (y) { delete y._p; }); S.fixAt = null; paint(); },
+        fix: function () {
+            var ls = picked(); if (!ls.length || S.fixing) return Promise.resolve();
+            if (typeof window.callUniversalAI !== 'function') { S.err = 'AI is not available on this page.'; paint(); return Promise.resolve(); }
+            var inp = S.fixEl && S.fixEl.querySelector('#qws-fix-model'), model = inp && inp.value ? (window.normalizeTextAIModel ? window.normalizeTextAIModel(inp.value) : inp.value) : 'gemini-3.8-flash';
+            var hint = String((S.fixEl && S.fixEl.querySelector('.qws-fh').value) || '').trim(), L = S.story.lang, nums0 = ls.map(function (x) { return S.story.lines.indexOf(x) + 1; });
+            var short = window.aiModelShortName ? window.aiModelShortName(model) : model;
+            S.fixing = ls.slice(); S.err = ''; paint();
+            return window.callUniversalAI(model, fixPrompt(ls, L, S.ask, hint), false, null, '', { feature: 'quiz_watch_fix' }).then(function (r) {
+                var resp = r && r.resp !== undefined ? r.resp : r, txt = String(resp && typeof resp === 'object' ? (resp.text || resp.outputText || resp.response || '') : (resp || ''));
+                var got = fixParse(txt), n = 0;
+                ls.forEach(function (x, k) { var t = got[nums0[k]]; if (t && S.story && S.story.lines.indexOf(x) > -1 && t !== x.t) { x._s = { t: t, m: short }; n++; } });
+                if (!n) throw new Error('no new line came back — try again or another model. It said: ' + txt.slice(0, 80));
+                ls.forEach(function (x) { delete x._p; }); S.fixAt = null;
+                if (S.fixEl) S.fixEl.querySelector('.qws-fh').value = '';
+            }).catch(function (e) { S.err = '🪄 ' + (e && e.message || e); })
+              .then(function () { S.fixing = null; paint(); });
+        },
+        use: function (i) {
+            var x = S.story && S.story.lines[i]; if (!x || !x._s) return;
+            x.t = x._s.t; delete x._s; delete x.a; delete x.b; delete x.c;   // new words: the old sounds no longer say this line
+            touch(); paint();
+        },
+        drop: function (i) { var x = S.story && S.story.lines[i]; if (!x) return; delete x._s; paint(); },
         who: function (i) { var x = S.story && S.story.lines[i]; if (!x) return; x.w = ORDER[(ORDER.indexOf(x.w) + 1) % ORDER.length]; delete x.a; delete x.b; delete x.c; touch(); paint(); },   // V102.672: another speaker = another voice
         del: function (i) { if (!S.story) return; stop(); S.story.lines.splice(i, 1); if (!S.story.lines.length) S.story = null; touch(); paint(); },
         add: function () { if (!S.story || S.story.lines.length >= MAX) return; S.story.lines.push({ w: 'rx', t: '', q: [] }); paint(); var ins = box().querySelectorAll('.qws-l input'); if (ins.length) ins[ins.length - 1].focus(); },
@@ -268,7 +365,7 @@
             step(0);
         },
         voice: function () { return { th: !!S.story && S.story.lang === 'th', have: voiced(), need: needed(), px: pvOf(S.story) ? { name: pvOf(S.story).name, have: pxHave(), need: pxLines().length } : null }; },   // V102.672: for the chip beside Review
-        _prompt: prompt, _parse: parse, _bad: bad, _S: S, _okUrl: okUrl
+        _prompt: prompt, _parse: parse, _fixPrompt: fixPrompt, _fixParse: fixParse, _bad: bad, _S: S, _okUrl: okUrl
     };
     window.QuizWatchStory = api;
 })();
