@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.322)</title>
+    <title>Internship Portfolio (V101.323)</title>
     <link rel="stylesheet" href="nika-ask.css?v=V101.308">
     <link rel="stylesheet" href="daily-canvas.css?v=V101.266">
     <link rel="stylesheet" href="halloween.css?v=V101.249">
@@ -2587,7 +2587,7 @@
 <link rel="stylesheet" href="case-insight-rail.css?v=V101.59">
 <script src="quiz-cover.js?v=V101.282"></script>
 <script src="activity-rewards.js?v=V101.84"></script><link rel="stylesheet" href="activity-rewards.css?v=V101.299">
-<script src="peds-dosing.js?v=V101.62"></script><script src="flood-watch.js?v=V101.150"></script><script src="history-news.js?v=V101.137"></script><link rel="stylesheet" href="flood-watch.css?v=V101.148">
+<script src="peds-dosing.js?v=V101.62"></script><script src="ir-calc.js?v=V101.323"></script><script src="flood-watch.js?v=V101.150"></script><script src="history-news.js?v=V101.137"></script><link rel="stylesheet" href="flood-watch.css?v=V101.148">
 </head>
 
 <body>
@@ -3441,6 +3441,17 @@
                 }
                 /* V101.60: 👶 = this drug has a paediatric dose calculator (peds-dosing.js) */
                 .dc-row-peds { flex-shrink: 0; font-size: 0.85em; line-height: 1; }
+                /* V101.323 (owner pick A, mockup-ir-calculator): 🧮 insulin resistance — five boxes, results as coloured chips (ir-calc.js) */
+                .dc-ir-g { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+                .dc-ir-f { display: flex; flex-direction: column; gap: 2px; font-size: 0.72em; font-weight: 700; color: #64748b; }
+                .dc-ir-in { width: 100%; box-sizing: border-box; height: 36px; margin: 0; border: 1px solid #cbd5e1; border-radius: 9px; padding: 0 8px; font-size: 16px; font-weight: 800; color: #0f172a; background: #fff; }
+                .dc-ir-res { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+                .dc-ir-res:empty { display: none; }
+                .dc-ir-c { min-height: 0; width: auto; margin: 0; font: inherit; font-size: 0.8em; font-weight: 800; padding: 4px 9px; border-radius: 999px; border: 1px solid; cursor: pointer; }
+                .dc-ir-c.g { background: #ecfdf5; border-color: #86efac; color: #166534; } .dc-ir-c.a { background: #fffbeb; border-color: #fcd34d; color: #92400e; } .dc-ir-c.r { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
+                .dc-ir-c small { font-weight: 600; margin-left: 3px; opacity: .85; } .dc-ir-c[aria-pressed="true"] { box-shadow: 0 0 0 2px #6366f1; }
+                .dc-ir-why { margin-top: 6px; padding: 6px 9px; border-radius: 8px; background: #eef2ff; color: #3730a3; font-size: 0.76em; line-height: 1.45; }
+                .dc-ir-note { margin-top: 6px; font-size: 0.7em; color: #94a3b8; }
                 /* V101.73: 📎 n = this drug has download files (admin-added, drug_codex.materials); the files sit in the detail header */
                 .dc-row-mat { flex-shrink: 0; font-size: 0.72em; font-weight: 800; line-height: 1; color: #6d28d9; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 999px; padding: 3px 7px; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; text-decoration: none; cursor: pointer; }
                 .dc-row-mat:hover { background: #ede9fe; border-color: #c4b5fd; }
@@ -21203,6 +21214,20 @@
             if (conc) PedsDosing.setConc(box.dataset.drugId, parseFloat(conc.value));   // mg per 5 ml, remembered per drug
             box.querySelector('.dc-peds-forms').innerHTML = PedsDosing.formsHtml(drug.pedsDosing, PedsDosing.state, box.dataset.drugId);
         };
+        // V101.323: a number typed into the 🧮 section — kept across drugs for this visit, the result chips repainted in place (the boxes are not)
+        window.dcIrInput = function (el) {
+            const box = el.closest('.dc-ir'); if (!box || !window.IrCalc) return;
+            IrCalc.set(el.dataset.k, el.value);
+            box.querySelector('.dc-ir-res').innerHTML = IrCalc.resultsHtml(IrCalc.state);
+            const why = box.querySelector('.dc-ir-why'); if (why) { why.hidden = true; why.textContent = ''; }
+        };
+        // tap a result = its formula, cut-off and source under the chips; tap again = hide
+        window.dcIrWhy = function (btn) {
+            const box = btn.closest('.dc-ir'), why = box && box.querySelector('.dc-ir-why'); if (!why || !window.IrCalc) return;
+            const on = btn.getAttribute('aria-pressed') !== 'true';
+            box.querySelectorAll('.dc-ir-c').forEach(c => c.setAttribute('aria-pressed', String(on && c === btn)));
+            why.hidden = !on; why.textContent = on ? IrCalc.SRC[btn.dataset.k] : '';
+        };
 
         function dcRenderDetail(drug) {
             // V94.99: i18n — pick effective drug for current language. Cache hit
@@ -21250,6 +21275,8 @@
                 : null;
             // V101.60: 👶 paediatric dose calculator (peds-dosing.js) — first, so the rail opens it. Built from the ORIGINAL doc: the numbers are not translated.
             const pedsSection = (window.PedsDosing && PedsDosing.hasPeds(drug)) ? { key: 'peds', title: '👶 Pediatric dose', open: false, peds: drug.pedsDosing } : null;
+            // V101.323 (owner pick A, mockup-ir-calculator): 🧮 insulin resistance on every diabetes drug (ATC A10) — first, like 👶, so the rail opens it
+            const irSection = (window.IrCalc && IrCalc.applies(drug)) ? { key: 'ir', title: '🧮 Insulin resistance', open: false, ir: true } : null;
             // V101.309 (owner pick C, mockup-drug-detail-lean): the reading view follows the questions asked at the counter —
             // 💊 how to give · ⛔ who must not · ⚠️ what to watch · 🗣 what to tell the patient · 🧬 why it works. Same fields as before, only regrouped;
             // the admin form and the data are unchanged. Titles and field names follow the language on screen (Thai on a Thai page).
@@ -21258,6 +21285,7 @@
                 ? { key: 'why', title: T('🧬 ทำไมได้ผล|🧬 Why it works|🧬 작용 원리'), open: false, fields: [[T('กลไก|Mechanism|기전'), eff.mechanism, 'learn']].concat(admetFields.slice(0, 4).map(([l, v, c]) => [T({ Absorption: 'การดูดซึม|Absorption|흡수', Distribution: 'การกระจาย|Distribution|분포', Metabolism: 'การเปลี่ยนแปลง|Metabolism|대사', Excretion: 'การขับออก|Excretion|배설' }[l]), v, c])) }
                 : { key: 'why', title: T('🧬 ทำไมได้ผล|🧬 Why it works|🧬 작용 원리'), open: false, fields: [[T('กลไก|Mechanism|기전'), eff.mechanism, 'learn'], [T('เภสัชจลนศาสตร์|Pharmacokinetics|약동학'), eff.pharmacokinetics, 'reference']] };
             const sections = [
+                irSection,
                 pedsSection,
                 {
                     key: 'give',
@@ -21315,6 +21343,13 @@
                 }
             ];
             const html = sections.filter(Boolean).map(sec => {
+                if (sec.ir) {
+                    return `
+                        <details class="dc-detail-section" data-section-key="ir" ${sec.open ? 'open' : ''}>
+                            <summary>${sec.title}</summary>
+                            <div class="dc-detail-section-body">${IrCalc.sectionBodyHtml(IrCalc.state, lang)}</div>
+                        </details>`;
+                }
                 if (sec.peds) {
                     return `
                         <details class="dc-detail-section" data-section-key="peds" ${sec.open ? 'open' : ''}>
