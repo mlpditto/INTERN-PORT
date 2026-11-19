@@ -58,7 +58,7 @@ T.addReview('as/gemini-4-argon');
 assert.ok(els['dxa-form-ai-trail'].innerHTML.includes('at-chip warn') && /Same model/.test(T.panelHtml()), 'same model → ⚠');
 // 5. a re-check by the same model replaces, not duplicates; the list is capped at 4 and keeps the newest
 T.load({ aiDraftedModel: 'gemini-3.8-flash' });
-['claude-haiku-5-5', 'gpt-6-luna', 'claude-haiku-5-5', 'claude-sonnet-5-5', 'gpt-6.1-sol', 'claude-opus-5-5'].forEach(m => T.addReview(m));
+['claude-haiku-5-5', 'gpt-6-luna', 'claude-haiku-5-5', 'claude-sonnet-5-5', 'gpt-6.2-sol', 'claude-opus-5-5'].forEach(m => T.addReview(m));
 const kept = T.state().review;
 assert.equal(kept.length, 4); assert.equal(new Set(kept).size, 4); assert.equal(kept[kept.length - 1], 'claude-opus-5-5');
 // 6. the panel head names the last checker and carries the 🔁 button wired to the override

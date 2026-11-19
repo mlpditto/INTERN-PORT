@@ -12,7 +12,7 @@ const grab = name => { const i = admin.indexOf('window.' + name + ' = function')
 const lib = ['providerModelRailHtml', 'browseAuditProvider', 'cmpBrowseVendor', '_compareModelBPickerHtml'].map(grab).join('\n');
 const tmp = PUB + 'zz-one-style-qa.html';
 fs.writeFileSync(tmp, `<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="text-ai-chips.css"><link rel="stylesheet" href="audit-toolbar.css"></head>
-<body style="width:900px"><script src="ai-model-ui.js"></script><script>window.textAIModelInfo = id => [...TEXT_AI_MODELS, ...TEXT_AI_TRIAL_MODELS].find(m => m.id === id); window._compareModelB = () => 'gpt-6-astra';\n${lib}</script></body></html>`);
+<body style="width:900px"><script src="ai-model-ui.js"></script><script>window.textAIModelInfo = id => [...TEXT_AI_MODELS, ...TEXT_AI_TRIAL_MODELS].find(m => m.id === id); window._compareModelB = () => 'gpt-6.2-astra';\n${lib}</script></body></html>`);
 
 (async () => {
   const browser = await chromium.launch();

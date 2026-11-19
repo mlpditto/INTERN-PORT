@@ -12,8 +12,8 @@
         { id: 'or/google/gemma-4-26b-a4b-it', label: 'Gemini Gemma 4 26B A4B', short: 'Gemma 4 26B', hint: 'Gemma 4 ของ Google เร็วและประหยัดมาก อ่านภาษาไทยจากรูปได้ ผ่าน OpenRouter 구글 Gemma 4, 매우 빠르고 저렴, OpenRouter 경유' },
         { id: 'gpt-6-luna', label: 'GPT 6 Luna', short: 'Luna 6', hint: 'GPT รุ่นประหยัด ค่าเริ่มต้นสำหรับงานทั่วไป' },
         { id: 'gpt-6.1-terra', label: 'GPT 6.1 Terra', short: 'Terra 6.1', hint: 'GPT สำหรับงานวิเคราะห์ที่ซับซ้อนขึ้น (รับภาพ · ราคา $1/$5 ต่อล้านโทเค็น)' },   // V102.516: 5.6 Terra → 6.1 Terra (2026-10-26, half the price)
-        { id: 'gpt-6.1-sol', label: 'GPT 6.1 Sol', short: 'Sol 6.1', hint: 'GPT สำหรับงานที่ต้องการรายละเอียดมากขึ้น' },
-        { id: 'gpt-6-astra', label: 'GPT 6 Astra', short: 'Astra 6', hint: 'GPT รุ่นใหญ่ ใช้เมื่อต้องการความสามารถสูง' },
+        { id: 'gpt-6.2-sol', label: 'GPT 6.2 Sol', short: 'Sol 6.2', hint: 'GPT สำหรับงานที่ต้องการรายละเอียดมากขึ้น' },
+        { id: 'gpt-6.2-astra', label: 'GPT 6.2 Astra', short: 'Astra 6.2', hint: 'GPT รุ่นใหญ่ ใช้เมื่อต้องการความสามารถสูง' },
         { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5', short: 'Haiku 5.5', hint: 'Claude รุ่นประหยัด สำหรับงานสั้น' },
         // V102.61: Sonnet 5.5 replaces Sonnet 5 (same price, $2/$10 per MTok); saved Sonnet 5 picks move to it.
         { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', short: 'Sonnet 5.5', hint: 'Claude สำหรับงานเขียนและวิเคราะห์' },
@@ -65,9 +65,9 @@
     window.isTextOnlyAIModel = id => /^(or\/deepseek\/deepseek-v4-pro|ol\/)/.test(String(id || ''));   // V102.76: + local Ollama (text only here)
     // V101.64: GPT-6 Luna/Sol replace 5.6, DeepSeek V4 Pro moves to its 0813 GA snapshot — saved picks move to their successor, not to the default.
     // V102.61: Claude Sonnet 5 → Sonnet 5.5.
-    const RETIRED_TEXT_AI_MODELS = { 'gpt-5.6-luna': 'gpt-6-luna', 'gpt-5.6-sol': 'gpt-6.1-sol', 'or/deepseek/deepseek-v4-pro': 'or/deepseek/deepseek-v4-pro-0813', 'claude-sonnet-5': 'claude-sonnet-5-5', 'claude-fable-5-1': 'claude-fable-5-2',
-        'claude-haiku-4-5': 'claude-haiku-5-5', 'gpt-6-sol': 'gpt-6.1-sol', 'or/deepseek/deepseek-v4.1-flash': 'or/deepseek/deepseek-v4.1-flash-1017',
-        'gpt-5.6-terra': 'gpt-6.1-terra' };   // V102.516: Terra 5.6 → 6.1   // V102.365: Haiku 4.5 → 5.5 · Sol 6 → 6.1 · DeepSeek Flash → the 1017 snapshot
+    const RETIRED_TEXT_AI_MODELS = { 'gpt-5.6-luna': 'gpt-6-luna', 'gpt-5.6-sol': 'gpt-6.2-sol', 'or/deepseek/deepseek-v4-pro': 'or/deepseek/deepseek-v4-pro-0813', 'claude-sonnet-5': 'claude-sonnet-5-5', 'claude-fable-5-1': 'claude-fable-5-2',
+        'claude-haiku-4-5': 'claude-haiku-5-5', 'gpt-6-sol': 'gpt-6.2-sol', 'or/deepseek/deepseek-v4.1-flash': 'or/deepseek/deepseek-v4.1-flash-1017',
+        'gpt-5.6-terra': 'gpt-6.1-terra', 'gpt-6.1-sol': 'gpt-6.2-sol', 'gpt-6-astra': 'gpt-6.2-astra' };   // V102.688: Sol 6.1 / Astra 6 → 6.2 (2026-11-18)   // V102.516: Terra 5.6 → 6.1   // V102.365: Haiku 4.5 → 5.5 · Sol 6 → 6.1 · DeepSeek Flash → the 1017 snapshot
     window.normalizeTextAIModel = value => { value = RETIRED_TEXT_AI_MODELS[value] || value; return models.some(m => m.id === value) ? value : 'gpt-6-luna'; };
     // A trial id stays as-is where a caller explicitly picked it; anything else normalises as before.
     window.resolveTrialTextAIModel = value => trialModels.some(m => m.id === value) ? value : window.normalizeTextAIModel(value);
