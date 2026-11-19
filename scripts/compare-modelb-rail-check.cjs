@@ -27,7 +27,7 @@ const modelB = cut('        window._compareModelB = function', '        window.g
 
         const chips = await page.locator('#b .text-ai-chips > button').evaluateAll(bs => bs.map(b => ({ label: b.getAttribute('aria-label'), owner: b.querySelector('.text-ai-logo')?.dataset.owner || '', bg: b.querySelector('.text-ai-logo') ? getComputedStyle(b.querySelector('.text-ai-logo')).backgroundImage : '' })));
         const byLabel = Object.fromEntries(chips.map(c => [c.label, c]));
-        for (const [label, owner] of [['Qwen 3.8 Flash', 'qwen'], ['Qwen 3.8 Max', 'qwen'], ['DeepSeek V4.1 Flash', 'deepseek'], ['DeepSeek V4 Pro', 'deepseek'], ['Grok 4.7', 'grok']]) {
+        for (const [label, owner] of [['Qwen 3.8 Flash', 'qwen'], ['Qwen 4 Max', 'qwen'], ['DeepSeek V4.1 Flash', 'deepseek'], ['DeepSeek V4 Pro', 'deepseek'], ['Grok 4.7', 'grok']]) {
             assert.ok(byLabel[label], label + ' chip is offered');
             assert.equal(byLabel[label].owner, owner, label + ' carries its logo');
             assert.match(byLabel[label].bg, new RegExp(owner + '-'), label + ' logo file resolves');
@@ -68,9 +68,9 @@ const modelB = cut('        window._compareModelB = function', '        window.g
         assert.match(lunaOn.logo, /^openai-blossom-white\.svg/, 'white OpenAI blossom');
         const flashOn = await pick('Gemini 3.8 Flash');
         assert.match(flashOn.img, /rgb\(66, 133, 244\).*rgb\(155, 114, 203\)/, 'picked Gemini = blue→purple');
-        const picked = await pick('Qwen 3.8 Max');
+        const picked = await pick('Qwen 4 Max');
         assert.deepEqual([picked.bg, picked.color], ['rgb(118, 36, 244)', 'rgb(255, 255, 255)'], 'picked OpenRouter = grape solid');
-        assert.equal(await page.locator('#b button[aria-label="Qwen 3.8 Max"]').evaluate(b => getComputedStyle(b, '::after').backgroundColor), 'rgb(118, 36, 244)', 'picked chip keeps its dot');
+        assert.equal(await page.locator('#b button[aria-label="Qwen 4 Max"]').evaluate(b => getComputedStyle(b, '::after').backgroundColor), 'rgb(118, 36, 244)', 'picked chip keeps its dot');
         // the audit toolbar and Curate paint their own amber pick — the vendor colour must still win there
         await page.evaluate(() => { const w = document.createElement('div'); w.className = 'audit-toolbar'; w.id = 'at'; w.innerHTML = textAIChipsHtml('', 'claude-opus-5-5', ''); document.body.append(w); });
         assert.deepEqual(await page.locator('#at .text-ai-chips > button[aria-pressed="true"]').evaluate(b => [getComputedStyle(b).backgroundColor, getComputedStyle(b).color]), ['rgb(217, 119, 87)', 'rgb(255, 255, 255)'], 'audit toolbar pick uses the vendor colour');
