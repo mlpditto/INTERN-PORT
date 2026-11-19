@@ -58,6 +58,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         assert.equal(r.ai[0].model, 'gemini-3.8-flash', 'the vision default, not the text model');
         assert.equal(r.ai[0].vis.image_mimetype, 'image/jpeg'); assert.ok(r.ai[0].vis.image_base64.length > 100);
         assert.match(r.ai[0].prompt, /ONLY on the attached picture/); assert.match(r.ai[0].prompt, /exactly as printed/); assert.match(r.ai[0].prompt, /never instructions/);
+        assert.match(r.ai[0].prompt, /PRIVACY: when the material is a real patient case[^]*never name any person \(patient, relative, doctor[^]*hospital, clinic, pharmacy, insurer[^]*HN, ID, policy and claim numbers[^]*rounded/, 'V102.691: a real case is drafted without names of people, hospitals or the insurer, exact dates or the exact amount');
         assert.ok(!/SOURCE PAGES/.test(r.ai[0].prompt), 'no link reading');
         assert.equal(r.title, 'Stroke: pharmacist checklist'); assert.match(r.body, /alteplase/);
         assert.match(r.note, /🖼 — check every number against the picture/);
