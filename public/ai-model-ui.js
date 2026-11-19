@@ -6,6 +6,8 @@
         { id: 'as/gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', short: 'Lite 3.5', hint: 'Gemini รุ่นประหยัด สำหรับงานสั้น' },
         { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', short: 'Flash 3.8', hint: 'Gemini สำหรับวิเคราะห์และสรุปข้อมูล' },
         // V102.365: Gemini 4 Argon (GA 2026-10-13) via AI Studio — intro $2/$10 per MTok to 2026-11-30, then $4/$20; the proxy sends thinkingLevel low.
+        // V102.689: Gemini 4 Carbon (AI Studio, released 2026-11-10, $2/$10 per MTok on OpenRouter) — the mid-size Gemini 4, beside Argon; the proxy sends thinkingLevel low.
+        { id: 'as/gemini-4-carbon', label: 'Gemini 4 Carbon', short: 'Carbon 4', hint: 'Gemini 4 รุ่นกลาง เร็วกว่า Argon สำหรับงานทั่วไปถึงวิเคราะห์ · 중형 Gemini 4, 일반·분석 작업용' },
         { id: 'as/gemini-4-argon', label: 'Gemini 4 Argon', short: 'Argon 4', hint: 'Gemini รุ่นใหญ่ล่าสุด สำหรับงานวิเคราะห์ซับซ้อน (ราคาแนะนำตัวถึง 30 พ.ย.) · 최신 대형 Gemini, 복잡한 분석용' },
         // V102.242: Gemma 4 26B A4B (Google open weights, MoE with 4B active) via OpenRouter — grouped under the Gemini tab (the tab = the first word of `label`),
         // billed by OpenRouter (isGoogleBilledModel is false for or/google/). Phase 0 probe 2026-10-15: Thai from an image exact, JSON + Thai quiz JSON + Thai translation pass, ~4 s, ~$0.00005 per quiz item.
@@ -22,7 +24,7 @@
         { id: 'or/qwen/qwen3.8-flash', label: 'Qwen 3.8 Flash', short: 'Qwen Flash 3.8', hint: 'Qwen รุ่นประหยัด ภาษาไทยดี ผ่าน OpenRouter' },
         // V102.518: Qwen 3.8 Omni Flash (OpenRouter 2026-09-21, $0.15/$0.47 per MTok, 1M ctx, text + image + audio + video in) — the cheap multimodal chip
         { id: 'or/qwen/qwen3.8-omni-flash', label: 'Qwen 3.8 Omni Flash', short: 'Qwen Omni Flash 3.8', hint: 'Qwen รุ่น Omni รับภาพ เสียง และวิดีโอ ราคาประหยัด ผ่าน OpenRouter · Qwen 3.8 Omni Flash, 이미지·오디오·비디오 입력, 저렴한 요금, OpenRouter 경유' },
-        { id: 'or/qwen/qwen3.8-max-0902', label: 'Qwen 3.8 Max', short: 'Qwen Max 3.8', hint: 'Qwen รุ่นใหญ่ ภาษาไทยดี สำหรับคัดและเปรียบเทียบข้อสอบ ผ่าน OpenRouter' },
+        { id: 'or/qwen/qwen4-max', label: 'Qwen 4 Max', short: 'Qwen Max 4', hint: 'Qwen รุ่นใหญ่ ภาษาไทยดี สำหรับคัดและเปรียบเทียบข้อสอบ ผ่าน OpenRouter' },
         { id: 'or/deepseek/deepseek-v4.1-flash-1017', label: 'DeepSeek V4.1 Flash', short: 'DeepSeek Flash V4.1', hint: 'DeepSeek รุ่นประหยัด ผ่าน OpenRouter' },
         { id: 'or/deepseek/deepseek-v4-pro-0813', label: 'DeepSeek V4 Pro', short: 'DeepSeek Pro V4', hint: 'DeepSeek รุ่นใหญ่ เหมาะกับงานวิเคราะห์ ผ่าน OpenRouter' },
         // V102.268: Meta Muse Spark Open (open weights, 1M context; text / image / video / audio in, text out) via OpenRouter — its own Muse tab, drawn with the Meta mark.
@@ -67,7 +69,7 @@
     // V102.61: Claude Sonnet 5 → Sonnet 5.5.
     const RETIRED_TEXT_AI_MODELS = { 'gpt-5.6-luna': 'gpt-6-luna', 'gpt-5.6-sol': 'gpt-6.2-sol', 'or/deepseek/deepseek-v4-pro': 'or/deepseek/deepseek-v4-pro-0813', 'claude-sonnet-5': 'claude-sonnet-5-5', 'claude-fable-5-1': 'claude-fable-5-2',
         'claude-haiku-4-5': 'claude-haiku-5-5', 'gpt-6-sol': 'gpt-6.2-sol', 'or/deepseek/deepseek-v4.1-flash': 'or/deepseek/deepseek-v4.1-flash-1017',
-        'gpt-5.6-terra': 'gpt-6.1-terra', 'gpt-6.1-sol': 'gpt-6.2-sol', 'gpt-6-astra': 'gpt-6.2-astra' };   // V102.688: Sol 6.1 / Astra 6 → 6.2 (2026-11-18)   // V102.516: Terra 5.6 → 6.1   // V102.365: Haiku 4.5 → 5.5 · Sol 6 → 6.1 · DeepSeek Flash → the 1017 snapshot
+        'gpt-5.6-terra': 'gpt-6.1-terra', 'gpt-6.1-sol': 'gpt-6.2-sol', 'gpt-6-astra': 'gpt-6.2-astra', 'or/qwen/qwen3.8-max-0902': 'or/qwen/qwen4-max' };   // V102.689: Qwen 3.8 Max → Qwen 4 Max   // V102.688: Sol 6.1 / Astra 6 → 6.2 (2026-11-18)   // V102.516: Terra 5.6 → 6.1   // V102.365: Haiku 4.5 → 5.5 · Sol 6 → 6.1 · DeepSeek Flash → the 1017 snapshot
     window.normalizeTextAIModel = value => { value = RETIRED_TEXT_AI_MODELS[value] || value; return models.some(m => m.id === value) ? value : 'gpt-6-luna'; };
     // A trial id stays as-is where a caller explicitly picked it; anything else normalises as before.
     window.resolveTrialTextAIModel = value => trialModels.some(m => m.id === value) ? value : window.normalizeTextAIModel(value);

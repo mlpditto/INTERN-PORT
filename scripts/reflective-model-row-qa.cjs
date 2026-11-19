@@ -65,7 +65,7 @@ for (const id of ['ai-model-review', 'ai-model-grammar', 'rr-providers', 'rr-gra
 
         // picking a tab shows that provider's chips; picking a chip sets the select and the registry pref
         await p.locator('#rr-providers .audit-provider[data-provider="Qwen"]').click();
-        assert.deepEqual(await visibleChips(p, 'rr-model-row'), ['Qwen Flash 3.8', 'Qwen Omni Flash 3.8', 'Qwen Max 3.8']);
+        assert.deepEqual(await visibleChips(p, 'rr-model-row'), ['Qwen Flash 3.8', 'Qwen Omni Flash 3.8', 'Qwen Max 4']);
         await p.locator('#rr-model-row .text-ai-chips > button:not([hidden])', { hasText: 'Qwen Flash 3.8' }).click();
         assert.equal(await p.locator('#ai-model-review').inputValue(), 'or/qwen/qwen3.8-flash');
         assert.equal(await p.locator('#rr-model-row .text-ai-chips [aria-pressed="true"]').count(), 1);
@@ -99,7 +99,7 @@ for (const id of ['ai-model-review', 'ai-model-grammar', 'rr-providers', 'rr-gra
         // rrSyncModelRow (modal open) follows a programmatic value
         await p.evaluate(() => { document.getElementById('ai-model-review').value = 'gemini-3.8-flash'; window.rrSyncModelRow('ai-model-review', 'rr-providers'); });
         assert.equal(await openTab(p, 'rr-providers'), 'Gemini');
-        assert.deepEqual(await visibleChips(p, 'rr-model-row'), ['Lite 3.5', 'Flash 3.8', 'Argon 4', 'Gemma 4 26B']);   // V102.242: + Gemma under the Gemini tab; V102.365: + Argon 4
+        assert.deepEqual(await visibleChips(p, 'rr-model-row'), ['Lite 3.5', 'Flash 3.8', 'Carbon 4', 'Argon 4', 'Gemma 4 26B']);   // V102.242: + Gemma under the Gemini tab; V102.365: + Argon 4
         await p.close();
 
         // ---- phone ----

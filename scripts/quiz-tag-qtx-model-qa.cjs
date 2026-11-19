@@ -52,19 +52,19 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
         // 2 · browsing a vendor changes nothing but the list; a pick on the ask view is remembered and only moves the selection
         await vendor('Gemini');
-        v = await view(); assert.deepEqual(v.pressed, ['Lite 3.5', 'Flash 3.8', 'Argon 4', 'Gemma 4 26B'], 'Gemini models (Gemma via OpenRouter sits with them, as everywhere)'); assert.equal(v.vendors[0], 'Gemini*');
+        v = await view(); assert.deepEqual(v.pressed, ['Lite 3.5', 'Flash 3.8', 'Carbon 4', 'Argon 4', 'Gemma 4 26B'], 'Gemini models (Gemma via OpenRouter sits with them, as everywhere)'); assert.equal(v.vendors[0], 'Gemini*');
         assert.equal(await page.evaluate(() => localStorage.getItem('quizTagAiModel')), null, 'browsing a vendor stores nothing'); assert.equal(await page.evaluate(() => __calls.length), 0);
         await vendor('Claude'); v = await view(); assert.deepEqual(v.pressed, ['Haiku 5.5', 'Sonnet 5.5', 'Opus 5.5', 'Fable 5.2']); await vendor('Grok'); v = await view(); assert.deepEqual(v.pressed, ['4.7'], 'the icon says Grok, the chip says the version');
         await vendor('DeepSeek'); v = await view(); assert.deepEqual(v.pressed, ['Flash V4.1', 'Pro V4']); await vendor('Qwen'); v = await view(); assert.deepEqual(v.pressed, ['Flash 3.8', 'Omni Flash 3.8', 'Max 3.8']); await vendor('GPT'); v = await view(); assert.deepEqual(v.pressed, ['Luna 6', 'Terra 6.1', 'Sol 6.2', 'Astra 6.2']);
         await vendor('Muse'); v = await view(); assert.deepEqual(v.pressed, ['Spark Open'], 'V102.646: Muse is offered here now'); await vendor('Kimi'); v = await view(); assert.deepEqual(v.pressed, ['K3.1 Pro'], 'and Kimi');
         await vendor('Gemini'); await chip('Flash 3.8');
-        v = await view(); assert.deepEqual(v.pressed, ['Lite 3.5', 'Flash 3.8*', 'Argon 4', 'Gemma 4 26B']); assert.equal(v.vendors[0], 'Gemini*'); assert.match(v.title, /Tags incomplete/);
+        v = await view(); assert.deepEqual(v.pressed, ['Lite 3.5', 'Flash 3.8*', 'Carbon 4', 'Argon 4', 'Gemma 4 26B']); assert.equal(v.vendors[0], 'Gemini*'); assert.match(v.title, /Tags incomplete/);
         assert.equal(await page.evaluate(() => localStorage.getItem('quizTagAiModel')), 'gemini-3.8-flash'); assert.equal(await page.evaluate(() => __calls.length), 0, 'no AI call from a mere pick');
 
         // 3 · Fix with AI runs the picked model; the result names it and keeps the rail
         await click('Fix with AI'); await ready(/AI suggests/);
         assert.deepEqual(await page.evaluate(() => __calls), ['gemini-3.8-flash']);
-        v = await view(); assert.match(v.title, /AI suggests\s*·\s*Gemini 3\.8 Flash/); assert.deepEqual(v.pressed, ['Lite 3.5', 'Flash 3.8*', 'Argon 4', 'Gemma 4 26B']);
+        v = await view(); assert.match(v.title, /AI suggests\s*·\s*Gemini 3\.8 Flash/); assert.deepEqual(v.pressed, ['Lite 3.5', 'Flash 3.8*', 'Carbon 4', 'Argon 4', 'Gemma 4 26B']);
         assert.ok(/Allergic Rhinitis/.test(v.sub) && /Geriatrics/.test(v.sub), 'the suggestion is shown');
 
         // 4 · V102.656: a pick on the result view only REMEMBERS the model — nothing runs, the proposal stays; ↻ in the footer runs again with it
@@ -105,7 +105,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         v = await view(); assert.match(v.sub, /Ollama is not reachable/); assert.equal(v.pressed[0], 'Ollama*', 'error view shows the model that failed');
         const nErr = await page.evaluate(() => __calls.length);
         await vendor('Gemini'); await chip('Lite 3.5'); v = await view();
-        assert.equal(await page.evaluate(() => __calls.length), nErr, 'error view: a model tap runs nothing'); assert.match(v.title, /could not suggest/); assert.deepEqual(v.pressed, ['Lite 3.5*', 'Flash 3.8', 'Argon 4', 'Gemma 4 26B'], 'the tapped model is the selected one');
+        assert.equal(await page.evaluate(() => __calls.length), nErr, 'error view: a model tap runs nothing'); assert.match(v.title, /could not suggest/); assert.deepEqual(v.pressed, ['Lite 3.5*', 'Flash 3.8', 'Carbon 4', 'Argon 4', 'Gemma 4 26B'], 'the tapped model is the selected one');
         await click('Try again'); await ready(/AI suggests\s*·\s*Gemini 3\.5 Flash-Lite/);
         assert.equal((await page.evaluate(() => __calls)).slice(-1)[0], 'as/gemini-3.5-flash-lite');
 
@@ -145,7 +145,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         await click('Apply only'); await page.waitForFunction(() => window.__done === false);   // Apply only = write the tags, do not save yet
         assert.match(await page.evaluate(() => document.getElementById('quiz-tags').value), /Allergic Rhinitis/);
         await page.evaluate(() => { document.getElementById('quiz-tags').value = ''; window.__done = null; confirmQuizEditorTags('Save').then(v => { window.__done = v; }); });
-        v = await view(); assert.deepEqual(v.pressed, ['Lite 3.5*', 'Flash 3.8', 'Argon 4', 'Gemma 4 26B'], 'remembered across dialogs — and the dialog opens on that vendor'); assert.equal(v.vendors[0], 'Gemini*'); await click('Cancel');
+        v = await view(); assert.deepEqual(v.pressed, ['Lite 3.5*', 'Flash 3.8', 'Carbon 4', 'Argon 4', 'Gemma 4 26B'], 'remembered across dialogs — and the dialog opens on that vendor'); assert.equal(v.vendors[0], 'Gemini*'); await click('Cancel');
         // a remembered id that is no longer a model falls back to local
         assert.equal(await page.evaluate(() => { localStorage.setItem('quizTagAiModel', 'gone-model-1'); return window.qtxModel(); }), 'ol/local', 'an unknown remembered model → local');
 
