@@ -38,7 +38,7 @@ const { chromium } = require('playwright');
         for (const id of ['ai-audit-popup', 'ai-analysis-popup']) {
             const popup = page.locator('#' + id);
             // V101.05 added Qwen/DeepSeek chips; V101.21 gave them provider tabs; V101.52 adds the Grok trial chip here only.
-            assert.equal(await popup.locator('.text-ai-chips button').count(), 22); // V102.642: + Inkling 2 Small trial chip; V102.518: + Qwen 3.8 Omni Flash; V102.432: + Kimi K3.1 Pro trial chip; V102.365: + Gemini 4 Argon; V102.268: + Muse Spark Open; V102.242: + Gemma 4 26B A4B; V101.64: + Claude Opus 5.5; V102.76: + local Ollama trial chip
+            assert.equal(await popup.locator('.text-ai-chips button').count(), 23); // V102.689: + Gemini 4 Carbon; V102.642: + Inkling 2 Small trial chip; V102.518: + Qwen 3.8 Omni Flash; V102.432: + Kimi K3.1 Pro trial chip; V102.365: + Gemini 4 Argon; V102.268: + Muse Spark Open; V102.242: + Gemma 4 26B A4B; V101.64: + Claude Opus 5.5; V102.76: + local Ollama trial chip
             if (id === 'ai-analysis-popup') {   // V102.659 (owner pick D): on Rewrites the model row is folded into a chip beside ↻ Rewrite; a tap opens it
                 assert.equal(await popup.locator('.text-ai-chips button:visible').count(), 0, 'the model row starts folded');
                 assert.equal(await popup.locator('.audit-model-chip').getAttribute('aria-expanded'), 'false');

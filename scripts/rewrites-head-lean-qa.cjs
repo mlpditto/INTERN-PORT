@@ -82,7 +82,7 @@ const shot = async (page, name) => { if (SHOT) { fs.mkdirSync(SHOT, { recursive:
 
         console.log('the model chip');
         await page.click('.audit-model-chip'); v = await view(page);
-        ok(v.rail && v.exp === 'true' && v.stored === '0' && v.chips.join(' ') === 'Lite 3.5 Flash 3.8* Argon 4 Gemma 4 26B', 'tap → the row of chips opens (remembered): ' + v.chips.join(' '));
+        ok(v.rail && v.exp === 'true' && v.stored === '0' && v.chips.join(' ') === 'Lite 3.5 Flash 3.8* Carbon 4 Argon 4 Gemma 4 26B', 'tap → the row of chips opens (remembered): ' + v.chips.join(' '));
         await shot(page, 'head-built-open');
         await page.click('.audit-provider[data-provider="Claude"]'); await page.locator('.text-ai-chips > button:visible', { hasText: 'Sonnet 5.5' }).click(); v = await view(page);
         ok(v.chip === 'Sonnet 5.5' && v.logo === 'claude' && v.model === 'claude-sonnet-5-5' && v.rail, 'a pick renames the chip (logo too) and sets the run model; the row stays open');
