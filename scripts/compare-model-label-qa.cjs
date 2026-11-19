@@ -22,7 +22,7 @@ const meta = id => sandbox.window._compareModelMeta(id);
 assert.strictEqual(meta('or/moonshotai/kimi-k3.1-pro').label, 'Kimi K3.1 Pro', 'Kimi trial model keeps its name');
 assert.strictEqual(meta('or/x-ai/grok-4.7').label, 'Grok 4.7', 'Grok trial model keeps its name');
 assert.strictEqual(meta('ol/local').label, 'Ollama local', 'Ollama trial model keeps its name');
-assert.strictEqual(meta('gpt-6.1-sol').label, 'GPT 6.1 Sol', 'catalog model unchanged');
+assert.strictEqual(meta('gpt-6.2-sol').label, 'GPT 6.2 Sol', 'catalog model unchanged');
 // the proxy echoes the provider's own name (Gemini modelVersion), not the catalogue id
 assert.strictEqual(meta('gemini-4-argon').label, 'Gemini 4 Argon', 'Argon echoed without its as/ prefix');
 assert.strictEqual(meta('gemini-4-argon-001').label, 'Gemini 4 Argon', 'Argon with a version suffix');

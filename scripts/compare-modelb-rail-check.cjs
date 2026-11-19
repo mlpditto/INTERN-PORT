@@ -83,7 +83,7 @@ const modelB = cut('        window._compareModelB = function', '        window.g
         await page.evaluate(() => { document.getElementById('b').innerHTML = window._compareModelBPickerHtml(); });
         assert.equal(await page.locator('#b .text-ai-chips > button[aria-pressed="true"]').getAttribute('aria-label'), 'Grok 4.7', 'reopened rail shows Grok picked');
         await page.evaluate(() => localStorage.setItem('ai_default_2model_b', 'gpt-5.6-sol'));
-        assert.equal(await page.evaluate(() => window._compareModelB()), 'gpt-6.1-sol', 'retired ids still move to their successor');
+        assert.equal(await page.evaluate(() => window._compareModelB()), 'gpt-6.2-sol', 'retired ids still move to their successor');
 
         // Qwen / DeepSeek logos also show on other flat rails (settings etc.)
         assert.equal(await page.evaluate(() => (textAIChipsHtml('', 'gpt-6-luna', '').match(/data-owner="(qwen|deepseek)"/g) || []).length), 5);   // V102.518: + Qwen 3.8 Omni Flash

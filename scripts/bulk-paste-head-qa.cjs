@@ -31,7 +31,7 @@ const styles = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => 
             window.escapeHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
             window.aiModelShortName = id => (textAIModelInfo(id) || {}).short || id;
             window.toasts = []; window.showToast = (...a) => toasts.push(a);
-            document.getElementById('bp-ai-model').innerHTML = '<option value="gpt-6-astra">GPT 6 Astra</option>';
+            document.getElementById('bp-ai-model').innerHTML = '<option value="gpt-6.2-astra">GPT 6.2 Astra</option>';
         });
         await page.addScriptTag({ content: logoJs + chipJs + batchJs });
         await page.evaluate(() => bpSyncModelChip());
@@ -55,8 +55,8 @@ const styles = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => 
         }
         const chip = page.locator('#bp-model-chip');
         assert.equal((await chip.innerText()).trim(), '', 'chip is logo + ▾ only');
-        assert.equal(await chip.getAttribute('data-model'), 'Astra 6');
-        assert.match(await chip.getAttribute('title'), /GPT 6 Astra/);
+        assert.equal(await chip.getAttribute('data-model'), 'Astra 6.2');
+        assert.match(await chip.getAttribute('title'), /GPT 6.2 Astra/);
         assert.equal(await chip.locator('.text-ai-logo').getAttribute('data-owner'), 'openai');
 
         // ring: the real batch → amber while running, then green n/N, red when some fail

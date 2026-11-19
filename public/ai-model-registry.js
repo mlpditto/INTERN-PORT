@@ -57,6 +57,24 @@ window.AI_MODEL_REGISTRY = {
       "rollout": "replaces gpt-5.6-terra everywhere gpt-5.6-terra was offered"
     },
     {
+      "id": "gpt-6.2-astra",
+      "label": "GPT-6.2 Astra",
+      "provider": "openai",
+      "adapter": "responses",
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text",
+        "json"
+      ],
+      "selectable": true,
+      "access": "verified-2026-11-18 (in GET /v1/models; OpenAI mail \"Meet GPT-6.2 Astra and Sol\")",
+      "validation": "text-json-vision-pass",
+      "rollout": "trial-only-defaults-unchanged"
+    },
+    {
       "id": "gpt-6-astra",
       "label": "GPT-6 Astra",
       "provider": "openai",
@@ -69,10 +87,11 @@ window.AI_MODEL_REGISTRY = {
         "text",
         "json"
       ],
-      "selectable": true,
+      "selectable": false,
       "access": "verified-2026-09-11",
       "validation": "text-json-vision-pass",
-      "rollout": "trial-only-defaults-unchanged"
+      "rollout": "trial-only-defaults-unchanged",
+      "replacedBy": "gpt-6.2-astra"
     },
     {
       "id": "gpt-6-luna",
@@ -257,6 +276,24 @@ window.AI_MODEL_REGISTRY = {
       "rollout": "quiz-feedback"
     },
     {
+      "id": "gpt-6.2-sol",
+      "label": "GPT-6.2 Sol",
+      "provider": "openai",
+      "adapter": "responses",
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text",
+        "json"
+      ],
+      "selectable": true,
+      "access": "verified-2026-11-18 (in GET /v1/models; OpenAI mail \"Meet GPT-6.2 Astra and Sol\")",
+      "validation": "text-json-vision-pass",
+      "rollout": "quiz-feedback"
+    },
+    {
       "id": "gpt-6.1-sol",
       "label": "GPT-6.1 Sol",
       "provider": "openai",
@@ -269,10 +306,11 @@ window.AI_MODEL_REGISTRY = {
         "text",
         "json"
       ],
-      "selectable": true,
+      "selectable": false,
       "access": "verified-2026-10-22",
       "validation": "text-json-vision-pass",
-      "rollout": "quiz-feedback"
+      "rollout": "quiz-feedback",
+      "replacedBy": "gpt-6.2-sol"
     },
     {
       "id": "gpt-5.6-sol",

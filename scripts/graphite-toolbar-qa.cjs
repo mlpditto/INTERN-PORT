@@ -51,8 +51,8 @@ const { chromium } = require('playwright');
             assert.deepEqual(await popup.locator('.audit-provider .text-ai-logo').evaluateAll(ns => ns.map(n => n.dataset.owner)), ['gemini', 'openai', 'claude', 'qwen', 'deepseek', 'meta', 'kimi', 'grok', 'ollama']);
             assert.equal(await popup.locator('.text-ai-chips .text-ai-logo').count(), 0);
             assert.deepEqual(await popup.locator('.audit-provider').evaluateAll(ns => ns.slice(0, 6).map(n => getComputedStyle(n).color)), ['rgb(168, 180, 255)', 'rgb(125, 211, 176)', 'rgb(232, 180, 154)', 'rgb(201, 160, 240)', 'rgb(127, 200, 245)', 'rgb(125, 184, 255)']);
-            assert.equal(await popup.locator('[data-value="gpt-6-astra"]').textContent(), 'Astra 6');
-            assert.equal(await popup.locator('[data-value="gpt-6-astra"]').getAttribute('aria-label'), 'GPT 6 Astra');
+            assert.equal(await popup.locator('[data-value="gpt-6.2-astra"]').textContent(), 'Astra 6.2');
+            assert.equal(await popup.locator('[data-value="gpt-6.2-astra"]').getAttribute('aria-label'), 'GPT 6.2 Astra');
             assert.equal(await popup.locator('.text-ai-chips [aria-pressed="true"]').count(), 1);
             // V102.82: the Ollama tab is a logo like the others (it was a name in V102.76-V102.79, unreadable when pressed).
             {
@@ -82,9 +82,9 @@ const { chromium } = require('playwright');
                 }
             }
         }
-        await page.locator('#ai-audit-popup [data-value="gpt-6.1-sol"]').click();
+        await page.locator('#ai-audit-popup [data-value="gpt-6.2-sol"]').click();
         await page.locator('#ai-audit-popup .audit-run').click();
-        assert.equal(await page.evaluate(() => auditRequest.model), 'gpt-6.1-sol');
+        assert.equal(await page.evaluate(() => auditRequest.model), 'gpt-6.2-sol');
         await page.locator('#ai-analysis-popup [data-provider="Claude"]').click();
         assert.equal(await page.locator('#ai-analysis-popup .text-ai-chips button:visible').count(), 4); // Claude: Haiku 5.5, Sonnet 5.5, Opus 5.5, Fable 5.2
         assert.equal(await page.locator('#rewrite-ai-model').inputValue(), 'gpt-6-luna');
@@ -138,7 +138,7 @@ const { chromium } = require('playwright');
             window._aiAnalysisItems = [];
             syncAuditFixHints();
         });
-        for (const [value, label] of [['gpt-6-astra', 'GPT 6 Astra'], ['gemini-3.8-flash', 'Gemini 3.8 Flash']]) {
+        for (const [value, label] of [['gpt-6.2-astra', 'GPT 6.2 Astra'], ['gemini-3.8-flash', 'Gemini 3.8 Flash']]) {
             await page.locator('#ai-audit-popup [data-provider="' + label.split(' ')[0] + '"]').click();
             await page.locator('#ai-audit-popup [data-value="' + value + '"]').click();
             const fix = page.locator('.audit-fix-control button');

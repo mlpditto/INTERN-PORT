@@ -22,10 +22,10 @@ assert.ok(/aria-label="Draft Read first with AI">✨</.test(box) && /The correct
             window.showToast = m => out.toasts.push(m); window.escapeHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
             window.safeJsonParse = JSON.parse; window._qImproveModel = () => 'claude-sonnet-5-5';
             window._qPrimerStrip = () => {}; window._qPrimerTodo = () => [...document.querySelectorAll('#quizManageModal .quiz-q-item')].filter(i => !i.querySelector('.q-primer').value.trim() && i.querySelector('.q-text').value.trim());
-            window.TEXT_AI_MODELS = [{ id: 'gpt-6-luna', short: 'Luna 6' }, { id: 'claude-sonnet-5-5', short: 'Sonnet 5.5' }, { id: 'gpt-6.1-sol', short: 'Sol 6' }];
+            window.TEXT_AI_MODELS = [{ id: 'gpt-6-luna', short: 'Luna 6' }, { id: 'claude-sonnet-5-5', short: 'Sonnet 5.5' }, { id: 'gpt-6.2-sol', short: 'Sol 6' }];
             window.normalizeTextAIModel = v => window.TEXT_AI_MODELS.some(m => m.id === v) ? v : 'gpt-6-luna';
             localStorage.clear();
-            const tb = document.createElement('input'); tb.id = 'toolbar-ai-translate-model'; tb.value = 'gpt-6.1-sol'; tb.type = 'hidden';
+            const tb = document.createElement('input'); tb.id = 'toolbar-ai-translate-model'; tb.value = 'gpt-6.2-sol'; tb.type = 'hidden';
             let reply;
             window.callUniversalAI = async (model, prompt, isJson, a, key, opts) => { out.prompts.push(prompt); out.models.push(model); out.feats.push(opts && opts.feature); if (reply instanceof Error) throw reply; return { text: JSON.stringify(reply) }; };
             document.body.innerHTML = '<div class="quiz-q-item"><textarea class="q-text">Which drug is a LABA?</textarea>' +
@@ -80,7 +80,7 @@ assert.ok(/aria-label="Draft Read first with AI">✨</.test(box) && /The correct
         assert.ok(!/คำตอบที่ถูก|correct|ข้อ 2/.test(pFull.replace('ห้ามระบุ ห้ามบอกใบ้ หรือเปรียบเทียบว่าตัวเลือกใดถูก/ผิด', '')), 'NO answer key in the prompt (no "correct answer", no index of the ticked option)');
         assert.ok(/ไม่มีการระบุคำตอบ/.test(pFull) && /ห้ามเฉลย/.test(pFull), 'the prompt forbids giving the answer away');
         assert.ok(/อภิธานศัพท์/.test(pTerms) && !/ความรู้พื้นฐานที่ต้องมี/.test(pTerms), 'terms-only mode asks for the glossary only');
-        assert.equal(r.inputKind, 'INPUT/hidden/id', 'V102.509: a hidden input with an id — the vendor-first rail binds to it on the real page'); assert.equal(r.firstPick, 'gpt-6.1-sol', 'first time the input follows the toolbar model'); assert.equal(r.remembered, null, 'V102.631: a row pick is that question only — the strip pick is the remembered one');
+        assert.equal(r.inputKind, 'INPUT/hidden/id', 'V102.509: a hidden input with an id — the vendor-first rail binds to it on the real page'); assert.equal(r.firstPick, 'gpt-6.2-sol', 'first time the input follows the toolbar model'); assert.equal(r.remembered, null, 'V102.631: a row pick is that question only — the strip pick is the remembered one');
         assert.deepEqual([...new Set(r.models)], ['claude-sonnet-5-5'], 'the draft uses the model picked in the select'); assert.deepEqual([...new Set(r.feats)], ['question_primer']);
         assert.match(r.filled, /LABA/); assert.equal(r.btnBack, true); assert.match(r.draftToast, /^✨ Read first drafted · \d+ s$/, 'V102.514: the single draft says how long it took: ' + r.draftToast);
         assert.match(r.leakToast, /repeats a correct option/); assert.match(r.leakFilled, /Salmeterol/, 'still filled — the admin decides');

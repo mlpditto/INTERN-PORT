@@ -79,12 +79,12 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
         assert.equal(await bar.locator('.audit-provider[aria-pressed="true"]').getAttribute('data-provider'), 'Claude');
         await page.evaluate(() => localStorage.setItem('ai_default_design_enhancer_model', 'gpt-5.6-sol'));
         await open();
-        assert.equal(await page.locator('#ai-model-design-enhancer').inputValue(), 'gpt-6.1-sol', 'retired id normalised');
+        assert.equal(await page.locator('#ai-model-design-enhancer').inputValue(), 'gpt-6.2-sol', 'retired id normalised');
         await page.evaluate(() => localStorage.setItem('ai_default_design_enhancer_model', 'no-such-model'));
         await open();
         assert.equal(await page.locator('#ai-model-design-enhancer').inputValue(), 'gpt-6-luna', 'unknown id → default');
-        // V102.364 / V102.531: desktop — ONE line in clip mode while it fits (1300 px); at 1000 px it wraps, and no chip or button is cut off or past the bar
-        for (const w of [1300, 1000]) {
+        // V102.364 / V102.531: desktop — ONE line in clip mode while it fits (1340 px — V102.688: "Astra 6.2" is wider, it fit at 1320 on Windows; CI fonts are wider); at 1000 px it wraps, and no chip or button is cut off or past the bar
+        for (const w of [1340, 1000]) {
             await page.setViewportSize({ width: w, height: 900 });
             await page.evaluate(() => {
                 const c = document.querySelector('#hub-view-design > div');
@@ -102,7 +102,7 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
             });
             const fit = await page.evaluate(() => { const b = document.querySelector('#hub-view-design .gm-bar'), r = b.getBoundingClientRect(), rail = b.querySelector('.alabasta-genmage-quick-rail'); return { railClip: rail.scrollWidth - rail.clientWidth, past: [...b.querySelectorAll('button')].filter(e => e.offsetParent).filter(e => e.getBoundingClientRect().right > r.right + 1).length }; });
             assert.ok(d.inside && fit.railClip <= 1 && fit.past === 0, 'nothing cut off at ' + w + ' px: ' + JSON.stringify([d, fit]));
-            if (w === 1300) assert.ok(d.h <= 66 && d.spread <= 12, 'one line at 1300 px: ' + JSON.stringify(d));
+            if (w === 1340) assert.ok(d.h <= 66 && d.spread <= 12, 'one line at 1340 px: ' + JSON.stringify(d));
             assert.ok(/^Plan 10 episodes$/.test(d.btn) && /^Free · text only/.test(d.title), 'the free tier sits in the tooltip, not on the button: ' + d.btn + ' / ' + d.title);
         }
         // V102.294: phone width — the bar wraps instead of overflowing; Create is a full-width line inside the viewport
