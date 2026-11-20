@@ -126,10 +126,22 @@ Proves the UI and the engine together with zero backend and no deploy beyond Git
 |---|---|
 | Mockups first: board (5-wide grid, numbered, emoji per type, tokens as small pills), killer notebook (home + 7 day rows, tap cells to build `a › b › c`, kill / witness chips appear inline), detective turn (step counter, question chips rail, arrest chip in red with quoted confirm), hand-off screen ("pass the phone to 🕵️ — tap to reveal"), end-of-game reveal with the path drawn on the board | owner picks a variant |
 | `public/cereal.js` + `.css`; the `🥣` entry (placement per the mockup pick: beside 💰 FIN on Schedule, or an Explore tile — the home activity row has had no chips since V101.87); state in `cereal_v1_<userId>`; game loop driven by the engine; a 🔁 replay of the finished game |
-| **Tutorial, two layers, same pattern as `journal-tour.js`** (violet tip card, Thai first + small EN line, 👆 finger, CSS-only animation, `prefers-reduced-motion` keeps the cards, once per device via a localStorage flag, replay from `?`): (1) **How to play** — 8 scenes on a demo board that animates by itself (goal · killer walks 3 · cereal + witness · calendar minimums · pass the phone · detective walks + asks · arrest · subway + cornered → ▸ start), opened on the first 🥣 tap; (2) **coach marks** — spotlight tips on the real first killer turn (pick home · tap 3 cells · 🥣 👁️ chips · lock → pass) and first detective turn (move · ask · arrest). Owner asked for this on 2026-11-20 ("ต้องมี animation tutorial สอน user เล่นทีละขั้น"); mockup frames T and C on the canvas | `scripts/cereal-tutorial-qa.cjs`: first open shows scene 1, ถัดไป walks all 8, ข้าม lands on the start card, the flag is set once and the tour does not return on reload, `?` replays it, reduced-motion renders every scene without animation, no Firestore call | `scripts/cereal-board-qa.cjs` (shape B, 320 + 390 px): the chip opens the sheet, a full scripted 2-day game via real taps lands the expected tokens on the board, the killer's path is not in the DOM while the detective screen is up, the wrong-arrest path decrements `🛡️ 4 → 3`, the reveal draws 6 cells |
+| **Tutorial, two layers, same pattern as `journal-tour.js`** (violet tip card, **Thai first + small EN line — confirmed by the owner 2026-11-20, same as the Journal tour**, 👆 finger, CSS-only animation, `prefers-reduced-motion` keeps the cards, once per device via a localStorage flag, replay from `?`; scenes advance on ถัดไป by default, with a small ▶ auto toggle on the tip card that plays them every ~6 s — owner 2026-11-20: "รอกดถัดไปอย่างเดียว หรือให้ user ตกลงกันได้"): (1) **How to play** — 8 scenes (owner picked 8 over 5) on a demo board that animates by itself (goal · killer walks 3 · cereal + witness · calendar minimums · pass the phone · detective walks + asks · arrest · subway + cornered → ▸ start), opened on the first 🥣 tap; (2) **coach marks** — spotlight tips on the real first killer turn (pick home · tap 3 cells · 🥣 👁️ chips · lock → pass) and first detective turn (move · ask · arrest). Owner asked for this on 2026-11-20 ("ต้องมี animation tutorial สอน user เล่นทีละขั้น"); mockup frames T and C on the canvas | `scripts/cereal-tutorial-qa.cjs`: first open shows scene 1, ถัดไป walks all 8, ข้าม lands on the start card, the flag is set once and the tour does not return on reload, `?` replays it, reduced-motion renders every scene without animation, no Firestore call | `scripts/cereal-board-qa.cjs` (shape B, 320 + 390 px): the chip opens the sheet, a full scripted 2-day game via real taps lands the expected tokens on the board, the killer's path is not in the DOM while the detective screen is up, the wrong-arrest path decrements `🛡️ 4 → 3`, the reveal draws 6 cells |
 | Version: intern V101.286 (+ `scripts/schedule-ui-qa.cjs` version pin, as every intern bump) | `node scripts/version-check.cjs`-style assertions in the suite |
 
 Size: 3 PRs (game → tutorial + coach marks → polish). Mockup canvas (2026-11-20): https://claude.ai/artifact/EDLqmodTtzkkB1raRrgC1d — frames Main, K-A, K-B, H, D-A, D-B, R, T (tutorial), C (coach). This is the phase to stop at if interns do not take to the game.
+
+### Phase 1½ — Play against a bot (single player, still one phone, no Firebase)
+
+Owner 2026-11-20: "เพิ่มโหมดเล่นกับบอทได้ด้วย". The pure engine makes this cheap, and a solo mode is what gets a game tried at all. Lobby gains an opponent chip (👤 friend · 🤖 bot) and a 🥄 level chip; the bot's secret lives only in memory on the device.
+
+| Deliverable | Verify |
+|---|---|
+| `public/cereal-bot.js` — pure, no DOM. **Bot detective:** keeps the set of killer cells consistent with everything public (start = every house; each day expand by every legal 3-path that avoids the detective; keep only paths that touch that day's cereal house and give that day's witness; filter by every answer); moves toward the densest part of the set, asks the card that splits the set most evenly (entropy), arrests when one candidate is in reach or late in the game when ≤ 2 are. **Bot killer:** among legal paths picks by a score — kills still needed vs the calendar, distance from the detective's reach (cells within 4 steps), a witness park far from the detective, never ends adjacent to the detective when it can help it, keeps the skip day for an emergency. **Levels** 🥄 = random card + arrest at ≤ 3 candidates / greedy killer · 🥄🥄 = entropy card, arrest at 1 / killer scores distance · 🥄🥄🥄 = also models what the detective can deduce | `scripts/cereal-bot-check.cjs`: the candidate set always contains the true killer cell (200 simulated games, seeded RNG — this is also the best regression test the engine will ever get); the bot never submits an illegal action (every action re-validated by the engine); win rates per level land in sane bands (🥄 detective catches the greedy killer < 🥄🥄🥄 does); a full game finishes in < 50 ms in node |
+| Lobby: opponent chip 👤 / 🤖, 🥄 level chip, the hand-off screen is skipped when the other seat is the bot; the bot's turn shows a short "🤖 thinking…" beat (≥ 600 ms so the move is seen to happen), then the public result; the reveal shows the bot's notebook like a human's | `cereal-bot-ui-qa.cjs`: a scripted solo game as detective and as killer reaches the reveal; no hand-off screen appears; the bot's path never enters the DOM before the reveal |
+| Tutorial hook: the last tutorial card offers "▸ Try a round vs 🤖" | — |
+
+Out of scope here: a bot for the 3-player game (Lola) — Phase 3 decides. Size: 2 PRs (bot + its check → lobby/turn UI). Version: intern +2.
 
 ### Phase 2 — Online, asynchronous, 2 players
 
@@ -172,7 +184,7 @@ Size: 2 PRs. Version: intern V101.292+, admin V102.608 only if the dashboard lin
 ## 4. What is deliberately not in this plan
 
 - No points, score or Beri for playing (§7 Q4). A game interns can grind for score invites collusion (two accounts, one brain).
-- No AI opponent. The engine makes one feasible later (a detective bot is a constraint-propagation problem over the question history), but it is a separate track.
+- ~~No AI opponent~~ — the owner asked for a bot mode on 2026-11-20; it is Phase 1½ above. A bot for the 3-player game is still out.
 - No OA push for turns. The free cap is already the binding constraint on the digest; a 7-day game between 2–3 people is 15–21 pushes.
 - No server timer job. A "claim" tap on expiry covers stale games without a scheduler.
 - No reuse of the publisher's board art, card art or logo. The cell layout (which cell is a house, park, café…) is game mechanics and is transcribed from the owner's own copy; the drawing is ours — emoji on a plain grid. The app credits the designer in the sheet footer.
@@ -200,12 +212,13 @@ Size: 2 PRs. Version: intern V101.292+, admin V102.608 only if the dashboard lin
 | Phase | PRs | Owner input needed | Deploys |
 |---|---|---|---|
 | 0 Map + engine | 1 | none left (photos received 2026-11-20) | none |
-| 1 Pass-and-play + tutorial | 3 | pick mockup variants (K-A/K-B, D-A/D-B, entry, tutorial scene count) | Pages only |
+| 1 Pass-and-play + tutorial | 3 | pick mockup variants (K-A/K-B, D-A/D-B, entry); tutorial = 8 scenes, tap-only + ▶ auto toggle (decided) | Pages only |
+| 1½ Play vs bot | 2 | 🥄 level names | Pages only |
 | 2 Online 2p | 3 | pick lobby mockup; run `firebase deploy` for the function + rules + index | functions, rules, indexes |
 | 3 Lola / suburb | 2 | suburb map sides; pick Lola mockup | functions, rules |
 | 4 Meta | 2 | decide badges placement | functions |
 
-Phases 0 → 1 → 2 are strictly sequential. Phase 3 can start as soon as Phase 2's function exists. Phase 4 is independent after Phase 2.
+Phases 0 → 1 → 1½ → 2 are sequential (1½ needs only the engine and Phase 1's screens). Phase 3 can start as soon as Phase 2's function exists. Phase 4 is independent after Phase 2.
 
 ---
 
