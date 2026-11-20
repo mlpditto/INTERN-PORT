@@ -263,33 +263,62 @@
     // the right (beside its twin when it has one). The pane reuses the Compare view; this is its first line: verdict · reason · Details · Keep / Remove · 📌.
     const WIDE = '(min-width:1300px)';
     function paneOn(s) { return s.step === 'review' && !!s.proposal && window.matchMedia(WIDE).matches; }
-    function paneHead(s, panel, id) {
-        const kept = s.keep.has(id), a = s.proposal.find(q => q.id === id), head = node('div', undefined, 'curate-pane-head');
-        head.append(node('b', 'Q' + id + ' → ' + (kept ? 'Keep' : 'Remove')));
+    // V102.692 (owner pick A3, mockup-curate-pane-lean): one line — reason · ▾ Details (detail, impact, and 🎯 ↔ ⭐ when there is a twin) · 📌 · ✂ Delete.
+    // Each question number is shown once, on its card; the card's own 🗑 is Keep / Remove (pressed = removed), so no verdict word, no Keep, no Keep both.
+    function paneHead(s, panel, id, relation) {
+        const a = s.proposal.find(q => q.id === id), head = node('div', undefined, 'curate-pane-head');
         const why = node('div', undefined, 'curate-pane-why'); head.append(why);
         if (a && a.notAssessed) why.append(node('span', 'not assessed · changed since that run', 'curate-na'));
         else if (a) {
-            bilingual(why, a.reason, a.reasonTh);
-            const details = disclosure('Details', 'Reasoning and what is lost if this question is removed', why); details.className = 'curate-reason-details';
+            bilingual(why, a.reason, a.reasonTh); why.lastChild.classList.add('curate-pane-reason');
+            const details = disclosure('', 'Details · reasoning, what is lost if this question is removed' + (relation ? ', and the comparison' : ''), why); details.className = 'curate-reason-details'; details.firstChild.setAttribute('aria-label', 'Details');
             bilingual(details, a.detail, a.detailTh); details.append(node('strong', 'Impact if removed')); bilingual(details, a.impact, a.impactTh);
+            if (relation) whyLines(details, relation);
         }
         if (a && !a.notAssessed && a.related.length > 1) a.related.forEach((r, i) => {   // more than one twin: pick which one is beside it
             const b = node('button', '↔ Q' + r.id, 'curate-pane-twin'); b.type = 'button'; b.setAttribute('aria-pressed', String(i === (s.twin || 0)));
             b.onclick = () => { s.twin = i; s.message = ''; render(); }; head.append(b);
         });
-        const move = node('button', kept ? 'Remove' : 'Keep', 'curate-pane-move'); move.type = 'button'; move.disabled = s.pins.has(id) || s.busy || s.saving || s.saved;
-        move.onclick = () => { kept ? s.keep.delete(id) : s.keep.add(id); s.message = ''; render(); };
-        const pin = node('button', '📌 Must keep', 'curate-pane-pin'); pin.type = 'button'; pin.setAttribute('aria-pressed', String(s.pins.has(id))); pin.disabled = s.busy || s.saving || s.saved;
+        if (s.source.form.caseContent) disclosure('Case', 'บริบทกรณีศึกษาร่วมของข้อสอบ', head).append(node('div', s.source.form.caseContent, 'curate-stem'));
+        const kept = s.keep.has(id), gone = s.deleted.has(id);
+        const pin = node('button', '📌', 'curate-pane-pin'); pin.type = 'button'; pin.title = 'Must keep · ปักหมุด ต้องเก็บข้อนี้ · 반드시 유지'; pin.setAttribute('aria-label', 'Must keep Q' + id);
+        pin.setAttribute('aria-pressed', String(s.pins.has(id))); pin.disabled = gone || s.busy || s.saving || s.saved;
         pin.onclick = () => { if (s.pins.has(id)) s.pins.delete(id); else { s.pins.add(id); s.keep.add(id); } s.message = ''; render(); };
-        const gone = s.deleted.has(id); if (gone) { move.disabled = pin.disabled = true; move.dataset.gone = pin.dataset.gone = '1'; }
+        head.append(pin);
         if (!kept) {   // V102.679 (owner pick A, mockup-curate-delete): delete this question from the editor form right here; ↶ Undo puts it back
-            const del = node('button', gone ? '↶ Undo' : '🗑 Delete Q' + id, 'curate-pane-del'); del.type = 'button'; del.disabled = s.busy || s.saving || s.saved;
+            const del = node('button', gone ? '↶ Undo' : '✂ Delete', 'curate-pane-del'); del.type = 'button'; del.disabled = s.busy || s.saving || s.saved;
             del.title = gone ? 'Put Q' + id + ' back in the form' : 'Delete Q' + id + ' from the form now. Nothing is saved until Save Quiz.';
             del.dataset.thTitle = gone ? 'ใส่ Q' + id + ' กลับเข้าฟอร์ม' : 'ลบ Q' + id + ' ออกจากฟอร์มเลย ยังไม่บันทึกจนกด Save Quiz'; del.dataset.krTitle = gone ? 'Q' + id + ' 문항을 양식에 되돌립니다' : 'Q' + id + ' 문항을 지금 양식에서 삭제합니다. Save Quiz를 눌러야 저장됩니다';
             del.onclick = () => gone ? undoDelete(s, id) : deleteQuestion(s, id);
             head.append(del);
         }
-        head.append(move, pin); panel.append(head);
+        panel.append(head);
+    }
+    function whyLines(host, relation) {
+        for (const [key, label, icon] of [['shared', 'Shared objective', '🎯'], ['difference', 'Key differences', '↔'], ['preference', 'Why prefer this question', '⭐']]) {
+            const line = node('div', undefined, 'curate-cmp-line'); const tag = node('strong', icon); tag.title = label; tag.setAttribute('aria-label', label);
+            line.append(tag); bilingual(line, relation[key], relation[key + 'Th']); host.append(line);
+        }
+    }
+    // V102.692: Qn · 🗑 · ⧉ — the 🗑 is the Keep / Remove switch for that question (pressed = removed; off while pinned or deleted from the form)
+    function questionCard(s, id, evidence) {
+        const q = s.source.form.questions[id - 1], missing = s.source.missingKeys.includes(id), kept = s.keep.has(id);
+        const card = node('section', undefined, 'curate-compare-card' + (kept ? '' : ' removed'));
+        const heading = node('h4', 'Q' + id + (s.pins.has(id) ? ' 📌' : ''));
+        const bin = node('button', '🗑', 'curate-card-del'); bin.type = 'button'; bin.setAttribute('aria-pressed', String(!kept));
+        bin.setAttribute('aria-label', (kept ? 'Remove Q' : 'Keep Q') + id); bin.title = kept ? 'Remove Q' + id + ' · ไม่เก็บข้อนี้ · 제외' : 'Keep Q' + id + ' · เก็บข้อนี้ · 유지';
+        bin.disabled = s.pins.has(id) || s.deleted.has(id) || s.busy || s.saving || s.saved;
+        bin.onclick = () => {
+            if (bin.disabled) return;
+            kept ? s.keep.delete(id) : s.keep.add(id);
+            s.message = (kept ? 'Removing Q' : 'Keeping Q') + id + ' · ' + s.keep.size + ' selected · target ' + target(s);
+            render();
+            byId('curate-comparison').querySelectorAll('.curate-card-del').forEach(b => { if (b.getAttribute('aria-label').endsWith('Q' + id)) b.focus(); });
+        };
+        heading.append(bin, copyButton(q, id, missing)); card.append(heading);
+        sourceView(card, q, true, evidence, missing, id);
+        card.querySelectorAll(':scope details').forEach(d => d.classList.add(/explanation/i.test(d.querySelector('summary')?.textContent || '') ? 'curate-cmp-exp' : 'curate-cmp-flat'));
+        return card;
     }
     // V102.679: the editor's .quiz-q-item for each original id is captured when Curate opens, so deleting one never renumbers the others here.
     function editorChanged() {
@@ -303,7 +332,7 @@
         s.deleted.set(id, el.parentNode); el.remove(); editorChanged();
         const next = removeIds(s).find(x => x < id && !s.deleted.has(x));   // the list runs last → first, so the next one is the next lower number
         if (next) { s.sel = next; s.twin = 0; if (s.openRow === id) s.openRow = next; }
-        s.message = '🗑 Q' + id + ' deleted from the form · Save Quiz to keep it'; render();
+        s.message = '✂ Q' + id + ' deleted from the form · Save Quiz to keep it'; render();
     }
     function undoDelete(s, id) {
         const parent = s.deleted.get(id); if (!parent) return;
@@ -317,65 +346,24 @@
         const pane = dialog.classList.contains('two') && !!s.sel;   // V102.665: the Review step's right side
         panel.hidden = !s.compare && !pane;
         dialog.classList.toggle('comparing', !!s.compare);
-        if (pane) paneHead(s, panel, s.sel);
+        const [a, b] = s.compare || [], relation = s.compare ? s.proposal.find(q => q.id === a).related.find(r => r.id === b) : null;
+        if (pane) paneHead(s, panel, s.sel, relation);
         if (!s.compare) {
-            if (pane) {   // no twin to compare with: the question alone, opened
-                const q = s.source.form.questions[s.sel - 1], missing = s.source.missingKeys.includes(s.sel);
-                const card = node('section', undefined, 'curate-compare-card curate-solo');
-                const heading = node('h4', 'Q' + s.sel + ' · ' + (s.keep.has(s.sel) ? 'Keep' : 'Remove') + (s.pins.has(s.sel) ? ' · Pinned' : '')); heading.append(copyButton(q, s.sel, missing)); card.append(heading);
-                sourceView(card, q, true, [], missing, s.sel); panel.append(card);
-                card.querySelectorAll(':scope details').forEach(d => d.classList.add(/explanation/i.test(d.querySelector('summary')?.textContent || '') ? 'curate-cmp-exp' : 'curate-cmp-flat'));
-            }
+            if (pane) { const card = questionCard(s, s.sel, []); card.classList.add('curate-solo'); panel.append(card); }   // no twin: the question alone, opened
             return;
         }
-        const [a, b] = s.compare, assessment = s.proposal.find(q => q.id === a), relation = assessment.related.find(r => r.id === b);
-        const back = node('button', '← Back to review', 'curate-back'); back.type = 'button'; back.title = 'กลับรายการข้อสอบ'; back.onclick = backToReview;
-        // V102.591 (owner: lean + inline): one header line — ← · Q10 ↔ Q14 · ⓘ · Shared case context · Keep both
-        back.textContent = '←'; back.setAttribute('aria-label', 'Back to review');
-        const head = node('div', undefined, 'curate-cmp-head'); panel.append(head);
-        const info = node('span', 'ⓘ', 'curate-info'); info.tabIndex = 0;
-        info.title = 'AI assessment · highlighted excerpts are verified against the source text · Selection changes do not rewrite questions. Match the target before saving.';
-        info.setAttribute('aria-label', info.title);
-        head.append(back, node('h3', 'Q' + a + ' ↔ Q' + b), info);
-        if (s.source.form.caseContent) disclosure('Shared case context', 'บริบทกรณีศึกษาร่วมของข้อสอบ', head).append(node('div', s.source.form.caseContent, 'curate-stem'));
+        if (!pane) {   // the narrow Compare page: ← · ⓘ · Case — the numbers are on the cards
+            const back = node('button', '←', 'curate-back'); back.type = 'button'; back.title = 'กลับรายการข้อสอบ'; back.setAttribute('aria-label', 'Back to review'); back.onclick = backToReview;
+            const head = node('div', undefined, 'curate-cmp-head'); panel.append(head);
+            const info = node('span', 'ⓘ', 'curate-info'); info.tabIndex = 0;
+            info.title = 'AI assessment · highlighted excerpts are verified against the source text · Selection changes do not rewrite questions. Match the target before saving.';
+            info.setAttribute('aria-label', info.title);
+            head.append(back, info);
+            if (s.source.form.caseContent) disclosure('Shared case context', 'บริบทกรณีศึกษาร่วมของข้อสอบ', head).append(node('div', s.source.form.caseContent, 'curate-stem'));
+        }
         const grid = node('div', undefined, 'curate-compare-grid'); panel.append(grid);
-        for (const id of [a, b]) {
-            const card = node('section', undefined, 'curate-compare-card');
-            const heading = node('h4', 'Q' + id + ' · ' + (s.keep.has(id) ? 'Keep' : 'Remove') + (s.pins.has(id) ? ' · Pinned' : ''));
-            heading.append(copyButton(s.source.form.questions[id - 1], id, s.source.missingKeys.includes(id))); // V101.18: inline with the heading
-            card.append(heading);
-            sourceView(card, s.source.form.questions[id - 1], true, relation.evidence.filter(e => e.id === id), s.source.missingKeys.includes(id), id); grid.append(card);
-            card.querySelectorAll(':scope details').forEach(d => d.classList.add(/explanation/i.test(d.querySelector('summary')?.textContent || '') ? 'curate-cmp-exp' : 'curate-cmp-flat'));
-        }
-        const why = node('section', undefined, 'curate-reason curate-cmp-why'); panel.append(why);
-        for (const [key, label, icon] of [['shared', 'Shared objective', '🎯'], ['difference', 'Key differences', '↔'], ['preference', 'Why prefer this question', '⭐']]) {
-            const line = node('div', undefined, 'curate-cmp-line'); const tag = node('strong', icon); tag.title = label; tag.setAttribute('aria-label', label);
-            line.append(tag); bilingual(line, relation[key], relation[key + 'Th']); why.append(line);
-        }
-        const actions = node('div', undefined, 'curate-compare-actions');
-        // V101.04: the button matching the current selection shows as pressed, and a click
-        // confirms the result in the feedback line — before, pressing an already-current
-        // choice (e.g. "Keep Q1" while Q1 was kept) changed nothing visible and looked broken.
-        const current = [a, b].filter(id => s.keep.has(id));
-        for (const ids of [[b], [a], [a, b]]) {   // V102.591 (owner, like Jev check): 🗑 Remove Qa = keep Qb, on that question's card
-            const gone = ids.length === 2 ? null : [a, b].find(id => !ids.includes(id));
-            const button = node('button', gone ? '🗑 Remove Q' + gone : 'Keep both', gone ? 'curate-cmp-del' : undefined); button.type = 'button';
-            const pressed = ids.length === current.length && ids.every(id => current.includes(id));
-            button.setAttribute('aria-pressed', String(pressed));
-            button.title = pressed ? 'ตัวเลือกปัจจุบัน' : 'ปรับข้อที่เก็บ โดยยังคงข้อที่ปักหมุดไว้';
-            button.disabled = s.saved || s.busy || s.saving || [a, b].some(id => s.pins.has(id) && !ids.includes(id));
-            button.onclick = () => {
-                if (s.saved || s.busy || s.saving || [a, b].some(id => s.pins.has(id) && !ids.includes(id))) return;
-                [a, b].forEach(id => ids.includes(id) ? s.keep.add(id) : s.keep.delete(id));
-                const removed = [a, b].filter(id => !ids.includes(id));
-                s.message = 'Keeping ' + ids.map(id => 'Q' + id).join(' and ') + (removed.length ? ' · removing ' + removed.map(id => 'Q' + id).join(', ') : '') + ' · ' + s.keep.size + ' selected · target ' + target(s);
-                render();
-                [...panel.querySelectorAll('.curate-compare-actions button, .curate-cmp-del')].find(b => b.textContent === button.textContent)?.focus();
-                byId('curate-feedback').scrollIntoView({ block: 'nearest' });
-            };
-            if (gone) panel.querySelectorAll('.curate-compare-card h4')[gone === a ? 0 : 1].append(button); else actions.append(button);
-        }
-        head.append(actions);   // Keep both, on the header line (the old note is the ⓘ title)
+        for (const id of [a, b]) grid.append(questionCard(s, id, relation.evidence.filter(e => e.id === id)));
+        if (!pane) { const why = node('section', undefined, 'curate-reason curate-cmp-why'); panel.append(why); whyLines(why, relation); }   // in the pane it sits under ▾
     }
     function problem(s) {
         const n = target(s);
@@ -645,7 +633,7 @@
                 row.classList.add('deleted'); move.textContent = '↶ Undo'; move.title = 'Put Q' + id + ' back in the form'; move.dataset.thTitle = 'ใส่ Q' + id + ' กลับเข้าฟอร์ม'; move.dataset.krTitle = 'Q' + id + ' 문항을 양식에 되돌립니다'; move.onclick = () => undoDelete(s, id);
                 row.querySelector('.curate-pin').dataset.gone = '1';
             } else if (open && !kept) {   // V102.679: a narrow window has no right pane, so the opened row carries 🗑 Delete Qn beside Keep
-                const del = node('button', '🗑 Delete Q' + id, 'curate-pane-del curate-row-del'); del.type = 'button';
+                const del = node('button', '✂ Delete', 'curate-pane-del curate-row-del'); del.type = 'button';
                 del.title = 'Delete Q' + id + ' from the form now. Nothing is saved until Save Quiz.'; del.dataset.thTitle = 'ลบ Q' + id + ' ออกจากฟอร์มเลย ยังไม่บันทึกจนกด Save Quiz'; del.dataset.krTitle = 'Q' + id + ' 문항을 지금 양식에서 삭제합니다. Save Quiz를 눌러야 저장됩니다';
                 del.onclick = () => deleteQuestion(s, id); move.before(del);
             }
