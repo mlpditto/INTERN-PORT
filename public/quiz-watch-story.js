@@ -112,7 +112,7 @@
         var pv = pvOf(st), ns = x.w === 'q' ? [['Kaimook', x.a, '']] : [['Kaitom', x.a, ''], ['Kaidang', x.b, '']].concat(pv ? [[pv.name, x.c, ' px']] : []);
         return '<span class="qws-vns">' + ns.map(function (n) { var ok = okUrl(n[1]); return '<i class="qws-vnm' + n[2] + (ok ? ' ok' : '') + '" title="' + esc(n[0]) + (ok ? ' — ready' : ' — not voiced yet') + '">' + esc(n[0]) + '</i>'; }).join('') + '</span>';
     }
-    function stop() { clearTimeout(S.timer); S.play = -1; if (S.au) { try { S.au.pause(); } catch (e) { /* not playing */ } S.au = null; } }
+    function stop() { clearTimeout(S.timer); S.play = -1; if (S.au) { try { S.au.pause(); } catch (e) { /* not playing */ } S.au = null; } pxEarStop(); }
     function paint() {
         if (typeof window._qeWatchChip === 'function') window._qeWatchChip();   // V102.670: the 🎬 half of the chip beside Review follows the story
         var el = box(), btn = document.getElementById('qws-make'); if (!el) return;
@@ -213,9 +213,33 @@
         if (!S.pxOpen || st.lang !== 'th') return '';
         var pv = pvOf(st), vs = S.pxVoices, g = S.pxG || '';
         var body = !vs ? '<small>' + (S.pxErr ? '⚠️ ' + esc(S.pxErr) : 'Loading the Paxa voices…') + '</small>'
-            : '<div class="qws-pxf" role="group" aria-label="Filter">' + [['', 'All ' + vs.length], ['f', '♀ ' + vs.filter(function (v) { return v.g === 'f'; }).length], ['m', '♂ ' + vs.filter(function (v) { return v.g === 'm'; }).length]].map(function (o) { return '<button type="button" aria-pressed="' + (g === o[0]) + '" onclick="QuizWatchStory.paxaFilter(' + String.fromCharCode(39) + o[0] + String.fromCharCode(39) + ')">' + o[1] + '</button>'; }).join('') + '</div>' +
-              '<div class="qws-pxl" role="group" aria-label="Paxa voices">' + vs.filter(function (v) { return !g || v.g === g; }).map(function (v) { return '<button type="button" aria-pressed="' + !!(pv && pv.id === v.id) + '" title="' + esc(v.d) + '" onclick="QuizWatchStory.paxaVoice(' + String.fromCharCode(39) + v.id + String.fromCharCode(39) + ')">' + (v.g === 'f' ? '♀ ' : v.g === 'm' ? '♂ ' : '') + esc(v.n) + '</button>'; }).join('') + '</div>';
-        return '<div class="qws-pxp" id="qws-pxp"><small>Paxa Labs · pick ONE voice for the pharmacist lines (hover a name for what it sounds like; listen at paxalabs.com ▸ Speech). Interns get it as a third chip beside Kaitom / Kaidang.</small>' + body + '</div>';
+            : '<div class="qws-pxf" role="group" aria-label="Filter">' + [['', 'All ' + vs.length], ['f', '♀ ' + vs.filter(function (v) { return v.g === 'f'; }).length], ['m', '♂ ' + vs.filter(function (v) { return v.g === 'm'; }).length]].map(function (o) { return '<button type="button" aria-pressed="' + (g === o[0]) + '" onclick="QuizWatchStory.paxaFilter(' + String.fromCharCode(39) + o[0] + String.fromCharCode(39) + ')">' + o[1] + '</button>'; }).join('') + pxUseHtml(pv) + '</div>' +
+              '<div class="qws-pxl" role="group" aria-label="Paxa voices">' + vs.filter(function (v) { return !g || v.g === g; }).map(function (v) { var ear = S.pxEar === v.id; return '<button type="button" class="' + (ear ? 'ear' : '') + '" aria-pressed="' + !!(pv && pv.id === v.id) + '" title="' + esc(v.d) + ' — tap to hear it" onclick="QuizWatchStory.paxaHear(' + String.fromCharCode(39) + v.id + String.fromCharCode(39) + ')">' + (ear && S.pxEarSt === 'load' ? '⏳ ' : ear && S.pxEarSt === 'play' ? '<span class="qws-eq" aria-hidden="true">▮▮▮</span>' : '') + (v.g === 'f' ? '♀ ' : v.g === 'm' ? '♂ ' : '') + esc(v.n) + '</button>'; }).join('') + '</div>' +
+              (S.pxEarErr ? '<small class="qws-pxe" role="alert">⚠️ ' + esc(S.pxEarErr) + '</small>' : '');
+        return '<div class="qws-pxp" id="qws-pxp"><small>Paxa Labs · tap a voice to hear it · ✓ Use picks it for the pharmacist lines. Interns get it as a third chip beside Kaitom / Kaidang.</small>' + body + '</div>';
+    }
+    // V102.694 (owner pick B, mockup-paxa-voice-preview/): a chip tap only PLAYS that voice's sample; "✓ Use" picks the last one heard (picking
+    // drops the story's Paxa sounds, so browsing must never do it). A sample is made once per voice (one short paid Paxa call, fixed text — nothing
+    // of ours is sent) and kept at watch-voices/sample-<id>.mp3, so every later play, by any admin, is free.
+    var PX_SAMPLE = { m: 'สวัสดีครับ ทานยาหลังอาหารนะครับ', f: 'สวัสดีค่ะ ทานยาหลังอาหารนะคะ' };
+    function pxUseHtml(pv) {
+        var v = S.pxEar && (S.pxVoices || []).find(function (x) { return x.id === S.pxEar; });
+        if (!v || (pv && pv.id === v.id)) return '';
+        return '<button type="button" class="qws-use" onclick="QuizWatchStory.paxaVoice(' + String.fromCharCode(39) + v.id + String.fromCharCode(39) + ')" title="Use ' + esc(v.n) + ' for the pharmacist lines' + (pv && pxHave() ? ' — the ' + esc(pv.name) + ' sounds are made again' : '') + '">✓ Use ' + esc(v.n) + '</button>';
+    }
+    function pxEarStop() { if (S.pxAu) { try { S.pxAu.pause(); } catch (e) { /* not playing */ } S.pxAu = null; } if (S.pxEarSt === 'play') S.pxEarSt = ''; }
+    function pxSampleUrl(v) {
+        S.pxUrls = S.pxUrls || {};
+        if (S.pxUrls[v.id]) return Promise.resolve(S.pxUrls[v.id]);
+        var app = window.adminApp || window.firebase.app('admin'), ref = app.storage().ref('watch-voices/sample-' + v.id + '.mp3');
+        return ref.getDownloadURL().catch(function (e) {   // not made yet → one paid call, then kept for everyone
+            if (e && e.code !== 'storage/object-not-found') throw e;
+            if (typeof window.callTtsProxy !== 'function') throw new Error('the voice service is not loaded on this page');
+            return window.callTtsProxy({ provider: 'paxa_tts', text: PX_SAMPLE[v.g === 'f' ? 'f' : 'm'], voice: v.id, feature: 'paxa_voice_sample' }).then(function (r) {
+                if (!r || !r.audioContent) throw new Error('no audio came back');
+                return ref.put(blobOf(r.audioContent, 'audio/mpeg'), { contentType: 'audio/mpeg' }).then(function (snap) { return snap.ref.getDownloadURL(); });
+            });
+        }).then(function (url) { S.pxUrls[v.id] = url; return url; });
     }
     function pxLoad() {
         if (S.pxVoices || S.pxLoading) return Promise.resolve();
@@ -278,13 +302,26 @@
                 .then(function () { S.busy = false; S.voicing = null; touch(); paint(); });
         },
         // V102.674 Paxa — the optional third pharmacist voice
-        paxaPick: function () { if (S.busy || !S.story) return; S.pxOpen = !S.pxOpen; S.pxG = ''; if (S.pxOpen && !S.pxVoices) { S.pxErr = ''; pxLoad(); } paint(); },
+        paxaHear: function (id) {
+            var v = (S.pxVoices || []).find(function (x) { return x.id === id; }); if (!v || !S.story) return Promise.resolve();
+            var again = S.pxEar === id && S.pxEarSt === 'play';
+            pxEarStop(); S.pxEarErr = '';
+            if (again) { paint(); return Promise.resolve(); }   // a second tap on the playing chip stops it
+            stop(); S.pxEar = id; S.pxEarSt = 'load'; paint();
+            return pxSampleUrl(v).then(function (url) {
+                if (S.pxEar !== id || !S.pxOpen) return;
+                var au = new Audio(url); S.pxAu = au; S.pxEarSt = 'play'; paint();
+                au.onended = function () { if (S.pxAu === au) { S.pxAu = null; S.pxEarSt = ''; paint(); } };
+                var p = au.play(); if (p && p.catch) p.catch(function (e) { if (S.pxAu === au) { S.pxAu = null; S.pxEarSt = ''; S.pxEarErr = 'could not play: ' + (e && e.message || e); paint(); } });
+            }).catch(function (e) { if (S.pxEar === id) { S.pxEarSt = ''; S.pxEarErr = v.n + ': ' + (e && e.message || e); paint(); } });
+        },
+        paxaPick: function () { if (S.busy || !S.story) return; S.pxOpen = !S.pxOpen; S.pxG = ''; pxEarStop(); S.pxEar = ''; S.pxEarErr = ''; if (S.pxOpen && !S.pxVoices) { S.pxErr = ''; pxLoad(); } paint(); },
         paxaFilter: function (g) { S.pxG = g === 'f' || g === 'm' ? g : ''; paint(); },
         paxaVoice: function (id) {
             var v = (S.pxVoices || []).find(function (x) { return x.id === id; }); if (!v || !S.story || S.busy) return;
             var was = pvOf(S.story);
             if (!was || was.id !== v.id) { S.story.lines.forEach(function (x) { delete x.c; }); S.story.pv = { id: v.id, name: v.n }; touch(); }   // another voice: the old sounds are not it
-            S.pxOpen = false; S.err = ''; paint();
+            pxEarStop(); S.pxEar = ''; S.pxOpen = false; S.err = ''; paint();
         },
         paxaDrop: function () { if (!S.story || S.busy) return; S.story.lines.forEach(function (x) { delete x.c; }); delete S.story.pv; S.pxOpen = false; touch(); paint(); },
         paxa: function () {
