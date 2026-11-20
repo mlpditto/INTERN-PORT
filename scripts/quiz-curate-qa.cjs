@@ -204,19 +204,20 @@ const { chromium } = require('playwright');
         assert.equal(await page.locator('.curate-compare-card').count(), 2);
         assert.equal(await page.locator('.curate-compare-card mark').count(), 2);
         assert.equal(await page.locator('.curate-compare-card .curate-key').count(), 2);
-        assert(await page.getByRole('button', { name: '🗑 Remove Q14', exact: true }).isDisabled(), 'cannot remove pinned Q14');
-        assert.deepEqual(await page.locator('.curate-compare-card').evaluateAll(cs => cs.map(c => (c.querySelector('.curate-cmp-del') || {}).textContent)), ['🗑 Remove Q10', '🗑 Remove Q14'], 'V102.591: 🗑 on each side, like Jev check');
-        { const g = await page.locator('.curate-compare-card h4').evaluateAll(hs => hs.map(h => { const r = e => e.getBoundingClientRect(), c = h.querySelector('.curate-copy'), d = h.querySelector('.curate-cmp-del'); return { gap: Math.round(r(d).left - r(c).right), right: Math.round(r(h).right - r(d).right) }; }));
-          assert.deepEqual(g, [{ gap: 8, right: 0 }, { gap: 8, right: 0 }], 'V102.649: ⧉ sits beside 🗑 Remove at the right of the heading, not floating mid-heading: ' + JSON.stringify(g)); }
+        assert(await page.getByRole('button', { name: 'Remove Q14', exact: true }).isDisabled(), 'cannot remove pinned Q14');
+        assert.deepEqual(await page.locator('.curate-compare-card').evaluateAll(cs => cs.map(c => [c.querySelector('h4').firstChild.textContent.trim(), c.querySelector('.curate-card-del').getAttribute('aria-label'), c.classList.contains('removed')])), [['Q10', 'Keep Q10', true], ['Q14 📌', 'Remove Q14', false]], 'V102.692 (pick A3): each card = its number + its own 🗑 (pressed = removed, red edge); no Keep / Remove words');
+        assert.equal(await page.locator('#curate-comparison').evaluate(p => /Keep both|Q10 ↔ Q14/.test(p.textContent)), false, 'no Keep both, no Q10 ↔ Q14 title: each number shows once');
+        { const g = await page.locator('.curate-compare-card h4').evaluateAll(hs => hs.map(h => { const r = e => e.getBoundingClientRect(), c = h.querySelector('.curate-copy'), d = h.querySelector('.curate-card-del'); return { copyRight: Math.round(r(h).right - r(c).right), binBeforeCopy: r(d).right < r(c).left, binNearNumber: Math.round(r(d).left - r(h).left) < 70 }; }));
+          assert.deepEqual(g, [{ copyRight: 0, binBeforeCopy: true, binNearNumber: true }, { copyRight: 0, binBeforeCopy: true, binNearNumber: true }], 'V102.692: 🗑 beside the number, ⧉ at the right of the heading: ' + JSON.stringify(g)); }
         for (const width of [320, 390, 736, 1024]) {
             await page.setViewportSize({ width, height: 900 });
             assert(await page.locator('#quiz-curate-dialog').evaluate(d => d.scrollWidth <= d.clientWidth + 1), 'comparison overflow at ' + width);
             const cols = await page.locator('.curate-compare-card').evaluateAll(cs => cs.map(c => {const r=c.getBoundingClientRect();return {x:r.x,y:r.y};}));
             assert(width <= 700 ? cols[0].y < cols[1].y : cols[0].x < cols[1].x);
         }
-        await page.getByRole('button', { name: 'Keep both', exact: true }).click(); assert(await saveDisabled());
+        await page.getByRole('button', { name: 'Keep Q10', exact: true }).click(); assert(await saveDisabled());   // = keep both
         assert.match(await feedback(), /11 selected/);
-        await page.getByRole('button', { name: '🗑 Remove Q10', exact: true }).click(); assert.equal(await saveDisabled(), false);
+        await page.getByRole('button', { name: 'Remove Q10', exact: true }).click(); assert.equal(await saveDisabled(), false);
         await page.screenshot({path:'quiz-curate-compare-qa.png'});
         await page.keyboard.press('Escape');
         assert(await page.locator('#quiz-curate-dialog').isVisible());

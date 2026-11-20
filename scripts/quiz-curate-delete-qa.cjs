@@ -50,7 +50,7 @@ const REMOVE = [2, 4, 5, 7, 8, 9, 15, 17, 19, 20];
             return { step: d.dataset.step, rows: [...d.querySelectorAll('#curate-rows [data-question-id]')].map(r => +r.dataset.questionId),
                 sel: +(d.querySelector('#curate-rows .sel') || {}).dataset?.questionId || null,
                 deletedRows: [...d.querySelectorAll('#curate-rows .curate-question.deleted')].map(r => +r.dataset.questionId),
-                del: (d.querySelector('.curate-pane-del') || {}).textContent || null, head: (d.querySelector('.curate-pane-head b') || {}).textContent,
+                del: (d.querySelector('.curate-pane-del') || {}).textContent || null, head: (c => c ? c.querySelector('h4').firstChild.textContent.trim() + (c.classList.contains('removed') ? ' → Remove' : ' → Keep') : undefined)(d.querySelector('#curate-comparison .curate-compare-card')),
                 editor: [...document.querySelectorAll('#editor .quiz-q-item')].map(e => +e.dataset.id), feedback: document.getElementById('curate-feedback').textContent,
                 stale: !document.getElementById('curate-reload').hidden };
         });
@@ -58,14 +58,14 @@ const REMOVE = [2, 4, 5, 7, 8, 9, 15, 17, 19, 20];
         assert.equal(v.step, 'review');
         assert.deepEqual(v.rows, [...REMOVE].reverse(), 'the Remove list runs last → first');
         assert.equal(v.sel, 20, 'the last question opens first'); assert.equal(v.head, 'Q20 → Remove');
-        assert.equal(v.del, '🗑 Delete Q20', 'the pane offers 🗑 Delete Q20');
+        assert.equal(v.del, '✂ Delete', 'the pane offers ✂ Delete (V102.692: the number is on the card)');
 
         await page.click('.curate-pane-del'); v = await view();
         assert.equal(v.editor.length, 19, 'Q20 left the editor form'); assert.ok(!v.editor.includes(20));
         assert.deepEqual(v.deletedRows, [20], 'the row stays, marked deleted');
         assert.equal(await page.$eval('#curate-rows [data-question-id="20"] .curate-move', b => b.textContent), '↶ Undo', '↶ Undo in place of Keep');
         assert.equal(await page.$eval('#curate-rows [data-question-id="20"] .curate-pin', b => b.disabled), true, 'no 📌 on a deleted row');
-        assert.equal(v.sel, 19, 'the next lower question opens'); assert.match(v.feedback, /Q20 deleted from the form · Save Quiz/);
+        assert.equal(v.sel, 19, 'the next lower question opens'); assert.match(v.feedback, /✂ Q20 deleted from the form · Save Quiz/);
         assert.equal(await page.$eval('#curate-rows [data-question-id="20"] .curate-stem', e => getComputedStyle(e).textDecorationLine), 'line-through');
         assert.ok(await page.evaluate(() => window.paginated) >= 1, 'the editor pager is refreshed');
 
@@ -75,10 +75,10 @@ const REMOVE = [2, 4, 5, 7, 8, 9, 15, 17, 19, 20];
 
         await page.click('#curate-rows [data-question-id="20"] .curate-move'); v = await view();   // ↶ Undo Q20 from its row
         assert.deepEqual(v.editor, [...Array.from({ length: 18 }, (_, i) => i + 1), 20], 'Q20 is back, in its place after Q18');
-        assert.deepEqual(v.deletedRows, [19]); assert.equal(v.sel, 20); assert.equal(v.del, '🗑 Delete Q20');
+        assert.deepEqual(v.deletedRows, [19]); assert.equal(v.sel, 20); assert.equal(v.del, '✂ Delete');
         await page.click('#curate-rows [data-question-id="19"]'); v = await view();
         assert.equal(v.del, '↶ Undo', 'a deleted question shows ↶ Undo in the pane');
-        assert.equal(await page.$eval('.curate-pane-move', b => b.disabled), true, 'Keep is off for a deleted question');
+        assert.equal(await page.$eval('#curate-comparison .curate-card-del', b => b.disabled), true, 'the card 🗑 (Keep / Remove) is off for a deleted question');
 
         await page.click('[data-view="keep"]'); v = await view();
         assert.equal(v.rows[0], 1, 'the Keep list keeps its order'); assert.equal(v.del, null, 'a kept question has no 🗑');
@@ -89,8 +89,8 @@ const REMOVE = [2, 4, 5, 7, 8, 9, 15, 17, 19, 20];
         assert.equal(await page.$eval('#quiz-curate-dialog', d => d.classList.contains('two')), false, 'one column at 900 px');
         assert.equal(await page.$$eval('.curate-row-del', b => b.length), 0, 'no 🗑 on folded lines');
         await page.click('#curate-rows [data-question-id="17"] .curate-row-toggle');
-        assert.equal(await page.$eval('#curate-rows [data-question-id="17"] .curate-row-del', b => b.textContent), '🗑 Delete Q17', 'the opened row offers 🗑');
-        assert.equal(await page.$eval('#curate-rows .curate-row-del', b => getComputedStyle(b).backgroundColor), 'rgb(127, 29, 29)', 'the row 🗑 is red like the pane one');
+        assert.equal(await page.$eval('#curate-rows [data-question-id="17"] .curate-row-del', b => b.textContent), '✂ Delete', 'the opened row offers ✂ Delete');
+        assert.equal(await page.$eval('#curate-rows .curate-row-del', b => getComputedStyle(b).backgroundColor), 'rgb(127, 29, 29)', 'the row ✂ is red like the pane one');
         await page.click('#curate-rows [data-question-id="17"] .curate-row-del'); v = await view();
         assert.ok(!v.editor.includes(17) && v.editor.length === 18, 'Q17 left the form (Q19 still deleted): ' + v.editor.join(' '));
         assert.deepEqual(v.deletedRows.sort((x, y) => x - y), [17, 19], 'the row stays, struck');

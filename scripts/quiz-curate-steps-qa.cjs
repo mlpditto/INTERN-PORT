@@ -145,8 +145,8 @@ const click = (page, sel) => page.locator('#quiz-curate-dialog ' + sel).first().
             const d = document.getElementById('quiz-curate-dialog'), rv = d.querySelector('.curate-review'), cmp = d.querySelector('#curate-comparison'), r = e => e.getBoundingClientRect(), vis = e => !!e && e.getClientRects().length > 0;
             const sel = d.querySelector('.curate-question.sel'), head = cmp.querySelector('.curate-pane-head');
             return { two: d.classList.contains('two'), side: vis(rv) && vis(cmp) && r(rv).right <= r(cmp).left + 1 && Math.abs(r(rv).top - r(cmp).top) < 4, listW: Math.round(r(rv).width), sel: sel ? sel.dataset.questionId : null, rows: d.querySelectorAll('#curate-rows .curate-question').length,
-                pair: (cmp.querySelector('.curate-cmp-head h3') || {}).textContent || '', cards: cmp.querySelectorAll('.curate-compare-card').length, solo: !!cmp.querySelector('.curate-solo'), back: vis(cmp.querySelector('.curate-back')),
-                head: head ? head.querySelector('b').textContent : '', why: head ? head.querySelector('.curate-pane-why').textContent : '', move: head ? head.querySelector('.curate-pane-move').textContent : '', moveOff: head ? head.querySelector('.curate-pane-move').disabled : null, pin: head ? head.querySelector('.curate-pane-pin').getAttribute('aria-pressed') : null,
+                pair: (hs => hs.length === 2 ? hs.join(' ↔ ') : '')([...cmp.querySelectorAll('.curate-compare-card h4')].map(h => h.firstChild.textContent.trim())), cards: cmp.querySelectorAll('.curate-compare-card').length, solo: !!cmp.querySelector('.curate-solo'), back: vis(cmp.querySelector('.curate-back')),
+                head: (c => c ? c.querySelector('h4').firstChild.textContent.trim() + (c.classList.contains('removed') ? ' → Remove' : ' → Keep') : '')(cmp.querySelector('.curate-compare-card')), why: head ? head.querySelector('.curate-pane-why').textContent : '', move: (b => b ? b.getAttribute('aria-label') : '')(cmp.querySelector('.curate-compare-card .curate-card-del')), moveOff: (b => b ? b.disabled : null)(cmp.querySelector('.curate-compare-card .curate-card-del')), verdictWord: head ? /→|\bKeep\b|\bRemove\b/.test([...head.querySelectorAll('b,button')].map(e => e.textContent).join(' ')) : null, bottomWhy: !!cmp.querySelector(':scope > .curate-cmp-why'), pin: head ? head.querySelector('.curate-pane-pin').getAttribute('aria-pressed') : null,
                 reasonInRow: [...d.querySelectorAll('.curate-question.compact .curate-reason > div')].some(vis), toggles: [...d.querySelectorAll('.curate-row-toggle')].some(e => r(e).width > 1), h: d.scrollHeight, fits: d.scrollHeight <= d.clientHeight + 1, overflowX: d.scrollWidth > d.clientWidth + 1, open: d.open,
                 tabs: [...d.querySelectorAll('[data-view]')].map(b => b.textContent).join(' | '), feedback: d.querySelector('#curate-feedback').textContent };
         });
@@ -157,7 +157,8 @@ const click = (page, sel) => page.locator('#quiz-curate-dialog ' + sel).first().
         let pn = await pane();
         ok(pn.two && pn.side && pn.listW <= 380 && !pn.overflowX, 'at 1,440 px the Review step is two panes: the list (' + pn.listW + ' px) and the detail beside it');
         ok(pn.sel === '1' && pn.pair === 'Q1 ↔ Q11' && pn.cards === 2 && !pn.back, 'Q1 picked → shown beside its twin (no ← back: it is the page itself)');
-        ok(pn.head === 'Q1 → Remove' && /Duplicate of Q11\./.test(pn.why) && pn.move === 'Keep' && pn.pin === 'false', 'first line of the detail: verdict · reason · Keep · 📌');
+        ok(pn.head === 'Q1 → Remove' && /Duplicate of Q11\./.test(pn.why) && pn.move === 'Keep Q1' && pn.pin === 'false', 'V102.692 (pick A3): first line = reason · ▾ · 📌; Q1 is red on its card and its own 🗑 is Keep');
+        ok(pn.verdictWord === false && !pn.bottomWhy, 'no verdict word, Keep or Keep both on the line; 🎯 ↔ ⭐ sits under ▾, not below the cards');
         ok(!pn.reasonInRow && !pn.toggles && pn.rows === 10, 'the list is names only — the reason and ▾ moved to the right');
         await shot(page, 'steps-2-review-pane');
         ok(pn.fits, 'nothing to scroll: ' + pn.h + ' px in a 810 px window');
@@ -165,11 +166,11 @@ const click = (page, sel) => page.locator('#quiz-curate-dialog ' + sel).first().
         ok(pn.sel === '3' && pn.pair === 'Q3 ↔ Q20', 'a click on a line shows that question: ' + pn.pair);
         await click(page, '.curate-question[data-question-id="6"] .curate-compare'); pn = await pane();
         ok(pn.sel === '6' && pn.pair === 'Q6 ↔ Q19', 'so does its ↔ chip');
-        await click(page, '.curate-pane-move'); pn = await pane();
+        await click(page, '#curate-comparison :is(.curate-compare-grid>.curate-compare-card:first-child,.curate-solo) .curate-card-del'); pn = await pane();
         ok(pn.tabs === 'Keep · 11 | Remove · 9' && pn.sel === '3' && /11 selected · target 10/.test(pn.feedback), 'Keep in the detail moves Q6 to Keep; the next removal down the list (Q3) is picked; the footer says 11 for a target of 10');
         await click(page, '[data-view="keep"]'); pn = await pane();
         ok(pn.sel === '4' && pn.solo && pn.cards === 1 && pn.pair === '' && pn.head === 'Q4 → Keep', 'Keep tab: a question with no twin is shown alone, opened');
-        await page.locator('#quiz-curate-dialog .curate-question[data-question-id="6"] .curate-stem').click(); await click(page, '.curate-pane-move'); pn = await pane();
+        await page.locator('#quiz-curate-dialog .curate-question[data-question-id="6"] .curate-stem').click(); await click(page, '#curate-comparison :is(.curate-compare-grid>.curate-compare-card:first-child,.curate-solo) .curate-card-del'); pn = await pane();
         ok(pn.tabs === 'Keep · 10 | Remove · 10', 'Remove in the detail puts Q6 back');
         await click(page, '.curate-pane-pin'); pn = await pane();
         ok(pn.pin === 'true' && pn.moveOff === true && /1 pinned/.test(await page.locator('#curate-coverage').innerText()), '📌 in the detail pins the question (Remove is then off)');
