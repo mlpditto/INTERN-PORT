@@ -73,7 +73,8 @@ How screens in this project are designed. Read it before any UI work. `CLAUDE.md
 | ❓ | how to use — an animated tour on this panel (nothing is called or saved) | 🪄 | AI rewrites just the picked line(s) — the answer waits until you tap it |
 | 🥣 | the Cereal Killer game / a cereal token (a kill) | 🔪 | the killer |
 | 🕵️ | the detective | 🐕 | Lola, the police dog |
-| 👁️ | a park: where a witness stands | 🦴 | Lola's ability used last turn / the dog bowl |
+| 🌳 | a park (a witness can stand there) | 👁️ | the witness token on a park |
+| 🦴 | Lola's ability used last turn / the dog bowl | 📓 | the killer's notebook — only the killer's screen shows it |
 | ☕ | a café: the detective's +1 step | 🚇 🚆 | subway S · train T |
 | 🛡️ | arrests left | 🥄 | map difficulty for the killer (1–4) |
 
