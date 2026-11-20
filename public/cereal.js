@@ -1,4 +1,4 @@
-/* V101.327 — 🥣 Cereal Killer, Phase 1: pass-and-play on ONE phone (Killer vs Detective, city map A/B). Owner's mockup picks
+/* V101.327 (+V101.328 tutorial hooks) — 🥣 Cereal Killer, Phase 1: pass-and-play on ONE phone (Killer vs Detective, city map A/B). Owner's mockup picks
    2026-11-20: K-A (board first, kill / witness chips appear under the board after the 3rd step, notebook strip at the bottom),
    D-A (question cards as a chip rail, the public case log at the bottom), a tint hand-off screen between every turn, reveal
    with a day rail. Entry: the 🥣 button beside 💰 FIN on Schedule (cerealOpen). Rules come from cereal-rules.js and the board
@@ -60,10 +60,12 @@
         store = load(); g = null; ui.arrest = null; ui.rules = false;
         render();
         root().style.display = 'flex';
+        if (window.CKTour && !CKTour.seen()) CKTour.open();   // V101.328: How to play, the first time on this device
     }
     function close() {
         if (g && g.status === 'playing' && !g.hand) g.hand = g.phase;   // whoever reopens must tap through the hand-off first
         save();
+        if (window.CKTour) CKTour.hideCoach();
         var m = document.getElementById('cerealModal'); if (m) m.style.display = 'none';
     }
     function render() {
@@ -72,6 +74,22 @@
         var html = !g ? lobbyHtml() : g.status === 'finished' ? revealHtml() : g.hand ? handHtml() : g.phase === 'killer' ? killerHtml() : detectiveHtml();
         body.innerHTML = html;
         var sc = document.querySelector('#cerealModal .modal-content'); if (sc) sc.scrollTop = 0;
+        if (window.CKTour) CKTour.coach(coachKey());   // V101.328: first-turn hints follow the step the player is on
+    }
+    /* Which first-turn hint fits the screen just drawn (cereal-tutorial.js shows each once). null = nothing to coach. */
+    function coachKey() {
+        if (!g || g.status !== 'playing' || g.hand) return null;
+        if (g.phase === 'killer') {
+            if (g.secret.home == null) return 'home';
+            if (g.draft.path.length < R.STEPS.killer + 1) return 'path';
+            var lk = document.getElementById('ck-lock');
+            return lk && !lk.disabled ? 'lock' : 'chips';
+        }
+        if (g.detectivePos == null) return 'cafe';
+        var last = g.dd.path.length ? g.dd.path[g.dd.path.length - 1] : g.detectivePos;
+        if (g.witness != null && !g.dd.asked && R.canQuestion(mapOf(g), last, g.witness)) return 'ask';
+        if (g.dd.asked || (g.witness == null && g.dd.path.length > 1)) return 'arrest';
+        return 'move';
     }
     function finish(winner, reason, extra) {
         g.status = 'finished'; g.phase = 'over'; g.hand = null; ui.arrest = null;
@@ -359,7 +377,7 @@
         hand: function () { if (!g) return; g.hand = null; save(); render(); },
         ask: ask, arrestMode: arrestMode, arrest: arrest, cancelArrest: cancelArrest, endTurn: endTurn,
         side: function (s) { readNames(); ui.side = s; render(); },
-        rules: function () { readNames(); ui.rules = !ui.rules; render(); },
+        rules: function () { readNames(); if (window.CKTour) { CKTour.open(); return; } ui.rules = !ui.rules; render(); },
         start: function () { readNames(); g = newGame(); store.games.unshift(g); store.games = store.games.slice(0, MAX_GAMES); save(); render(); },
         resume: function (id) { var x = store.games.filter(function (y) { return y.id === id; })[0]; if (!x) return; g = x; ui.arrest = null; if (g.status === 'playing') g.hand = g.phase; else ui.revealDay = g.result.day; save(); render(); },
         rematch: function () { if (g) ui.names = { killer: g.names.detective, detective: g.names.killer }; g = null; render(); },
