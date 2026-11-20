@@ -1,4 +1,4 @@
-/* V101.327 (+V101.328 tutorial hooks) — 🥣 Cereal Killer, Phase 1: pass-and-play on ONE phone (Killer vs Detective, city map A/B). Owner's mockup picks
+/* V101.327 (+V101.328 tutorial hooks, +V101.329 bot mode) — 🥣 Cereal Killer, Phase 1: pass-and-play on ONE phone (Killer vs Detective, city map A/B). Owner's mockup picks
    2026-11-20: K-A (board first, kill / witness chips appear under the board after the 3rd step, notebook strip at the bottom),
    D-A (question cards as a chip rail, the public case log at the bottom), a tint hand-off screen between every turn, reveal
    with a day rail. Entry: the 🥣 button beside 💰 FIN on Schedule (cerealOpen). Rules come from cereal-rules.js and the board
@@ -7,8 +7,9 @@
    nothing in Firestore. Handlers hang off window.CK (one global, no inline-handler id shadowing); cerealOpen() is the entry. */
 (function () {
     'use strict';
-    var R = window.CerealRules, M = window.CEREAL_MAPS;
+    var R = window.CerealRules, M = window.CEREAL_MAPS, B = window.CerealBot || null;   // B: cereal-bot.js (Phase 1½), optional
     if (!R || !M) { console.warn('[cereal] cereal-rules.js / cereal-maps.js must load first'); return; }
+    var BOT_DELAY = 700;   // the bot's move is seen to happen
 
     var ICON = { H: '🏠', P: '🌳', C: '☕', S: '🚇', T: '🚆', B: '🦴', '.': '' };
     var CLS = { H: 'h', P: 'p', C: 'c', S: 's', T: 't', B: 'b', '.': 'r' };
@@ -29,7 +30,7 @@
     function save() { if (g) g.upd = Date.now(); try { localStorage.setItem(key(), JSON.stringify(store)); } catch (_) { /* storage may be blocked (LIFF) */ } }
 
     var store = { games: [] }, g = null;                 // g = the open game; null = lobby
-    var ui = { side: 'A', names: { killer: '', detective: '' }, arrest: null, revealDay: null, rules: false };
+    var ui = { side: 'A', names: { killer: '', detective: '' }, arrest: null, revealDay: null, rules: false, vs: 'friend', level: 2, seat: 'detective', thinking: false, botBusy: false };
 
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function t(en, th) { return ' title="' + esc(en) + '" data-th-title="' + esc(th) + '" aria-label="' + esc(en) + '"'; }
@@ -38,9 +39,12 @@
     function blockedFor(game) { return game.detectivePos != null ? [game.detectivePos] : []; }
 
     function newGame() {
+        var bot = ui.vs === 'bot' && B ? { seat: ui.seat === 'killer' ? 'detective' : 'killer', level: ui.level, k: B.newKnowledge(R.buildMap(M, ui.side, null)) } : null;
+        var names = { killer: (ui.names.killer || '').trim() || 'Killer', detective: (ui.names.detective || '').trim() || 'Detective' };
+        if (bot) names[bot.seat] = '🤖 Bot';
         return { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), created: Date.now(), upd: Date.now(), citySide: ui.side,
-            names: { killer: (ui.names.killer || '').trim() || 'Killer', detective: (ui.names.detective || '').trim() || 'Detective' },
-            status: 'playing', day: 1, phase: 'killer', hand: 'killer',
+            names: names, bot: bot,
+            status: 'playing', day: 1, phase: 'killer', hand: bot ? null : 'killer',
             secret: { home: null, path: {}, kills: {} }, detectivePos: null, cereals: [], witness: null, arrestsLeft: R.ARRESTS, kills: 0,
             usedQuestions: [], skipUsed: false, log: [], draft: { path: [], kill: null, witness: null }, dd: { path: [], asked: null }, result: null };
     }
@@ -63,7 +67,7 @@
         if (window.CKTour && !CKTour.seen()) CKTour.open();   // V101.328: How to play, the first time on this device
     }
     function close() {
-        if (g && g.status === 'playing' && !g.hand) g.hand = g.phase;   // whoever reopens must tap through the hand-off first
+        if (g && g.status === 'playing' && !g.hand && !g.bot) g.hand = g.phase;   // whoever reopens must tap through the hand-off first (not needed against a bot)
         save();
         if (window.CKTour) CKTour.hideCoach();
         var m = document.getElementById('cerealModal'); if (m) m.style.display = 'none';
@@ -72,9 +76,43 @@
         root();
         var body = document.getElementById('ck-body');
         var html = !g ? lobbyHtml() : g.status === 'finished' ? revealHtml() : g.hand ? handHtml() : g.phase === 'killer' ? killerHtml() : detectiveHtml();
+        var botsTurn = g && g.bot && B && g.status === 'playing' && !g.hand && g.phase === g.bot.seat && !ui.botBusy;
+        if (botsTurn) html = thinkingHtml();
         body.innerHTML = html;
         var sc = document.querySelector('#cerealModal .modal-content'); if (sc) sc.scrollTop = 0;
-        if (window.CKTour) CKTour.coach(coachKey());   // V101.328: first-turn hints follow the step the player is on
+        if (window.CKTour) CKTour.coach(botsTurn ? null : coachKey());   // V101.328: first-turn hints follow the step the player is on
+        if (botsTurn && !ui.thinking) { ui.thinking = true; setTimeout(function () { ui.thinking = false; if (g && g.bot && g.status === 'playing' && g.phase === g.bot.seat) botTurn(); }, BOT_DELAY); }
+    }
+    function thinkingHtml() {
+        var det = g.bot.seat === 'detective';
+        return '<div class="ck ' + (det ? 'detective' : 'killer') + '">' + topHtml((det ? '🕵️' : '🔪') + ' Day ' + g.day, pills(g))
+            + '<div class="ck-hand" id="ck-thinking"><div class="who" aria-hidden="true">🤖</div><h4>thinking…</h4><p class="th">' + (det ? 'บอทนักสืบกำลังเดิน' : 'บอทฆาตกรกำลังเดิน') + '</p></div></div>';
+    }
+    /* One whole bot turn through the same functions a human's taps call, so every move is validated the same way. */
+    function botTurn() {
+        if (!g || !g.bot || !B) return;
+        ui.botBusy = true;
+        try {
+            var m = mapOf(g), rng = Math.random, L = g.bot.level;
+            if (g.phase === 'killer') {
+                var turn = B.killerTurn(m, { pos: kpos(g), detectivePos: g.detectivePos, cereals: g.cereals, kills: g.kills, skipUsed: g.skipUsed, day: g.day }, L, rng);
+                if (!turn) finish('good', 'cornered', { cell: kpos(g) });
+                else {
+                    if (g.secret.home == null) g.secret.home = turn.home;
+                    g.draft = { path: turn.path, kill: turn.kill == null ? 'skip' : turn.kill, witness: turn.witness };
+                    lock();
+                }
+            } else {
+                var k = g.bot.k;
+                if (g.detectivePos == null) { g.detectivePos = B.detectiveStart(m, k, L, rng); g.dd.path = [g.detectivePos]; }
+                var plan = B.detectivePlan(m, { pos: g.detectivePos, witness: g.witness, usedQuestions: g.usedQuestions }, k, L, rng);
+                g.dd.path = plan.path; if (plan.q) ask(plan.q);
+                var fin = B.detectiveFinish(m, { day: g.day, arrestsLeft: g.arrestsLeft, lastKill: g.cereals[g.cereals.length - 1] }, k, L, rng, g.dd.path);
+                g.dd.path = fin.path;
+                if (fin.arrest != null) { ui.arrest = fin.arrest; arrest(); } else endTurn();
+            }
+        } finally { ui.botBusy = false; }
+        save(); render();
     }
     /* Which first-turn hint fits the screen just drawn (cereal-tutorial.js shows each once). null = nothing to coach. */
     function coachKey() {
@@ -143,14 +181,24 @@
     function lobbyHtml() {
         var h = '<div class="ck lobby">' + topHtml('🥣 Cereal Killer', '<button type="button" class="ck-pill' + (ui.rules ? ' acc' : '') + '" onclick="CK.rules()"' + t('How to play', 'กติกา · วิธีเล่น') + '>?</button>');
         if (ui.rules) h += '<div class="ck-rules">🔪 moves exactly 3 steps a day, unseen, and drops 🥣 on a house it touched — 6 victims in 7 days (≥1 by day 2, ≥3 by day 4). A kill next to a park puts a 👁️ witness there.<br>🕵️ moves up to 3 (+1 through ☕), stands by 👁️ and asks one of 5 cards; the app answers truthfully. 🛡️ arrest = own or next cell, 4 tries. 🚇 S to S is one step for both.</div>';
-        h += '<div class="ck-row"><span class="ck-mini">Vs</span><span class="ck-chip on">👤 friend</span><button type="button" class="ck-chip" disabled' + t('Play against a bot — coming in the next release', 'เล่นกับบอท · เร็ว ๆ นี้') + '>🤖 bot</button></div>';
+        var bot = ui.vs === 'bot' && B;
+        h += '<div class="ck-row"><span class="ck-mini">Vs</span><button type="button" id="ck-vs-friend" class="ck-chip' + (bot ? '' : ' on') + '" onclick="CK.vs(\'friend\')"' + t('Two players, one phone', 'เล่นกับเพื่อน ส่งมือถือกัน') + '>👤 friend</button>'
+            + '<button type="button" id="ck-vs-bot" class="ck-chip' + (bot ? ' on' : '') + '"' + (B ? ' onclick="CK.vs(\'bot\')"' : ' disabled') + t('Play against the bot on this phone', 'เล่นกับบอทบนเครื่องนี้') + '>🤖 bot</button></div>';
+        if (bot) {
+            h += '<div class="ck-row" id="ck-level"><span class="ck-mini">🤖 Level</span>';
+            B.LEVELS.forEach(function (lv) { h += '<button type="button" class="ck-chip' + (ui.level === lv.level ? ' on' : '') + '" data-level="' + lv.level + '" onclick="CK.level(' + lv.level + ')"' + t(lv.name, lv.th) + '>' + lv.spoons + '</button>'; });
+            h += '</div><div class="ck-row" id="ck-seat"><span class="ck-mini">You play</span>'
+                + '<button type="button" class="ck-chip' + (ui.seat === 'detective' ? ' on' : '') + '" data-seat="detective" onclick="CK.seat(\'detective\')"' + t('You are the detective, the bot kills', 'คุณเป็นนักสืบ บอทเป็นฆาตกร') + '>🕵️ detective</button>'
+                + '<button type="button" class="ck-chip' + (ui.seat === 'killer' ? ' on' : '') + '" data-seat="killer" onclick="CK.seat(\'killer\')"' + t('You are the killer, the bot hunts you', 'คุณเป็นฆาตกร บอทตามจับ') + '>🔪 killer</button></div>';
+        }
         h += '<div class="ck-row"><span class="ck-mini">Map</span>'
             + '<button type="button" id="ck-side-A" class="ck-chip' + (ui.side === 'A' ? ' on' : '') + '" onclick="CK.side(\'A\')"' + t('Side A — favours the killer', 'ด้าน A · ฆาตกรได้เปรียบ') + '>A <small>🥄🥄 killer+</small></button>'
             + '<button type="button" id="ck-side-B" class="ck-chip' + (ui.side === 'B' ? ' on' : '') + '" onclick="CK.side(\'B\')"' + t('Side B — favours the detective', 'ด้าน B · นักสืบได้เปรียบ') + '>B <small>🥄 detective+</small></button></div>';
+        var botPill = function (who) { return '<span class="ck-name" style="color:#94a3b8"><span>' + who + '</span>🤖 Bot</span>'; };
         h += '<div class="ck-row"><span class="ck-mini">Players</span>'
-            + '<label class="ck-name"><span>🔪</span><input type="text" id="ck-n1" maxlength="20" placeholder="Killer" value="' + esc(ui.names.killer) + '" aria-label="Killer name" data-th-placeholder="ฆาตกร"></label>'
-            + '<label class="ck-name"><span>🕵️</span><input type="text" id="ck-n2" maxlength="20" placeholder="Detective" value="' + esc(ui.names.detective) + '" aria-label="Detective name" data-th-placeholder="นักสืบ"></label></div>';
-        h += '<div class="ck-row" style="padding-left:68px"><span class="ck-pill"' + t('The rulebook: whoever just had breakfast is the killer', 'ใครเพิ่งทานอาหารเช้า = ฆาตกร') + '>🥣 who just had breakfast = 🔪</span></div>';
+            + (bot && ui.seat !== 'killer' ? botPill('🔪') : '<label class="ck-name"><span>🔪</span><input type="text" id="ck-n1" maxlength="20" placeholder="Killer" value="' + esc(ui.names.killer) + '" aria-label="Killer name" data-th-placeholder="ฆาตกร"></label>')
+            + (bot && ui.seat !== 'detective' ? botPill('🕵️') : '<label class="ck-name"><span>🕵️</span><input type="text" id="ck-n2" maxlength="20" placeholder="Detective" value="' + esc(ui.names.detective) + '" aria-label="Detective name" data-th-placeholder="นักสืบ"></label>') + '</div>';
+        if (!bot) h += '<div class="ck-row" style="padding-left:68px"><span class="ck-pill"' + t('The rulebook: whoever just had breakfast is the killer', 'ใครเพิ่งทานอาหารเช้า = ฆาตกร') + '>🥣 who just had breakfast = 🔪</span></div>';
         h += '<button type="button" class="ck-primary" id="ck-start" onclick="CK.start()"' + t('Start day 1 — the phone goes to the killer first', 'เริ่มวันที่ 1 · มือถืออยู่กับฆาตกรก่อน') + '>▸ Start · 🔪 goes first</button>';
         var games = store.games.filter(function (x) { return x.status === 'playing' || x.status === 'finished'; });
         if (games.length) {
@@ -181,7 +229,8 @@
     function killerHtml() {
         var m = mapOf(g), pos = kpos(g), blocked = blockedFor(g), path = g.draft.path;
         if (pos != null && !path.length) {
-            if (R.cornered(m, pos, blocked)) { finish('good', 'cornered', { cell: pos }); return revealHtml(); }
+            var ps = R.legalPaths(m, pos, R.STEPS.killer, { exact: true, canRide: true, blocked: blocked });
+            if (!ps.length || (g.skipUsed && !ps.some(function (p) { return R.killOptions(m, p, g.cereals).length; }))) { finish('good', 'cornered', { cell: pos }); return revealHtml(); }   // no legal turn
             path = g.draft.path = [pos];
         }
         var ex = publicExtra(g), add = function (id, k, v) { ex[id] = ex[id] || {}; ex[id][k] = (ex[id][k] || '') + v; };
@@ -253,8 +302,9 @@
         g.kills = v.kills; g.skipUsed = v.skipUsed; g.witness = v.witness;
         g.log.push({ day: g.day, type: 'kill', witness: v.witness, text: v.kill != null ? '🥣 ' + v.kill + (v.witness != null ? ' · 👁️ ' + v.witness : '') : '⏭ no victim' });
         g.draft = { path: [], kill: null, witness: null };
+        if (g.bot && B && g.bot.seat === 'detective') B.observeKillerTurn(m, g.bot.k, { blocked: blockedFor(g), kill: v.kill, witness: v.witness });   // what the bot detective can deduce
         if (!R.calendarOk(g.day, g.kills)) finish('good', 'calendar');
-        else { g.phase = 'detective'; g.hand = 'detective'; }
+        else { g.phase = 'detective'; g.hand = g.bot ? null : 'detective'; }
         save(); render();
     }
 
@@ -311,6 +361,7 @@
         if (g.witness == null || !R.canQuestion(m, last, g.witness) || g.dd.asked || g.usedQuestions.indexOf(q) >= 0) return;
         var ans = R.answer(m, q, kpos(g), g.witness), pick = ans.length > 1 ? R.leastInformative(m, g.witness, ans) : ans[0];
         g.usedQuestions.push(q); g.dd.asked = { q: q, ans: pick, two: ans.length > 1 };
+        if (g.bot && B && g.bot.seat === 'detective') B.observeAnswer(m, g.bot.k, q, pick, g.witness);
         g.log.push({ day: g.day, type: 'ask', q: q, ans: pick, text: '❓ ' + qcard(q).ic + ' → ' + pick });
         save(); render();
     }
@@ -322,6 +373,7 @@
         g.detectivePos = g.dd.path.length ? g.dd.path[g.dd.path.length - 1] : g.detectivePos;   // where the arrest is made from (the reveal shows it)
         if (cell === kpos(g)) { g.log.push({ day: g.day, type: 'arrest', text: '🛡️ ' + cell + ' ✔' }); finish('good', 'arrest', { cell: cell }); render(); return; }
         g.arrestsLeft -= 1;
+        if (g.bot && B && g.bot.seat === 'detective') B.observeArrestMiss(g.bot.k, cell);
         g.log.push({ day: g.day, type: 'arrest', text: '🛡️ ' + cell + ' ✗ (' + g.arrestsLeft + ' left)' });
         if (g.arrestsLeft <= 0) { finish('killer', 'arrests'); render(); return; }
         endTurn();
@@ -331,7 +383,7 @@
         var path = g.dd.path.length ? g.dd.path : [g.detectivePos];
         g.detectivePos = path[path.length - 1]; g.witness = null; g.dd = { path: [], asked: null };
         if (g.day >= R.DAYS) finish('killer', 'survived');
-        else { g.day += 1; g.phase = 'killer'; g.hand = 'killer'; }
+        else { g.day += 1; g.phase = 'killer'; g.hand = g.bot ? null : 'killer'; }
         save(); render();
     }
 
@@ -377,10 +429,18 @@
         hand: function () { if (!g) return; g.hand = null; save(); render(); },
         ask: ask, arrestMode: arrestMode, arrest: arrest, cancelArrest: cancelArrest, endTurn: endTurn,
         side: function (s) { readNames(); ui.side = s; render(); },
+        vs: function (v) { readNames(); ui.vs = v; render(); },
+        level: function (n) { readNames(); ui.level = n; render(); },
+        seat: function (s) { readNames(); ui.seat = s; render(); },
+        _botDelay: function (ms) { BOT_DELAY = ms; },   // QA hook
         rules: function () { readNames(); if (window.CKTour) { CKTour.open(); return; } ui.rules = !ui.rules; render(); },
         start: function () { readNames(); g = newGame(); store.games.unshift(g); store.games = store.games.slice(0, MAX_GAMES); save(); render(); },
-        resume: function (id) { var x = store.games.filter(function (y) { return y.id === id; })[0]; if (!x) return; g = x; ui.arrest = null; if (g.status === 'playing') g.hand = g.phase; else ui.revealDay = g.result.day; save(); render(); },
-        rematch: function () { if (g) ui.names = { killer: g.names.detective, detective: g.names.killer }; g = null; render(); },
+        resume: function (id) { var x = store.games.filter(function (y) { return y.id === id; })[0]; if (!x) return; g = x; ui.arrest = null; if (g.status === 'playing') g.hand = g.bot ? null : g.phase; else ui.revealDay = g.result.day; save(); render(); },
+        rematch: function () {
+            if (g && g.bot) { ui.vs = 'bot'; ui.level = g.bot.level; ui.seat = g.bot.seat; var me = g.bot.seat === 'killer' ? g.names.detective : g.names.killer; ui.names = { killer: me, detective: me }; }   // swap: you take the bot's old seat
+            else if (g) { ui.vs = 'friend'; ui.names = { killer: g.names.detective, detective: g.names.killer }; }
+            g = null; render();
+        },
         lobby: function () { g = null; render(); },
         revealDay: function (d) { ui.revealDay = d; render(); },
         close: close,

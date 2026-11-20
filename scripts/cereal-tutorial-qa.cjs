@@ -16,7 +16,7 @@ assert.ok(!/db\.collection|firebase\.|fetch\(|httpsCallable/.test(js), 'the tuto
 for (let i = 1; i <= 8; i++) assert.ok(js.includes("'" + i + " / 8 · "), 'scene ' + i + ' present');
 assert.ok(/root\.className = 'lang-no-toggle'/.test(js) && /croot\.className = 'lang-no-toggle'/.test(js), 'Thai is not hidden by lang-toggle');
 assert.ok(!/✓|✅/.test(js), 'no check marks');
-assert.ok(game.includes('CKTour.coach(coachKey())') && game.includes('CKTour.open()'), 'cereal.js calls the tutorial');
+assert.ok(/CKTour\.coach\([^)]*coachKey\(\)\)/.test(game) && game.includes('CKTour.open()'), 'cereal.js calls the tutorial');
 
 async function open(browser, { width = 390, reducedMotion = 'no-preference', storage = {} } = {}) {
     const ctx = await browser.newContext({ viewport: { width, height: 780 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, timezoneId: 'Asia/Bangkok', reducedMotion });

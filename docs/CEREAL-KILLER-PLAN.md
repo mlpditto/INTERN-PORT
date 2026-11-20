@@ -143,6 +143,8 @@ Owner 2026-11-20: "เพิ่มโหมดเล่นกับบอทไ�
 
 Out of scope here: a bot for the 3-player game (Lola) — Phase 3 decides. Size: 2 PRs (bot + its check → lobby/turn UI). Version: intern +2.
 
+**Built 2026-11-20 as one PR, intern V101.329:** `public/cereal-bot.js`, `scripts/cereal-bot-check.cjs` (tournament: 🥄 6 · 🥄🥄 13 · 🥄🥄🥄 21 detective wins of 40 vs a 🥄🥄 killer; 🥄 killer caught 32 of 40), lobby chips, thinking beat, `scripts/cereal-bot-ui-qa.cjs`. Change from the sketch: 🥄 does not track candidates at all (random walk, random card, arrests only when one candidate is beside it) — a candidate-tracking rookie turned out to be the strongest level. The tutorial's "try a round vs 🤖" button was not added.
+
 ### Phase 2 — Online, asynchronous, 2 players
 
 | Deliverable | Verify |

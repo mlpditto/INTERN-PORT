@@ -76,7 +76,8 @@ How screens in this project are designed. Read it before any UI work. `CLAUDE.md
 | 🌳 | a park (a witness can stand there) | 👁️ | the witness token on a park |
 | 🦴 | Lola's ability used last turn / the dog bowl | 📓 | the killer's notebook — only the killer's screen shows it |
 | ☕ | a café: the detective's +1 step | 🚇 🚆 | subway S · train T |
-| 🛡️ | arrests left | 🥄 | map difficulty for the killer (1–4) |
+| 🛡️ | arrests left | 🥄 | map difficulty for the killer (1–4) / the bot's level (1–3) |
+| 🤖 | the bot opponent (its seat, its turn) | | |
 
 ## 6. AI model picker
 *Why: 19 models plus trials. One style lets the admin find a model the same way on every screen.*
