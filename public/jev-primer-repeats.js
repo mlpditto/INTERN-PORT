@@ -6,9 +6,12 @@
     function render(box, r) {
         const list = r.repeats || [];
         const note = (r.left ? ` · ${r.left} pairs not checked` : '') + (r.errors ? ` · ${r.errors} failed` : '');
-        const rows = list.slice(0, 40).map(x => `<div class="jpr-row">${go(x.q, x.term)}<span>≈</span>${go(x.otherQ, x.otherTerm)}<small>${Number(x.score).toFixed(2)}</small></div>`).join('');
+        // V102.698 (owner pick C): ✨ Qn = AI rewrites the later note of the pair so it does not repeat the earlier one
+        const fix = x => window.praDedupe ? `<button type="button" class="jpr-fix" onclick="praDedupe.one(${Math.max(x.q, x.otherQ)})" title="AI rewrites Q${Math.max(x.q, x.otherQ) + 1} so it does not repeat Q${Math.min(x.q, x.otherQ) + 1} · เขียนข้อหลังใหม่ไม่ให้ซ้ำ">✨ Q${Math.max(x.q, x.otherQ) + 1}</button>` : '';
+        const rows = list.slice(0, 40).map(x => `<div class="jpr-row">${go(x.q, x.term)}<span>≈</span>${go(x.otherQ, x.otherTerm)}<small>${Number(x.score).toFixed(2)}</small>${fix(x)}</div>`).join('');
         box.innerHTML = `<div class="jpr-h">${list.length ? `Jev · ${list.length} to check` : 'Jev · no repeats under other terms'}<small>${r.compared || 0} pairs${esc(note)}</small></div>${rows}`;
         box.hidden = false;
+        if (window.praDedupe) window.praDedupe.setJev(list);   // the header ✨ count takes Jev's pairs in
     }
 
     async function run(btn) {
