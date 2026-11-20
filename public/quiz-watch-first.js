@@ -26,7 +26,7 @@
         go: { en: 'Start the quiz ▸', th: 'เริ่มทำควิซ ▸', ko: '퀴즈 시작 ▸', ja: 'クイズ開始 ▸', zh: '开始测验 ▸' },
         skip: { en: 'Skip the film', th: 'ข้ามหนัง', ko: '영상 건너뛰기', ja: '映像をスキップ', zh: '跳过短片' },
         read: { en: '📖 Read it', th: '📖 อ่านเอง', ko: '📖 직접 읽기', ja: '📖 自分で読む', zh: '📖 自己读' },
-        va: { en: 'Kaitom', th: 'ไข่ต้ม', ko: '카이톰', ja: 'カイトム', zh: 'Kaitom' }, vb: { en: 'Kaidang', th: 'ไข่แดง', ko: '카이댕', ja: 'カイデーン', zh: 'Kaidang' },
+        va: { en: 'Kaitom', th: 'ไข่ต้ม', ko: '카이톰', ja: 'カイトム', zh: 'Kaitom' }, vm: { en: 'Kaimook', th: 'ไข่มุก', ko: '카이묵', ja: 'カイムック', zh: 'Kaimook' }, vb: { en: 'Kaidang', th: 'ไข่แดง', ko: '카이댕', ja: 'カイデーン', zh: 'Kaidang' },
         play: { en: '🎬 Play', th: '🎬 ดูเรื่อง', ko: '🎬 재생', ja: '🎬 再生', zh: '🎬 播放' },
         sound: { en: 'Tap for sound', th: 'แตะเพื่อเปิดเสียง', ko: '눌러서 소리 켜기', ja: 'タップで音声', zh: '点击开启声音' },
         who: { en: 'Intern', th: 'น้องฝึกงาน', ko: '인턴', ja: '実習生', zh: '实习生' },
@@ -74,10 +74,14 @@
     function storyOf(q) {
         var st = q && q.watchFirst && q.watchFirst.story, ls = st && Array.isArray(st.lines) ? st.lines.filter(function (x) { return x && /^(q|rx|key)$/.test(x.w) && typeof x.t === 'string' && x.t.trim(); }).slice(0, 24) : [];
         var lg = ls.length ? (/^(th|en|ko)$/.test(st.lang) ? st.lang : 'en') : '';
+        // V101.326 (owner 2026-11-20): new voices — Q `k` Kaitom, pharmacist `d` Kaimook (first) + `b` Kaidang. When every line has them they take the
+        // a / b slots below (so the player is unchanged); otherwise the old set plays (Q `a` Kaimook, pharmacist `a` Kaitom + `b` Kaidang).
+        var nv = lg === 'th' && ls.every(function (x) { return x.w === 'q' ? voiceUrl(x, 'k') : voiceUrl(x, 'd') && voiceUrl(x, 'b'); });
+        if (nv) ls = ls.map(function (x) { return Object.assign({}, x, { a: x.w === 'q' ? x.k : x.d }); });
         if (lg === 'th' && !ls.every(function (x) { return voiceUrl(x) && (x.w === 'q' || voiceUrl(x, 'b')); })) return null;   // V101.319: a Thai story waits for all its AI voices
         var pv = st && st.pv && typeof st.pv.name === 'string' && st.pv.name.trim() ? st.pv.name.trim().slice(0, 40) : '';
         var third = lg === 'th' && !!pv && ls.every(function (x) { return x.w === 'q' || voiceUrl(x, 'c'); }) && ls.some(function (x) { return x.w !== 'q'; });
-        return ls.length ? { lang: lg, lines: ls, pick: lg === 'th', third: third ? pv : '' } : null;
+        return ls.length ? { lang: lg, lines: ls, pick: lg === 'th', third: third ? pv : '', nv: nv } : null;
     }
     function muted() { try { return localStorage.getItem('qwsMute') === '1'; } catch (e) { return false; } }
     var play = null;   // the story being played: { i, sound, done, t0, timer, n }
@@ -154,7 +158,7 @@
         seen = { max: 0, played: false, ended: false, failed: false };
         box.innerHTML = '<div class="lang-no-toggle qwf">' +
             '<div class="qws"><div class="qws-top"><div class="qws-prog">' + ls.map(function () { return '<i></i>'; }).join('') + '</div>' + (story.pick ? '' : '<button type="button" class="qws-snd" aria-pressed="' + on + '">' + (on ? '🔊' : '🔇 ' + esc(L(T.sound))) + '</button>') + '</div>' +
-            (story.pick ? '<div class="qws-rail" role="group" aria-label="Voice">' + vb('off', '🔇') + vb('a', '🗣 ' + esc(L(T.va))) + vb('b', '🗣 ' + esc(L(T.vb))) + (story.third ? vb('c', '🗣 ' + esc(story.third)) : '') + '</div>' : '') +
+            (story.pick ? '<div class="qws-rail" role="group" aria-label="Voice">' + vb('off', '🔇') + vb('a', '🗣 ' + esc(L(story.nv ? T.vm : T.va))) + vb('b', '🗣 ' + esc(L(T.vb))) + (story.third ? vb('c', '🗣 ' + esc(story.third)) : '') + '</div>' : '') +
             '<div class="qws-chat" aria-live="polite"></div></div>' +
             '<div class="qwf-two"><button type="button" class="qwf-read" aria-pressed="false">' + esc(L(T.read)) + '</button><button type="button" class="qwf-go" data-state="go">' + esc(L(T.go)) + '</button></div></div>';
         var chat = box.querySelector('.qws-chat'), snd = box.querySelector('.qws-snd'), dots = box.querySelectorAll('.qws-prog i'), card = box.querySelector('.qws'), rd = box.querySelector('.qwf-read');

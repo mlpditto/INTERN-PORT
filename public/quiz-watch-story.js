@@ -14,8 +14,14 @@
     // (watch-voices/<sha256>.mp3, admin-only rule; interns play it through the download token kept on the line as `a`). Thai stories only for now.
     // V102.672 (owner pick A 2026-11-17, mockup-watch-first-voices/): the intern picks the pharmacist's voice, so every RX / KEY line carries TWO
     // sounds — `a` Kaitom and `b` Kaidang; a Q line has one (`a` Kaimook). A Thai story reaches interns only when every sound is there.
-    var VOICE = { q: 'kaimook', rx: 'kaitom', key: 'kaitom' }, VOICE2 = 'kaidang', VSTYLE = { q: 'friendly', rx: 'calm', key: 'calm' };
-    function fields(x) { return x.w === 'q' ? ['a'] : ['a', 'b']; }
+    // V102.697 (owner 2026-11-20): the pharmacist's MAIN voice is Kaimook — the intern (Q) = Kaitom; the pharmacist = Kaimook (default) or Kaidang.
+    // New fields so the stories already voiced keep playing until they are voiced again: Q `k` (Kaitom), RX / KEY `d` (Kaimook) + `b` (Kaidang, unchanged).
+    // The old set (Q `a` Kaimook, RX / KEY `a` Kaitom) is kept but no longer made or counted; 🗣 n/N counts the new set.
+    var FVOICE = { k: 'kaitom', d: 'kaimook', b: 'kaidang' }, VSTYLE = { q: 'friendly', rx: 'calm', key: 'calm' };
+    function fields(x) { return x.w === 'q' ? ['k'] : ['d', 'b']; }
+    // the old set is all there (Q `a`, RX / KEY `a` + `b`): interns still hear this story with the old voices
+    function oldDone() { return !!S.story && S.story.lines.length > 0 && S.story.lines.every(function (x) { return okUrl(x.a) && (x.w === 'q' || okUrl(x.b)); }); }
+    function dropSounds(x) { delete x.a; delete x.b; delete x.c; delete x.d; delete x.k; }
     // V102.674 (owner pick A + "every Paxa voice can be picked", mockup-watch-first-paxa/): Paxa Labs = an OPTIONAL third pharmacist voice.
     // The admin picks ONE of Paxa's voices for the story (`pv` = { id, name }, from Paxa's public GET /v1/voices — no key, nothing of ours is sent);
     // ＋ Paxa voices every RX / KEY line with it (`c`, through callTtsProxy provider paxa_tts — the key stays on the server). It is not part of
@@ -49,7 +55,7 @@
     function secs(ls) { return ls.reduce(function (s, x) { return s + 1 + Math.ceil(x.t.length / 14); }, 0); }
     function clean(story) {
         if (!story || !Array.isArray(story.lines)) return null;
-        var ls = story.lines.map(function (x) { return x && ORDER.indexOf(x.w) > -1 && String(x.t || '').trim() ? Object.assign({ w: x.w, t: String(x.t).trim().slice(0, LEN), q: (Array.isArray(x.q) ? x.q : []).filter(function (n) { return Number.isInteger(n) && n > 0; }).slice(0, 6) }, okUrl(x.a) ? { a: x.a } : {}, x.w !== 'q' && okUrl(x.b) ? { b: x.b } : {}, x.w !== 'q' && okUrl(x.c) && pvOf(story) ? { c: x.c } : {}) : null; }).filter(Boolean).slice(0, MAX);
+        var ls = story.lines.map(function (x) { return x && ORDER.indexOf(x.w) > -1 && String(x.t || '').trim() ? Object.assign({ w: x.w, t: String(x.t).trim().slice(0, LEN), q: (Array.isArray(x.q) ? x.q : []).filter(function (n) { return Number.isInteger(n) && n > 0; }).slice(0, 6) }, okUrl(x.a) ? { a: x.a } : {}, x.w === 'q' && okUrl(x.k) ? { k: x.k } : {}, x.w !== 'q' && okUrl(x.d) ? { d: x.d } : {}, x.w !== 'q' && okUrl(x.b) ? { b: x.b } : {}, x.w !== 'q' && okUrl(x.c) && pvOf(story) ? { c: x.c } : {}) : null; }).filter(Boolean).slice(0, MAX);
         return ls.length ? Object.assign({ lang: /^(th|en|ko)$/.test(story.lang) ? story.lang : langOf(ls.map(function (x) { return x.t; }).join(' ')), lines: ls }, pvOf(story) ? { pv: pvOf(story) } : {}) : null;
     }
     function want(n) { return Math.max(12, Math.min(MAX, n * 2)); }
@@ -109,8 +115,11 @@
     // V102.683 (owner pick A, mockup-watch-voice-names/): each line names its voices — green = the sound is there, grey = not yet
     function voiceNames(x, st) {
         if (!st || st.lang !== 'th') return '';   // AI voices are Thai only; other languages use the phone voice
-        var pv = pvOf(st), ns = x.w === 'q' ? [['Kaimook', x.a, '']] : [['Kaitom', x.a, ''], ['Kaidang', x.b, '']].concat(pv ? [[pv.name, x.c, ' px']] : []);
-        return '<span class="qws-vns">' + ns.map(function (n) { var ok = okUrl(n[1]); return '<i class="qws-vnm' + n[2] + (ok ? ' ok' : '') + '" title="' + esc(n[0]) + (ok ? ' — ready' : ' — not voiced yet') + '">' + esc(n[0]) + '</i>'; }).join('') + '</span>';
+        // V102.697 (owner 2026-11-20): a Q line = one name chip (Kaitom); an RX / KEY line = ONE chip 🗣 2 for its two pharmacist voices, names on hover
+        var pv = pvOf(st), chip = function (label, ok, title, cls) { return '<i class="qws-vnm' + (cls || '') + (ok ? ' ok' : '') + '" title="' + esc(title) + '">' + esc(label) + '</i>'; };
+        var out = x.w === 'q' ? [chip('Kaitom', okUrl(x.k), 'Kaitom' + (okUrl(x.k) ? ' — ready' : ' — not voiced yet'))]
+            : [chip('🗣 2', okUrl(x.d) && okUrl(x.b), 'Kaimook ' + (okUrl(x.d) ? '✓' : '–') + ' · Kaidang ' + (okUrl(x.b) ? '✓' : '–') + ' — the intern hears one of them', '')].concat(pv ? [chip(pv.name, okUrl(x.c), pv.name + (okUrl(x.c) ? ' — ready' : ' — not voiced yet'), ' px')] : []);
+        return '<span class="qws-vns">' + out.join('') + '</span>';
     }
     function stop() { clearTimeout(S.timer); S.play = -1; if (S.au) { try { S.au.pause(); } catch (e) { /* not playing */ } S.au = null; } pxEarStop(); }
     function paint() {
@@ -125,7 +134,7 @@
         var flagged = st.lines.reduce(function (n, x) { return n + bad(x.t).length; }, 0);
         el.innerHTML = '<div class="qws-h"><b>🎬 from Read first</b><small>' + st.lines.length + ' lines · ~' + secs(st.lines) + ' s · ' + st.lang.toUpperCase() + '</small>' + savedHtml() +
             '<span class="' + (flagged ? 'qws-warn' : 'qws-ok') + '">' + (flagged ? '⚠️ ' + flagged + ' number' + (flagged > 1 ? 's' : '') + ' not in Read first' : '✓ every number is in Read first') + '</span>' +
-            '<button type="button" class="qws-b qws-v' + (voiced() && voiced() === needed() ? ' all' : '') + '" id="qws-voice" onclick="QuizWatchStory.voices()"' + (S.busy ? ' disabled' : '') + ' aria-label="AI voices" title="AI voices (Chinda): intern = Kaimook; pharmacist = Kaitom AND Kaidang — the intern picks which one to hear. Interns see a Thai story only when every sound is ready. Each sound is one paid voice call.">🗣 <span class="qws-vn">' + (S.voicing ? S.voicing.done + '/' + S.voicing.total + ' …' : voiced() + '/' + needed()) + '</span></button>' +
+            '<button type="button" class="qws-b qws-v' + (voiced() && voiced() === needed() ? ' all' : '') + '" id="qws-voice" onclick="QuizWatchStory.voices()"' + (S.busy ? ' disabled' : '') + ' aria-label="AI voices" title="AI voices (Chinda): intern = Kaitom; pharmacist = Kaimook AND Kaidang — the intern picks which one to hear (Kaimook first). Interns see a Thai story only when every sound is ready. Each sound is one paid voice call.">🗣 <span class="qws-vn">' + (S.voicing ? S.voicing.done + '/' + S.voicing.total + ' …' : voiced() + '/' + needed()) + '</span></button>' +
             pxBtnHtml(st) +
             '<button type="button" class="qws-b" onclick="QuizWatchStory.play()" aria-label="' + (S.play > -1 ? 'Stop' : 'Play') + '" title="Play the story here">' + (S.play > -1 ? '⏹' : '▶') + '</button>' +
             '<button type="button" class="qws-b" onclick="QuizWatchStory.make()" aria-label="Write again" title="Write the story again from Read first">↻</button>' +
@@ -216,7 +225,7 @@
             : '<div class="qws-pxf" role="group" aria-label="Filter">' + [['', 'All ' + vs.length], ['f', '♀ ' + vs.filter(function (v) { return v.g === 'f'; }).length], ['m', '♂ ' + vs.filter(function (v) { return v.g === 'm'; }).length]].map(function (o) { return '<button type="button" aria-pressed="' + (g === o[0]) + '" onclick="QuizWatchStory.paxaFilter(' + String.fromCharCode(39) + o[0] + String.fromCharCode(39) + ')">' + o[1] + '</button>'; }).join('') + pxUseHtml(pv) + '</div>' +
               '<div class="qws-pxl" role="group" aria-label="Paxa voices">' + vs.filter(function (v) { return !g || v.g === g; }).map(function (v) { var ear = S.pxEar === v.id; return '<button type="button" class="' + (ear ? 'ear' : '') + '" aria-pressed="' + !!(pv && pv.id === v.id) + '" title="' + esc(v.d) + ' — tap to hear it" onclick="QuizWatchStory.paxaHear(' + String.fromCharCode(39) + v.id + String.fromCharCode(39) + ')">' + (ear && S.pxEarSt === 'load' ? '⏳ ' : ear && S.pxEarSt === 'play' ? '<span class="qws-eq" aria-hidden="true">▮▮▮</span>' : '') + (v.g === 'f' ? '♀ ' : v.g === 'm' ? '♂ ' : '') + esc(v.n) + '</button>'; }).join('') + '</div>' +
               (S.pxEarErr ? '<small class="qws-pxe" role="alert">⚠️ ' + esc(S.pxEarErr) + '</small>' : '');
-        return '<div class="qws-pxp" id="qws-pxp"><small>Paxa Labs · tap a voice to hear it · ✓ Use picks it for the pharmacist lines. Interns get it as a third chip beside Kaitom / Kaidang.</small>' + body + '</div>';
+        return '<div class="qws-pxp" id="qws-pxp"><small>Paxa Labs · tap a voice to hear it · ✓ Use picks it for the pharmacist lines. Interns get it as a third chip beside Kaimook / Kaidang.</small>' + body + '</div>';
     }
     // V102.694 (owner pick B, mockup-paxa-voice-preview/): a chip tap only PLAYS that voice's sample; "✓ Use" picks the last one heard (picking
     // drops the story's Paxa sounds, so browsing must never do it). A sample is made once per voice (one short paid Paxa call, fixed text — nothing
@@ -273,8 +282,8 @@
         },
         edit: function (i, v) {   // no repaint: the caret stays where it is
             var x = S.story && S.story.lines[i]; if (!x) return; x.t = String(v).slice(0, LEN);
-            if (x.a || x.b || x.c) {   // new words: the old sounds no longer say this line
-                var hadC = !!x.c; delete x.a; delete x.b; delete x.c; if (hadC) { var pn = box().querySelector('.qws-pn'), pb = document.getElementById('qws-paxa'); if (pn) pn.textContent = pxHave() + '/' + pxLines().length; if (pb) pb.classList.remove('all'); }
+            if (x.a || x.b || x.c || x.d || x.k) {   // new words: the old sounds no longer say this line
+                var hadC = !!x.c; dropSounds(x); if (hadC) { var pn = box().querySelector('.qws-pn'), pb = document.getElementById('qws-paxa'); if (pn) pn.textContent = pxHave() + '/' + pxLines().length; if (pb) pb.classList.remove('all'); }
                 var row = box().querySelectorAll('.qws-l')[i], n = box().querySelector('.qws-vn'), b = document.getElementById('qws-voice');
                 if (row) row.querySelectorAll('.qws-vnm.ok').forEach(function (m) { m.classList.remove('ok'); m.title = m.textContent + ' — not voiced yet'; });   // the names go grey
                 if (n) n.textContent = voiced() + '/' + needed(); if (b) b.classList.remove('all');
@@ -292,7 +301,7 @@
             stop(); S.busy = true; S.err = ''; S.voicing = { done: 0, total: todo.length }; paint();
             var one = function (job) {
                 var x = job.x, said = x.t, w = x.w;
-                return window.callTtsProxy({ provider: 'iapp_tts', text: said, voice: job.f === 'b' ? VOICE2 : VOICE[w], style: VSTYLE[w], feature: 'quiz_watch_voice' }).then(function (r) {
+                return window.callTtsProxy({ provider: 'iapp_tts', text: said, voice: FVOICE[job.f], style: VSTYLE[w], feature: 'quiz_watch_voice' }).then(function (r) {
                     if (!r || !r.audioContent) throw new Error('no audio came back');
                     var mime = r.mimeType || 'audio/mpeg'; return store(blobOf(r.audioContent, mime), mime);
                 }).then(function (url) { if (x.t === said && x.w === w && okUrl(url)) x[job.f] = url; S.voicing.done++; paint(); autoSave(); });   // each paid sound is kept at once
@@ -379,11 +388,11 @@
         },
         use: function (i) {
             var x = S.story && S.story.lines[i]; if (!x || !x._s) return;
-            x.t = x._s.t; delete x._s; delete x.a; delete x.b; delete x.c;   // new words: the old sounds no longer say this line
+            x.t = x._s.t; delete x._s; dropSounds(x);   // new words: the old sounds no longer say this line
             touch(); paint();
         },
         drop: function (i) { var x = S.story && S.story.lines[i]; if (!x) return; delete x._s; paint(); },
-        who: function (i) { var x = S.story && S.story.lines[i]; if (!x) return; x.w = ORDER[(ORDER.indexOf(x.w) + 1) % ORDER.length]; delete x.a; delete x.b; delete x.c; touch(); paint(); },   // V102.672: another speaker = another voice
+        who: function (i) { var x = S.story && S.story.lines[i]; if (!x) return; x.w = ORDER[(ORDER.indexOf(x.w) + 1) % ORDER.length]; dropSounds(x); touch(); paint(); },   // V102.672: another speaker = another voice
         del: function (i) { if (!S.story) return; stop(); S.story.lines.splice(i, 1); if (!S.story.lines.length) S.story = null; touch(); paint(); },
         add: function () { if (!S.story || S.story.lines.length >= MAX) return; S.story.lines.push({ w: 'rx', t: '', q: [] }); paint(); var ins = box().querySelectorAll('.qws-l input'); if (ins.length) ins[ins.length - 1].focus(); },
         clear: function () { stop(); S.story = null; S.err = ''; touch(); paint(); },
@@ -394,14 +403,15 @@
                 if (!S.story || i >= S.story.lines.length) { stop(); return paint(); }
                 S.play = i; paint();
                 var x = S.story.lines[i], went = false, next = function () { if (went || S.play !== i) return; went = true; clearTimeout(S.timer); step(i + 1); };
-                if (okUrl(x.a)) {   // hear the stored voice
-                    try { var au = S.au = new Audio(x.a); au.onended = function () { S.timer = setTimeout(next, 250); }; au.onerror = next; var pr = au.play(); if (pr && pr.catch) pr.catch(next); S.timer = setTimeout(next, 20000); return; } catch (e) { /* no player: the timer */ }
+                var heard = (x.w === 'q' ? okUrl(x.k) && x.k : okUrl(x.d) && x.d) || (okUrl(x.a) && x.a);   // V102.697: the new voice, else the old one
+                if (heard) {   // hear the stored voice
+                    try { var au = S.au = new Audio(heard); au.onended = function () { S.timer = setTimeout(next, 250); }; au.onerror = next; var pr = au.play(); if (pr && pr.catch) pr.catch(next); S.timer = setTimeout(next, 20000); return; } catch (e) { /* no player: the timer */ }
                 }
                 S.timer = setTimeout(next, 900 + x.t.length * 55);
             };
             step(0);
         },
-        voice: function () { return { th: !!S.story && S.story.lang === 'th', have: voiced(), need: needed(), px: pvOf(S.story) ? { name: pvOf(S.story).name, have: pxHave(), need: pxLines().length } : null }; },   // V102.672: for the chip beside Review
+        voice: function () { return { th: !!S.story && S.story.lang === 'th', have: voiced(), need: needed(), old: oldDone(), px: pvOf(S.story) ? { name: pvOf(S.story).name, have: pxHave(), need: pxLines().length } : null }; },   // V102.672: for the chip beside Review
         _prompt: prompt, _parse: parse, _fixPrompt: fixPrompt, _fixParse: fixParse, _bad: bad, _S: S, _okUrl: okUrl
     };
     window.QuizWatchStory = api;
