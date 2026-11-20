@@ -125,10 +125,11 @@ Proves the UI and the engine together with zero backend and no deploy beyond Git
 | Deliverable | Verify |
 |---|---|
 | Mockups first: board (5-wide grid, numbered, emoji per type, tokens as small pills), killer notebook (home + 7 day rows, tap cells to build `a › b › c`, kill / witness chips appear inline), detective turn (step counter, question chips rail, arrest chip in red with quoted confirm), hand-off screen ("pass the phone to 🕵️ — tap to reveal"), end-of-game reveal with the path drawn on the board | owner picks a variant |
-| `public/cereal.js` + `.css`; `🥣` chip on the activity row; state in `cereal_v1_<userId>`; game loop driven by the engine; a 🔁 replay of the finished game | `scripts/cereal-board-qa.cjs` (shape B, 320 + 390 px): the chip opens the sheet, a full scripted 2-day game via real taps lands the expected tokens on the board, the killer's path is not in the DOM while the detective screen is up, the wrong-arrest path decrements `🛡️ 4 → 3`, the reveal draws 6 cells |
+| `public/cereal.js` + `.css`; the `🥣` entry (placement per the mockup pick: beside 💰 FIN on Schedule, or an Explore tile — the home activity row has had no chips since V101.87); state in `cereal_v1_<userId>`; game loop driven by the engine; a 🔁 replay of the finished game |
+| **Tutorial, two layers, same pattern as `journal-tour.js`** (violet tip card, Thai first + small EN line, 👆 finger, CSS-only animation, `prefers-reduced-motion` keeps the cards, once per device via a localStorage flag, replay from `?`): (1) **How to play** — 8 scenes on a demo board that animates by itself (goal · killer walks 3 · cereal + witness · calendar minimums · pass the phone · detective walks + asks · arrest · subway + cornered → ▸ start), opened on the first 🥣 tap; (2) **coach marks** — spotlight tips on the real first killer turn (pick home · tap 3 cells · 🥣 👁️ chips · lock → pass) and first detective turn (move · ask · arrest). Owner asked for this on 2026-11-20 ("ต้องมี animation tutorial สอน user เล่นทีละขั้น"); mockup frames T and C on the canvas | `scripts/cereal-tutorial-qa.cjs`: first open shows scene 1, ถัดไป walks all 8, ข้าม lands on the start card, the flag is set once and the tour does not return on reload, `?` replays it, reduced-motion renders every scene without animation, no Firestore call | `scripts/cereal-board-qa.cjs` (shape B, 320 + 390 px): the chip opens the sheet, a full scripted 2-day game via real taps lands the expected tokens on the board, the killer's path is not in the DOM while the detective screen is up, the wrong-arrest path decrements `🛡️ 4 → 3`, the reveal draws 6 cells |
 | Version: intern V101.286 (+ `scripts/schedule-ui-qa.cjs` version pin, as every intern bump) | `node scripts/version-check.cjs`-style assertions in the suite |
 
-Size: 2 PRs (mockup → build). This is the phase to stop at if interns do not take to the game.
+Size: 3 PRs (game → tutorial + coach marks → polish). Mockup canvas (2026-11-20): https://claude.ai/artifact/EDLqmodTtzkkB1raRrgC1d — frames Main, K-A, K-B, H, D-A, D-B, R, T (tutorial), C (coach). This is the phase to stop at if interns do not take to the game.
 
 ### Phase 2 — Online, asynchronous, 2 players
 
@@ -199,7 +200,7 @@ Size: 2 PRs. Version: intern V101.292+, admin V102.608 only if the dashboard lin
 | Phase | PRs | Owner input needed | Deploys |
 |---|---|---|---|
 | 0 Map + engine | 1 | none left (photos received 2026-11-20) | none |
-| 1 Pass-and-play | 2 | pick mockup variant | Pages only |
+| 1 Pass-and-play + tutorial | 3 | pick mockup variants (K-A/K-B, D-A/D-B, entry, tutorial scene count) | Pages only |
 | 2 Online 2p | 3 | pick lobby mockup; run `firebase deploy` for the function + rules + index | functions, rules, indexes |
 | 3 Lola / suburb | 2 | suburb map sides; pick Lola mockup | functions, rules |
 | 4 Meta | 2 | decide badges placement | functions |
