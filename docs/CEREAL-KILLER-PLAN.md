@@ -212,7 +212,7 @@ Size: 2 PRs. Version: intern V101.292+, admin V102.608 only if the dashboard lin
 | Phase | PRs | Owner input needed | Deploys |
 |---|---|---|---|
 | 0 Map + engine | 1 | none left (photos received 2026-11-20) | none |
-| 1 Pass-and-play + tutorial | 3 | **owner picked K-A (board first) + D-A (chip rail + log) on 2026-11-20**; entry point still open; tutorial = 8 scenes, Thai first, tap-only + ▶ auto toggle (decided) | Pages only |
+| 1 Pass-and-play + tutorial | 3 | **owner picked K-A (board first) + D-A (chip rail + log) on 2026-11-20**; **entry = a 🥣 chip beside 💰 FIN on the Schedule row (owner 2026-11-20)**; tutorial = 8 scenes, Thai first, tap-only + ▶ auto toggle (decided) | Pages only |
 | 1½ Play vs bot | 2 | 🥄 level names | Pages only |
 | 2 Online 2p | 3 | pick lobby mockup; run `firebase deploy` for the function + rules + index | functions, rules, indexes |
 | 3 Lola / suburb | 2 | suburb map sides; pick Lola mockup | functions, rules |
