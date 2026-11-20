@@ -28,6 +28,7 @@ Walk the areas top to bottom for a broad regression: intern surfaces first, then
 - [explore-shops](explore-shops.md): Explore tiles, the Open tooltip, the review sheet, and the admin Explore Links cards with logo / category tools.
 - [beri-shop](beri-shop.md): The intern Beri shop and the admin Beri Reward / "A Shop for Killers" panels.
 - [flood-watch](flood-watch.md): Open-Meteo / canal-gauge flood alerts: the intern popup, the profile river strip, the 10 km summary, district tables and tiers in functions.
+- [cereal-killer](cereal-killer.md): The 🥣 Cereal Killer deduction game: board data and rules engine (Phase 0; no screen yet).
 - [content-creator](content-creator.md): The social-content division: intern post form, admin content board, separate CAFE points.
 - [guides](guides.md): Markdown guides served through guide.js with chip rails, feedback boxes and built PDFs.
 - [translations](translations.md): EN / TH / KO toggle, Translate Missing, stale quiz translations, the Korean gap ratchet.

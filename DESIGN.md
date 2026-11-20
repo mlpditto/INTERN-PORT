@@ -71,6 +71,11 @@ How screens in this project are designed. Read it before any UI work. `CLAUDE.md
 | 🔴 🟠 ⚪ | severity high · medium · low (inside the pill, with the word) | ✏ | try an edit in the admin's own preview — nothing of the intern's changes |
 | 💬＋ | add to the reply the intern will read | ⏳ | a model is reading — the earlier result stays below, faded |
 | ❓ | how to use — an animated tour on this panel (nothing is called or saved) | 🪄 | AI rewrites just the picked line(s) — the answer waits until you tap it |
+| 🥣 | the Cereal Killer game / a cereal token (a kill) | 🔪 | the killer |
+| 🕵️ | the detective | 🐕 | Lola, the police dog |
+| 👁️ | a park: where a witness stands | 🦴 | Lola's ability used last turn / the dog bowl |
+| ☕ | a café: the detective's +1 step | 🚇 🚆 | subway S · train T |
+| 🛡️ | arrests left | 🥄 | map difficulty for the killer (1–4) |
 
 ## 6. AI model picker
 *Why: 19 models plus trials. One style lets the admin find a model the same way on every screen.*
