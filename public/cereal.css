@@ -1,0 +1,88 @@
+/* V101.327 — 🥣 Cereal Killer, Phase 1 (pass-and-play on one phone). Owner's mockup picks 2026-11-20: K-A (board first) + D-A (chip rail + log);
+   one accent per screen — 🔪 rose, 🕵️ indigo, lobby / reveal amber — so the colour alone says whose turn it is. Everything is scoped to #cerealModal. */
+#cerealModal { z-index: 10000; }                                  /* opened from Schedule (z 9999), like FIN */
+#cerealModal .modal-content { text-align: left; padding: 14px 14px calc(18px + env(safe-area-inset-bottom)); max-width: 430px; max-height: 88vh; }
+#cerealModal .ck { --acc: #b45309; --tint: #fffbeb; display: flex; flex-direction: column; gap: 10px; font-variant-numeric: tabular-nums; }
+#cerealModal .ck.killer { --acc: #be123c; --tint: #fff1f2; }
+#cerealModal .ck.detective { --acc: #4338ca; --tint: #eef2ff; }
+#cerealModal .ck button { font-family: inherit; width: auto; min-height: 0; margin: 0; box-shadow: none; cursor: pointer; }
+#cerealModal .ck-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+#cerealModal .ck-top h3 { margin: 0; font-size: 1.05em; font-weight: 900; color: var(--acc); white-space: nowrap; }
+#cerealModal .ck-pill { border: 1px solid #e2e8f0; border-radius: 999px; background: #fff; padding: 3px 9px; font-size: 0.72em; font-weight: 800; color: #475569; white-space: nowrap; }
+#cerealModal .ck-pill.acc { border-color: var(--acc); color: var(--acc); background: var(--tint); }
+#cerealModal .ck-pill.red { border-color: #fecaca; color: #b91c1c; background: #fef2f2; }
+#cerealModal .ck-x { width: 30px; height: 30px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #475569; margin-left: auto; padding: 0; font-size: 0.9em; flex: 0 0 auto; }
+#cerealModal .ck-cal { display: flex; gap: 4px; }
+#cerealModal .ck-cal span { flex: 1; text-align: center; font-size: 0.62em; font-weight: 900; color: #94a3b8; border-radius: 999px; padding: 3px 0; background: #f1f5f9; white-space: nowrap; }
+#cerealModal .ck-cal span.done { background: var(--tint); color: var(--acc); }
+#cerealModal .ck-cal span.now { background: var(--acc); color: #fff; }
+/* the board: 5 columns, square cells, soft tint per type, tokens in the corners */
+#cerealModal .ck-board { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+#cerealModal .ck-cell { position: relative; aspect-ratio: 1; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.35em; background: #e8edf3; border: 2px solid transparent; box-sizing: border-box; padding: 0; color: inherit; line-height: 1; }
+#cerealModal .ck-cell.h { background: #fdf1e7; } #cerealModal .ck-cell.p { background: #dcfce7; } #cerealModal .ck-cell.c { background: #fef3c7; } #cerealModal .ck-cell.s { background: #e0e7ff; }
+#cerealModal .ck-cell .n { position: absolute; top: 3px; left: 5px; font-size: 0.5em; font-weight: 900; color: #64748b; }
+#cerealModal .ck-cell .st { position: absolute; top: 2px; right: 4px; font-size: 0.5em; font-weight: 900; color: #fff; background: var(--acc); border-radius: 999px; min-width: 14px; height: 14px; line-height: 14px; text-align: center; padding: 0 3px; }
+#cerealModal .ck-cell .tk { position: absolute; bottom: 2px; right: 3px; font-size: 0.6em; line-height: 1; letter-spacing: -1px; }
+#cerealModal .ck-cell .me { position: absolute; left: 4px; bottom: 2px; font-size: 0.6em; line-height: 1; }
+#cerealModal .ck-cell.on { border-color: var(--acc); }
+#cerealModal .ck-cell.ring { box-shadow: 0 0 0 3px var(--acc) inset; }
+#cerealModal .ck-cell.wit { border-color: #16a34a; }
+#cerealModal .ck-cell.hint::after { content: ''; position: absolute; bottom: 5px; left: 50%; width: 7px; height: 7px; margin-left: -3px; border-radius: 50%; background: var(--acc); opacity: .55; }
+#cerealModal .ck-cell.pick { outline: 2px dashed var(--acc); outline-offset: -2px; }
+#cerealModal .ck-cell.home { box-shadow: 0 0 0 3px #be123c inset; }
+#cerealModal .ck-cell.caught { box-shadow: 0 0 0 3px #be123c inset, 0 0 0 6px #4338ca; }
+#cerealModal .ck-cell:disabled { cursor: default; }
+/* rows of chips */
+#cerealModal .ck-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-height: 32px; }
+#cerealModal .ck-mini { font-size: 0.7em; font-weight: 800; color: #64748b; min-width: 62px; }
+#cerealModal .ck-chip { border: 1px solid #e2e8f0; border-radius: 999px; background: #fff; padding: 6px 12px; font-size: 0.8em; font-weight: 800; color: #475569; min-height: 32px; box-sizing: border-box; display: inline-flex; align-items: center; gap: 5px; }
+#cerealModal .ck-chip.on { border-color: var(--acc); color: var(--acc); background: var(--tint); }
+#cerealModal .ck-chip.dim, #cerealModal .ck-chip:disabled { color: #cbd5e1; border-style: dashed; cursor: default; }
+#cerealModal .ck-chip.used { color: #cbd5e1; text-decoration: line-through; border-style: dashed; }
+#cerealModal .ck-chip.red { border-color: #fecaca; color: #b91c1c; background: #fef2f2; }
+#cerealModal .ck-chip small { font-weight: 700; color: #94a3b8; font-size: 0.85em; }
+#cerealModal .ck-chip.on small { color: var(--acc); opacity: .8; }
+#cerealModal .ck-path { display: flex; align-items: center; gap: 8px; }
+#cerealModal .ck-path b { font-size: 1.3em; font-weight: 900; color: var(--acc); letter-spacing: .02em; }
+#cerealModal .ck-undo { width: 30px; height: 30px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #475569; margin-left: auto; padding: 0; }
+#cerealModal .ck-note { font-size: 0.7em; color: #94a3b8; }
+#cerealModal .ck-ans { display: flex; align-items: center; gap: 8px; background: var(--tint); border-radius: 12px; padding: 8px 12px; font-size: 0.8em; font-weight: 800; color: var(--acc); }
+#cerealModal .ck-ans b { font-size: 1.2em; }
+#cerealModal .ck-confirm { display: flex; align-items: center; gap: 8px; border: 1px solid #fecaca; background: #fef2f2; border-radius: 12px; padding: 8px 10px; font-size: 0.8em; font-weight: 800; color: #b91c1c; flex-wrap: wrap; }
+#cerealModal .ck-confirm .yes { border: 0; border-radius: 999px; background: #b91c1c; color: #fff; font-weight: 900; padding: 7px 14px; font-size: 1em; margin-left: auto; }
+#cerealModal .ck-confirm .no { width: 30px; height: 30px; border: 1px solid #fecaca; border-radius: 8px; background: #fff; color: #b91c1c; padding: 0; }
+#cerealModal .ck-primary { display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 14px; background: var(--acc); color: #fff; font-weight: 900; font-size: 1em; height: 48px; width: 100%; }
+#cerealModal .ck-primary:disabled { opacity: .45; cursor: default; }
+/* notebook / log strips */
+#cerealModal .ck-nb { border-top: 1px solid #e2e8f0; padding-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+#cerealModal .ck-nb .lbl { font-size: 0.62em; font-weight: 900; text-transform: uppercase; letter-spacing: .07em; color: #94a3b8; display: flex; align-items: center; gap: 6px; }
+#cerealModal .ck-nb .r { display: flex; align-items: center; gap: 8px; font-size: 0.75em; color: #475569; }
+#cerealModal .ck-nb .r .d { font-weight: 900; color: #94a3b8; min-width: 22px; }
+#cerealModal .ck-nb .r b { font-weight: 800; color: #0f172a; letter-spacing: .02em; }
+#cerealModal .ck-nb .r .m { margin-left: auto; white-space: nowrap; }
+#cerealModal .ck-nb .r.now .d, #cerealModal .ck-nb .r.now b { color: var(--acc); }
+/* lobby */
+#cerealModal .ck-name { flex: 1; display: flex; align-items: center; gap: 6px; border: 1px solid #e2e8f0; border-radius: 999px; padding: 5px 12px; font-size: 0.8em; font-weight: 700; background: #fff; min-width: 0; }
+#cerealModal .ck-name input { border: 0; outline: 0; font: inherit; width: 100%; min-width: 0; background: transparent; color: #0f172a; margin: 0; padding: 0; }
+#cerealModal .ck-game { display: flex; align-items: center; gap: 8px; border: 1px solid #e2e8f0; border-radius: 14px; padding: 9px 12px; background: #fff; width: 100%; text-align: left; }
+#cerealModal .ck-game .d { font-weight: 900; color: var(--acc); font-size: 0.8em; min-width: 28px; }
+#cerealModal .ck-game .who { flex: 1; font-size: 0.8em; font-weight: 700; color: #0f172a; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#cerealModal .ck-game .go { width: 30px; height: 30px; border-radius: 999px; background: var(--tint); color: var(--acc); display: flex; align-items: center; justify-content: center; font-weight: 900; flex: 0 0 auto; }
+#cerealModal .ck-foot { font-size: 0.62em; color: #94a3b8; text-align: center; margin-top: 4px; }
+#cerealModal .ck-rules { background: var(--tint); border-radius: 12px; padding: 10px 12px; font-size: 0.78em; color: #475569; line-height: 1.5; }
+/* hand-off: a full tint screen, nothing of the previous turn on it */
+#cerealModal .ck-hand { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; background: var(--tint); border-radius: 16px; padding: 28px 16px; min-height: 420px; }
+#cerealModal .ck-hand .who { font-size: 4.5em; line-height: 1; }
+#cerealModal .ck-hand h4 { margin: 0; font-size: 1.3em; font-weight: 900; color: var(--acc); }
+#cerealModal .ck-hand .th { font-size: 0.9em; font-weight: 700; color: #475569; margin: -6px 0 0; }
+#cerealModal .ck-hand .ck-primary { max-width: 300px; height: 60px; margin-top: 16px; }
+/* reveal */
+#cerealModal .ck-win { display: flex; align-items: center; gap: 12px; background: var(--tint); border-radius: 16px; padding: 12px 14px; }
+#cerealModal .ck-win .big { font-size: 2.4em; line-height: 1; }
+#cerealModal .ck-win .t { font-size: 1em; font-weight: 900; color: var(--acc); margin: 0; }
+#cerealModal .ck-win .s { font-size: 0.75em; font-weight: 700; color: #475569; margin: 2px 0 0; }
+#cerealModal .ck-days { display: flex; gap: 4px; }
+#cerealModal .ck-days button { flex: 1; text-align: center; font-size: 0.68em; font-weight: 900; color: #64748b; border: 0; border-radius: 999px; padding: 4px 0; background: #f1f5f9; }
+#cerealModal .ck-days button.on { background: var(--acc); color: #fff; }
+#cerealModal .ck-days button:disabled { color: #cbd5e1; cursor: default; }
+@media (max-width: 359px) { #cerealModal .ck-mini { min-width: 0; } #cerealModal .ck-cell { font-size: 1.15em; border-radius: 8px; } #cerealModal .ck-board { gap: 4px; } }
