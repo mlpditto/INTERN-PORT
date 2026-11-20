@@ -1,5 +1,5 @@
 // V102.676 (owner pick C, mockup-admet-steps/): Drug Codex ▸ a published drug ▸ 📊 tab.
-// A step strip — 🧠 Card lines › 🎨 Visual › 💾 Save the picture — says what to press next: done steps are green, the next one is blue and its REAL
+// A step strip — 🧠 Card lines › 🎨 Visual › 🖼 Picture on the page (V102.696: was 💾 Save the picture) — says what to press next: done steps are green, the next one is blue and its REAL
 // button pulses (a ring; still under prefers-reduced-motion); the strip is gone once all three are done. The picture's words are the 🧠 Card lines
 // (no second AI shortening), and the "Saved ADMET Visual" thumbnail draws those words over the picture — a picture made without text no longer
 // looks as if it had none. The REAL admin.html in Chromium; AI, Storage and Firestore are stubbed.
@@ -58,21 +58,21 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAJCAIAAAC0SDtlA
         }, PNG);
         const view = () => page.evaluate(() => { const el = document.getElementById('dca-pk-steps'), vis = e => !!e && e.getClientRects().length > 0, wrap = document.getElementById('dca-pk-visual-current');
             return { shown: vis(el), steps: el ? [...el.querySelectorAll('span')].map(s => s.textContent + (s.classList.contains('done') ? '✓' : s.classList.contains('next') ? '*' : '')).join(' › ') : '',
-                pulse: ['dca-pkc-ai', 'dca-pkc-save', 'dca-pk-visual-open', 'dcaPkVisualGenerateBtn', 'dcaPkVisualSaveBtn'].filter(id => { const b = document.getElementById(id); return !!b && b.classList.contains('dca-pulse'); }).join(' '),
-                anim: (b => b ? getComputedStyle(b).animationName : '')(document.querySelector('.dca-pulse')), state: (document.getElementById('dca-pkc-state') || {}).textContent || '',
+                pulse: ['dca-pkc-ai', 'dca-pkc-save', 'dca-form-save-btn', 'dca-pk-visual-open', 'dcaPkVisualGenerateBtn', 'dcaPkVisualSaveBtn'].filter(id => { const b = document.getElementById(id); return !!b && b.classList.contains('dca-pulse'); }).join(' '),
+                anim: (b => b ? getComputedStyle(b).animationName : '')(document.querySelector('.dca-pulse')), state: (document.getElementById('dca-pkc-state') || { dataset: {} }).dataset.s || '', dot: document.getElementById('dca-form-save-btn').classList.contains('dca-dirty'),
                 thumb: vis(wrap), words: wrap ? [...wrap.querySelectorAll('#dca-pk-visual-current-labels .pv-l')].map(s => s.textContent) : [], rawB: wrap ? /<b>/.test(document.getElementById('dca-pk-visual-current-labels').innerHTML) : false, meta: (document.getElementById('dca-pk-visual-current-meta') || {}).textContent || '',
-                inPic: wrap ? [...wrap.querySelectorAll('#dca-pk-visual-current-labels .pv-l')].every(s => { const a = s.getBoundingClientRect(), b = document.getElementById('dca-pk-visual-current-img').getBoundingClientRect(); return a.left >= b.left - 1 && a.right <= b.right + 1 && a.top >= b.top - 1 && a.bottom <= b.bottom + 1; }) : true,
+                inPic: wrap ? [...wrap.querySelectorAll('#dca-pk-visual-current-labels .pv-l')].every(s => s.getBoundingClientRect().top >= document.getElementById('dca-pk-visual-current-img').getBoundingClientRect().bottom - 1) : true,   // V102.696 (pick P1): the words sit UNDER the picture
                 ai: window.__ai.join(','), labels: typeof dcaPkVisualState !== 'undefined' && dcaPkVisualState.labels ? JSON.parse(JSON.stringify(dcaPkVisualState.labels)) : null, lang: (document.getElementById('dca-pv-lang-btn') || {}).textContent }; });
         const shot = async n => { if (!SHOT) return; fs.mkdirSync(SHOT, { recursive: true }); await page.screenshot({ path: path.join(SHOT, n + '.png') }); };
 
         console.log('the step strip');
         let v = await view();
-        ok(v.shown && v.steps === '1 🧠 Card lines* › 2 🎨 Visual › 3 💾 Save the picture' && v.pulse === 'dca-pkc-ai' && v.anim === 'dcaPulse' && !v.thumb, 'a published drug with nothing yet: three steps, the first is next, and 🤖 Shorten pulses');
+        ok(v.shown && v.steps === '1 🧠 Card lines* › 2 🎨 Visual › 3 🖼 Picture on the page' && v.pulse === 'dca-pkc-ai' && v.anim === 'dcaPulse' && !v.thumb, 'a published drug with nothing yet: three steps, the first is next, and 🤖 Shorten pulses');
         await page.evaluate(() => document.getElementById('dca-pk-steps').scrollIntoView({ block: 'center' })); await shot('steps-1');
         await page.click('#dca-pkc-ai'); await page.waitForFunction(() => document.getElementById('dca-pkc-a').value.length > 0); v = await view();
-        ok(v.state === '● not saved' && v.pulse === 'dca-pkc-save' && /Card lines\*/.test(v.steps), 'lines written → the pulse moves to 💾 beside them (still step 1)');
-        await page.click('#dca-pkc-save'); await page.waitForFunction(() => window.__w.length === 1); v = await view();
-        ok(v.steps === '✓ 🧠 Card lines✓ › 2 🎨 Visual* › 3 💾 Save the picture' && v.pulse === 'dca-pk-visual-open dcaPkVisualGenerateBtn' && v.ai === 'json', 'saved → step 1 is green ✓, step 2 is next and the 🎨 Visual button pulses (and Generate, inside its window)');
+        ok(v.state === 'dirty' && v.dot && v.pulse === 'dca-form-save-btn' && /Card lines\*/.test(v.steps), 'V102.696 (one 💾): lines written → 💾 Save Drug gets its dot and pulses (still step 1)');
+        await page.evaluate(() => dcaPkCardSave()); await page.waitForFunction(() => window.__w.length === 1); v = await view();
+        ok(v.steps === '✓ 🧠 Card lines✓ › 2 🎨 Visual* › 3 🖼 Picture on the page' && v.pulse === 'dca-pk-visual-open dcaPkVisualGenerateBtn' && v.ai === 'json', 'saved → step 1 is green ✓, step 2 is next and the 🎨 Visual button pulses (and Generate, inside its window)');
         await shot('steps-2');
 
         console.log('the picture takes the Card lines as its words');
@@ -80,7 +80,7 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAJCAIAAAC0SDtlA
         ok(v.pulse === 'dca-pk-visual-open dcaPkVisualGenerateBtn', 'in the window, Generate pulses');
         await page.click('#dcaPkVisualGenerateBtn'); await page.waitForFunction(() => document.querySelector('#dcaPkVisualLabels [data-k="a"]') && !dcaPkVisualState.generating); await page.waitForTimeout(250); v = await view();
         ok(v.ai === 'json,image' && v.labels.a === 'Fast oral uptake, Tmax 1.6-1.9 h' && v.labels.e === 'Urine 70-80% in 24 h' && v.labels.t.length === 60 && Object.keys(v.labels).length === 5, 'one image call and NO second shortening call: the five Card lines are the words over the picture');
-        ok(v.steps === '✓ 🧠 Card lines✓ › ✓ 🎨 Visual✓ › 3 💾 Save the picture*' && v.pulse === 'dca-pk-visual-open dcaPkVisualSaveBtn', 'a picture exists → step 3 is next and 💾 Save pulses (Generate no longer does)');
+        ok(v.steps === '✓ 🧠 Card lines✓ › ✓ 🎨 Visual✓ › 3 🖼 Picture on the page*' && v.pulse === 'dca-pk-visual-open dcaPkVisualSaveBtn', 'a picture exists → step 3 is next and 💾 Save pulses (Generate no longer does)');
         await shot('steps-3');
         await page.click('#dcaPkVisualSaveBtn'); await page.waitForFunction(() => window.__w.length === 2); await page.waitForTimeout(200);
         const upd = await page.evaluate(() => window.__w[1][2].pkVisual); v = await view();
@@ -88,16 +88,16 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAJCAIAAAC0SDtlA
 
         console.log('the saved-picture thumbnail');
         await page.evaluate(() => { if (typeof dcaClosePkVisualModal === 'function') dcaClosePkVisualModal(); document.getElementById('dca-pk-visual-current').scrollIntoView({ block: 'center' }); }); await page.waitForTimeout(150); v = await view();
-        ok(v.thumb && v.words.length === 5 && v.words[0] === 'AFast oral uptake, Tmax 1.6-1.9 h' && v.inPic && /🔤 5 words over it/.test(v.meta), 'the thumbnail draws the five words over the picture, inside it; the caption says so: ' + v.meta);
+        ok(v.thumb && v.words.length === 5 && v.words[0] === 'AFast oral uptake, Tmax 1.6-1.9 h' && v.inPic && /🔤 5 words under it/.test(v.meta), 'V102.696 (pick P1): the thumbnail shows the five words in a strip UNDER the picture; the caption says so: ' + v.meta);
         ok(!v.shown && v.pulse === '', 'all three steps done → the strip is gone and nothing pulses');
         await shot('steps-done');
         await page.evaluate(() => window.__open('p3')); v = await view();
-        ok(v.words.join('|') === 'ASaved A <b>|MSaved M' && !v.rawB && /🔤 2 words over it/.test(v.meta), 'a picture saved earlier with words shows them too; the text is escaped');
-        ok(v.shown && v.steps === '1 🧠 Card lines* › ✓ 🎨 Visual✓ › ✓ 💾 Save the picture✓' && v.pulse === 'dca-pkc-ai', 'it has no Card lines yet → only step 1 is left');
+        ok(v.words.join('|') === 'ASaved A <b>|MSaved M' && !v.rawB && /🔤 2 words under it/.test(v.meta), 'a picture saved earlier with words shows them too; the text is escaped');
+        ok(v.shown && v.steps === '1 🧠 Card lines* › ✓ 🎨 Visual✓ › ✓ 🖼 Picture on the page✓' && v.pulse === 'dca-pkc-ai', 'it has no Card lines yet → only step 1 is left');
         await page.evaluate(() => window.__open('p4')); v = await view();
         ok(v.thumb && v.words.length === 0 && !/🔤/.test(v.meta) && /Generated · diagram/.test(v.meta), 'an old picture with its own text (no saved words): the thumbnail is the picture alone, as before');
         await page.evaluate(() => window.__open('p2')); v = await view();
-        ok(v.steps === '✓ 🧠 Card lines✓ › 2 🎨 Visual* › 3 💾 Save the picture' && !v.thumb, 'a drug that already has Card lines opens on step 2');
+        ok(v.steps === '✓ 🧠 Card lines✓ › 2 🎨 Visual* › 3 🖼 Picture on the page' && !v.thumb, 'a drug that already has Card lines opens on step 2');
         await page.evaluate(() => window.__open('p1', true)); v = await view();
         ok(!v.shown && v.pulse === '', 'a draft: no strip, nothing pulses (Card lines are for published drugs)');
         await page.emulateMedia({ reducedMotion: 'reduce' }); await page.evaluate(() => window.__open('p2')); v = await view();

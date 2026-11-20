@@ -47,12 +47,12 @@ assert.ok(/id="dca-pk-card" class="dca-pkc lang-no-toggle" hidden/.test(admin), 
             if (typeof dcaSwitchSection === 'function') dcaSwitchSection('pk');
         });
         await page.waitForTimeout(200);
-        const ui = () => page.evaluate(() => ({ hidden: document.getElementById('dca-pk-card').hidden, vals: ['a', 'd', 'm', 'e', 't'].map(k => document.getElementById('dca-pkc-' + k).value), lang: document.querySelector('input[name="dca-pkc-lang"]:checked').value, state: document.getElementById('dca-pkc-state').textContent, counts: [...document.querySelectorAll('#dca-pk-card .dca-pkc-row small')].map(s => s.textContent) }));
+        const ui = () => page.evaluate(() => ({ hidden: document.getElementById('dca-pk-card').hidden, vals: ['a', 'd', 'm', 'e', 't'].map(k => document.getElementById('dca-pkc-' + k).value), lang: document.querySelector('input[name="dca-pkc-lang"]:checked').value, state: ({ saved: '✓ saved', dirty: '● not saved' })[document.getElementById('dca-pkc-state').dataset.s] || '', counts: [...document.querySelectorAll('#dca-pk-card .dca-pkc-row small')].map(s => s.textContent) }));
 
         // 1. empty on a drug with no lines; visible; one head row
         let u = await ui();
         assert.deepEqual([u.hidden, u.vals, u.lang, u.state], [false, ['', '', '', '', ''], 'th', ''], JSON.stringify(u));
-        const geo = await page.evaluate(() => { const h = document.querySelector('#dca-pk-card .dca-pkc-head'), tops = new Set([...h.children].map(c => Math.round(c.getBoundingClientRect().top + c.getBoundingClientRect().height / 2))); const rows = [...document.querySelectorAll('#dca-pk-card .dca-pkc-row')].map(r => Math.round(r.getBoundingClientRect().height)); return { visible: h.getBoundingClientRect().width > 0, spread: Math.max(...tops) - Math.min(...tops), rows, letters: [...document.querySelectorAll('#dca-pk-card .dca-pkc-row i')].map(i => i.textContent).join('') }; });
+        const geo = await page.evaluate(() => { const h = document.querySelector('#dca-pk-card .dca-pkc-head'), tops = new Set([...h.children].filter(c => c.getBoundingClientRect().width > 0).map(c => Math.round(c.getBoundingClientRect().top + c.getBoundingClientRect().height / 2))); const rows = [...document.querySelectorAll('#dca-pk-card .dca-pkc-row')].map(r => Math.round(r.getBoundingClientRect().height)); return { visible: h.getBoundingClientRect().width > 0, spread: Math.max(...tops) - Math.min(...tops), rows, letters: [...document.querySelectorAll('#dca-pk-card .dca-pkc-row i')].map(i => i.textContent).join('') }; });
         assert.ok(geo.visible && geo.spread <= 6 && geo.letters === 'ADMET' && geo.rows.every(h => h <= 40), 'one head row, five slim rows A D M E T: ' + JSON.stringify(geo));
         if (process.env.SHOT) await page.locator('.dca-form-section[data-tab="pk"]').screenshot({ path: path.join(process.env.SHOT, 'pk-card-empty.png') });
 
@@ -69,7 +69,7 @@ assert.ok(/id="dca-pk-card" class="dca-pkc lang-no-toggle" hidden/.test(admin), 
 
         // 3. edit one line, 💾: only pkCard + updatedAt go to drug_codex/p1; the list copy follows; state = saved
         await page.fill('#dca-pkc-t', '  มือสั่น ·   ใจสั่น  ');
-        await page.click('#dca-pkc-save');
+        await page.evaluate(() => dcaPkCardSave());   // V102.696: no 💾 beside the lines — Save Drug or this
         await page.waitForFunction(() => document.getElementById('dca-pkc-state').dataset.s === 'saved');
         const w = await page.evaluate(() => window.__w);
         assert.deepEqual(w, [['drug_codex', 'p1', { pkCard: { at: 'NOW', by: 'admin@test', a: 'กิน · F ~x% · Tmax x ชม.', d: 'จับโปรตีน x%', m: 'ตับ · CYP3A4', e: 'ปัสสาวะ · t½ x ชม.', t: 'มือสั่น · ใจสั่น', lang: 'th' }, updatedAt: 'NOW' }]], JSON.stringify(w));
@@ -83,7 +83,7 @@ assert.ok(/id="dca-pk-card" class="dca-pkc lang-no-toggle" hidden/.test(admin), 
         u = await ui();
         assert.deepEqual([u.vals, u.lang, u.state], [['เดิม A', '', '', 'เดิม E', ''], 'en', '✓ saved']);
         await page.evaluate(() => { window.__w.length = 0; ['a', 'e'].forEach(k => { document.getElementById('dca-pkc-' + k).value = ''; }); });
-        await page.click('#dca-pkc-save');
+        await page.evaluate(() => dcaPkCardSave());   // V102.696: no 💾 beside the lines — Save Drug or this
         await page.waitForFunction(() => window.__w.length === 1);
         assert.deepEqual(await page.evaluate(() => [window.__w[0][2], 'pkCard' in dcaState.codex[1]]), [{ pkCard: 'DELETE', updatedAt: 'NOW' }, false]);
 
@@ -97,7 +97,7 @@ assert.ok(/id="dca-pk-card" class="dca-pkc lang-no-toggle" hidden/.test(admin), 
         await page.waitForFunction(() => window.__toast.some(t => /Could not shorten/.test(t)));
         assert.equal((await ui()).vals[0], 'กิน · F ~x% · Tmax x ชม.', 'a bad answer leaves the lines as they were');
         await page.evaluate(() => { window.__fail = true; window.__toast.length = 0; document.getElementById('dca-pkc-a').value = 'ใหม่'; });
-        await page.click('#dca-pkc-save');
+        await page.evaluate(() => dcaPkCardSave());   // V102.696: no 💾 beside the lines — Save Drug or this
         await page.waitForFunction(() => window.__toast.some(t => /Save failed: offline/.test(t)));
         assert.equal((await ui()).state, '● not saved');
 
