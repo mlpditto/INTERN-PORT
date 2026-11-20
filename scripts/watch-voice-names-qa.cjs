@@ -31,12 +31,14 @@ const U = k => 'https://firebasestorage.googleapis.com/v0/b/x/o/' + k + '.mp3?al
   await page.evaluate(([a, b, c]) => {
     document.getElementById('edit-quiz-id').value = 'quizA';
     QuizWatchStory.set({ lang: 'th', pv: { id: 'khanomkrok', name: 'Khanom Krok' }, lines: [
-      { w: 'q', t: 'ถามอะไร', q: [1], a: a }, { w: 'rx', t: 'ตอบ', q: [1], a: a, b: b, c: c }, { w: 'key', t: 'จำไว้', q: [1], a: a }] });
+      { w: 'q', t: 'ถามอะไร', q: [1], k: a }, { w: 'rx', t: 'ตอบ', q: [1], d: a, b: b, c: c }, { w: 'key', t: 'จำไว้', q: [1], d: a }] });
   }, [U('a'), U('b'), U('c')]);
   let r = await rows();
-  ok(r[0] === 'Kaimook+', 'a Q line names Kaimook (green: its sound is there)');
-  ok(r[1] === 'Kaitom+ Kaidang+ Khanom Krok+P', 'an RX line names Kaitom · Kaidang · the Paxa voice (magenta) — all ready');
-  ok(r[2] === 'Kaitom+ Kaidang- Khanom Krok-P', 'a KEY line shows which voices are still missing (grey)');
+  ok(r[0] === 'Kaitom+', 'V102.697: a Q line names Kaitom (green: its sound is there)');
+  ok(r[1] === '🗣 2+ Khanom Krok+P', 'V102.697 (owner): an RX line has ONE chip 🗣 2 for its two pharmacist voices (green: both there) · the Paxa voice (magenta)');
+  ok(r[2] === '🗣 2- Khanom Krok-P', 'a KEY line with only one of the two → 🗣 2 grey');
+  const tips = await page.evaluate(() => [...document.querySelectorAll('#qws-box .qws-l')].map(r => (r.querySelector('.qws-vnm') || {}).title));
+  ok(/^Kaimook ✓ · Kaidang ✓/.test(tips[1]) && /^Kaimook ✓ · Kaidang –/.test(tips[2]), 'hover on 🗣 2 names the voices and which are there: ' + tips[2]);
   ok(!(await page.$('#qws-box .qws-a')), 'the bare ♪ is gone — the names say it');
   await page.waitForTimeout(1300);
   ok((await page.evaluate(() => window.__writes.length)) === 0 && (await sv()) === '', 'loading a quiz (set) writes nothing and shows no save state');
@@ -44,13 +46,13 @@ const U = k => 'https://firebasestorage.googleapis.com/v0/b/x/o/' + k + '.mp3?al
   console.log('auto-save');
   await page.locator('#qws-box .qws-l input').nth(2).fill('จำไว้ใหม่');
   r = await rows();
-  ok(r[2] === 'Kaitom- Kaidang- Khanom Krok-P', 'retyping a line greys its names (its sounds no longer say it)');
+  ok(r[2] === '🗣 2- Khanom Krok-P', 'retyping a line greys its chips (its sounds no longer say it)');
   await page.locator('#qws-box .qws-l input').nth(2).press('End'); await page.keyboard.type('ๆ');
   ok((await page.evaluate(() => window.__writes.length)) === 0, 'nothing is written while typing (1 s debounce)');
   await page.waitForFunction(() => window.__writes.length === 1); await page.waitForTimeout(100);
   let w = await page.evaluate(() => window.__writes);
   ok(w.length === 1 && w[0].c === 'quizzes' && w[0].d === 'quizA' && JSON.stringify(Object.keys(w[0].v)) === '["watchFirst"]', 'one write to quizzes/<this quiz> with ONLY watchFirst');
-  ok(w[0].v.watchFirst.story.lines[2].t === 'จำไว้ใหม่ๆ' && !('a' in w[0].v.watchFirst.story.lines[2]) && w[0].v.watchFirst.story.lines[1].c === U('c') && w[0].v.watchFirst.story.pv.id === 'khanomkrok' && !('url' in w[0].v.watchFirst), 'the saved story is the cleaned one: new words without the old sound, other lines keep theirs, the Paxa pick rides along');
+  ok(w[0].v.watchFirst.story.lines[2].t === 'จำไว้ใหม่ๆ' && !('d' in w[0].v.watchFirst.story.lines[2]) && w[0].v.watchFirst.story.lines[1].c === U('c') && w[0].v.watchFirst.story.pv.id === 'khanomkrok' && !('url' in w[0].v.watchFirst), 'the saved story is the cleaned one: new words without the old sound, other lines keep theirs, the Paxa pick rides along');
   ok(/^qws-sv ok\|☁ saved \d\d:\d\d$/.test(await sv()), 'the header says ☁ saved hh:mm');
   ok(await page.evaluate(() => document.activeElement && document.activeElement.matches('#qws-box .qws-l input')), 'saving does not repaint the lines — the caret stays in the box');
 

@@ -213,6 +213,19 @@ console.log('admin: the Quiz Editor field');
         await tap('.qwf-go'); await page.evaluate(() => { window.__au = []; }); await start({ watchFirst: { story: VO } }); await three();
         ok(await rail() === '🔇 | 🗣 Kaitom* | 🗣 Kaidang' && await page.evaluate(([a, b, c]) => __au.join() === [a, b, c].join() && localStorage.getItem('qwsVoice') === 'c', [A0, A1, A2]), 'a story with no Paxa voice, on a phone that picked it: Kaitom plays; the pick is kept for stories that have it');
         await page.evaluate(() => { localStorage.removeItem('qwsVoice'); window.__au = []; });
+        // V101.326 (owner 2026-11-20): new voices — Q `k` Kaitom, pharmacist `d` Kaimook (first) + `b` Kaidang. A story with all of them plays them;
+        // a story still voiced the old way keeps playing the old set until every new sound is there.
+        const K0 = A0.replace('a0', 'k0'), D1 = A0.replace('a0', 'd1'), D2 = A0.replace('a0', 'd2');
+        const NV = { lang: 'th', lines: [{ w: 'q', t: 'What is body-identical?', q: [1], k: K0 }, { w: 'rx', t: 'The same molecule the ovary makes.', q: [1], d: D1, b: B1 }, { w: 'key', t: 'Start within 10 years', q: [2], d: D2, b: B2 }] };
+        await tap('.qwf-go'); await start({ watchFirst: { story: NV } }); await three();
+        ok(await rail() === '🔇 | 🗣 Kaimook* | 🗣 Kaidang' && await page.evaluate(([a, b, c]) => __au.join() === [a, b, c].join(), [K0, D1, D2]), 'new voices: the rail is 🗣 Kaimook (first) │ 🗣 Kaidang; Q plays Kaitom (k), the pharmacist Kaimook (d)'); await shot('watch-story-kaimook');
+        const MIX = JSON.parse(JSON.stringify(VO)); MIX.lines[0].k = K0; MIX.lines[1].d = D1;   // the new set half made: Q k + one d, the KEY line has no d yet
+        await page.evaluate(() => { window.__au = []; }); await tap('.qwf-go'); await start({ watchFirst: { story: MIX } }); await three();
+        ok(await rail() === '🔇 | 🗣 Kaitom* | 🗣 Kaidang' && await page.evaluate(([a, b, c]) => __au.join() === [a, b, c].join(), [A0, A1, A2]), 'old voices complete, new ones half made → the old set still plays (never a mix)');
+        const BOTH = JSON.parse(JSON.stringify(MIX)); BOTH.lines[2].d = D2;
+        await page.evaluate(() => { window.__au = []; }); await tap('.qwf-go'); await start({ watchFirst: { story: BOTH } }); await three();
+        ok(await rail() === '🔇 | 🗣 Kaimook* | 🗣 Kaidang' && await page.evaluate(([a, b, c]) => __au.join() === [a, b, c].join(), [K0, D1, D2]), 'both sets complete → the new voices win');
+        await page.evaluate(() => { localStorage.removeItem('qwsVoice'); window.__au = []; });
         await tap('.qwf-go');
         await start({ watchFirst: { url: 'https://film.test/meno.mp4', story: STORY }, __quiet: true }); st = await sv();
         ok(st.video && !st.story, 'a quiz with both: the film link wins');
