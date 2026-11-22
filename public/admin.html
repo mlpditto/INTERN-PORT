@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.698)</title>
+    <title>Nika Admin (V102.699)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -1547,6 +1547,13 @@
         .dca-batch-bar button.ghost { background: #fff; color: #7c2d12; border: 1px solid #fdba74; }
         .dca-batch-prog { flex: 1; min-width: 120px; height: 8px; border-radius: 99px; background: #fed7aa; overflow: hidden; }
         .dca-batch-prog > div { height: 100%; background: #d97706; transition: width 0.3s ease; }
+        /* V102.699 (owner pick D): Disease Codex Auto-Draft inline in the toolbar row — search + Add step aside, the name input takes their place */
+        #dxa-view-published .dca-toolbar.dxa-ad-on #dxa-search, #dxa-view-published .dca-toolbar.dxa-ad-on .dca-add-btn { display: none; }
+        #dxa-view-published .dxa-ad-name { flex: 1; min-width: 0; padding: 9px 14px; border: 1.5px solid #f59e0b; border-radius: 10px; font-size: 0.95em; background: #fff; color: #0f172a; box-shadow: 0 0 0 3px rgba(245,158,11,.18); outline: none; }
+        #dxa-view-published .dxa-ad-name[hidden], #dxa-view-published .dxa-ad-x[hidden] { display: none; }
+        #dxa-view-published .dca-toolbar.dxa-ad-on .ai-cap .dxa-ad-btn { background: linear-gradient(135deg, #f59e0b, #d97706) !important; color: #fff !important; }   /* .ai-cap button sets transparent !important */
+        #dxa-view-published .dxa-ad-x { flex: 0 0 auto; width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 10px; border: 1px solid #fcd9a8; background: #fff; color: #92400e; font-size: 1em; cursor: pointer; }
+        #dxa-view-published .dxa-ad-legacy { display: none; }
         /* V93.98 Phase 3: AI Auto-Draft button + input row */
         .dca-ai-draft-btn {
             padding: 7px 14px; border-radius: 8px; border: none;
@@ -17678,11 +17685,15 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
             <div id="dxa-view-published">
                 <div class="dca-toolbar">
                     <input type="text" id="dxa-search" placeholder="Search by name, Thai name, ICD-10, or category…" oninput="dxaSearch()">
+                    <!-- V102.699 (owner pick D, mockup-dxa-autodraft-lean/): 🤖 turns this row into the Auto-Draft row — the name input takes the search
+                         box's place, 🤖 becomes ▸ Generate, ✕ goes back; the model is picked only on the chip (its rail drops open under the row on tap). -->
+                    <input type="text" id="dxa-ai-name" class="dxa-ad-name" hidden placeholder="🤖 Disease name · e.g. Type 2 Diabetes · Dengue Fever" maxlength="120" aria-label="Disease name for AI Auto-Draft" onkeydown="if(event.key==='Enter'){event.preventDefault();dxaAutoDraftGo();}else if(event.key==='Escape'){event.preventDefault();dxaAutoDraftCancel();}">
                     <span class="ai-cap ai-cap-list">
-                        <button type="button" class="dca-ai-draft-btn aic-seg" onclick="dxaAutoDraftToggle()" title="Generate a starting draft with AI · admin verifies before save">🤖 AI Auto-Draft</button>
+                        <button type="button" class="dca-ai-draft-btn aic-seg dxa-ad-btn" onclick="dxaAutoDraftBtn()" title="Generate a starting draft with AI · admin verifies before save">🤖 AI Auto-Draft</button>
                         <button type="button" id="dxa-ai-model-toggle" class="dxa-form-model-toggle" onclick="dxaToggleListModelRail()" aria-expanded="false" aria-controls="dxa-ai-models" title="Model for Auto-Draft — click to change"><span class="aic-two"><small>Auto-Draft model</small><span class="aic-row"><span class="dxa-model-logo" aria-hidden="true"></span><span id="dxa-ai-model-name">…</span><i class="fa-solid fa-chevron-down dxa-chev" aria-hidden="true"></i></span></span></button>
                     </span>
                     <button type="button" class="dca-add-btn" onclick="dxaAddNew()">+ Add Disease</button>
+                    <button type="button" id="dxa-ai-close" class="dxa-ad-x" hidden onclick="dxaAutoDraftCancel()" title="Close Auto-Draft · back to search" aria-label="Close Auto-Draft">✕</button>
                 </div>
                 <div id="dxa-ai-models" class="audit-toolbar lang-no-toggle dxa-form-model-rail" role="group" aria-label="Model for Auto-Draft" hidden></div>
 
@@ -17690,14 +17701,8 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                      Enter disease name + pick model → calls window.callUniversalAI in JSON mode →
                      fills the 21-field form (mode-label marks it AI-drafted until first save).
                      Reuses the Drug Codex .dca-ai-* CSS classes — no new styles. -->
-                <div id="dxa-ai-input-row" class="dca-ai-input-row" style="display:none;">
-                    <div class="dca-ai-input-row-head">
-                        <span class="dca-ai-input-row-title">🤖 AI Auto-Draft · type a disease name + pick a model</span>
-                        <button type="button" class="dca-ai-cancel-btn" onclick="dxaAutoDraftCancel()" title="Cancel">×</button>
-                    </div>
-                    <div class="dca-ai-input-row-body">
-                        <input type="text" id="dxa-ai-name" placeholder="Disease name e.g. Type 2 Diabetes · Dengue Fever · Community-acquired Pneumonia" maxlength="120" onkeydown="if(event.key==='Enter'){event.preventDefault();dxaAutoDraftGo();}">
-                        <div class="glass-toggle-container dca-ai-chip-rail" id="dxa-ai-chip-rail">
+                <div id="dxa-ai-input-row" class="dxa-ad-legacy" hidden>
+                    <div class="glass-toggle-container dca-ai-chip-rail" hidden id="dxa-ai-chip-rail">
                             <div class="glass-toggle-item active" data-value="gemini-3.6-flash" onclick="dxaSelectAutoDraftModel(this)">3.6</div>
                             <div class="glass-toggle-item" data-value="gpt-4o" onclick="dxaSelectAutoDraftModel(this)">GPT</div>
                             <div class="glass-toggle-item" data-value="claude-4-sonnet-latest" onclick="dxaSelectAutoDraftModel(this)">Claude</div>
@@ -17705,10 +17710,9 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                             <div class="glass-toggle-item" data-value="or/xiaomi/mimo-v2.5-pro" onclick="dxaSelectAutoDraftModel(this)" title="MiMo-V2.5-Pro via OpenRouter">MiMo Pro</div>
                             <div class="glass-toggle-item" data-value="or/xiaomi/mimo-v2.5" onclick="dxaSelectAutoDraftModel(this)" title="MiMo-V2.5 base via OpenRouter">MiMo</div>
                         </div>
-                        <input type="hidden" id="dxa-ai-model-val" value="gemini-3.6-flash">
-                        <button type="button" id="dxa-ai-go-btn" class="dca-ai-go-btn" onclick="dxaAutoDraftGo()">Generate</button>
-                    </div>
-                    <div id="dxa-ai-error" class="dca-ai-error" style="display:none;"></div>
+                    <input type="hidden" id="dxa-ai-model-val" value="gemini-3.6-flash">
+                </div>
+                <div id="dxa-ai-error" class="dca-ai-error" style="display:none;"></div>
                 </div>
 
                 <div class="dca-az-rail" id="dxa-az-rail"></div>
@@ -54099,29 +54103,34 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // the 21-field form, admin reviews + saves. Mirrors Drug Codex Phase 3
         // (dcaAutoDraft*). Admin-only; zero infrastructure delta.
         // ===================================================================
+        // V102.699 (owner pick D): the toolbar row IS the Auto-Draft row. dxaAdBtn() = the 🤖 segment, which reads ▸ Generate while open.
+        function dxaAdBtn() { return document.querySelector('#dxa-view-published .dxa-ad-btn'); }
+        function dxaAutoDraftOpen() { const tb = document.querySelector('#dxa-view-published .dca-toolbar'); return !!(tb && tb.classList.contains('dxa-ad-on')); }
+        function dxaAutoDraftBtn() { if (dxaAutoDraftOpen()) dxaAutoDraftGo(); else dxaAutoDraftToggle(); }
         function dxaAutoDraftToggle() {
-            const row = document.getElementById('dxa-ai-input-row');
-            if (!row) return;
-            const showing = row.style.display !== 'none';
-            if (showing) {
-                dxaAutoDraftCancel();
-                return;
-            }
-            row.style.display = 'block';
+            const tb = document.querySelector('#dxa-view-published .dca-toolbar');
+            if (!tb) return;
+            if (dxaAutoDraftOpen()) { dxaAutoDraftCancel(); return; }
+            tb.classList.add('dxa-ad-on');
+            const nameEl = document.getElementById('dxa-ai-name'), x = document.getElementById('dxa-ai-close'), btn = dxaAdBtn();
+            if (nameEl) nameEl.hidden = false;
+            if (x) x.hidden = false;
+            if (btn) { btn.textContent = '▸ Generate'; btn.title = 'Generate the draft (Enter)'; }
             dxaSyncAutoDraftChipFromStorage();
-            const nameEl = document.getElementById('dxa-ai-name');
             if (nameEl) setTimeout(() => nameEl.focus(), 40);
         }
 
         function dxaAutoDraftCancel() {
-            const row = document.getElementById('dxa-ai-input-row');
-            if (row) row.style.display = 'none';
+            const tb = document.querySelector('#dxa-view-published .dca-toolbar');
+            if (tb) tb.classList.remove('dxa-ad-on');
             const nameEl = document.getElementById('dxa-ai-name');
-            if (nameEl) nameEl.value = '';
+            if (nameEl) { nameEl.value = ''; nameEl.hidden = true; }
+            const x = document.getElementById('dxa-ai-close'); if (x) x.hidden = true;
+            dxaToggleListModelRail(false);
             const errEl = document.getElementById('dxa-ai-error');
             if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
-            const goBtn = document.getElementById('dxa-ai-go-btn');
-            if (goBtn) { goBtn.disabled = false; goBtn.textContent = 'Generate'; }
+            const goBtn = dxaAdBtn();
+            if (goBtn) { goBtn.disabled = false; goBtn.textContent = '🤖 AI Auto-Draft'; goBtn.title = 'Generate a starting draft with AI · admin verifies before save'; }
         }
 
         function dxaSelectAutoDraftModel(el) {
@@ -54158,7 +54167,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         async function dxaAutoDraftGo() {
             const nameEl = document.getElementById('dxa-ai-name');
             const errEl = document.getElementById('dxa-ai-error');
-            const goBtn = document.getElementById('dxa-ai-go-btn');
+            const goBtn = dxaAdBtn();   // V102.699: the 🤖 segment shows the progress
             const diseaseName = nameEl ? String(nameEl.value || '').trim() : '';
             if (!diseaseName) {
                 if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Type a disease name first (e.g. Type 2 Diabetes Mellitus).'; }
@@ -54245,7 +54254,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     errEl.style.display = 'block';
                     errEl.textContent = 'Auto-draft failed: ' + (err && err.message ? err.message : 'unknown error');
                 }
-                if (goBtn) { goBtn.disabled = false; goBtn.textContent = 'Generate'; }
+                if (progress) { progress.stop(); progress = null; }
+                if (goBtn) { goBtn.disabled = false; goBtn.textContent = '▸ Generate'; }
             } finally {
                 if (progress) progress.stop();
             }
