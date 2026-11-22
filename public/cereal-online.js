@@ -8,7 +8,9 @@
    V101.338 — PR 3 (owner pick room B + nudge B, mockup-cereal-share/): 📤 LINE beside 📋 in the room sends a Flex invite card whose
    button opens ?cereal=<code> (joins the room, no typing); 📤 สะกิด in the waiting row sends a "ถึงตาคุณแล้ว" card that opens
    ?cereal=<gameId>. Sent only when the player taps (shareTargetPicker → OS share → clipboard), so no LINE OA quota. Cards carry the
-   room code, names and the day — never the killer's home or path. deepLink() is called by applyTabDeepLink in index.html. */
+   room code, names and the day — never the killer's home or path. deepLink() is called by applyTabDeepLink in index.html.
+   V101.339 (owner pick C, mockup-cereal-tour-bot/): the lobby is one row — ＋ สร้างห้อง + 🔑 [รหัส 6 ตัว] ▸ typed in place (no join screen,
+   no "ยังไม่มีเกม…" line, no sub-lines). */
 (function () {
     'use strict';
     var R = window.CerealRules;
@@ -53,12 +55,6 @@
                 + '<button type="button" class="ck-chip" style="align-self:center" onclick="CKOnline.pick(\'view\',null)">✕ ยกเลิก</button>';
             return h;
         }
-        if (st.view === 'join') {
-            h += '<div class="ck-row"><span class="ck-mini">รหัสห้อง</span><label class="ck-name ck-code"><span>🔑</span><input type="text" id="ck-on-code" maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="K7P3QX" value="' + esc(st.code) + '" aria-label="Room code"></label></div>'
-                + '<button type="button" class="ck-primary" id="ck-on-join" onclick="CKOnline.join()"' + (st.busy || !st.uid ? ' disabled' : '') + '>' + L('🔑 เข้าร่วม', 'Join') + '</button>'
-                + '<button type="button" class="ck-chip" style="align-self:center" onclick="CKOnline.pick(\'view\',null)">✕ ยกเลิก</button>';
-            return h;
-        }
         var order = function (x) { return myTurn(x) ? 0 : x.status === 'playing' ? 1 : x.status === 'lobby' ? 2 : 3; };
         var games = st.list.slice().sort(function (a, b) { return order(a) - order(b) || (b.updatedAt || 0) - (a.updatedAt || 0); }).slice(0, 12);
         if (games.length) {
@@ -72,9 +68,11 @@
                 h += '<button type="button" class="ck-game' + (mine ? ' mine' : '') + '" data-game="' + esc(x.id) + '" onclick="CKOnline.open(\'' + esc(x.id) + '\')"><span class="d">' + (x.status === 'playing' ? 'D' + x.day : x.status === 'lobby' ? '—' : '🏁') + '</span><span class="who">' + (me === 'killer' ? '🔪' : '🕵️') + ' คุณ' + (on ? ' · ' + (me === 'killer' ? '🕵️ ' : '🔪 ') + esc(on) : '') + '</span>' + tail + '<span class="go">▸</span></button>';
             });
             h += '</div>';
-        } else if (st.uid) h += '<div class="ck-note" style="text-align:center">ยังไม่มีเกมออนไลน์ · สร้างห้องแล้วส่งรหัสให้เพื่อน</div>';
-        h += '<div class="ck-2btn"><button type="button" class="ck-big" id="ck-on-new" onclick="CKOnline.pick(\'view\',\'create\')">＋<b>สร้างห้อง</b><small>เลือกบทบาท · ได้รหัส</small></button>'
-            + '<button type="button" class="ck-big" id="ck-on-have" onclick="CKOnline.pick(\'view\',\'join\')">🔑<b>มีรหัสห้อง</b><small>พิมพ์รหัส 6 ตัว</small></button></div>';
+        }
+        var off = st.busy || !st.uid ? ' disabled' : '';
+        h += '<div class="ck-onrow"><button type="button" class="ck-primary" id="ck-on-new" onclick="CKOnline.pick(\'view\',\'create\')">＋ สร้างห้อง</button>'
+            + '<label class="ck-name ck-code"><span>🔑</span><input type="text" id="ck-on-code" maxlength="6" autocomplete="off" autocapitalize="characters" enterkeyhint="go" placeholder="รหัส 6 ตัว" value="' + esc(st.code) + '" aria-label="Room code" onkeydown="if(event.key===\'Enter\'){event.preventDefault();CKOnline.join();}">'
+            + '<button type="button" class="ck-go" id="ck-on-join" onclick="CKOnline.join()" aria-label="Join"' + off + '>▸</button></label></div>';
         return h;
     }
 
@@ -233,8 +231,8 @@
         if (v.length === 6) {
             var c6 = v.toUpperCase(), mine = st.list.filter(function (x) { return x.code === c6 && meRole(x); }).sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); })[0];
             if (mine) { open(mine.id); return; }
-            st.code = c6; st.view = 'join'; rerender();
-            act({ action: 'join', code: c6 }, function (r) { st.view = null; if (r && r.gameId) open(r.gameId); });
+            st.code = c6; st.view = null; rerender();
+            act({ action: 'join', code: c6 }, function (r) { if (r && r.gameId) { st.code = ''; open(r.gameId); } });
             return;
         }
         open(v);
@@ -244,12 +242,12 @@
         invite: invite, nudge: nudge, deepLink: deepLink,
         lobbyHtml: lobbyHtml, screen: screen, open: open, leave: leave, myTurnCount: myTurnCount, start: start,
         lock: lock, ask: ask, end: end, cornered: cornered,
-        pick: function (k, v) { if (k === 'view' && v === 'join') st.code = ''; st[k] = v; st.err = ''; rerender(); },
+        pick: function (k, v) { st[k] = v; st.err = ''; rerender(); },
         create: function () { return act({ action: 'create', role: st.role, side: st.side }, function (r) { st.view = null; if (r && r.gameId) open(r.gameId); }); },
         join: function () {
             var el = document.getElementById('ck-on-code'); st.code = ((el && el.value) || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
             if (st.code.length !== 6) { st.err = 'รหัสห้องมี 6 ตัว'; rerender(); return Promise.resolve(null); }
-            return act({ action: 'join', code: st.code }, function (r) { st.view = null; if (r && r.gameId) open(r.gameId); });
+            return act({ action: 'join', code: st.code }, function (r) { if (r && r.gameId) { st.code = ''; open(r.gameId); } });
         },
         copy: function () { var g = C().get(); try { navigator.clipboard.writeText(g.online.code); } catch (_) { /* old webview */ } var b = document.getElementById('ck-on-copy'); if (b) b.textContent = '📋 คัดลอกแล้ว'; },
         cancel: function () { var g = C().get(); return act({ action: 'cancel', gameId: g.online.id }, function () { leave(); C().set(null); }); },
