@@ -3,7 +3,8 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.336)</title>
+    <title>Internship Portfolio (V101.337)</title>
+    <script>document.addEventListener('touchstart', function () {}, { passive: true }); /* V101.337: lets iOS show :active on tap */</script>
     <link rel="stylesheet" href="nika-ask.css?v=V101.308">
     <link rel="stylesheet" href="daily-canvas.css?v=V101.266">
     <link rel="stylesheet" href="halloween.css?v=V101.249">
@@ -100,6 +101,15 @@
         @media (pointer: coarse) {
             input:where(:not([type=checkbox], [type=radio], [type=range], [type=color], [type=file], #enroll-code-input)), textarea, select { font-size: 16px !important; }
             #finModal .fin-amt input { font-size: 1.25em !important; }
+            /* V101.337 (fix 3): no grey/blue flash on a tapped button or link; it dims while the finger is down instead and
+               taps fire at once. Cards and other onclick boxes keep the browser flash — :active would dim a whole card or modal
+               on any tap inside it. iOS only runs :active with a touchstart listener on the page (added in <head>). */
+            button, a, [role="button"] { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+            button:active:not(:disabled), a:active, [role="button"]:active { opacity: .7; }
+            /* V101.337 (fix 4): scrolling to the end of a box no longer drags the page behind it */
+            .modal-content, .chat-box, #quizPreviewSheet .qzp, .dc-list, #nx-map, .dc-detail-body, .dc-discussion-box, .dc-submit-body,
+            #qb-list, #quiz-case-content-body, #discussion-comments-box, #lb-list, #ln-history-modal-list, #ln-view-modal-content,
+            [role="dialog"] { overscroll-behavior: contain; }
         }
         .lang-toggle-btn:hover {
             background: #e9ecef;
@@ -272,7 +282,7 @@
             box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
             text-align: center;
             /* Ensure scrolling if content is tall */
-            max-height: 80vh;
+            max-height: 80vh; max-height: 80dvh;
             overflow-y: auto;
         }
 
@@ -778,7 +788,7 @@
         .lean-activity .activity-more { width:36px; height:36px; min-width:36px; min-height:36px; padding:0; border-radius:50%; background:rgba(255,255,255,.6); }
         /* V100.78: FIN money-plan popup */
         #finModal { z-index:10000; }   /* V101.82: opened from Schedule (also z 9999, later in the page) — must stack above it */
-        #finModal .modal-content { text-align:left; padding:14px 14px calc(18px + env(safe-area-inset-bottom)); max-width:430px; max-height:88vh; }
+        #finModal .modal-content { text-align:left; padding:14px 14px calc(18px + env(safe-area-inset-bottom)); max-width:430px; max-height:88vh; max-height: 88dvh; }
         #finModal .fin-head { display:flex; align-items:center; gap:6px; margin-bottom:8px; }
         #finModal .fin-head h3 { margin:0; font-size:1.05em; font-weight:900; color:#065f46; }
         #finModal .fin-x { width:30px; height:30px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; color:#475569; cursor:pointer; padding:0; }
@@ -1075,7 +1085,7 @@
         .assignment-card.qz-previewable { cursor:pointer; }
         #quizPreviewSheet { position:fixed; inset:0; z-index:10010; display:none; align-items:flex-end; justify-content:center; background:rgba(15,23,42,.45); }
         #quizPreviewSheet.open { display:flex; }
-        #quizPreviewSheet .qzp { width:100%; max-width:440px; max-height:86vh; overflow:auto; box-sizing:border-box; padding:16px 16px calc(16px + env(safe-area-inset-bottom)); border-radius:22px 22px 0 0; background:#fff; color:#1e293b; box-shadow:0 -10px 40px rgba(15,23,42,.25); text-align:left; animation:qzpUp .22s ease-out; }
+        #quizPreviewSheet .qzp { width:100%; max-width:440px; max-height:86vh; max-height: 86dvh; overflow:auto; box-sizing:border-box; padding:16px 16px calc(16px + env(safe-area-inset-bottom)); border-radius:22px 22px 0 0; background:#fff; color:#1e293b; box-shadow:0 -10px 40px rgba(15,23,42,.25); text-align:left; animation:qzpUp .22s ease-out; }
         @keyframes qzpUp { from { transform:translateY(24px); opacity:0; } to { transform:none; opacity:1; } }
         @media (prefers-reduced-motion: reduce) { #quizPreviewSheet .qzp { animation:none; } }
         #quizPreviewSheet .qzp-head { display:flex; align-items:center; gap:12px; }
@@ -3425,7 +3435,7 @@
                     .dc-az-letter.has-content:not(.active) { background: hsl(218 100% calc(97% - var(--n, 0) * 1.1%)); border-color: hsl(218 80% calc(92% - var(--n, 0) * 1%)); }
                 }
                 .dc-list {
-                    max-height: 60vh; overflow-y: auto;
+                    max-height: 60vh; max-height: 60dvh; overflow-y: auto;
                     padding: 0 12px 12px;
                 }
                 .dc-letter-heading {
@@ -3615,7 +3625,7 @@
                 }
                 .dc-detail-close:hover { background: #f1f5f9; }
                 .dc-detail-body {
-                    padding: 8px 0 16px; max-height: 70vh; overflow-y: auto;
+                    padding: 8px 0 16px; max-height: 70vh; max-height: 70dvh; overflow-y: auto;
                     /* V95.14: .modal-content sets text-align:center as the modal
                        default; clinical body content (bullets, paragraphs, labels)
                        must read left-aligned. Reset here so both Drug + Disease
@@ -3825,13 +3835,13 @@
                     .dc-detail-head { padding: 12px 16px; }
                     .dc-detail-section > summary { padding: 10px 16px; }
                     .dc-detail-section-body { padding: 8px 16px 14px; }
-                    .dc-list { max-height: 65vh; }
+                    .dc-list { max-height: 65vh; max-height: 65dvh; }
                 }
 
                 /* --- V94.93 Phase 6: per-drug discussion thread (mirrors quiz_discussions chat bubbles, escaped) --- */
                 .dc-discussion-box {
                     display: flex; flex-direction: column; gap: 10px;
-                    max-height: 40vh; min-height: 80px; overflow-y: auto;
+                    max-height: 40vh; max-height: 40dvh; min-height: 80px; overflow-y: auto;
                     padding: 10px; background: #f8fafc;
                     border: 1px solid #e2e8f0; border-radius: 10px;
                     margin-bottom: 10px;
@@ -4213,7 +4223,7 @@
                     background: #ede9fe; color: #6b21a8;
                 }
                 .dc-submit-body {
-                    padding: 12px 18px; max-height: 65vh; overflow-y: auto;
+                    padding: 12px 18px; max-height: 65vh; max-height: 65dvh; overflow-y: auto;
                     /* V95.68: .modal-content sets text-align:center (V95.14) which centred
                        the form labels; reset to left so it reads as a real form. */
                     text-align: left;
@@ -5220,7 +5230,7 @@
 
             <!-- 🔥 Unified Submission Modal (Phase 3) -->
             <div id="unified-submit-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
-                <div role="dialog" aria-label="Submit New" style="background:white; border-radius:20px; max-width:600px; width:90%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+                <div role="dialog" aria-label="Submit New" style="background:white; border-radius:20px; max-width:600px; width:90%; max-height:90vh; max-height: 90dvh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
                     <!-- V101.85: no title / "Select Type" label — the type chips ARE the header; ✕ sits at the end of the launchers row -->
                     <div style="padding:12px 14px 8px;">
                         <!-- Type Selector -->
@@ -6061,7 +6071,7 @@
          fallback), leaving the request buttons as empty pills. The walker skips any
          subtree under a .lang-no-toggle ancestor (lang-toggle.js). -->
     <div id="quizBrowseModal" class="modal lang-no-toggle">
-        <div class="modal-content" style="max-width:560px; width:92%; max-height:85vh; display:flex; flex-direction:column; text-align:left;">
+        <div class="modal-content" style="max-width:560px; width:92%; max-height:85vh; max-height: 85dvh; display:flex; flex-direction:column; text-align:left;">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:6px;">
                 <span style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:900; font-size:1.02em; color:#1e293b;">🔍 Find or request a quiz</span>
                 <button onclick="qbCloseBrowse()" aria-label="Close" style="flex-shrink:0; width:auto; border:none; background:none; font-size:1.5em; line-height:1; cursor:pointer; color:#64748b; padding:0 2px;">×</button>
@@ -6206,7 +6216,7 @@
 
     <div id="discussion-modal" class="modal" style="z-index: 10001;">
         <div class="modal-content"
-            style="max-width:450px; padding:0; overflow:hidden; display:flex; flex-direction:column; height:80vh; max-height:600px;">
+            style="max-width:450px; padding:0; overflow:hidden; display:flex; flex-direction:column; height:80vh; height: 80dvh; max-height:600px;">
             <div
                 style="background:var(--primary); color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
                 <h4 id="discussion-modal-title" style="margin:0;"><i class="fa-regular fa-comments"></i> Discussion</h4>
@@ -6367,7 +6377,7 @@
             <div style="background:#f5f3ff; border:1px solid #ddd6fe; border-radius:8px; padding:8px 10px; font-size:0.78em; color:#5b21b6; margin-bottom:12px; line-height:1.5;">
                 <span class="lang-en">An admin reviewed and edited this entry. The full change log is shown below for transparency.</span><span class="lang-th">ผู้ดูแลได้แก้ไขบันทึกนี้ บันทึกการเปลี่ยนแปลงทั้งหมดแสดงด้านล่างเพื่อความโปร่งใส</span><span class="lang-kr">관리자가 이 항목을 검토하고 수정했습니다. 전체 변경 내역은 투명성을 위해 아래에 표시됩니다.</span>
             </div>
-            <div id="ln-history-modal-list" style="display:flex; flex-direction:column; gap:10px; max-height:55vh; overflow-y:auto;"></div>
+            <div id="ln-history-modal-list" style="display:flex; flex-direction:column; gap:10px; max-height:55vh; max-height: 55dvh; overflow-y:auto;"></div>
         </div>
     </div>
 
@@ -6379,7 +6389,7 @@
             <h3 class="lang-no-toggle" id="ln-view-modal-title" style="margin:0 22px 4px 0; color:#5b21b6; font-size:1.15em; word-break:break-word;">🎓 —</h3>
             <div id="ln-view-modal-meta" style="font-size:0.78em; color:#64748b; margin-bottom:10px;"></div>
             <div id="ln-view-modal-tags" style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:10px;"></div>
-            <div id="ln-view-modal-content" class="md-render" style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:12px; padding:14px 16px; max-height:50vh; overflow-y:auto; font-size:0.92em; line-height:1.6; color:#1f2937; word-break:break-word;"></div>
+            <div id="ln-view-modal-content" class="md-render" style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:12px; padding:14px 16px; max-height:50vh; max-height: 50dvh; overflow-y:auto; font-size:0.92em; line-height:1.6; color:#1f2937; word-break:break-word;"></div>
             <!-- V96.93: withdraw control. lnInternViewNote shows it only while the
                  note is still pending; the authoritative check runs in lnDeleteNote. -->
             <div id="ln-view-modal-actions" style="display:none; margin-top:14px; text-align:right;">
@@ -6405,7 +6415,7 @@
     <!-- V101.17: Achievements — tiered badges, Duolingo-style list (filled by renderAchievementsList) -->
     <div id="achievementsModal" class="modal" style="z-index: 10003;">
         <div class="modal-content"
-            style="max-width: 480px; max-height: 90vh; overflow-y: auto; border-radius: 20px; padding: 20px 18px; position:relative;">
+            style="max-width: 480px; max-height: 90vh; max-height: 90dvh; overflow-y: auto; border-radius: 20px; padding: 20px 18px; position:relative;">
             <button type="button" aria-label="Close achievements"
                 onclick="document.getElementById('achievementsModal').style.display='none'"
                 style="position:absolute; top:10px; right:10px; width:34px; height:34px; min-height:0; padding:0; border:none; border-radius:50%; background:linear-gradient(135deg, #ff6b35, #e53935); color:#fff; font-size:20px; font-weight:900; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 14px rgba(229,57,53,0.35);">×</button>
