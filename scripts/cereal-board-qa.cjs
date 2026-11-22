@@ -14,7 +14,7 @@ const idx = fs.readFileSync('public/index.html', 'utf8').replace(/\r\n/g, '\n'),
 const ver = (/<title>Internship Portfolio \((V\d+\.\d+)\)<\/title>/.exec(idx) || [])[1];
 assert.ok(ver, 'title version');
 assert.ok(idx.includes('<link rel="stylesheet" href="cereal.css?v='), 'cereal.css is linked');
-assert.ok(/<script src="cereal-maps\.js\?v=V[\d.]+"><\/script>\n<script src="cereal-rules\.js\?v=V[\d.]+"><\/script>\n<script src="cereal\.js\?v=V[\d.]+" defer><\/script>/.test(idx), 'maps → rules → cereal (defer), adjacent');
+assert.ok(/<script src="cereal-maps\.js\?v=V[\d.]+"><\/script>\n<script src="cereal-rules\.js\?v=V[\d.]+"><\/script>\n<script src="cereal-bot\.js\?v=V[\d.]+"><\/script>\n<script src="cereal\.js\?v=V[\d.]+" defer><\/script>/.test(idx), 'maps → rules → bot → cereal (defer), adjacent');
 assert.ok(/id="sch-cereal-btn" class="sch-gb-fin" onclick="cerealOpen\(\)"[^>]*data-th-title=/.test(idx), 'the 🥣 button sits in the Schedule goals row beside 💰 with a Thai title');
 assert.ok(idx.indexOf('id="sch-fin-btn"') < idx.indexOf('id="sch-cereal-btn"'), '🥣 comes right after 💰');
 assert.ok(!/db\.collection|firebase\.|fetch\(|httpsCallable/.test(js), 'cereal.js reads and writes nothing in Firestore');
