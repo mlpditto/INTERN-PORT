@@ -11,6 +11,7 @@ Admin: Dashboard ▸ Drug Codex / Disease Codex.
 - `drug-form-head-qa` — drug form one-row header (drug-toolbar.js)
 - `drug-form-ui-qa` — emoji-first drug form: tab pill colour = % filled
 - `disease-form-head-qa` — disease form header as lean as the drug form
+- `dxa-autodraft-inline-qa` — Disease Codex list: 🤖 turns the toolbar row into Auto-Draft (name input · ▸ Generate · model chip · ✕), no yellow panel or second model rail; Enter / Esc / ✕; empty name and a failure keep the row ready
 - `drug-list-ui-qa` — published list least-complete-first, three fixed tiers
 - `drug-codex-incomplete-view-qa` — Incomplete view: < 90 % only, chip rail narrows
 - `drug-autodraft-chip-qa` — 🤖 AI Auto-Draft panel as one line
