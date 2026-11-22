@@ -111,6 +111,10 @@ const secret = (id) => db.store.get('cereal_games/' + id + '/secret/killer');
     const leak = (gg) => { const s = JSON.stringify(Object.assign({}, gg, { result: null })); return /"home"|8,3,2,1|revealed/.test(s); };
     assert.ok(!leak(g), 'the public doc never holds the home or the path: ' + JSON.stringify(g));
     await refused(call('authK', { action: 'killerMove', gameId: id, path: [1, 2, 3, 4] }), 'not-your-turn', 'killer twice');
+    // Phase 2 PR 2: mySecret — the killer's own notebook, nobody else's
+    assert.deepEqual((await call('authK', { action: 'mySecret', gameId: id })).secret, { home: 8, path: { 1: [8, 3, 2, 1] }, kills: { 1: 3 } }, 'the killer reads back the notebook');
+    await refused(call('authD', { action: 'mySecret', gameId: id }), 'permission-denied', 'the detective never gets the notebook');
+    await refused(call('authX', { action: 'mySecret', gameId: id }), 'permission-denied', 'an outsider never gets it');
 
     // detective day 1: café → 8 → 9 (next to 👁️ 4), ask, a second card refused, miss at 4
     await refused(call('authD', { action: 'ask', gameId: id, path: [8, 9], question: 'building' }), 'start', 'day 1 starts on a café');
@@ -144,6 +148,13 @@ const secret = (id) => db.store.get('cereal_games/' + id + '/secret/killer');
     assert.deepEqual(g.result.revealedPath, { 1: [8, 3, 2, 1], 2: [1, 6, 11, 12] }, 'revealedPath = what the killer sent');
     assert.equal(g.result.revealedHome, 8);
     await refused(call('authK', { action: 'killerMove', gameId: id, path: [12, 13, 14, 15] }), 'not-playing', 'no moves after the end');
+
+    // Phase 2 PR 2: cancel an unjoined room; a started game cannot be cancelled
+    const cx = await call('authX', { action: 'create', role: 'killer' });
+    await call('authX', { action: 'cancel', gameId: cx.gameId });
+    assert.equal(pub(cx.gameId).status, 'cancelled', 'an unjoined room is cancelled');
+    await refused(call('authD', { action: 'join', code: cx.code }), 'no-game', 'a cancelled room takes nobody');
+    await refused(call('authK', { action: 'cancel', gameId: id }), 'started', 'a started game is not cancelled');
 
     // a second game: a stale killer is claimed after 1 h → detective wins on time; a third: resign
     const c2 = await call('authD', { action: 'create', role: 'detective', side: 'B' });

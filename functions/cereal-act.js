@@ -96,6 +96,12 @@ async function handle(request, deps) {
         const g = s.data();
         const role = ROLES.find((r) => g.players[r] && g.players[r].authUid === authUid);
         if (!role) throw new HttpsError('permission-denied', 'Not your game');
+        // Phase 2 PR 2: ✕ ยกเลิกห้อง — the creator drops a room nobody has joined yet; it leaves every list (status 'cancelled')
+        if (d.action === 'cancel') {
+            if (g.status !== 'lobby') fail('started', 'The game has started — resign instead');
+            tx.update(ref, { status: 'cancelled', updatedAt: now });
+            return { ok: true };
+        }
         if (g.status !== 'playing') fail('not-playing', 'Game is not running');
         const sec = (await tx.get(secRef)).data() || { home: null, path: {}, kills: {} };
         const map = R.buildMap(MAPS, g.citySide, null);
@@ -110,6 +116,13 @@ async function handle(request, deps) {
         const commit = (ret) => { up.log = log; tx.update(ref, up); return Object.assign({ ok: true }, ret || {}); };
 
         if (d.action === 'resign') { finish(role === 'killer' ? 'good' : 'killer', 'resigned'); return commit(); }
+
+        // Phase 2 PR 2: the killer's own home and paths, for the killer only — the doc is unreadable to every client (rules), and a
+        // killer who reloads or changes phone still needs the notebook and where today starts. Read-only: nothing is written.
+        if (d.action === 'mySecret') {
+            if (role !== 'killer') throw new HttpsError('permission-denied', 'Only the killer sees the notebook');
+            return { ok: true, secret: { home: sec.home, path: sec.path || {}, kills: sec.kills || {} } };
+        }
 
         if (d.action === 'claim') {
             if (g.phase === role) fail('your-turn', 'It is your turn');
