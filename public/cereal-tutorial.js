@@ -82,6 +82,9 @@
         + '.ct-tip .dots{display:flex;gap:5px;flex:1}.ct-tip .dots i{width:6px;height:6px;border-radius:50%;background:#ddd6fe}.ct-tip .dots i.on{width:16px;border-radius:4px;background:#7c3aed}'
         + '.ct-tip .skip{border:0;background:none;color:#8a7fa3;font-weight:700;font-size:13px;padding:6px 8px}'
         + '.ct-tip .back{border:0;background:none;color:#7c3aed;font-weight:800;font-size:13px;padding:6px 6px}'
+        + '.ct-tip .try{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 4px}'
+        + '.ct-tip .try button{display:flex;flex-direction:column;align-items:center;gap:2px;border:0;border-radius:14px;padding:10px 6px;color:#fff;font-weight:800;font-size:13px}'
+        + '.ct-tip .try .tk{background:#be123c}.ct-tip .try .td{background:#4338ca}.ct-tip .try small{font-weight:600;font-size:11px;opacity:.85}'
         + '.ct-tip .next{border:0;background:#7c3aed;color:#fff;font-weight:800;font-size:13px;padding:8px 16px;border-radius:999px;display:inline-flex;align-items:center}'
         + '.ct-tip .auto{border:1px solid #ddd6fe;background:#fff;color:#7c3aed;font-weight:800;font-size:12px;padding:5px 9px;border-radius:999px}'
         + '.ct-tip .auto[aria-pressed="true"]{background:#7c3aed;color:#fff;border-color:#7c3aed}'
@@ -148,11 +151,13 @@
             + '<div style="position:relative">' + board(sc.ex, sc.det) + (sc.finger ? '<span class="ct-fing" aria-hidden="true">👆</span>' : '') + '</div>'
             + '<div class="ct-wid">' + (sc.wid || '') + '</div>'
             + '<div class="ct-tip" role="dialog" aria-modal="true" aria-labelledby="ct-title" aria-live="polite"><div class="k">' + sc.k + '</div><p class="t" id="ct-title">' + sc.t + '</p><p class="b">' + sc.b + '</p><p class="en">' + sc.en + '</p>'
+            // V101.339 (owner pick B, mockup-cereal-tour-bot/): the last card starts a first round vs the easiest 🤖 🥄 in the seat picked here
+            + (sc.last && window.CK ? '<div class="try"><button type="button" class="tk" data-ct="bot-killer">🔪 เป็นฆาตกร<small>vs 🤖 🥄</small></button><button type="button" class="td" data-ct="bot-detective">🕵️ เป็นนักสืบ<small>vs 🤖 🥄</small></button></div>' : '')
             + '<div class="f">' + dots(Math.min(cur + 1, 8))
             + (sc.last ? '' : '<button type="button" class="auto" data-ct="auto" aria-pressed="' + (autoOn() ? 'true' : 'false') + '" title="เลื่อนฉากเองทุก 6 วินาที · auto-advance">▶ auto</button>')
             + (cur > 0 && !sc.last ? '<button type="button" class="back" data-ct="back" aria-label="ย้อนกลับ">‹</button>' : '')
             + (sc.last ? '' : '<button type="button" class="skip" data-ct="skip">ข้าม</button>')
-            + (sc.last ? '<button type="button" class="next" data-ct="close">▸ เริ่มเกม</button>' : '<button type="button" class="next" data-ct="next">ถัดไป ›</button>')
+            + (sc.last ? '<button type="button" class="skip" data-ct="close">ปิด</button>' : '<button type="button" class="next" data-ct="next">ถัดไป ›</button>')
             + '</div></div></div>';
         root.scrollTop = 0;
         var next = root.querySelector('.next'); if (next) next.focus({ preventScroll: true });
@@ -181,6 +186,7 @@
             var b = e.target.closest('[data-ct]'); if (!b) return;
             var a = b.getAttribute('data-ct');
             if (a === 'skip' || a === 'close') close();
+            else if (a === 'bot-killer' || a === 'bot-detective') { close(); var me = a.slice(4); CK.tab('local'); CK.vs('bot'); CK.level(me, 1); CK.start(); }
             else if (a === 'auto') { set(AUTO, autoOn() ? '0' : '1'); render(); }
             else go(a === 'back' ? -1 : 1);
         });

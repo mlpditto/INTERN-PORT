@@ -1,6 +1,6 @@
 // V101.329: 🥣 Cereal Killer tutorial (cereal-tutorial.js) on the REAL public/index.html, touch phone, file://, network blocked, Firebase
 // stubbed. Layer 1, How to play: opens by itself the first time the 🥣 sheet opens, 8 scenes Thai first with an English line, the demo
-// board animates (CSS only), ถัดไป walks all 8 to the ▸ เริ่มเกม card, ข้าม closes, the flag keeps it closed on the next open, ? in the
+// board animates (CSS only), ถัดไป walks all 8 to the last card (V101.339 pick B: 🔪 / 🕵️ vs 🤖 🥄 start a first bot round, ปิด closes), ข้าม closes, the flag keeps it closed on the next open, ? in the
 // lobby replays it, ▶ auto advances by itself and is remembered, reduced motion = still cards. Layer 2, coach marks: on the first real
 // turns one hint at a time follows the step (home → path → chips → lock · cafe → move → ask → arrest), each once, ring over the real
 // element, the game stays tappable, ข้ามคำใบ้ stops them for good. 320 px: no horizontal scroll. Writes nothing but localStorage.
@@ -77,9 +77,11 @@ const thai = /[฀-๿]/;
         for (let i = 3; i <= 8; i++) { await page.click('#cerealTour .next'); assert.equal((await tour(page)).step, i + ' / 8', 'scene ' + i); }
         await page.click('#cerealTour .next');
         t = await tour(page);
-        assert.equal(t.step, '🏁'); assert.ok(t.next.includes('เริ่มเกม') && !t.skip, 'the last card starts the game');
-        await page.click('#cerealTour .next');
-        assert.ok(!(await tour(page)).open, '▸ เริ่มเกม closes the tour');
+        assert.equal(t.step, '🏁');
+        assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#cerealTour .try button')].map(b => b.innerText.replace(/\s+/g, ' ').trim())), ['🔪 เป็นฆาตกร vs 🤖 🥄', '🕵️ เป็นนักสืบ vs 🤖 🥄'], 'last card: two seats vs the easiest bot (pick B)');
+        assert.ok(!t.next && t.skip, 'no ▸ เริ่มเกม any more, only ปิด');
+        await page.click('#cerealTour [data-ct="close"]');
+        assert.ok(!(await tour(page)).open, 'ปิด closes the tour');
         assert.ok(await page.isVisible('#ck-start'), 'the lobby was underneath all along');
 
         // closed + reopened: no tour; ? replays it; ข้าม closes; Escape closes
@@ -157,6 +159,22 @@ const thai = /[฀-๿]/;
         const ph = await open(browser, { width: 390, height: 844 });
         await ph.page.evaluate(() => cerealOpen());
         gg = await gap(ph.page); assert.ok(gg.bottom < 40, 'phone: card stays at the bottom: ' + JSON.stringify(gg));
+        // V101.339 pick B: 🔪 / 🕵️ on the last card start a bot round at 🥄 in that seat, coach marks on
+        for (const [seat, coachKey] of [['killer', 'home'], ['detective', 'cafe']]) {
+            const s = await open(browser);
+            await s.page.evaluate(() => cerealOpen());
+            for (let i = 0; i < 8; i++) await s.page.click('#cerealTour .next');
+            await s.page.click('#cerealTour [data-ct="bot-' + seat + '"]');
+            assert.ok(!(await tour(s.page)).open, 'the tour closes (' + seat + ')');
+            const g = await s.page.evaluate(() => { const x = CK.game(); return x && { bot: x.bot, status: x.status, hand: x.hand }; });
+            assert.deepEqual(g.bot, { seat: seat === 'killer' ? 'detective' : 'killer', level: 1 }, 'bot in the other seat at 🥄 (' + seat + ')');
+            assert.equal(g.status, 'playing'); assert.equal(g.hand, null, 'no hand-off screen vs the bot');
+            if (seat === 'detective') { await s.page.waitForSelector('#ck-bot-ok', { timeout: 8000 }); await s.page.click('#ck-bot-ok'); }   // the 🤖 killer moves first, then ▸ ตาคุณ
+            await s.page.waitForFunction(() => !!document.querySelector('#cerealCoach'), null, { timeout: 5000 });
+            assert.equal((await coach(s.page)).key, coachKey, 'first-turn hint for the ' + seat);
+            assert.deepEqual(s.errors, []);
+            await s.ctx.close();
+        }
         console.log('cereal-tutorial-qa: OK — auto-open once, 8 Thai-first scenes with animation, ▸ start / ข้าม / Esc / ? replay, ▶ auto remembered, 8 coach marks follow the real turn and ring the real element, skip-all, reduced motion, 320 px, big screen card under the board');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

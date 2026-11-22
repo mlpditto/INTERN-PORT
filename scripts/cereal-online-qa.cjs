@@ -84,8 +84,11 @@ const until = (page, fn, arg, msg) => page.waitForFunction(fn, arg, { timeout: 5
         assert.ok((await txt(K.page, '#cerealModal .seats')).includes('คุณ') && (await txt(K.page, '#cerealModal .seats')).includes('รอเพื่อน'), 'seats: me + waiting');
         // detective: 🌐 → 🔑 มีรหัสห้อง → join → both pages flip into the game
         await D.page.evaluate(() => cerealOpen()); await D.page.click('#ck-tab-online');
-        await until(D.page, () => !!document.getElementById('ck-on-have'), null, 'online tab (detective)');
-        await D.page.click('#ck-on-have'); await D.page.fill('#ck-on-code', code.toLowerCase()); await D.page.click('#ck-on-join');
+        await until(D.page, () => !!document.getElementById('ck-on-code'), null, 'online tab (detective)');
+        // V101.339 lobby pick C: one row ＋ สร้างห้อง + 🔑 [code] ▸, no empty-state line, no credit line, typed in place (Enter joins)
+        assert.deepEqual(await D.page.evaluate(() => [...document.querySelectorAll('#cerealModal .ck-onrow > *')].map(e => e.id || e.className)), ['ck-on-new', 'ck-name ck-code'], 'lobby: one row');
+        assert.ok(!/ยังไม่มีเกม|Julián|เลือกบทบาท|พิมพ์รหัส 6/.test(await D.page.evaluate(() => document.getElementById('cerealModal').innerText)), 'no repeated lines, no credit line');
+        await D.page.fill('#ck-on-code', code.toLowerCase()); await D.page.press('#ck-on-code', 'Enter');
         await until(D.page, () => !!document.getElementById('ck-on-wait'), null, 'detective waits for the killer');
         assert.ok((await txt(D.page, '#ck-on-wait')).includes('ตา Pond'), 'waiting card names the killer');
         assert.equal(await D.page.$('#ck-hand-go'), null, 'no hand-off screen online');

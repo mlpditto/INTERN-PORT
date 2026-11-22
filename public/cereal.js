@@ -165,7 +165,7 @@
             var n = CKOnline.myTurnCount();
             h += '<div class="ck-tabs" role="tablist"><button type="button" role="tab" id="ck-tab-local" aria-selected="' + (ui.tab !== 'online') + '" class="' + (ui.tab !== 'online' ? 'on' : '') + '" onclick="CK.tab(\'local\')">📱 เครื่องนี้</button>'
                 + '<button type="button" role="tab" id="ck-tab-online" aria-selected="' + (ui.tab === 'online') + '" class="' + (ui.tab === 'online' ? 'on' : '') + '" onclick="CK.tab(\'online\')">🌐 ออนไลน์' + (n ? ' <i class="ck-badge">' + n + '</i>' : '') + '</button></div>';
-            if (ui.tab === 'online') return h + CKOnline.lobbyHtml() + '<div class="ck-foot">Cereal Killer · Julián Tunni · Primigenio / Super Noob Games</div></div>';
+            if (ui.tab === 'online') return h + CKOnline.lobbyHtml() + '</div>';   // V101.339: no credit line under the lobby (owner)
         }
         if (ui.rules) h += '<div class="ck-rules">🔪 moves exactly 3 steps a day, unseen, and drops 🥣 on a house it touched — 6 victims in 7 days (≥1 by day 2, ≥3 by day 4). A kill next to a park puts a 👁️ witness there.<br>🕵️ moves up to 3 (+1 through ☕), stands by 👁️ and asks one of 5 cards; the app answers truthfully. 🛡️ arrest = own or next cell, 4 tries. 🚇 S to S is one step for both.</div>';
         var solo = ui.vs === 'bot' && !!B;
@@ -198,7 +198,7 @@
             });
             h += '</div>';
         }
-        h += '<div class="ck-foot">Cereal Killer · Julián Tunni · Primigenio / Super Noob Games</div></div>';
+        h += '</div>';
         return h;
     }
 
