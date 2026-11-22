@@ -31,7 +31,8 @@ async function open(browser, width) {
 }
 const cell = id => `#cerealModal .ck-cell[data-id="${id}"]`;
 const box = (page, sel) => page.evaluate(s => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), l: r.left, r: r.right }; }, sel);
-const oneLine = (page, sel) => page.evaluate(s => { const tops = [...document.querySelectorAll(s + ' .ck-chip')].map(b => Math.round(b.getBoundingClientRect().top)); return tops.length > 0 && new Set(tops).size === 1; }, sel);
+// one line = every chip's vertical centre within 4 px (a Thai-font chip can be a pixel taller on Linux, so tops alone differ)
+const oneLine = (page, sel) => page.evaluate(s => { const mids = [...document.querySelectorAll(s + ' .ck-chip')].map(b => { const r = b.getBoundingClientRect(); return (r.top + r.bottom) / 2; }); return mids.length > 0 && Math.max(...mids) - Math.min(...mids) <= 4; }, sel);
 const fitsTop = page => page.evaluate(() => { const m = document.querySelector('#cerealModal .modal-content').getBoundingClientRect(), x = document.querySelector('#cerealModal .ck-x').getBoundingClientRect(); return x.right <= m.right + 0.5 && x.left >= m.left; });
 const txt = (page, sel) => page.evaluate(s => { const e = document.querySelector(s); return e ? e.innerText.replace(/\s+/g, ' ').trim() : null; }, sel);
 
