@@ -1,4 +1,5 @@
-/* V101.327 (+V101.333 owner picks from mockup-cereal-ux/: 1A lean quota warning above 🔒, 2A+D reveal = every day's route drawn on the board
+/* V101.327 (+V101.335 🌐 online play — cereal-online.js draws the 🌐 tab, the room and the waiting screen; lock / ask / arrest / end go
+   through the cerealAct callable when the game is online; V101.333 owner picks from mockup-cereal-ux/: 1A lean quota warning above 🔒, 2A+D reveal = every day's route drawn on the board
    in its own colour + 🔎 ทบทวนคดี, 12 sounds via cereal-sound.js; V101.329 tutorial hooks, V101.331 🤖 bot mode — owner pick C: two cards 🔪 vs 🤖 / 🕵️ vs 🤖 with 🥄 levels, no hand-off
    when the other seat is the bot, a ≥ 0.6 s "🤖 กำลังคิด…" beat then what the bot did in public, then ▸ ตาคุณ; V101.330 polish: Thai first with a small English line, labelled ask chips, ✕ / ↺ fixed) — 🥣 Cereal Killer, Phase 1: pass-and-play on ONE phone (Killer vs Detective, city map A/B). Owner's mockup picks
    2026-11-20: K-A (board first, kill / witness chips appear under the board after the 3rd step, notebook strip at the bottom),
@@ -31,7 +32,7 @@
     function save() { if (g) g.upd = Date.now(); try { localStorage.setItem(key(), JSON.stringify(store)); } catch (_) { /* storage may be blocked (LIFF) */ } }
 
     var store = { games: [] }, g = null;                 // g = the open game; null = lobby
-    var ui = { side: 'A', names: { killer: '', detective: '' }, arrest: null, revealDay: null, rules: false, vs: 'friend', me: 'killer', level: { killer: 2, detective: 2 }, beat: null };
+    var ui = { tab: 'local', side: 'A', names: { killer: '', detective: '' }, arrest: null, revealDay: null, rules: false, vs: 'friend', me: 'killer', level: { killer: 2, detective: 2 }, beat: null };
     var BOT_MS = 700;                                     // the bot's "thinking" beat (≥ 0.6 s so its move is seen to happen); CK.botDelay() sets it for QA
 
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -75,7 +76,7 @@
         if (window.CKTour && !CKTour.seen()) CKTour.open();   // V101.329: How to play, the first time on this device
     }
     function close() {
-        if (g && g.status === 'playing' && !g.hand && !g.bot) g.hand = g.phase;   // whoever reopens must tap through the hand-off first (not vs 🤖)
+        if (g && g.status === 'playing' && !g.hand && !g.bot && !g.online) g.hand = g.phase;   // whoever reopens must tap through the hand-off first (not vs 🤖)
         if (botTimer) { clearTimeout(botTimer); botTimer = null; ui.beat = null; }   // a bot turn in flight runs again on reopen
         save();
         if (window.CKTour) CKTour.hideCoach();
@@ -84,7 +85,8 @@
     function render() {
         root();
         var body = document.getElementById('ck-body');
-        var html = !g ? lobbyHtml() : g.status === 'finished' ? revealHtml() : ui.beat ? beatHtml() : g.hand ? handHtml() : g.phase === 'killer' ? killerHtml() : detectiveHtml();
+        var on = g && g.online && window.CKOnline ? CKOnline.screen() : null;   // V101.335: room / waiting screens
+        var html = !g ? lobbyHtml() : on ? on : g.status === 'finished' ? revealHtml() : ui.beat ? beatHtml() : g.hand ? handHtml() : g.phase === 'killer' ? killerHtml() : detectiveHtml();
         body.innerHTML = html;
         var sc = document.querySelector('#cerealModal .modal-content'); if (sc) sc.scrollTop = 0;
         if (window.CKTour) CKTour.coach(coachKey());   // V101.329: first-turn hints follow the step the player is on
@@ -159,6 +161,12 @@
     // ---- lobby ------------------------------------------------------------------------------------------
     function lobbyHtml() {
         var h = '<div class="ck lobby">' + topHtml('🥣 Cereal Killer', '<button type="button" class="ck-pill' + (ui.rules ? ' acc' : '') + '" onclick="CK.rules()"' + t('How to play', 'กติกา · วิธีเล่น') + '>?</button>');
+        if (window.CKOnline) {   // V101.335 owner pick B: 📱 เครื่องนี้ | 🌐 ออนไลน์ (the badge = online games waiting for my move)
+            var n = CKOnline.myTurnCount();
+            h += '<div class="ck-tabs" role="tablist"><button type="button" role="tab" id="ck-tab-local" aria-selected="' + (ui.tab !== 'online') + '" class="' + (ui.tab !== 'online' ? 'on' : '') + '" onclick="CK.tab(\'local\')">📱 เครื่องนี้</button>'
+                + '<button type="button" role="tab" id="ck-tab-online" aria-selected="' + (ui.tab === 'online') + '" class="' + (ui.tab === 'online' ? 'on' : '') + '" onclick="CK.tab(\'online\')">🌐 ออนไลน์' + (n ? ' <i class="ck-badge">' + n + '</i>' : '') + '</button></div>';
+            if (ui.tab === 'online') return h + CKOnline.lobbyHtml() + '<div class="ck-foot">Cereal Killer · Julián Tunni · Primigenio / Super Noob Games</div></div>';
+        }
         if (ui.rules) h += '<div class="ck-rules">🔪 moves exactly 3 steps a day, unseen, and drops 🥣 on a house it touched — 6 victims in 7 days (≥1 by day 2, ≥3 by day 4). A kill next to a park puts a 👁️ witness there.<br>🕵️ moves up to 3 (+1 through ☕), stands by 👁️ and asks one of 5 cards; the app answers truthfully. 🛡️ arrest = own or next cell, 4 tries. 🚇 S to S is one step for both.</div>';
         var solo = ui.vs === 'bot' && !!B;
         h += '<div class="ck-row"><span class="ck-mini">เล่นกับ</span><button type="button" id="ck-vs-friend" class="ck-chip' + (solo ? '' : ' on') + '" onclick="CK.vs(\'friend\')">👤 เพื่อน</button>'
@@ -208,7 +216,7 @@
     function killerHtml() {
         var m = mapOf(g), pos = kpos(g), blocked = blockedFor(g), path = g.draft.path;
         if (pos != null && !path.length) {
-            if (R.cornered(m, pos, blocked)) { finish('good', 'cornered', { cell: pos }); return revealHtml(); }
+            if (R.cornered(m, pos, blocked)) { if (g.online) return CKOnline.cornered(); finish('good', 'cornered', { cell: pos }); return revealHtml(); }
             path = g.draft.path = [pos];
         }
         var ex = publicExtra(g), add = function (id, k, v) { ex[id] = ex[id] || {}; ex[id][k] = (ex[id][k] || '') + v; };
@@ -274,6 +282,7 @@
     function kill(id) { g.draft.kill = id; g.draft.witness = null; save(); render(); }
     function witness(id) { g.draft.witness = id; save(); render(); }
     function lock() {
+        if (g.online) { CKOnline.lock(); return; }   // V101.335: the referee validates and stores it
         var m = mapOf(g), path = g.draft.path, kill = typeof g.draft.kill === 'number' ? g.draft.kill : null;
         var v = R.validateKillerTurn(m, { path: path, kill: kill, witness: g.draft.witness }, { blocked: blockedFor(g), taken: g.cereals, kills: g.kills, skipUsed: g.skipUsed });
         if (!v.ok) return;
@@ -339,6 +348,7 @@
         path.push(id); snd('stepD'); save(); render();
     }
     function ask(q) {
+        if (g.online) { if (!g.dd.asked) CKOnline.ask(q); return; }   // V101.335: only the referee knows where the killer is
         var m = mapOf(g), last = g.dd.path[g.dd.path.length - 1];
         if (g.witness == null || !R.canQuestion(m, last, g.witness) || g.dd.asked || g.usedQuestions.indexOf(q) >= 0) return;
         var ans = R.answer(m, q, kpos(g), g.witness), pick = ans.length > 1 ? R.leastInformative(m, g.witness, ans) : ans[0];
@@ -351,6 +361,7 @@
     function cancelArrest() { ui.arrest = null; render(); }
     function arrest() {
         var cell = ui.arrest; if (typeof cell !== 'number') return;
+        if (g.online) { CKOnline.end(cell); return; }
         ui.arrest = null;
         g.detectivePos = g.dd.path.length ? g.dd.path[g.dd.path.length - 1] : g.detectivePos;   // where the arrest is made from (the reveal shows it)
         if (cell === kpos(g)) { g.log.push({ day: g.day, type: 'arrest', cell: cell, text: '🛡️ ' + cell + ' ✔' }); finish('good', 'arrest', { cell: cell }); render(); return; }
@@ -362,6 +373,7 @@
     }
     function endTurn() {
         if (ui.arrest) return;
+        if (g.online) { CKOnline.end(null); return; }
         var path = g.dd.path.length ? g.dd.path : [g.detectivePos];
         g.detectivePos = path[path.length - 1]; g.witness = null; g.dd = { path: [], asked: null };
         if (g.day >= R.DAYS) finish('killer', 'survived');
@@ -505,11 +517,14 @@
         botOk: function () { ui.beat = null; if (g && g.status === 'playing') snd(g.phase === 'killer' ? 'heartbeat' : 'tick'); render(); },
         botDelay: function (ms) { BOT_MS = ms; },   // QA
         resume: function (id) { var x = store.games.filter(function (y) { return y.id === id; })[0]; if (!x) return; g = x; ui.arrest = null; ui.beat = null; if (g.status === 'playing') g.hand = g.bot ? null : g.phase; else ui.revealDay = 0; save(); render(); botNext(); },
-        rematch: function () { if (g && g.bot) { ui.vs = 'bot'; ui.me = g.bot.seat; } else if (g) { ui.vs = 'friend'; ui.names = { killer: g.names.detective, detective: g.names.killer }; } g = null; ui.beat = null; render(); },
-        lobby: function () { g = null; render(); },
+        rematch: function () { if (g && g.online) { if (window.CKOnline) CKOnline.leave(); ui.tab = 'online'; g = null; render(); return; } if (g && g.bot) { ui.vs = 'bot'; ui.me = g.bot.seat; } else if (g) { ui.vs = 'friend'; ui.names = { killer: g.names.detective, detective: g.names.killer }; } g = null; ui.beat = null; render(); },
+        lobby: function () { if (g && g.online) { if (window.CKOnline) CKOnline.leave(); ui.tab = 'online'; } g = null; render(); },
+        tab: function (tb) { readNames(); ui.tab = tb; render(); },
         revealDay: function (d) { ui.revealDay = d; render(); },
         close: close,
-        game: function () { return g; }   // read by the QA harness
+        game: function () { return g; },   // read by the QA harness
+        // V101.335: what cereal-online.js needs from this file (the same screens draw an online game)
+        _: { get: function () { return g; }, set: function (x) { g = x; }, render: render, ui: ui, topHtml: topHtml, pills: pills, boardHtml: boardHtml, publicExtra: publicExtra, logHtml: logHtml, L: L, snd: snd, kposOf: kpos }
     };
     window.cerealOpen = open;
 })();
