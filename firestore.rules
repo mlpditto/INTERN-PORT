@@ -114,6 +114,17 @@ service cloud.firestore {
       allow read, create, update: if isSignedIn();
       allow delete: if isAdmin();
     }
+
+    // 🥣 Cereal Killer Phase 2 (2026-11-22): the cerealAct callable is the only writer (admin SDK). Players read their own game;
+    // the killer's home and paths sit in secret/killer, which no client may read — the function answers questions from it and
+    // copies it into result.revealedPath when the game ends.
+    match /cereal_games/{gameId} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid in resource.data.authUids);
+      allow write: if false;
+      match /secret/{doc} {
+        allow read, write: if false;
+      }
+    }
     
     // 5. Check-in Logs
     match /checkin_logs/{logId} {

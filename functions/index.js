@@ -2849,6 +2849,12 @@ exports.syncNikaContent = onSchedule({
 });
 
 // 🌞 Nika: an intern asks, the search store answers (nika-ask.js). Callable, so the count and the quiz pause live on the server.
+// 🥣 Cereal Killer Phase 2 (owner 2026-11-22): the online referee — clients never write cereal_games; the killer's path lives in
+// cereal_games/{id}/secret/killer (no client access). See functions/cereal-act.js and scripts/cereal-act-check.cjs.
+exports.cerealAct = onCall({ timeoutSeconds: 30 }, async (request) => {
+    return require('./cereal-act').handle(request, { db: admin.firestore(), FieldValue: admin.firestore.FieldValue, HttpsError, isAdmin: isAdminToken, now: Date.now(), rand: Math.random });
+});
+
 exports.askNika = onCall({ timeoutSeconds: 60 }, async (request) => {
     const auth = new GoogleAuth({ scopes: 'https://www.googleapis.com/auth/cloud-platform' });
     return require('./nika-ask').handle(request, {

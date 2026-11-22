@@ -10,6 +10,7 @@ Schedule ▸ the round `🥣` button beside `💰` (goals row) ▸ lobby: map si
 
 ## Scripts that drive it
 
+- `cereal-act-check` — Phase 2 referee `functions/cereal-act.js` on a fake Firestore with two linked players: engine copies match public/, create → join (1 h deadline), a scripted game to a correct arrest with `result.revealedPath`, the secret never in the public doc while playing, illegal actions refused with codes, ⏳ claim after 1 h, resign
 - `cereal-bot-ui-qa` — lobby 👤 / 🤖 chips and the two cards with 🥄 levels, no hand-off in a solo game, the thinking beat → what the bot did → ▸ ตาคุณ, the bot detective blocks its cell, the bot killer's path never on screen before the reveal, nothing written to Firestore (390 + 320)
 - `cereal-bot-check` — 1 200 seeded bot-vs-bot games in node: the detective's candidate set (public facts only) always holds the killer's real cell after every day, answer and missed arrest; every bot action passes the engine; 🥄 → 🥄🥄🥄 strength is ordered on both sides; < 40 ms a game
 - `cereal-maps-check` — `public/cereal-maps.js` against the photo transcription (Appendix A): tallies per side, contiguous ids, connected board, the subway pair, the train chain, one bowl, the five seam edges, orphan parks noted
