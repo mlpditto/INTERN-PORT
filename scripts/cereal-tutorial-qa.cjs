@@ -18,8 +18,8 @@ assert.ok(/root\.className = 'lang-no-toggle'/.test(js) && /croot\.className = '
 assert.ok(!/✓|✅/.test(js), 'no check marks');
 assert.ok(game.includes('CKTour.coach(coachKey())') && game.includes('CKTour.open()'), 'cereal.js calls the tutorial');
 
-async function open(browser, { width = 390, reducedMotion = 'no-preference', storage = {} } = {}) {
-    const ctx = await browser.newContext({ viewport: { width, height: 780 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, timezoneId: 'Asia/Bangkok', reducedMotion });
+async function open(browser, { width = 390, height = 780, reducedMotion = 'no-preference', storage = {} } = {}) {
+    const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, timezoneId: 'Asia/Bangkok', reducedMotion });
     const page = await ctx.newPage();
     const errors = []; page.on('pageerror', e => errors.push(e.message)); page.on('dialog', d => d.dismiss());
     await page.addInitScript((storage) => {
@@ -148,6 +148,15 @@ const thai = /[฀-๿]/;
         t = await tour(n.page); assert.ok(t.open && t.fits, '320: no horizontal scroll');
         for (let i = 0; i < 5; i++) { await n.page.click('#cerealTour .next'); assert.ok((await tour(n.page)).fits, '320 scene fits'); }
         assert.deepEqual(n.errors, []);
-        console.log('cereal-tutorial-qa: OK — auto-open once, 8 Thai-first scenes with animation, ▸ start / ข้าม / Esc / ? replay, ▶ auto remembered, 8 coach marks follow the real turn and ring the real element, skip-all, reduced motion, 320 px');
+
+        // V101.332: a big screen keeps the card next to the board; a phone keeps it at the bottom (thumb reach)
+        const gap = async (p) => p.evaluate(() => { const b = document.querySelector('#cerealTour .ct-board').getBoundingClientRect(), t = document.querySelector('#cerealTour .ct-tip').getBoundingClientRect(); return { gap: t.top - b.bottom, bottom: innerHeight - t.bottom }; });
+        const big = await open(browser, { width: 1280, height: 1300 });
+        await big.page.evaluate(() => cerealOpen());
+        let gg = await gap(big.page); assert.ok(gg.gap < 100 && gg.bottom > 200, 'big screen: card right under the board (the scene row sits between), not at the bottom edge: ' + JSON.stringify(gg));
+        const ph = await open(browser, { width: 390, height: 844 });
+        await ph.page.evaluate(() => cerealOpen());
+        gg = await gap(ph.page); assert.ok(gg.bottom < 40, 'phone: card stays at the bottom: ' + JSON.stringify(gg));
+        console.log('cereal-tutorial-qa: OK — auto-open once, 8 Thai-first scenes with animation, ▸ start / ข้าม / Esc / ? replay, ▶ auto remembered, 8 coach marks follow the real turn and ring the real element, skip-all, reduced motion, 320 px, big screen card under the board');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

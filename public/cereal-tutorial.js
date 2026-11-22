@@ -70,6 +70,8 @@
         /* the tip card — the Journal tour's jt-tip */
         + '#cerealTour .ct-tip,#cerealCoach .ct-tip{background:#fff;border-radius:16px;padding:12px 14px 10px;box-shadow:0 12px 32px rgba(30,16,60,.18);color:#2e1065;border:1px solid #ede9fe;animation:jt-in .3s ease-out both}'
         + '#cerealTour .ct-tip{margin-top:auto}'
+        // V101.332 (owner screenshot 2026-11-22): on a big screen the card sat at the bottom edge, far from the board — center the pair there; phones keep the card in thumb reach
+        + '@media (min-width:600px) and (min-height:1000px){#cerealTour .ct{justify-content:center}#cerealTour .ct-tip{margin-top:6px}}'
         + '@keyframes jt-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}'
         + '.ct-tip .k{font-size:11px;font-weight:800;letter-spacing:.06em;color:#8b5cf6;text-transform:uppercase}'
         + '.ct-tip .t{margin:2px 0 4px;font-size:16px;font-weight:800;color:#4c1d95}'
