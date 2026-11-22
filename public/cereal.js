@@ -1,4 +1,4 @@
-/* V101.327 (+V101.329 tutorial hooks) — 🥣 Cereal Killer, Phase 1: pass-and-play on ONE phone (Killer vs Detective, city map A/B). Owner's mockup picks
+/* V101.327 (+V101.329 tutorial hooks, V101.330 polish: Thai first with a small English line, labelled ask chips, ✕ / ↺ fixed) — 🥣 Cereal Killer, Phase 1: pass-and-play on ONE phone (Killer vs Detective, city map A/B). Owner's mockup picks
    2026-11-20: K-A (board first, kill / witness chips appear under the board after the 3rd step, notebook strip at the bottom),
    D-A (question cards as a chip rail, the public case log at the bottom), a tint hand-off screen between every turn, reveal
    with a day rail. Entry: the 🥣 button beside 💰 FIN on Schedule (cerealOpen). Rules come from cereal-rules.js and the board
@@ -14,11 +14,11 @@
     var CLS = { H: 'h', P: 'p', C: 'c', S: 's', T: 't', B: 'b', '.': 'r' };
     var CAL = { 2: ' ≥1', 4: ' ≥3', 7: ' 6' };
     var QCARDS = [
-        { q: 'dir', ic: '🧭', en: 'Which way from the witness?', th: 'คุณอยู่ทิศใดเมื่อเทียบกับพยาน?' },
-        { q: 'row', ic: '↔', en: 'Same row as the witness?', th: 'อยู่แถวเดียวกับพยานหรือไม่?' },
-        { q: 'col', ic: '↕', en: 'Same column as the witness?', th: 'อยู่คอลัมน์เดียวกับพยานหรือไม่?' },
-        { q: 'building', ic: '🏠', en: 'In a building? (house · café · S)', th: 'อยู่ในอาคารหรือไม่? (บ้าน / ร้านกาแฟ / S)' },
-        { q: 'parity', ic: '2·1', en: 'Even or odd cell?', th: 'อยู่บนช่องเลขคู่หรือเลขคี่?' }
+        { q: 'dir', ic: '🧭', w: 'ทิศ', en: 'Which way from the witness?', th: 'อยู่ทิศไหนของพยาน?' },
+        { q: 'row', ic: '↔', w: 'แถว', en: 'Same row as the witness?', th: 'อยู่แถวเดียวกับพยานไหม?' },
+        { q: 'col', ic: '↕', w: 'คอลัมน์', en: 'Same column as the witness?', th: 'อยู่คอลัมน์เดียวกับพยานไหม?' },
+        { q: 'building', ic: '🏠', w: 'อาคาร', en: 'In a building? (house · café · S)', th: 'อยู่ในอาคารไหม? (บ้าน · ☕ · S)' },
+        { q: 'parity', ic: '2·1', w: 'คู่/คี่', en: 'Even or odd cell?', th: 'ช่องเลขคู่หรือคี่?' }
     ];
     var MAX_GAMES = 10;
 
@@ -33,6 +33,8 @@
 
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function t(en, th) { return ' title="' + esc(en) + '" data-th-title="' + esc(th) + '" aria-label="' + esc(en) + '"'; }
+    function L(th, en) { return th + '<small class="en">' + en + '</small>'; }   // V101.330: Thai first, a small English line under it
+    function ansTh(q, a) { return q === 'dir' ? dirWord(a) : ({ yes: 'ใช่', no: 'ไม่ใช่', even: 'คู่', odd: 'คี่' }[a] || a); }
     function mapOf(game) { return R.buildMap(M, game.citySide, null); }
     function kpos(game) { var days = Object.keys(game.secret.path).map(Number).sort(function (a, b) { return b - a; }); return days.length ? game.secret.path[days[0]].slice(-1)[0] : game.secret.home; }
     function blockedFor(game) { return game.detectivePos != null ? [game.detectivePos] : []; }
@@ -130,31 +132,31 @@
     }
     function logHtml(game, label) {
         var byDay = {}; game.log.forEach(function (e) { (byDay[e.day] = byDay[e.day] || []).push(e); });
-        var h = '<div class="ck-nb"><div class="lbl">' + (label || 'Case log · public') + '</div>';
+        var h = '<div class="ck-nb"><div class="lbl">' + (label || 'บันทึกคดี · ทุกคนเห็น') + '</div>';
         Object.keys(byDay).map(Number).sort(function (a, b) { return a - b; }).forEach(function (d) {
             h += '<div class="r' + (d === game.day ? ' now' : '') + '"><span class="d">D' + d + '</span>' + byDay[d].map(function (e) { return esc(e.text); }).join(' · ') + '</div>';
         });
         return h + '</div>';
     }
     function qcard(q) { for (var i = 0; i < QCARDS.length; i++) if (QCARDS[i].q === q) return QCARDS[i]; return QCARDS[0]; }
-    function dirWord(a) { return { N: 'N · north', S: 'S · south', E: 'E · east', W: 'W · west' }[a] || a; }
+    function dirWord(a) { return { N: 'N · เหนือ', S: 'S · ใต้', E: 'E · ตะวันออก', W: 'W · ตะวันตก' }[a] || a; }
 
     // ---- lobby ------------------------------------------------------------------------------------------
     function lobbyHtml() {
         var h = '<div class="ck lobby">' + topHtml('🥣 Cereal Killer', '<button type="button" class="ck-pill' + (ui.rules ? ' acc' : '') + '" onclick="CK.rules()"' + t('How to play', 'กติกา · วิธีเล่น') + '>?</button>');
         if (ui.rules) h += '<div class="ck-rules">🔪 moves exactly 3 steps a day, unseen, and drops 🥣 on a house it touched — 6 victims in 7 days (≥1 by day 2, ≥3 by day 4). A kill next to a park puts a 👁️ witness there.<br>🕵️ moves up to 3 (+1 through ☕), stands by 👁️ and asks one of 5 cards; the app answers truthfully. 🛡️ arrest = own or next cell, 4 tries. 🚇 S to S is one step for both.</div>';
-        h += '<div class="ck-row"><span class="ck-mini">Vs</span><span class="ck-chip on">👤 friend</span><button type="button" class="ck-chip" disabled' + t('Play against a bot — coming in the next release', 'เล่นกับบอท · เร็ว ๆ นี้') + '>🤖 bot</button></div>';
-        h += '<div class="ck-row"><span class="ck-mini">Map</span>'
-            + '<button type="button" id="ck-side-A" class="ck-chip' + (ui.side === 'A' ? ' on' : '') + '" onclick="CK.side(\'A\')"' + t('Side A — favours the killer', 'ด้าน A · ฆาตกรได้เปรียบ') + '>A <small>🥄🥄 killer+</small></button>'
-            + '<button type="button" id="ck-side-B" class="ck-chip' + (ui.side === 'B' ? ' on' : '') + '" onclick="CK.side(\'B\')"' + t('Side B — favours the detective', 'ด้าน B · นักสืบได้เปรียบ') + '>B <small>🥄 detective+</small></button></div>';
-        h += '<div class="ck-row"><span class="ck-mini">Players</span>'
-            + '<label class="ck-name"><span>🔪</span><input type="text" id="ck-n1" maxlength="20" placeholder="Killer" value="' + esc(ui.names.killer) + '" aria-label="Killer name" data-th-placeholder="ฆาตกร"></label>'
-            + '<label class="ck-name"><span>🕵️</span><input type="text" id="ck-n2" maxlength="20" placeholder="Detective" value="' + esc(ui.names.detective) + '" aria-label="Detective name" data-th-placeholder="นักสืบ"></label></div>';
-        h += '<div class="ck-row" style="padding-left:68px"><span class="ck-pill"' + t('The rulebook: whoever just had breakfast is the killer', 'ใครเพิ่งทานอาหารเช้า = ฆาตกร') + '>🥣 who just had breakfast = 🔪</span></div>';
-        h += '<button type="button" class="ck-primary" id="ck-start" onclick="CK.start()"' + t('Start day 1 — the phone goes to the killer first', 'เริ่มวันที่ 1 · มือถืออยู่กับฆาตกรก่อน') + '>▸ Start · 🔪 goes first</button>';
+        h += '<div class="ck-row"><span class="ck-mini">เล่นกับ</span><span class="ck-chip on">👤 เพื่อน</span><button type="button" class="ck-chip" disabled' + t('Play against a bot — coming in the next release', 'เล่นกับบอท · เร็ว ๆ นี้') + '>🤖 บอท</button></div>';
+        h += '<div class="ck-row"><span class="ck-mini">แผนที่</span>'
+            + '<button type="button" id="ck-side-A" class="ck-chip' + (ui.side === 'A' ? ' on' : '') + '" onclick="CK.side(\'A\')"' + t('Side A — favours the killer', 'ด้าน A · ฆาตกรได้เปรียบ') + '>A <small>🥄🥄 ฆาตกร+</small></button>'
+            + '<button type="button" id="ck-side-B" class="ck-chip' + (ui.side === 'B' ? ' on' : '') + '" onclick="CK.side(\'B\')"' + t('Side B — favours the detective', 'ด้าน B · นักสืบได้เปรียบ') + '>B <small>🥄 นักสืบ+</small></button></div>';
+        h += '<div class="ck-row"><span class="ck-mini">ผู้เล่น</span>'
+            + '<label class="ck-name"><span>🔪</span><input type="text" id="ck-n1" maxlength="20" placeholder="ฆาตกร" value="' + esc(ui.names.killer) + '" aria-label="Killer name" data-th-placeholder="ฆาตกร"></label>'
+            + '<label class="ck-name"><span>🕵️</span><input type="text" id="ck-n2" maxlength="20" placeholder="นักสืบ" value="' + esc(ui.names.detective) + '" aria-label="Detective name" data-th-placeholder="นักสืบ"></label></div>';
+        h += '<div class="ck-row" style="padding-left:68px"><span class="ck-pill"' + t('The rulebook: whoever just had breakfast is the killer', 'ใครเพิ่งทานอาหารเช้า = ฆาตกร') + '>🥣 ใครเพิ่งกินข้าวเช้า = 🔪</span></div>';
+        h += '<button type="button" class="ck-primary" id="ck-start" onclick="CK.start()"' + t('Start day 1 — the phone goes to the killer first', 'เริ่มวันที่ 1 · มือถืออยู่กับฆาตกรก่อน') + '>' + L('▸ เริ่ม · 🔪 เล่นก่อน', 'Start · killer first') + '</button>';
         var games = store.games.filter(function (x) { return x.status === 'playing' || x.status === 'finished'; });
         if (games.length) {
-            h += '<div class="ck-nb"><div class="lbl">My games · on this phone</div>';
+            h += '<div class="ck-nb"><div class="lbl">เกมของฉัน · ในเครื่องนี้</div>';
             games.forEach(function (x) {
                 var fin = x.status === 'finished', res = fin ? (x.result.winner === 'good' ? '🕵️ won · D' + x.result.day : '🔪 won · D' + x.result.day) : '';
                 h += '<button type="button" class="ck-game" onclick="CK.resume(\'' + esc(x.id) + '\')"><span class="d">' + (fin ? '🏁' : 'D' + x.day) + '</span><span class="who">🔪 ' + esc(x.names.killer) + ' · 🕵️ ' + esc(x.names.detective) + '</span>'
@@ -169,12 +171,11 @@
     // ---- hand-off -----------------------------------------------------------------------------------------
     function handHtml() {
         var det = g.hand === 'detective', who = det ? '🕵️' : '🔪', name = det ? g.names.detective : g.names.killer;
-        return '<div class="ck ' + (det ? 'detective' : 'killer') + '">' + topHtml(who + ' Day ' + g.day)
-            + '<div class="ck-hand"><div class="ck-note">' + (det ? '🔪 day ' + g.day + ' locked 🔒 · nothing of that turn is on this screen' : g.day === 1 ? 'new game · the killer picks a secret home first' : '🕵️ day ' + (g.day - 1) + ' done') + '</div>'
-            + '<div class="who" aria-hidden="true">' + who + '</div><h4>Pass the phone to ' + esc(name) + '</h4><p class="th">' + (det ? 'ส่งมือถือให้นักสืบ' : 'ส่งมือถือให้ฆาตกร') + '</p>'
-            + '<div class="ck-row" style="justify-content:center"><span class="ck-pill">Day ' + g.day + ' / 7</span>' + pills(g) + (g.witness != null ? '<span class="ck-pill">👁️ at ' + g.witness + '</span>' : '') + '</div>'
-            + '<button type="button" class="ck-primary" id="ck-hand-go" onclick="CK.hand()"' + t('Tap when the phone is in your hands', 'แตะเมื่อถึงมือคุณ') + '>👆 I\'m ' + who + ' ' + esc(name) + '</button>'
-            + '<div class="ck-note">the next screen opens only after this tap</div></div></div>';
+        return '<div class="ck ' + (det ? 'detective' : 'killer') + '">' + topHtml(who + ' วันที่ ' + g.day)
+            + '<div class="ck-hand"><div class="ck-note">' + (det ? '🔪 ล็อกวันที่ ' + g.day + ' แล้ว 🔒' : g.day === 1 ? 'เกมใหม่ · ฆาตกรเลือกบ้านลับก่อน' : '🕵️ จบวันที่ ' + (g.day - 1)) + '</div>'
+            + '<div class="who" aria-hidden="true">' + who + '</div><h4>ส่งมือถือให้ ' + esc(name) + '</h4><p class="th">Pass the phone to ' + esc(name) + '</p>'
+            + '<div class="ck-row" style="justify-content:center"><span class="ck-pill">วันที่ ' + g.day + ' / 7</span>' + pills(g) + (g.witness != null ? '<span class="ck-pill">👁️ ที่ ' + g.witness + '</span>' : '') + '</div>'
+            + '<button type="button" class="ck-primary" id="ck-hand-go" onclick="CK.hand()"' + t('Tap when the phone is in your hands', 'แตะเมื่อถึงมือคุณ') + '>👆 ฉันคือ ' + who + ' ' + esc(name) + '</button></div></div>';
     }
 
     // ---- killer turn ---------------------------------------------------------------------------------------
@@ -194,32 +195,32 @@
             if (!full) { targets = R.stepTargets(m, path[path.length - 1], { blocked: blocked }); targets.forEach(function (id) { add(id, 'cls', ' hint'); }); }
         }
         var enabled = pos == null ? function (id) { return m.cells[id].t === R.T.HOUSE; } : function (id) { return targets.indexOf(id) >= 0; };
-        var h = '<div class="ck killer">' + topHtml('🔪 Day ' + g.day, pills(g) + '<span class="ck-pill"' + t(g.skipUsed ? 'the quiet day is used' : 'one day without a victim is allowed', g.skipUsed ? 'ใช้วันไม่สังหารไปแล้ว' : 'ไม่สังหารได้ 1 วัน') + '>⏭ ' + (g.skipUsed ? 0 : 1) + '</span>') + calHtml(g);
+        var h = '<div class="ck killer">' + topHtml('🔪 วันที่ ' + g.day, pills(g) + '<span class="ck-pill"' + t(g.skipUsed ? 'the quiet day is used' : 'one day without a victim is allowed', g.skipUsed ? 'ใช้วันไม่สังหารไปแล้ว' : 'ไม่สังหารได้ 1 วัน') + '>⏭ ' + (g.skipUsed ? 0 : 1) + '</span>') + calHtml(g);
         h += boardHtml(g, { extra: ex, tap: true, enabled: enabled });
-        if (pos == null) h += '<div class="ck-row"><span class="ck-mini">🏠 Home</span><span class="ck-note">tap a house — your secret start</span></div>';
+        if (pos == null) h += '<div class="ck-row"><span class="ck-mini">🏠 บ้าน</span><span class="ck-note">แตะบ้าน 1 หลัง · จุดเริ่มลับของคุณ</span></div>';
         else {
-            h += '<div class="ck-path"><span class="ck-mini">Path</span><b id="ck-path">' + path.join(' › ') + (full ? '' : ' › _'.repeat(R.STEPS.killer + 1 - path.length)) + '</b>'
+            h += '<div class="ck-path"><span class="ck-mini">เส้นทาง</span><b id="ck-path">' + path.join(' › ') + (full ? '' : ' › _'.repeat(R.STEPS.killer + 1 - path.length)) + '</b>'
                 + (path.length > 1 || g.day === 1 ? '<button type="button" class="ck-undo" onclick="CK.undo()"' + t('Undo one step', 'ถอยหนึ่งก้าว') + '>↺</button>' : '') + '</div>';
             if (full) {
                 var opts = R.killOptions(m, path, g.cereals), kill = g.draft.kill;
-                h += '<div class="ck-row" id="ck-kill"><span class="ck-mini">🥣 Kill at</span>';
+                h += '<div class="ck-row rail" id="ck-kill"><span class="ck-mini">🥣 สังหาร</span>';
                 path.filter(function (id, i) { return path.indexOf(id) === i && m.cells[id].t === R.T.HOUSE; }).forEach(function (id) {
                     var ok = opts.indexOf(id) >= 0;
                     h += '<button type="button" class="ck-chip' + (kill === id ? ' on' : '') + (ok ? '' : ' dim') + '"' + (ok ? ' onclick="CK.kill(' + id + ')"' : ' disabled' + t('already has cereal', 'มีซีเรียลแล้ว')) + '>🏠 ' + id + '</button>';
                 });
-                h += '<button type="button" class="ck-chip' + (kill === 'skip' ? ' on' : '') + '"' + (g.skipUsed ? ' disabled' : ' onclick="CK.kill(\'skip\')"') + t('No victim today — once per game', 'ไม่สังหารวันนี้ · ใช้ได้ 1 ครั้ง') + '>⏭ skip</button></div>';
+                h += '<button type="button" class="ck-chip' + (kill === 'skip' ? ' on' : '') + '"' + (g.skipUsed ? ' disabled' : ' onclick="CK.kill(\'skip\')"') + t('No victim today — once per game', 'ไม่สังหารวันนี้ · ใช้ได้ 1 ครั้ง') + '>⏭ เว้น</button></div>';
                 if (typeof kill === 'number') {
                     var parks = R.witnessOptions(m, kill);
-                    h += '<div class="ck-row" id="ck-wit"><span class="ck-mini">👁️ Witness</span>';
+                    h += '<div class="ck-row rail" id="ck-wit"><span class="ck-mini">👁️ พยาน</span>';
                     if (parks.length) parks.forEach(function (id) { h += '<button type="button" class="ck-chip' + (g.draft.witness === id ? ' on' : '') + '" onclick="CK.witness(' + id + ')"' + (id === path[path.length - 1] ? ' disabled' + t('you may not end your turn on the witness park', 'ห้ามจบเทิร์นบนสวนที่วางพยาน') : '') + '>🌳 ' + id + '</button>'; });
-                    else h += '<span class="ck-note">no park next to ' + kill + ' — no witness today</span>';
+                    else h += '<span class="ck-note">ไม่มีสวนติดบ้าน ' + kill + ' · วันนี้ไม่มีพยาน</span>';
                     h += '</div>';
                 }
             }
             var turn = { path: path, kill: typeof kill === 'number' ? kill : null, witness: g.draft.witness }, v = full && g.draft.kill != null ? R.validateKillerTurn(m, turn, { blocked: blocked, taken: g.cereals, kills: g.kills, skipUsed: g.skipUsed }) : { ok: false };
-            h += '<button type="button" class="ck-primary" id="ck-lock" onclick="CK.lock()"' + (v.ok ? '' : ' disabled') + t('Lock day ' + g.day + ' and pass the phone', 'ล็อกวันที่ ' + g.day + ' แล้วส่งมือถือ') + '>🔒 Lock day ' + g.day + '</button>';
+            h += '<button type="button" class="ck-primary" id="ck-lock" onclick="CK.lock()"' + (v.ok ? '' : ' disabled') + t('Lock day ' + g.day + ' and pass the phone', 'ล็อกวันที่ ' + g.day + ' แล้วส่งมือถือ') + '>' + L('🔒 ล็อกวันที่ ' + g.day, 'Lock day ' + g.day) + '</button>';
         }
-        h += '<div class="ck-nb"><div class="lbl">📓 notebook · only you see this<span style="margin-left:auto">🏠 home ' + (g.secret.home != null ? g.secret.home : '—') + '</span></div>';
+        h += '<div class="ck-nb"><div class="lbl">📓 สมุดลับ · เห็นคนเดียว<span style="margin-left:auto">🏠 บ้าน ' + (g.secret.home != null ? g.secret.home : '—') + '</span></div>';
         for (var d = 1; d <= g.day; d++) {
             var p = d < g.day ? g.secret.path[d] : path, k = g.secret.kills[d], w = d < g.day ? (g.log.filter(function (e) { return e.day === d && e.type === 'kill'; })[0] || {}).witness : g.draft.witness;
             h += '<div class="r' + (d === g.day ? ' now' : '') + '"><span class="d">D' + d + '</span><b>' + (p && p.length ? p.join(' › ') : '—') + '</b><span class="m">' + (d < g.day ? (k ? '🥣 ' + k : '⏭') + (w != null ? ' · 👁️ ' + w : '') : '') + '</span></div>';
@@ -251,7 +252,7 @@
         g.secret.path[g.day] = path.slice();
         if (v.kill != null) { g.cereals.push(v.kill); g.secret.kills[g.day] = v.kill; }
         g.kills = v.kills; g.skipUsed = v.skipUsed; g.witness = v.witness;
-        g.log.push({ day: g.day, type: 'kill', witness: v.witness, text: v.kill != null ? '🥣 ' + v.kill + (v.witness != null ? ' · 👁️ ' + v.witness : '') : '⏭ no victim' });
+        g.log.push({ day: g.day, type: 'kill', witness: v.witness, text: v.kill != null ? '🥣 ' + v.kill + (v.witness != null ? ' · 👁️ ' + v.witness : '') : '⏭ ไม่มีเหยื่อ' });
         g.draft = { path: [], kill: null, witness: null };
         if (!R.calendarOk(g.day, g.kills)) finish('good', 'calendar');
         else { g.phase = 'detective'; g.hand = 'detective'; }
@@ -264,8 +265,8 @@
         var h = '<div class="ck detective">';
         if (g.detectivePos == null) {
             R.detectiveStartOptions(m).forEach(function (id) { add(id, 'cls', ' pick'); });
-            h += topHtml('🕵️ Day ' + g.day, pills(g)) + boardHtml(g, { extra: ex, tap: true, enabled: function (id) { return m.cells[id].t === R.T.CAFE; } })
-                + '<div class="ck-row"><span class="ck-mini">☕ Start</span><span class="ck-note">tap a café — that is where you begin</span></div>' + logHtml(g) + '</div>';
+            h += topHtml('🕵️ วันที่ ' + g.day, pills(g)) + boardHtml(g, { extra: ex, tap: true, enabled: function (id) { return m.cells[id].t === R.T.CAFE; } })
+                + '<div class="ck-row"><span class="ck-mini">☕ เริ่ม</span><span class="ck-note">แตะร้านกาแฟ · จุดเริ่มของคุณ</span></div>' + logHtml(g) + '</div>';
             return h;
         }
         var path = g.dd.path.length ? g.dd.path : (g.dd.path = [g.detectivePos]), last = path[path.length - 1];
@@ -278,24 +279,24 @@
         arrestCells.forEach(function (id) { add(id, 'cls', ' pick'); });
         if (typeof ui.arrest === 'number') add(ui.arrest, 'cls', ' ring');
         var enabled = function (id) { return ui.arrest === 'pick' ? arrestCells.indexOf(id) >= 0 : targets.indexOf(id) >= 0; };
-        h += topHtml('🕵️ Day ' + g.day, '<span class="ck-pill acc"' + t('steps left' + (v.bonus ? ' (☕ +1)' : ''), 'ก้าวที่เหลือ') + '>👣 ' + left + '</span>' + pills(g)) + boardHtml(g, { extra: ex, tap: true, enabled: enabled });
-        if (path.length > 1) h += '<div class="ck-path"><span class="ck-mini">Path</span><b>' + path.join(' › ') + '</b><button type="button" class="ck-undo" onclick="CK.undo()"' + t('Undo one step', 'ถอยหนึ่งก้าว') + '>↺</button></div>';
+        h += topHtml('🕵️ วันที่ ' + g.day, '<span class="ck-pill acc"' + t('steps left' + (v.bonus ? ' (☕ +1)' : ''), 'ก้าวที่เหลือ') + '>👣 ' + left + '</span>' + pills(g)) + boardHtml(g, { extra: ex, tap: true, enabled: enabled });
+        if (path.length > 1) h += '<div class="ck-path"><span class="ck-mini">เส้นทาง</span><b>' + path.join(' › ') + '</b><button type="button" class="ck-undo" onclick="CK.undo()"' + t('Undo one step', 'ถอยหนึ่งก้าว') + '>↺</button></div>';
         // question cards
         var canAsk = g.witness != null && R.canQuestion(m, last, g.witness) && !g.dd.asked;
-        h += '<div class="ck-row" id="ck-ask"><span class="ck-mini">❓ Ask' + (g.witness != null ? ' 👁️' + g.witness : '') + '</span>';
+        h += '<div class="ck-row rail" id="ck-ask"><span class="ck-mini">❓ ถาม' + (g.witness != null ? ' 👁️' + g.witness : '') + '</span>';
         QCARDS.forEach(function (c) {
             var used = g.usedQuestions.indexOf(c.q) >= 0, past = used ? g.log.filter(function (e) { return e.type === 'ask' && e.q === c.q; })[0] : null;
-            h += '<button type="button" class="ck-chip' + (used ? ' used' : '') + '" data-q="' + c.q + '"' + (used || !canAsk ? ' disabled' : ' onclick="CK.ask(\'' + c.q + '\')"') + t(c.en + (past ? ' — D' + past.day + ' → ' + past.ans : ''), c.th) + '>' + c.ic + '</button>';
+            h += '<button type="button" class="ck-chip ck-q' + (used ? ' used' : '') + '" data-q="' + c.q + '"' + (used || !canAsk ? ' disabled' : ' onclick="CK.ask(\'' + c.q + '\')"') + t(c.th + ' · ' + c.en + (past ? ' — D' + past.day + ' → ' + past.ans : ''), c.th) + '><span class="qi">' + c.ic + '</span><span class="qw">' + c.w + '</span></button>';
         });
         h += '</div>';
-        if (g.dd.asked) { var a = g.dd.asked; h += '<div class="ck-ans" id="ck-answer">' + qcard(a.q).ic + ' ' + esc(qcard(a.q).en) + ' <b>→ ' + esc(a.q === 'dir' ? dirWord(a.ans) : a.ans) + '</b>' + (a.two ? '<span class="ck-note" style="margin-left:auto">two directions were true · the less telling one is given</span>' : '') + '</div>'; }
-        else if (g.witness == null) h += '<div class="ck-note">no witness today — nothing to ask</div>';
-        else if (!canAsk) h += '<div class="ck-note">stand on or next to 👁️ ' + g.witness + ' to ask (one card per witness)</div>';
+        if (g.dd.asked) { var a = g.dd.asked; h += '<div class="ck-ans" id="ck-answer">' + qcard(a.q).ic + ' ' + esc(qcard(a.q).th) + ' <b>→ ' + esc(ansTh(a.q, a.ans)) + '</b>' + (a.two ? '<span class="ck-note" style="margin-left:auto">จริงทั้ง 2 ทิศ · ให้ทิศที่บอกใบ้น้อยกว่า</span>' : '') + '</div>'; }
+        else if (g.witness == null) h += '<div class="ck-note">วันนี้ไม่มีพยาน · ไม่มีอะไรให้ถาม</div>';
+        else if (!canAsk) h += '<div class="ck-note">ยืนบนหรือข้าง 👁️ ' + g.witness + ' แล้วถามได้ 1 ใบ</div>';
         // arrest
-        if (typeof ui.arrest === 'number') h += '<div class="ck-confirm" id="ck-confirm">🛡️ Arrest at <b>' + ui.arrest + '</b>? <span style="font-weight:700;opacity:.8">wrong = 🛡️ ' + g.arrestsLeft + ' → ' + (g.arrestsLeft - 1) + '</span><button type="button" class="yes" onclick="CK.arrest()">Arrest</button><button type="button" class="no" onclick="CK.cancelArrest()"' + t('Cancel', 'ยกเลิก') + '>✕</button></div>';
-        else if (ui.arrest === 'pick') h += '<div class="ck-confirm">🛡️ tap your cell or a neighbour<button type="button" class="no" style="margin-left:auto" onclick="CK.cancelArrest()"' + t('Cancel', 'ยกเลิก') + '>✕</button></div>';
-        else h += '<div class="ck-row"><span class="ck-mini">Then</span><button type="button" class="ck-chip red" id="ck-arrest" onclick="CK.arrestMode()"' + t('Arrest: your cell or a neighbour · wrong costs one of ' + g.arrestsLeft, 'จับกุม · ช่องที่ยืนหรือช่องติดกัน · ผิดเสีย 1 ครั้ง') + '>🛡️ arrest</button></div>';
-        h += '<button type="button" class="ck-primary" id="ck-end" onclick="CK.endTurn()"' + (ui.arrest ? ' disabled' : '') + t('End turn — the witness leaves the map', 'จบเทิร์น · พยานออกจากแผนที่') + '>▸ End turn</button>';
+        if (typeof ui.arrest === 'number') h += '<div class="ck-confirm" id="ck-confirm">🛡️ จับที่ <b>' + ui.arrest + '</b>? <span style="font-weight:700;opacity:.8">ผิด = 🛡️ ' + g.arrestsLeft + ' → ' + (g.arrestsLeft - 1) + '</span><button type="button" class="yes" onclick="CK.arrest()">จับกุม</button><button type="button" class="no" onclick="CK.cancelArrest()"' + t('Cancel', 'ยกเลิก') + '>✕</button></div>';
+        else if (ui.arrest === 'pick') h += '<div class="ck-confirm">🛡️ แตะช่องที่ยืนหรือช่องติดกัน<button type="button" class="no" style="margin-left:auto" onclick="CK.cancelArrest()"' + t('Cancel', 'ยกเลิก') + '>✕</button></div>';
+        else h += '<div class="ck-row"><span class="ck-mini">จากนั้น</span><button type="button" class="ck-chip red" id="ck-arrest" onclick="CK.arrestMode()"' + t('Arrest: your cell or a neighbour · wrong costs one of ' + g.arrestsLeft, 'จับกุม · ช่องที่ยืนหรือช่องติดกัน · ผิดเสีย 1 ครั้ง') + '>🛡️ จับกุม</button></div>';
+        h += '<button type="button" class="ck-primary" id="ck-end" onclick="CK.endTurn()"' + (ui.arrest ? ' disabled' : '') + t('End turn — the witness leaves the map', 'จบเทิร์น · พยานออกจากแผนที่') + '>' + L('▸ จบเทิร์น', 'End turn') + '</button>';
         return h + logHtml(g) + '</div>';
     }
     function tapDetective(id) {
@@ -311,7 +312,7 @@
         if (g.witness == null || !R.canQuestion(m, last, g.witness) || g.dd.asked || g.usedQuestions.indexOf(q) >= 0) return;
         var ans = R.answer(m, q, kpos(g), g.witness), pick = ans.length > 1 ? R.leastInformative(m, g.witness, ans) : ans[0];
         g.usedQuestions.push(q); g.dd.asked = { q: q, ans: pick, two: ans.length > 1 };
-        g.log.push({ day: g.day, type: 'ask', q: q, ans: pick, text: '❓ ' + qcard(q).ic + ' → ' + pick });
+        g.log.push({ day: g.day, type: 'ask', q: q, ans: pick, text: '❓ ' + qcard(q).ic + ' → ' + ansTh(q, pick) });
         save(); render();
     }
     function arrestMode() { ui.arrest = 'pick'; render(); }
@@ -322,7 +323,7 @@
         g.detectivePos = g.dd.path.length ? g.dd.path[g.dd.path.length - 1] : g.detectivePos;   // where the arrest is made from (the reveal shows it)
         if (cell === kpos(g)) { g.log.push({ day: g.day, type: 'arrest', text: '🛡️ ' + cell + ' ✔' }); finish('good', 'arrest', { cell: cell }); render(); return; }
         g.arrestsLeft -= 1;
-        g.log.push({ day: g.day, type: 'arrest', text: '🛡️ ' + cell + ' ✗ (' + g.arrestsLeft + ' left)' });
+        g.log.push({ day: g.day, type: 'arrest', text: '🛡️ ' + cell + ' ✗ (เหลือ ' + g.arrestsLeft + ')' });
         if (g.arrestsLeft <= 0) { finish('killer', 'arrests'); render(); return; }
         endTurn();
     }
@@ -340,11 +341,11 @@
         var m = mapOf(g), r = g.result, days = Object.keys(g.secret.path).map(Number).sort(function (a, b) { return a - b; }), lastDay = days.length ? days[days.length - 1] : 1;
         var sel = ui.revealDay && days.indexOf(ui.revealDay) >= 0 ? ui.revealDay : lastDay;
         var good = r.winner === 'good', title, sub;
-        if (r.reason === 'arrest') { title = '🕵️ ' + esc(g.names.detective) + ' caught ' + esc(g.names.killer) + ' at ' + r.cell; sub = 'day ' + r.day + ' · arrest ' + (R.ARRESTS - g.arrestsLeft + 1) + ' of ' + R.ARRESTS; }
-        else if (r.reason === 'cornered') { title = '🕵️ ' + esc(g.names.killer) + ' was cornered at ' + r.cell; sub = 'day ' + r.day + ' · no legal 3-step path left'; }
-        else if (r.reason === 'calendar') { title = '🕵️ wins — only ' + g.kills + ' victim' + (g.kills === 1 ? '' : 's') + ' by day ' + r.day; sub = 'the calendar wanted ' + R.CALENDAR_MIN[r.day]; }
-        else if (r.reason === 'arrests') { title = '🔪 ' + esc(g.names.killer) + ' wins — no arrests left'; sub = 'day ' + r.day + ' · ' + g.kills + ' victims'; }
-        else { title = '🔪 ' + esc(g.names.killer) + ' survived 7 days'; sub = g.kills + ' victims · ' + g.arrestsLeft + ' arrest' + (g.arrestsLeft === 1 ? '' : 's') + ' unused'; }
+        if (r.reason === 'arrest') { title = L('🕵️ ' + esc(g.names.detective) + ' จับ ' + esc(g.names.killer) + ' ได้ที่ ' + r.cell, esc(g.names.detective) + ' caught ' + esc(g.names.killer) + ' at ' + r.cell); sub = 'วันที่ ' + r.day + ' · จับครั้งที่ ' + (R.ARRESTS - g.arrestsLeft + 1) + ' จาก ' + R.ARRESTS; }
+        else if (r.reason === 'cornered') { title = L('🕵️ ' + esc(g.names.killer) + ' จนมุมที่ ' + r.cell, esc(g.names.killer) + ' was cornered at ' + r.cell); sub = 'วันที่ ' + r.day + ' · ไม่มีทางเดิน 3 ก้าวเหลือแล้ว'; }
+        else if (r.reason === 'calendar') { title = L('🕵️ ชนะ · เหยื่อแค่ ' + g.kills + ' ภายในวันที่ ' + r.day, 'detective wins on the calendar'); sub = 'ปฏิทินต้องการอย่างน้อย ' + R.CALENDAR_MIN[r.day]; }
+        else if (r.reason === 'arrests') { title = L('🔪 ' + esc(g.names.killer) + ' ชนะ · 🛡️ หมด', esc(g.names.killer) + ' wins — no arrests left'); sub = 'วันที่ ' + r.day + ' · เหยื่อ ' + g.kills; }
+        else { title = L('🔪 ' + esc(g.names.killer) + ' รอดครบ 7 วัน', esc(g.names.killer) + ' survived 7 days'); sub = 'เหยื่อ ' + g.kills + ' · 🛡️ เหลือ ' + g.arrestsLeft; }
         var ex = publicExtra(g), add = function (id, k, v) { ex[id] = ex[id] || {}; ex[id][k] = (ex[id][k] || '') + v; };
         if (g.secret.home != null) add(g.secret.home, 'cls', ' home');
         var p = g.secret.path[sel] || [];
@@ -352,19 +353,19 @@
         if (p.length) add(p[p.length - 1], 'me', '🔪');
         if (sel === lastDay && r.reason === 'arrest') add(r.cell, 'cls', ' caught');
         if (g.detectivePos != null) add(g.detectivePos, 'tk', '🕵️');
-        var h = '<div class="ck lobby">' + topHtml('🏁 Game over', '<span class="ck-pill">Day ' + r.day + ' / 7</span>' + pills(g))
+        var h = '<div class="ck lobby">' + topHtml('🏁 จบเกม', pills(g))
             + '<div class="ck-win"><span class="big" aria-hidden="true">' + (good ? '🕵️' : '🔪') + '</span><div><p class="t">' + title + '</p><p class="s">' + sub + '</p></div></div>'
             + '<div class="ck-days" aria-label="Replay by day">';
         for (var d = 1; d <= R.DAYS; d++) h += '<button type="button" class="' + (d === sel ? 'on' : '') + '"' + (days.indexOf(d) >= 0 ? ' onclick="CK.revealDay(' + d + ')"' : ' disabled') + '>D' + d + '</button>';
         h += '</div>' + boardHtml(g, { extra: ex, tap: false });
-        h += '<div class="ck-nb"><div class="lbl">📓 the killer\'s notebook · 🏠 home ' + g.secret.home + '</div>';
+        h += '<div class="ck-nb"><div class="lbl">📓 สมุดลับของฆาตกร · 🏠 บ้าน ' + g.secret.home + '</div>';
         days.forEach(function (d) {
-            var asked = g.log.filter(function (e) { return e.day === d && e.type === 'ask'; }).map(function (e) { return qcard(e.q).ic + ' ' + e.ans; }).join(' · ');
+            var asked = g.log.filter(function (e) { return e.day === d && e.type === 'ask'; }).map(function (e) { return qcard(e.q).ic + ' ' + ansTh(e.q, e.ans); }).join(' · ');
             var kl = g.log.filter(function (e) { return e.day === d && e.type === 'kill'; })[0] || {};
             h += '<div class="r' + (d === sel ? ' now' : '') + '"><span class="d">D' + d + '</span><b>' + g.secret.path[d].join(' › ') + '</b><span class="m">' + esc(kl.text || '') + (asked ? ' · ' + esc(asked) : '') + '</span></div>';
         });
-        h += '</div><div class="ck-row"><button type="button" class="ck-chip" onclick="CK.revealDay(1)"' + t('Replay from day 1', 'ดูซ้ำตั้งแต่วันแรก') + '>↺ Replay</button><button type="button" class="ck-chip" onclick="CK.lobby()">📋 My games</button></div>';
-        h += '<button type="button" class="ck-primary" onclick="CK.rematch()"' + t('New game with the roles swapped', 'เกมใหม่ สลับบทบาท') + '>🆕 New game · swap roles</button></div>';
+        h += '</div><div class="ck-row"><button type="button" class="ck-chip" onclick="CK.revealDay(1)"' + t('Replay from day 1', 'ดูซ้ำตั้งแต่วันแรก') + '>↺ ดูซ้ำ</button><button type="button" class="ck-chip" onclick="CK.lobby()">📋 เกมของฉัน</button></div>';
+        h += '<button type="button" class="ck-primary" onclick="CK.rematch()"' + t('New game with the roles swapped', 'เกมใหม่ สลับบทบาท') + '>' + L('🆕 เกมใหม่ · สลับบทบาท', 'New game · swap roles') + '</button></div>';
         return h;
     }
 
