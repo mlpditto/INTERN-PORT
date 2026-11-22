@@ -12,6 +12,7 @@ Intern: home header → tap name / photo → Info modal; Personal Info cards; Kn
 - `profile-card-qa` — profile card activity states, timeline modes, Log / Case destinations (both pages)
 - `settings-in-info-qa` — ⚙ moved into the Info modal; privacy panel folds under the title
 - `personal-info-health-qa` — persona cards start folded, born-at / reference persons / optional Health (admin side too)
+- `pi-dot-count-qa` — each unfinished Persona card shows ✏️ n (how many are empty, glowing); opening Info puts a nudge bubble under the first one (gone on tap, when that card opens or fills, or after 6 s); still under reduced motion
 - `info-field-points-qa` — Info ▸ Persona: +0.1 score per filled field (27, Health not paid), −0.1 when emptied, silent, registered only; `users.infoPts` (V101.292). Admin Recalculate Score adds it back (V102.613)
 - `intern-address-checkin-ring-qa` — two addresses (ID card + current) and the check-in ring
 - `know-thyself-qa` — "In my words" chip stored at personality.self with a merge set
