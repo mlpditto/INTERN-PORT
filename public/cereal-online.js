@@ -4,11 +4,15 @@
    Every move goes through the cerealAct callable (functions/cereal-act.js) — this page never writes cereal_games. The game doc is
    watched live (onSnapshot) and mapped onto the same game object cereal.js draws, so the board, notebook and reveal are the same
    screens. While the other player moves: the public board + "⏳ ตา Pond · n นาที"; after 1 hour ⏳ เคลม. The killer's own
-   notebook comes from cerealAct mySecret (no client can read secret/killer). Share cards / LINE invite = PR 3. window.CKOnline. */
+   notebook comes from cerealAct mySecret (no client can read secret/killer). window.CKOnline.
+   V101.338 — PR 3 (owner pick room B + nudge B, mockup-cereal-share/): 📤 LINE beside 📋 in the room sends a Flex invite card whose
+   button opens ?cereal=<code> (joins the room, no typing); 📤 สะกิด in the waiting row sends a "ถึงตาคุณแล้ว" card that opens
+   ?cereal=<gameId>. Sent only when the player taps (shareTargetPicker → OS share → clipboard), so no LINE OA quota. Cards carry the
+   room code, names and the day — never the killer's home or path. deepLink() is called by applyTabDeepLink in index.html. */
 (function () {
     'use strict';
     var R = window.CerealRules;
-    var st = { uid: null, list: [], unList: null, unGame: null, gameId: null, doc: null, secret: {}, err: '', busy: false, view: null, code: '', side: 'A', role: 'killer', timer: null, authTried: false };
+    var st = { uid: null, list: [], unList: null, unGame: null, gameId: null, doc: null, secret: {}, err: '', busy: false, view: null, code: '', side: 'A', role: 'killer', timer: null, authTried: false, pending: null, listed: false, sent: '' };
     var C = function () { return window.CK && CK._; };
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function call(data) { return firebase.functions().httpsCallable('cerealAct')(data).then(function (r) { return r.data || {}; }); }
@@ -29,7 +33,7 @@
             if (!st.uid) { st.err = 'ต้องเปิดจาก LINE เพื่อเล่นออนไลน์'; st.authTried = false; rerender(); return; }
             st.unList = db.collection('cereal_games').where('authUids', 'array-contains', st.uid).onSnapshot(function (s) {
                 st.list = s.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); }).filter(function (x) { return x.status !== 'cancelled'; });
-                rerender();
+                st.listed = true; rerender(); runPending();
             }, function () { st.err = 'โหลดเกมออนไลน์ไม่ได้'; rerender(); });
             rerender();
         }).catch(function () { st.err = 'ต้องเปิดจาก LINE เพื่อเล่นออนไลน์'; st.authTried = false; rerender(); });
@@ -132,7 +136,7 @@
         return '<div class="ck lobby">' + c.topHtml('🌐 ห้อง ' + esc(on.code))
             + (st.err ? '<div class="ck-warn">' + esc(st.err) + '</div>' : '')
             + '<div class="ck-room"><div class="code" id="ck-on-room-code">' + esc(on.code) + '</div>'
-            + '<div class="ck-row" style="justify-content:center"><button type="button" class="ck-chip on" id="ck-on-copy" onclick="CKOnline.copy()">📋 คัดลอกรหัส</button></div>'
+            + '<div class="ck-row" style="justify-content:center"><button type="button" class="ck-chip line" id="ck-on-invite" onclick="CKOnline.invite()">' + (st.sent === 'invite' ? '✓ ส่งแล้ว' : '📤 LINE') + '</button><button type="button" class="ck-chip on" id="ck-on-copy" onclick="CKOnline.copy()">📋 คัดลอกรหัส</button></div>'
             + '<div class="seats">' + seat('killer') + seat('detective') + '</div>'
             + '<div class="ck-note" style="text-align:center">เพื่อนกด 🥣 → 🌐 ออนไลน์ → 🔑 ใส่รหัส · เกมเริ่มทันทีที่เข้าห้อง</div></div>'
             + '<div class="ck-row" style="justify-content:center"><button type="button" class="ck-chip" id="ck-on-cancel" onclick="CKOnline.cancel()">✕ ยกเลิกห้อง</button><button type="button" class="ck-chip" onclick="CK.lobby()">📋 เกมของฉัน</button></div></div>';
@@ -145,7 +149,7 @@
             ? '<div class="ck-waitcard late" id="ck-on-wait"><span>⏳ ' + esc(name) + ' หายไป ' + mins(now - (on.updatedAt || now)) + '</span><small>เกินเวลาแล้ว · กดเคลมเพื่อจบตาที่ค้าง' + (other === 'killer' ? ' (ฆาตกรค้าง = นักสืบชนะ)' : ' (นักสืบค้าง = จบตาที่จุดเดิม)') + '</small><button type="button" class="ck-claim" id="ck-on-claim" onclick="CKOnline.claim()"' + (st.busy ? ' disabled' : '') + '>⏳ เคลม</button></div>'
             : '<div class="ck-waitcard" id="ck-on-wait"><span>⏳ ตา <b>' + esc(name) + '</b> (' + (other === 'killer' ? '🔪' : '🕵️') + ') · ผ่านมา ' + mins(now - (on.updatedAt || now)) + '</span><small>หน้านี้อัปเดตเองเมื่อ ' + esc(name) + ' เล่นเสร็จ · เคลมได้เมื่อครบ 1 ชม.</small></div>';
         return '<div class="ck ' + on.me + '">' + c.topHtml('🌐 ' + (on.me === 'killer' ? '🔪' : '🕵️') + ' วันที่ ' + g.day, c.pills(g)) + (st.err ? '<div class="ck-warn">' + esc(st.err) + '</div>' : '') + card
-            + c.boardHtml(g, { extra: ex, tap: false }) + c.logHtml(g) + '<div class="ck-row" style="justify-content:center"><button type="button" class="ck-chip" onclick="CK.lobby()">📋 เกมของฉัน</button><button type="button" class="ck-chip" id="ck-on-resign" onclick="CKOnline.resign()">🏳️ ยอมแพ้</button></div></div>';
+            + c.boardHtml(g, { extra: ex, tap: false }) + c.logHtml(g) + '<div class="ck-row" style="justify-content:center"><button type="button" class="ck-chip line" id="ck-on-nudge" onclick="CKOnline.nudge()">' + (st.sent === 'nudge:' + on.id + ':' + g.day + g.phase ? '✓ สะกิดแล้ว' : '📤 สะกิด') + '</button><button type="button" class="ck-chip" onclick="CK.lobby()">📋 เกมของฉัน</button><button type="button" class="ck-chip" id="ck-on-resign" onclick="CKOnline.resign()">🏳️ ยอมแพ้</button></div></div>';
     }
 
     // ---- moves (each one through cerealAct; the snapshot redraws) ------------------------------------------------
@@ -176,7 +180,68 @@
         return '<div class="ck killer">' + c.topHtml('🌐 🔪 วันที่ ' + g.day, c.pills(g)) + '<div class="ck-note" style="text-align:center">🔪 จนมุม · ไม่มีทางเดิน 3 ก้าว</div></div>';
     }
 
+    // ---- 📤 share in LINE (V101.338) -------------------------------------------------------------------------------
+    function link(v) { return 'https://liff.line.me/' + (typeof USER_LIFF_ID !== 'undefined' ? USER_LIFF_ID : '') + '?cereal=' + encodeURIComponent(v); }
+    function card(o) {   // o: { alt, color, kicker, title, lines[], big?, button, uri }
+        var body = o.lines.map(function (t) { return { type: 'text', text: t, wrap: true, size: 'sm', color: '#3c3c3c' }; });
+        if (o.big) body.splice(1, 0, { type: 'text', text: o.big, size: 'xxl', weight: 'bold', color: '#92400e' });
+        return { type: 'flex', altText: o.alt, contents: { type: 'bubble', size: 'kilo',
+            header: { type: 'box', layout: 'vertical', backgroundColor: o.color, paddingAll: '16px', contents: [
+                { type: 'text', text: o.kicker, color: '#ffffff', size: 'xs', weight: 'bold' },
+                { type: 'text', text: o.title, color: '#ffffff', size: 'lg', weight: 'bold', wrap: true }] },
+            body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: body },
+            footer: { type: 'box', layout: 'vertical', contents: [{ type: 'button', style: 'primary', color: '#06c755', height: 'sm', action: { type: 'uri', label: o.button, uri: o.uri } }] } } };
+    }
+    /** Flex card via shareTargetPicker → the OS share sheet → the clipboard. Resolves true when something was handed over. */
+    function share(o) {
+        var text = o.alt + '\n' + o.uri;
+        var viaLine = window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')
+            ? Promise.resolve(liff.shareTargetPicker([card(o)])).then(function (r) { return r ? 'sent' : 'closed'; }, function () { return null; })
+            : Promise.resolve(null);
+        return viaLine.then(function (r) {
+            if (r === 'sent') return true;
+            if (r === 'closed') return false;   // the picker opened and the player closed it
+            if (navigator.share) return navigator.share({ text: text }).then(function () { return true; }, function () { return false; });
+            try { return navigator.clipboard.writeText(text).then(function () { st.err = ''; return true; }, function () { return false; }); } catch (_) { return Promise.resolve(false); }
+        });
+    }
+    function invite() {
+        var g = C().get(), on = g.online, me = on.me, my = (g.names && g.names[me]) || 'เพื่อน', theirs = me === 'killer' ? '🕵️ นักสืบ' : '🔪 ฆาตกร';
+        return share({ alt: '🥣 ' + my + ' ชวนเล่น Cereal Killer · รหัส ' + on.code, color: '#92400e', kicker: '🥣 CEREAL KILLER', title: my + ' ชวนเล่น ' + theirs,
+            lines: ['รหัสห้อง', 'แตะแล้วเข้าห้องเลย ไม่ต้องพิมพ์'], big: on.code, button: '🔑 เข้าห้อง', uri: link(on.code) })
+            .then(function (ok) { if (ok) { st.sent = 'invite'; rerender(); } return ok; });
+    }
+    function nudge() {
+        var g = C().get(), on = g.online, to = g.phase, from = on.me, mine = (g.names && g.names[from]) || 'เพื่อน', key = 'nudge:' + on.id + ':' + g.day + g.phase;
+        return share({ alt: '🥣 ถึงตาคุณแล้ว · Cereal Killer วันที่ ' + g.day, color: to === 'killer' ? '#be123c' : '#4338ca', kicker: '🥣 CEREAL KILLER · วันที่ ' + g.day,
+            title: 'ถึงตาคุณแล้ว ' + (to === 'killer' ? '🔪' : '🕵️'), lines: [mine + ' (' + (from === 'killer' ? '🔪' : '🕵️') + ') เล่นเสร็จแล้ว · รอคุณอยู่'], button: '▸ เล่นต่อ', uri: link(on.id) })
+            .then(function (ok) { if (ok) { st.sent = key; rerender(); } return ok; });
+    }
+    /** ?cereal=<6-letter code> joins (or opens, if I am already in it) that room; ?cereal=<gameId> opens that game. */
+    function deepLink(v) {
+        v = String(v || '').trim();
+        if (!/^[A-Za-z0-9]{6,40}$/.test(v)) return;
+        st.pending = v;
+        if (typeof cerealOpen === 'function') cerealOpen();
+        if (window.CK) CK.tab('online');
+        start(); runPending();
+    }
+    function runPending() {
+        var v = st.pending;
+        if (!v || !st.uid || !st.listed) return;
+        st.pending = null;
+        if (v.length === 6) {
+            var c6 = v.toUpperCase(), mine = st.list.filter(function (x) { return x.code === c6 && meRole(x); }).sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); })[0];
+            if (mine) { open(mine.id); return; }
+            st.code = c6; st.view = 'join'; rerender();
+            act({ action: 'join', code: c6 }, function (r) { st.view = null; if (r && r.gameId) open(r.gameId); });
+            return;
+        }
+        open(v);
+    }
+
     window.CKOnline = {
+        invite: invite, nudge: nudge, deepLink: deepLink,
         lobbyHtml: lobbyHtml, screen: screen, open: open, leave: leave, myTurnCount: myTurnCount, start: start,
         lock: lock, ask: ask, end: end, cornered: cornered,
         pick: function (k, v) { if (k === 'view' && v === 'join') st.code = ''; st[k] = v; st.err = ''; rerender(); },
