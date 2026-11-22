@@ -14,7 +14,7 @@ const idx = fs.readFileSync('public/index.html', 'utf8').replace(/\r\n/g, '\n'),
 const ver = (/<title>Internship Portfolio \((V\d+\.\d+)\)<\/title>/.exec(idx) || [])[1];
 assert.ok(ver, 'title version');
 assert.ok(idx.includes('<link rel="stylesheet" href="cereal.css?v='), 'cereal.css is linked');
-assert.ok(/<script src="cereal-maps\.js\?v=V[\d.]+"><\/script>\n<script src="cereal-rules\.js\?v=V[\d.]+"><\/script>\n<script src="cereal-bot\.js\?v=V[\d.]+"><\/script>\n<script src="cereal\.js\?v=V[\d.]+" defer><\/script>/.test(idx), 'maps → rules → bot → cereal (defer), adjacent');
+assert.ok(/<script src="cereal-maps\.js\?v=V[\d.]+"><\/script>\n<script src="cereal-rules\.js\?v=V[\d.]+"><\/script>\n<script src="cereal-bot\.js\?v=V[\d.]+"><\/script>\n<script src="cereal-sound\.js\?v=V[\d.]+"><\/script>\n<script src="cereal\.js\?v=V[\d.]+" defer><\/script>/.test(idx), 'maps → rules → bot → sound → cereal (defer), adjacent');
 assert.ok(/id="sch-cereal-btn" class="sch-gb-fin" onclick="cerealOpen\(\)"[^>]*data-th-title=/.test(idx), 'the 🥣 button sits in the Schedule goals row beside 💰 with a Thai title');
 assert.ok(idx.indexOf('id="sch-fin-btn"') < idx.indexOf('id="sch-cereal-btn"'), '🥣 comes right after 💰');
 assert.ok(!/db\.collection|firebase\.|fetch\(|httpsCallable/.test(js), 'cereal.js reads and writes nothing in Firestore');
@@ -146,7 +146,7 @@ const stored = page => page.evaluate(() => JSON.parse(localStorage.getItem('cere
 
         // reveal
         assert.ok((await txt(page, '#cerealModal .ck-win .t')).includes('Mint caught Pond at 12'), 'correct arrest ends the game');
-        assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#cerealModal .ck-days button')].map(b => (b.disabled ? '-' : '') + b.textContent)), ['D1', 'D2', '-D3', '-D4', '-D5', '-D6', '-D7']);
+        assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#cerealModal .ck-days button')].map(b => (b.disabled ? '-' : '') + b.textContent)), ['ทั้งหมด', 'D1', 'D2', '-D3', '-D4', '-D5', '-D6', '-D7'], 'V101.333: the rail opens on ทั้งหมด (every day\'s route)');
         assert.ok((await cls(page, 12)).includes('caught') && (await cls(page, 8)).includes('home'), 'caught cell + home ring');
         assert.ok((await txt(page, cell(13))).includes('🕵️'), 'the detective is drawn where the arrest was made from (13), not where the turn began');
         const nb = await txt(page, '#cerealModal .ck-nb');

@@ -72,6 +72,7 @@
         + '#cerealTour .ct-tip{margin-top:auto}'
         // V101.332 (owner screenshot 2026-11-22): on a big screen the card sat at the bottom edge, far from the board — center the pair there; phones keep the card in thumb reach
         + '@media (min-width:600px) and (min-height:1000px){#cerealTour .ct{justify-content:center}#cerealTour .ct-tip{margin-top:6px}}'
+        + '@media (min-width:600px){#cerealTour .ct{max-width:560px}#cerealTour .ct-cell{font-size:1.7em}}'   // V101.333: same width as the game
         + '@keyframes jt-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}'
         + '.ct-tip .k{font-size:11px;font-weight:800;letter-spacing:.06em;color:#8b5cf6;text-transform:uppercase}'
         + '.ct-tip .t{margin:2px 0 4px;font-size:16px;font-weight:800;color:#4c1d95}'
