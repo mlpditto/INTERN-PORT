@@ -1,4 +1,5 @@
-/* V101.327 (+V101.329 tutorial hooks, V101.331 🤖 bot mode — owner pick C: two cards 🔪 vs 🤖 / 🕵️ vs 🤖 with 🥄 levels, no hand-off
+/* V101.327 (+V101.333 owner picks from mockup-cereal-ux/: 1A lean quota warning above 🔒, 2A+D reveal = every day's route drawn on the board
+   in its own colour + 🔎 ทบทวนคดี, 12 sounds via cereal-sound.js; V101.329 tutorial hooks, V101.331 🤖 bot mode — owner pick C: two cards 🔪 vs 🤖 / 🕵️ vs 🤖 with 🥄 levels, no hand-off
    when the other seat is the bot, a ≥ 0.6 s "🤖 กำลังคิด…" beat then what the bot did in public, then ▸ ตาคุณ; V101.330 polish: Thai first with a small English line, labelled ask chips, ✕ / ↺ fixed) — 🥣 Cereal Killer, Phase 1: pass-and-play on ONE phone (Killer vs Detective, city map A/B). Owner's mockup picks
    2026-11-20: K-A (board first, kill / witness chips appear under the board after the 3rd step, notebook strip at the bottom),
    D-A (question cards as a chip rail, the public case log at the bottom), a tint hand-off screen between every turn, reveal
@@ -38,6 +39,11 @@
     function L(th, en) { return th + '<small class="en">' + en + '</small>'; }   // V101.330: Thai first, a small English line under it
     function ansTh(q, a) { return q === 'dir' ? dirWord(a) : ({ yes: 'ใช่', no: 'ไม่ใช่', even: 'คู่', odd: 'คี่' }[a] || a); }
     function mapOf(game) { return R.buildMap(M, game.citySide, null); }
+    function snd(k, d) { if (window.CKSound) CKSound.play(k, d); }   // V101.333
+    var DAYC = ['#f97316', '#2563eb', '#7c3aed', '#16a34a', '#db2777', '#0891b2', '#ca8a04'];   // V101.333: one colour per day on the reveal
+    /* V101.333 (owner pick 1A): true when a day without a victim today loses the game — the calendar minimum, or as many kills
+       still owed as days left (today included). */
+    function mustKill(game) { if (game.kills >= R.MAX_KILLS) return false; if (!R.calendarOk(game.day, game.kills)) return true; return R.MAX_KILLS - game.kills >= R.DAYS - game.day + 1; }
     function kpos(game) { var days = Object.keys(game.secret.path).map(Number).sort(function (a, b) { return b - a; }); return days.length ? game.secret.path[days[0]].slice(-1)[0] : game.secret.home; }
     function blockedFor(game) { return game.detectivePos != null ? [game.detectivePos] : []; }
 
@@ -102,7 +108,8 @@
         g.status = 'finished'; g.phase = 'over'; g.hand = null; ui.arrest = null;
         g.result = { winner: winner, reason: reason, day: g.day, cell: extra && extra.cell != null ? extra.cell : null, kpos: kpos(g) };
         g.log.push({ day: g.day, type: 'end', text: winner === 'good' ? '🕵️ wins · ' + reason : '🔪 wins · ' + reason });
-        ui.revealDay = g.day;
+        ui.revealDay = 0;   // V101.333: the reveal opens on every day's route at once
+        snd(winner === 'good' ? 'siren' : 'lose');
         save();
     }
 
@@ -111,7 +118,10 @@
         return '<span class="ck-pill"' + t('victims', 'เหยื่อ') + '>🥣 ' + game.kills + '/' + R.MAX_KILLS + '</span>'
             + '<span class="ck-pill"' + t('arrests left', 'จับกุมเหลือ') + '>🛡️ ' + game.arrestsLeft + '</span>';
     }
-    function topHtml(h3, extra) { return '<div class="ck-top"><h3>' + h3 + '</h3>' + (extra || '') + '<button type="button" class="ck-x" onclick="CK.close()"' + t('Close', 'ปิด') + '>✕</button></div>'; }
+    function topHtml(h3, extra) {
+        var so = !window.CKSound || CKSound.on();
+        return '<div class="ck-top"><h3>' + h3 + '</h3>' + (extra || '') + (window.CKSound ? '<button type="button" class="ck-snd" id="ck-snd" onclick="CK.sound()" aria-pressed="' + so + '"' + t(so ? 'Sound on' : 'Sound off', so ? 'เสียงเปิด' : 'เสียงปิด') + '>' + (so ? '🔊' : '🔇') + '</button>' : '') + '<button type="button" class="ck-x" onclick="CK.close()"' + t('Close', 'ปิด') + '>✕</button></div>';
+    }
     function calHtml(game) {
         var h = '<div class="ck-cal"' + t('Victims required by the end of day 2 / 4 / 7', 'เหยื่อขั้นต่ำเมื่อจบวัน 2 / 4 / 7') + '>';
         for (var d = 1; d <= R.DAYS; d++) h += '<span class="' + (d < game.day ? 'done' : d === game.day ? 'now' : '') + '">D' + d + (d < game.day && game.secret.kills[d] ? ' 🥣' : (CAL[d] || '')) + '</span>';
@@ -233,6 +243,7 @@
                     h += '</div>';
                 }
             }
+            if (mustKill(g) && typeof g.draft.kill !== 'number') h += '<div class="ck-warn" id="ck-warn">⚠️ วันนี้ต้องมีเหยื่อ · เว้น = แพ้</div>';   // V101.333 pick 1A
             var turn = { path: path, kill: typeof kill === 'number' ? kill : null, witness: g.draft.witness }, v = full && g.draft.kill != null ? R.validateKillerTurn(m, turn, { blocked: blocked, taken: g.cereals, kills: g.kills, skipUsed: g.skipUsed }) : { ok: false };
             h += '<button type="button" class="ck-primary" id="ck-lock" onclick="CK.lock()"' + (v.ok ? '' : ' disabled') + t('Lock day ' + g.day + ' and pass the phone', 'ล็อกวันที่ ' + g.day + ' แล้วส่งมือถือ') + '>' + L('🔒 ล็อกวันที่ ' + g.day, 'Lock day ' + g.day) + '</button>';
         }
@@ -251,6 +262,7 @@
             if (R.stepTargets(m, path[path.length - 1], { blocked: blockedFor(g) }).indexOf(id) < 0) return;
             path.push(id); g.draft.kill = null; g.draft.witness = null;
         }
+        snd('step');
         save(); render();
     }
     function undo() {
@@ -270,9 +282,10 @@
         g.kills = v.kills; g.skipUsed = v.skipUsed; g.witness = v.witness;
         g.log.push({ day: g.day, type: 'kill', witness: v.witness, text: v.kill != null ? '🥣 ' + v.kill + (v.witness != null ? ' · 👁️ ' + v.witness : '') : '⏭ ไม่มีเหยื่อ' });
         pubPush(v);
+        if (v.kill != null) snd('crunch'); if (v.witness != null) snd('gasp', 0.45);
         g.draft = { path: [], kill: null, witness: null };
         if (!R.calendarOk(g.day, g.kills)) finish('good', 'calendar');
-        else { g.phase = 'detective'; g.hand = g.bot ? null : 'detective'; }
+        else { g.phase = 'detective'; g.hand = g.bot ? null : 'detective'; if (!g.bot) snd('whoosh', 1); }
         save(); render();
         botNext();
     }
@@ -319,11 +332,11 @@
     }
     function tapDetective(id) {
         var m = mapOf(g);
-        if (g.detectivePos == null) { if (m.cells[id].t !== R.T.CAFE) return; g.detectivePos = id; g.dd.path = [id]; save(); render(); return; }
+        if (g.detectivePos == null) { if (m.cells[id].t !== R.T.CAFE) return; g.detectivePos = id; g.dd.path = [id]; snd('stepD'); save(); render(); return; }
         var path = g.dd.path, last = path[path.length - 1];
         if (ui.arrest === 'pick') { if (R.arrestValid(m, last, id)) { ui.arrest = id; render(); } return; }
         if (!R.validateDetectivePath(m, path.concat(id)).ok) return;
-        path.push(id); save(); render();
+        path.push(id); snd('stepD'); save(); render();
     }
     function ask(q) {
         var m = mapOf(g), last = g.dd.path[g.dd.path.length - 1];
@@ -332,7 +345,7 @@
         g.usedQuestions.push(q); g.dd.asked = { q: q, ans: pick, two: ans.length > 1 };
         pubToday().asks.push({ q: q, ans: pick });
         g.log.push({ day: g.day, type: 'ask', q: q, ans: pick, text: '❓ ' + qcard(q).ic + ' → ' + ansTh(q, pick) });
-        save(); render();
+        snd('ding'); save(); render();
     }
     function arrestMode() { ui.arrest = 'pick'; render(); }
     function cancelArrest() { ui.arrest = null; render(); }
@@ -340,9 +353,10 @@
         var cell = ui.arrest; if (typeof cell !== 'number') return;
         ui.arrest = null;
         g.detectivePos = g.dd.path.length ? g.dd.path[g.dd.path.length - 1] : g.detectivePos;   // where the arrest is made from (the reveal shows it)
-        if (cell === kpos(g)) { g.log.push({ day: g.day, type: 'arrest', text: '🛡️ ' + cell + ' ✔' }); finish('good', 'arrest', { cell: cell }); render(); return; }
+        if (cell === kpos(g)) { g.log.push({ day: g.day, type: 'arrest', cell: cell, text: '🛡️ ' + cell + ' ✔' }); finish('good', 'arrest', { cell: cell }); render(); return; }
         g.arrestsLeft -= 1; pubToday().misses.push(cell);
-        g.log.push({ day: g.day, type: 'arrest', text: '🛡️ ' + cell + ' ✗ (เหลือ ' + g.arrestsLeft + ')' });
+        g.log.push({ day: g.day, type: 'arrest', cell: cell, text: '🛡️ ' + cell + ' ✗ (เหลือ ' + g.arrestsLeft + ')' });
+        snd('buzz');
         if (g.arrestsLeft <= 0) { finish('killer', 'arrests'); render(); return; }
         endTurn();
     }
@@ -351,7 +365,7 @@
         var path = g.dd.path.length ? g.dd.path : [g.detectivePos];
         g.detectivePos = path[path.length - 1]; g.witness = null; g.dd = { path: [], asked: null };
         if (g.day >= R.DAYS) finish('killer', 'survived');
-        else { g.day += 1; g.phase = 'killer'; g.hand = g.bot ? null : 'killer'; }
+        else { g.day += 1; g.phase = 'killer'; g.hand = g.bot ? null : 'killer'; if (!g.bot) snd('whoosh', 0.3); }
         save(); render();
         botNext();
     }
@@ -365,7 +379,7 @@
     /* If the seat to move now is the bot's, show the thinking beat and move after BOT_MS. */
     function botNext() {
         if (!g || !g.bot || !B || g.status !== 'playing' || g.phase !== g.bot.seat || botTimer) return;
-        ui.beat = { think: true }; render();
+        ui.beat = { think: true }; render(); snd('typing');
         var game = g;
         botTimer = setTimeout(function () { botTimer = null; if (g !== game || g.status !== 'playing') return; if (g.phase === 'killer') botKiller(); else botDetective(); }, BOT_MS);
     }
@@ -382,6 +396,7 @@
         g.kills = v.kills; g.skipUsed = v.skipUsed; g.witness = v.witness;
         g.log.push({ day: g.day, type: 'kill', witness: v.witness, text: v.kill != null ? '🥣 ' + v.kill + (v.witness != null ? ' · 👁️ ' + v.witness : '') : '⏭ ไม่มีเหยื่อ' });
         pubPush(v);
+        if (v.kill != null) snd('crunch'); if (v.witness != null) snd('gasp', 0.45);
         if (!R.calendarOk(g.day, g.kills)) { ui.beat = null; finish('good', 'calendar'); save(); render(); return; }
         g.phase = 'detective'; g.hand = null;
         ui.beat = { text: v.kill != null ? '🤖 🔪 คืนนี้มีเหยื่อที่ 🏠 ' + v.kill + (v.witness != null ? ' · 👁️ พยานที่ ' + v.witness : ' · ไม่มีพยาน') : '🤖 🔪 คืนนี้ไม่มีเหยื่อ', next: '🕵️' };
@@ -418,7 +433,7 @@
     // ---- reveal --------------------------------------------------------------------------------------------
     function revealHtml() {
         var m = mapOf(g), r = g.result, days = Object.keys(g.secret.path).map(Number).sort(function (a, b) { return a - b; }), lastDay = days.length ? days[days.length - 1] : 1;
-        var sel = ui.revealDay && days.indexOf(ui.revealDay) >= 0 ? ui.revealDay : lastDay;
+        var sel = ui.revealDay === 0 ? 0 : ui.revealDay && days.indexOf(ui.revealDay) >= 0 ? ui.revealDay : lastDay;   // 0 = every day (V101.333)
         var good = r.winner === 'good', title, sub;
         if (r.reason === 'arrest') { title = L('🕵️ ' + esc(g.names.detective) + ' จับ ' + esc(g.names.killer) + ' ได้ที่ ' + r.cell, esc(g.names.detective) + ' caught ' + esc(g.names.killer) + ' at ' + r.cell); sub = 'วันที่ ' + r.day + ' · จับครั้งที่ ' + (R.ARRESTS - g.arrestsLeft + 1) + ' จาก ' + R.ARRESTS; }
         else if (r.reason === 'cornered') { title = L('🕵️ ' + esc(g.names.killer) + ' จนมุมที่ ' + r.cell, esc(g.names.killer) + ' was cornered at ' + r.cell); sub = 'วันที่ ' + r.day + ' · ไม่มีทางเดิน 3 ก้าวเหลือแล้ว'; }
@@ -427,22 +442,46 @@
         else { title = L('🔪 ' + esc(g.names.killer) + ' รอดครบ 7 วัน', esc(g.names.killer) + ' survived 7 days'); sub = 'เหยื่อ ' + g.kills + ' · 🛡️ เหลือ ' + g.arrestsLeft; }
         var ex = publicExtra(g), add = function (id, k, v) { ex[id] = ex[id] || {}; ex[id][k] = (ex[id][k] || '') + v; };
         if (g.secret.home != null) add(g.secret.home, 'cls', ' home');
-        var p = g.secret.path[sel] || [];
+        var p = sel ? (g.secret.path[sel] || []) : [];
         p.slice(1).forEach(function (id, i) { add(id, 'cls', ' on'); ex[id].st = String(i + 1); });
         if (p.length) add(p[p.length - 1], 'me', '🔪');
-        if (sel === lastDay && r.reason === 'arrest') add(r.cell, 'cls', ' caught');
+        if (!sel && r.kpos != null) add(r.kpos, 'me', '🔪');
+        if ((!sel || sel === lastDay) && r.reason === 'arrest') add(r.cell, 'cls', ' caught');
+        var arrests = g.log.filter(function (e) { return e.type === 'arrest'; }).map(function (e) { return { day: e.day, cell: e.cell != null ? e.cell : +((/🛡️ (\d+)/.exec(e.text) || [])[1]), ok: /✔/.test(e.text) }; });
+        arrests.forEach(function (a) { if (!a.ok && (!sel || a.day === sel)) add(a.cell, 'cls', ' miss'); });
         if (g.detectivePos != null) add(g.detectivePos, 'tk', '🕵️');
         var h = '<div class="ck lobby">' + topHtml('🏁 จบเกม', pills(g))
             + '<div class="ck-win"><span class="big" aria-hidden="true">' + (good ? '🕵️' : '🔪') + '</span><div><p class="t">' + title + '</p><p class="s">' + sub + '</p></div></div>'
-            + '<div class="ck-days" aria-label="Replay by day">';
-        for (var d = 1; d <= R.DAYS; d++) h += '<button type="button" class="' + (d === sel ? 'on' : '') + '"' + (days.indexOf(d) >= 0 ? ' onclick="CK.revealDay(' + d + ')"' : ' disabled') + '>D' + d + '</button>';
-        h += '</div>' + boardHtml(g, { extra: ex, tap: false });
+            + '<div class="ck-days" aria-label="Replay by day"><button type="button" class="all' + (sel ? '' : ' on') + '" onclick="CK.revealDay(0)">ทั้งหมด</button>';
+        for (var d = 1; d <= R.DAYS; d++) h += '<button type="button" class="' + (d === sel ? 'on' : '') + '"' + (days.indexOf(d) >= 0 ? ' onclick="CK.revealDay(' + d + ')" style="--dc:' + DAYC[d - 1] + '"' : ' disabled') + '>D' + d + '</button>';
+        // V101.333 pick 2D: the killer's route drawn on the board, one colour per day (all days, or the one picked)
+        var rows = Math.max.apply(null, m.ids.map(function (id) { return m.cells[id].y; }));
+        var shown = days.filter(function (d) { return !sel || d === sel; });
+        var lines = shown.map(function (d, i) {
+            var off = shown.length > 1 ? (i - (shown.length - 1) / 2) * 0.09 : 0;   // a day that walks back over another stays visible beside it
+            return '<polyline class="ck-route" data-day="' + d + '" stroke="' + DAYC[d - 1] + '" points="' + g.secret.path[d].map(function (id) { return (m.cells[id].x - 0.5 + off) + ',' + (m.cells[id].y - 0.5 + off); }).join(' ') + '"/>';
+        }).join('');
+        h += '</div><div class="ck-boardwrap">' + boardHtml(g, { extra: ex, tap: false }) + '<svg class="ck-routes" viewBox="0 0 5 ' + rows + '" preserveAspectRatio="none" aria-hidden="true">' + lines + '</svg></div>';
         h += '<div class="ck-nb"><div class="lbl">📓 สมุดลับของฆาตกร · 🏠 บ้าน ' + g.secret.home + '</div>';
         days.forEach(function (d) {
             var asked = g.log.filter(function (e) { return e.day === d && e.type === 'ask'; }).map(function (e) { return qcard(e.q).ic + ' ' + ansTh(e.q, e.ans); }).join(' · ');
             var kl = g.log.filter(function (e) { return e.day === d && e.type === 'kill'; })[0] || {};
-            h += '<div class="r' + (d === sel ? ' now' : '') + '"><span class="d">D' + d + '</span><b>' + g.secret.path[d].join(' › ') + '</b><span class="m">' + esc(kl.text || '') + (asked ? ' · ' + esc(asked) : '') + '</span></div>';
+            h += '<div class="r' + (d === sel ? ' now' : '') + '"><span class="d"><i class="ck-dot" style="background:' + DAYC[d - 1] + '"></i>D' + d + '</span><b>' + g.secret.path[d].join(' › ') + '</b><span class="m">' + esc(kl.text || '') + (asked ? ' · ' + esc(asked) : '') + '</span></div>';
         });
+        // V101.333 pick 2A: 🔎 ทบทวนคดี — every card asked and every arrest, with where the killer really stood that day
+        var steps = g.log.filter(function (e) { return e.type === 'ask' || e.type === 'arrest'; });
+        if (steps.length) {
+            h += '</div><div class="ck-nb ck-review"><div class="lbl">🔎 ทบทวนคดี</div>';
+            steps.forEach(function (e) {
+                var kp = (g.secret.path[e.day] || []).slice(-1)[0], line;
+                if (e.type === 'ask') line = '❓ ' + qcard(e.q).ic + ' ' + esc(qcard(e.q).w) + ' → ' + esc(ansTh(e.q, e.ans)) + '<span class="m">ฆาตกรอยู่ ' + kp + '</span>';
+                else {
+                    var c = e.cell != null ? e.cell : +((/🛡️ (\d+)/.exec(e.text) || [])[1]), hit = /✔/.test(e.text), dd = hit ? 0 : R.distance(m, c, kp, { canRide: true });
+                    line = '<span class="' + (hit ? 'good' : 'bad') + '">🛡️ จับ ' + c + (hit ? ' ✔' : ' ✗') + '</span>' + (hit ? '' : '<span class="m">ฆาตกรอยู่ ' + kp + ' · ห่าง <b>' + dd + '</b> ช่อง</span>');
+                }
+                h += '<div class="r"><span class="d">D' + e.day + '</span>' + line + '</div>';
+            });
+        }
         h += '</div><div class="ck-row"><button type="button" class="ck-chip" onclick="CK.revealDay(1)"' + t('Replay from day 1', 'ดูซ้ำตั้งแต่วันแรก') + '>↺ ดูซ้ำ</button><button type="button" class="ck-chip" onclick="CK.lobby()">📋 เกมของฉัน</button></div>';
         h += '<button type="button" class="ck-primary" onclick="CK.rematch()"' + t('New game with the roles swapped', 'เกมใหม่ สลับบทบาท') + '>' + L('🆕 เกมใหม่ · สลับบทบาท', 'New game · swap roles') + '</button></div>';
         return h;
@@ -454,17 +493,18 @@
         tap: function (id) { if (!g || g.status !== 'playing' || g.hand) return; if (g.phase === 'killer') tapKiller(id); else tapDetective(id); },
         undo: function () { if (!g) return; if (g.phase === 'killer') undo(); else if (g.dd.path.length > 1) { g.dd.path.pop(); save(); render(); } },
         kill: kill, witness: witness, lock: lock,
-        hand: function () { if (!g) return; g.hand = null; save(); render(); },
+        hand: function () { if (!g) return; g.hand = null; snd(g.phase === 'killer' ? 'heartbeat' : 'tick'); save(); render(); },
+        sound: function () { if (window.CKSound) CKSound.toggle(); render(); },
         ask: ask, arrestMode: arrestMode, arrest: arrest, cancelArrest: cancelArrest, endTurn: endTurn,
         side: function (s) { readNames(); ui.side = s; render(); },
         rules: function () { readNames(); if (window.CKTour) { CKTour.open(); return; } ui.rules = !ui.rules; render(); },
-        start: function () { readNames(); g = newGame(); if (g.bot) g.hand = null; store.games.unshift(g); store.games = store.games.slice(0, MAX_GAMES); ui.beat = null; save(); render(); botNext(); },
+        start: function () { readNames(); g = newGame(); if (g.bot) g.hand = null; store.games.unshift(g); store.games = store.games.slice(0, MAX_GAMES); ui.beat = null; if (g.bot && g.bot.seat === 'detective') snd('heartbeat'); save(); render(); botNext(); },
         vs: function (v) { readNames(); ui.vs = v; render(); },
         me: function (r) { ui.me = r; render(); },
         level: function (r, n) { ui.me = r; ui.level[r] = n; render(); },
-        botOk: function () { ui.beat = null; render(); },
+        botOk: function () { ui.beat = null; if (g && g.status === 'playing') snd(g.phase === 'killer' ? 'heartbeat' : 'tick'); render(); },
         botDelay: function (ms) { BOT_MS = ms; },   // QA
-        resume: function (id) { var x = store.games.filter(function (y) { return y.id === id; })[0]; if (!x) return; g = x; ui.arrest = null; ui.beat = null; if (g.status === 'playing') g.hand = g.bot ? null : g.phase; else ui.revealDay = g.result.day; save(); render(); botNext(); },
+        resume: function (id) { var x = store.games.filter(function (y) { return y.id === id; })[0]; if (!x) return; g = x; ui.arrest = null; ui.beat = null; if (g.status === 'playing') g.hand = g.bot ? null : g.phase; else ui.revealDay = 0; save(); render(); botNext(); },
         rematch: function () { if (g && g.bot) { ui.vs = 'bot'; ui.me = g.bot.seat; } else if (g) { ui.vs = 'friend'; ui.names = { killer: g.names.detective, detective: g.names.killer }; } g = null; ui.beat = null; render(); },
         lobby: function () { g = null; render(); },
         revealDay: function (d) { ui.revealDay = d; render(); },

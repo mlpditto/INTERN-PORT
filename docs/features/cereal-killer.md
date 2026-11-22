@@ -10,6 +10,7 @@ Schedule ▸ the round `🥣` button beside `💰` (goals row) ▸ lobby: map si
 
 ## Scripts that drive it
 
+- `cereal-ux-qa` — V101.333 owner picks: 1A one amber line above 🔒 on a day where no victim loses (calendar, or kills owed = days left; never day 1); 2A+D reveal opens on ทั้งหมด with each day's route drawn in its own colour (offset so a day that walks back stays visible), ✗ on missed arrests, 🔎 ทบทวนคดี (card / arrest · where the killer was · cells off); 12 Web Audio cues (`public/cereal-sound.js`, on at first, 🔊/🔇 remembered as `cerealSound`) fire on the right moments; 320 px header fits with 🔊; a ≥ 600 px window gets a 560 px game (bigger board)
 - `cereal-act-check` — Phase 2 referee `functions/cereal-act.js` on a fake Firestore with two linked players: engine copies match public/, create → join (1 h deadline), a scripted game to a correct arrest with `result.revealedPath`, the secret never in the public doc while playing, illegal actions refused with codes, ⏳ claim after 1 h, resign
 - `cereal-bot-ui-qa` — lobby 👤 / 🤖 chips and the two cards with 🥄 levels, no hand-off in a solo game, the thinking beat → what the bot did → ▸ ตาคุณ, the bot detective blocks its cell, the bot killer's path never on screen before the reveal, nothing written to Firestore (390 + 320)
 - `cereal-bot-check` — 1 200 seeded bot-vs-bot games in node: the detective's candidate set (public facts only) always holds the killer's real cell after every day, answer and missed arrest; every bot action passes the engine; 🥄 → 🥄🥄🥄 strength is ordered on both sides; < 40 ms a game

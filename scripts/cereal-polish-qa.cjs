@@ -43,7 +43,8 @@ const txt = (page, sel) => page.evaluate(s => { const e = document.querySelector
             const { page, errors } = await open(browser, width);
             await page.evaluate(() => cerealOpen());
             let x = await box(page, '#cerealModal .ck-x');
-            assert.ok(x.w === 30 && x.h === 30, width + ' lobby ✕ is a 30 px square: ' + JSON.stringify(x));
+            const xs = width < 360 ? 26 : 30;   // V101.333: under 360 px ✕ and 🔊 are 26 px so the killer header fits
+            assert.ok(x.w === xs && x.h === xs, width + ' lobby ✕ is a ' + xs + ' px square: ' + JSON.stringify(x));
             assert.ok((await txt(page, '#ck-start')).includes('เริ่ม') && (await txt(page, '#ck-start')).includes('Start'), 'Start: Thai first + small English');
             assert.ok((await txt(page, '#cerealModal .ck.lobby')).includes('ผู้เล่น'), 'lobby labels in Thai');
             await page.fill('#ck-n1', 'Pond'); await page.fill('#ck-n2', 'Mint');
@@ -81,7 +82,7 @@ const txt = (page, sel) => page.evaluate(s => { const e = document.querySelector
             await page.click('#ck-arrest'); await page.click(cell(12)); await page.click('#ck-confirm .yes');
             // reveal: header fits, ✕ on screen, day said once (in the sub line)
             assert.ok(await fitsTop(page), width + ' Game over ✕ is inside the card');
-            x = await box(page, '#cerealModal .ck-x'); assert.ok(x.w === 30 && x.h === 30, width + ' reveal ✕ square');
+            x = await box(page, '#cerealModal .ck-x'); assert.ok(x.w === xs && x.h === xs, width + ' reveal ✕ square');
             const top = await txt(page, '#cerealModal .ck-top');
             assert.ok(top.includes('จบเกม') && !/Day \d/.test(top), 'reveal header: จบเกม, no Day pill: ' + top);
             const win = await txt(page, '#cerealModal .ck-win');
