@@ -141,6 +141,8 @@ Owner 2026-11-20: "เพิ่มโหมดเล่นกับบอทไ�
 | Lobby: opponent chip 👤 / 🤖, 🥄 level chip, the hand-off screen is skipped when the other seat is the bot; the bot's turn shows a short "🤖 thinking…" beat (≥ 600 ms so the move is seen to happen), then the public result; the reveal shows the bot's notebook like a human's | `cereal-bot-ui-qa.cjs`: a scripted solo game as detective and as killer reaches the reveal; no hand-off screen appears; the bot's path never enters the DOM before the reveal |
 | Tutorial hook: the last tutorial card offers "▸ Try a round vs 🤖" | — |
 
+**PR 1 built 2026-11-22 (no version bump, nothing loads it yet): `public/cereal-bot.js` + `scripts/cereal-bot-check.cjs`.** Measured over 200 games per pairing (detective win %): 🔪🥄 vs 🕵️🥄 62 · vs 🕵️🥄🥄🥄 86 · 🔪🥄🥄 vs 🕵️🥄🥄 50 · 🔪🥄🥄🥄 vs 🕵️🥄🥄🥄 19. The bot killer scores how many cells the detective could still suspect, whether any cell the detective can reach today puts it in arrest reach (🥄🥄🥄 simulates the bot detective's own move), a witness park far from its end, a fresh house in reach tomorrow, and keeps the quiet day; the bot detective walks to the witness first, asks the entropy card, arrests when half the suspects are in reach.
+
 Out of scope here: a bot for the 3-player game (Lola) — Phase 3 decides. Size: 2 PRs (bot + its check → lobby/turn UI). Version: intern +2.
 
 ### Phase 2 — Online, asynchronous, 2 players

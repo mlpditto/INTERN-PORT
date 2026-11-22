@@ -2,7 +2,7 @@
 
 A turn-based deduction game for 2–3 interns (Killer vs Detective, plus Lola the police dog), built in phases — plan and board transcription in [`docs/CEREAL-KILLER-PLAN.md`](../CEREAL-KILLER-PLAN.md).
 
-**Built so far: Phase 0 (board + engine), Phase 1 PR 1 (pass-and-play game on one phone, V101.327) PR 2 (the animated tutorial + first-turn coach marks, V101.329) and PR 3 polish (V101.330: Thai first with a small English line, labelled ask chips, one-line chip rails, ✕ / ↺ fixed, lean hand-off).** The bot (Phase 1½) is not built yet.
+**Built so far: Phase 0 (board + engine), Phase 1 PR 1 (pass-and-play game on one phone, V101.327) PR 2 (the animated tutorial + first-turn coach marks, V101.329) and PR 3 polish (V101.330: Thai first with a small English line, labelled ask chips, one-line chip rails, ✕ / ↺ fixed, lean hand-off).** Phase 1½ PR 1: `public/cereal-bot.js` — the bot brain, pure, not loaded by the page yet; PR 2 wires it into the lobby.
 
 ## How to get to it (user POV)
 
@@ -10,6 +10,7 @@ Schedule ▸ the round `🥣` button beside `💰` (goals row) ▸ lobby: map si
 
 ## Scripts that drive it
 
+- `cereal-bot-check` — 1 200 seeded bot-vs-bot games in node: the detective's candidate set (public facts only) always holds the killer's real cell after every day, answer and missed arrest; every bot action passes the engine; 🥄 → 🥄🥄🥄 strength is ordered on both sides; < 40 ms a game
 - `cereal-maps-check` — `public/cereal-maps.js` against the photo transcription (Appendix A): tallies per side, contiguous ids, connected board, the subway pair, the train chain, one bowl, the five seam edges, orphan parks noted
 - `cereal-board-qa` — the whole Phase 1 flow on the real page: 🥣 button beside 💰, lobby, killer day 1 (home · 8›3›2›1 · kill 3 · witness 4 · lock), hand-off hides the turn, detective café / walk / ask / missed arrest, reload + resume, day 2 kill without a park, correct arrest → reveal, 320 px fit
 - `cereal-polish-qa` — ✕ / ↺ / cancel ✕ are 30 px squares, the Game over header fits with its ✕, kill / witness / ask rows stay one line, the five ask chips carry ทิศ แถว คอลัมน์ อาคาร คู่/คี่, Thai first + small English on Start / Lock / End turn / hand-off / reveal, no meta lines on the hand-off (390 + 320)
