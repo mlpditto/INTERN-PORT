@@ -128,20 +128,36 @@ window.piOpenCard = function(key) {
     if (d) d.open = true;
 };
 window.piFoldAll = function() { document.querySelectorAll('#pi-info-panel details').forEach(d => { d.open = false; }); };
-window.piRefreshDots = function() {
+// V101.328 (owner pick C + bubble, mockup-pi-dot-anim/): the dot says HOW MANY are still empty (✏️ n, softly glowing), and when the Info
+// opens a small bubble over the first unfinished card nudges the intern; it goes on a tap, when that card opens, or after 6 s.
+window.piRefreshDots = function(nudge) {
     const v = id => (document.getElementById(id) || {}).value || '';
-    const empty = id => !v(id).trim();
-    const dots = {
-        personal: ['pi-firstname', 'pi-lastname', 'pi-nickname', 'pi-birthplace', 'pi-bday-day', 'pi-bday-month', 'pi-bday-year'].some(empty),
-        certificate: ['pi-firstname-en', 'pi-lastname-en', 'pi-institute'].some(empty),
-        contact: (empty('pi-phone') && empty('pi-email')) || empty('pi-address') || empty('pi-ref-name-1') || empty('pi-ref-phone-1'),
-        period: empty('pi-start-date') || empty('pi-end-date'),
-        social: ['facebook', 'line', 'instagram', 'tiktok', 'duolingo'].every(k => empty('pi-social-' + k))
+    const n = ids => ids.filter(id => !v(id).trim()).length;
+    const counts = {
+        personal: n(['pi-firstname', 'pi-lastname', 'pi-nickname', 'pi-birthplace', 'pi-bday-day', 'pi-bday-month', 'pi-bday-year']),
+        certificate: n(['pi-firstname-en', 'pi-lastname-en', 'pi-institute']),
+        contact: (n(['pi-phone', 'pi-email']) === 2 ? 1 : 0) + n(['pi-address', 'pi-ref-name-1', 'pi-ref-phone-1']),
+        period: n(['pi-start-date', 'pi-end-date']),
+        social: ['facebook', 'line', 'instagram', 'tiktok', 'duolingo'].every(k => !v('pi-social-' + k).trim()) ? 1 : 0
     };
-    Object.entries(dots).forEach(([k, missing]) => {
+    let first = null;
+    Object.entries(counts).forEach(([k, c]) => {
         const dot = document.querySelector('#pi-info-panel [data-dot="' + k + '"]');
-        if (dot) { dot.hidden = !missing; dot.title = missing ? 'Something is still empty · ยังมีช่องว่าง' : ''; }
+        if (!dot) return;
+        dot.hidden = !c; dot.textContent = c ? '✏️ ' + c : '';
+        dot.title = c ? c + ' still empty · ยังว่าง ' + c + ' ช่อง' : '';
+        if (c && !first) first = { dot, c };
     });
+    const old = document.querySelector('#pi-info-panel .pi-nudge');
+    if (old && (!old.parentElement.querySelector('.pi-dot:not([hidden])') || old.closest('details[open]'))) old.remove();
+    if (!nudge || !first) return;
+    old?.remove();
+    const end = first.dot.closest('.pi-end'), bubble = document.createElement('span');
+    bubble.className = 'pi-nudge lang-no-toggle'; bubble.setAttribute('role', 'status');
+    bubble.textContent = 'อีก ' + first.c + ' ช่อง · กรอกให้ครบนะ ✨';
+    bubble.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); bubble.remove(); });
+    end.prepend(bubble);
+    setTimeout(() => bubble.remove(), 6000);
 };
 // Health (optional, admin-only). "None" writes "-" so an answered "no" differs from a blank; the consent tick is stored as health.consentAt.
 window.piSyncNone = function() {
