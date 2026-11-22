@@ -2,7 +2,7 @@
 
 A turn-based deduction game for 2–3 interns (Killer vs Detective, plus Lola the police dog), built in phases — plan and board transcription in [`docs/CEREAL-KILLER-PLAN.md`](../CEREAL-KILLER-PLAN.md).
 
-**Built so far: Phase 0 (board + engine), Phase 1 PR 1 (pass-and-play game on one phone, V101.327) and PR 2 (the animated tutorial + first-turn coach marks, V101.328).** The bot (Phase 1½) is not built yet.
+**Built so far: Phase 0 (board + engine), Phase 1 PR 1 (pass-and-play game on one phone, V101.327) and PR 2 (the animated tutorial + first-turn coach marks, V101.329).** The bot (Phase 1½) is not built yet.
 
 ## How to get to it (user POV)
 

@@ -1,4 +1,4 @@
-/* V101.327 (+V101.328 tutorial hooks) — 🥣 Cereal Killer, Phase 1: pass-and-play on ONE phone (Killer vs Detective, city map A/B). Owner's mockup picks
+/* V101.327 (+V101.329 tutorial hooks) — 🥣 Cereal Killer, Phase 1: pass-and-play on ONE phone (Killer vs Detective, city map A/B). Owner's mockup picks
    2026-11-20: K-A (board first, kill / witness chips appear under the board after the 3rd step, notebook strip at the bottom),
    D-A (question cards as a chip rail, the public case log at the bottom), a tint hand-off screen between every turn, reveal
    with a day rail. Entry: the 🥣 button beside 💰 FIN on Schedule (cerealOpen). Rules come from cereal-rules.js and the board
@@ -60,7 +60,7 @@
         store = load(); g = null; ui.arrest = null; ui.rules = false;
         render();
         root().style.display = 'flex';
-        if (window.CKTour && !CKTour.seen()) CKTour.open();   // V101.328: How to play, the first time on this device
+        if (window.CKTour && !CKTour.seen()) CKTour.open();   // V101.329: How to play, the first time on this device
     }
     function close() {
         if (g && g.status === 'playing' && !g.hand) g.hand = g.phase;   // whoever reopens must tap through the hand-off first
@@ -74,7 +74,7 @@
         var html = !g ? lobbyHtml() : g.status === 'finished' ? revealHtml() : g.hand ? handHtml() : g.phase === 'killer' ? killerHtml() : detectiveHtml();
         body.innerHTML = html;
         var sc = document.querySelector('#cerealModal .modal-content'); if (sc) sc.scrollTop = 0;
-        if (window.CKTour) CKTour.coach(coachKey());   // V101.328: first-turn hints follow the step the player is on
+        if (window.CKTour) CKTour.coach(coachKey());   // V101.329: first-turn hints follow the step the player is on
     }
     /* Which first-turn hint fits the screen just drawn (cereal-tutorial.js shows each once). null = nothing to coach. */
     function coachKey() {

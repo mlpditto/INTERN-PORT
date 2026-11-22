@@ -1,4 +1,4 @@
-/* V101.328 — 🥣 Cereal Killer tutorial, two layers in the Journal-tour shape (violet card, Thai first with a small English line, 👆 finger,
+/* V101.329 — 🥣 Cereal Killer tutorial, two layers in the Journal-tour shape (violet card, Thai first with a small English line, 👆 finger,
    CSS-only animation, reduced motion = still cards, once per device, replay from the lobby's ?). Owner 2026-11-20: 8 scenes, advance on ถัดไป
    by default with a ▶ auto toggle the players may switch on (every 6 s), Thai first like the Journal tour.
    (1) How to play — 8 scenes on a demo board (side A) that animates by itself; opens the first time the 🥣 sheet opens.

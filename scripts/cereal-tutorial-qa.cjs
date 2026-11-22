@@ -1,4 +1,4 @@
-// V101.328: 🥣 Cereal Killer tutorial (cereal-tutorial.js) on the REAL public/index.html, touch phone, file://, network blocked, Firebase
+// V101.329: 🥣 Cereal Killer tutorial (cereal-tutorial.js) on the REAL public/index.html, touch phone, file://, network blocked, Firebase
 // stubbed. Layer 1, How to play: opens by itself the first time the 🥣 sheet opens, 8 scenes Thai first with an English line, the demo
 // board animates (CSS only), ถัดไป walks all 8 to the ▸ เริ่มเกม card, ข้าม closes, the flag keeps it closed on the next open, ? in the
 // lobby replays it, ▶ auto advances by itself and is remembered, reduced motion = still cards. Layer 2, coach marks: on the first real
