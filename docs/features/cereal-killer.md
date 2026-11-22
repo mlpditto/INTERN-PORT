@@ -2,7 +2,7 @@
 
 A turn-based deduction game for 2–3 interns (Killer vs Detective, plus Lola the police dog), built in phases — plan and board transcription in [`docs/CEREAL-KILLER-PLAN.md`](../CEREAL-KILLER-PLAN.md).
 
-**Built so far: Phase 0 (board + engine), Phase 1 PR 1 (pass-and-play game on one phone, V101.327) and PR 2 (the animated tutorial + first-turn coach marks, V101.329).** The bot (Phase 1½) is not built yet.
+**Built so far: Phase 0 (board + engine), Phase 1 PR 1 (pass-and-play game on one phone, V101.327) PR 2 (the animated tutorial + first-turn coach marks, V101.329) and PR 3 polish (V101.330: Thai first with a small English line, labelled ask chips, one-line chip rails, ✕ / ↺ fixed, lean hand-off).** The bot (Phase 1½) is not built yet.
 
 ## How to get to it (user POV)
 
@@ -12,10 +12,13 @@ Schedule ▸ the round `🥣` button beside `💰` (goals row) ▸ lobby: map si
 
 - `cereal-maps-check` — `public/cereal-maps.js` against the photo transcription (Appendix A): tallies per side, contiguous ids, connected board, the subway pair, the train chain, one bowl, the five seam edges, orphan parks noted
 - `cereal-board-qa` — the whole Phase 1 flow on the real page: 🥣 button beside 💰, lobby, killer day 1 (home · 8›3›2›1 · kill 3 · witness 4 · lock), hand-off hides the turn, detective café / walk / ask / missed arrest, reload + resume, day 2 kill without a park, correct arrest → reveal, 320 px fit
+- `cereal-polish-qa` — ✕ / ↺ / cancel ✕ are 30 px squares, the Game over header fits with its ✕, kill / witness / ask rows stay one line, the five ask chips carry ทิศ แถว คอลัมน์ อาคาร คู่/คี่, Thai first + small English on Start / Lock / End turn / hand-off / reveal, no meta lines on the hand-off (390 + 320)
 - `cereal-tutorial-qa` — auto-open once, 8 Thai-first scenes with CSS animation, ▸ เริ่มเกม / ข้าม / Esc / ? replay, ▶ auto advances and is remembered, the 8 coach marks follow the real turn and ring the real element(s) with the card off them, skip-all, reduced motion = still cards, 320 px
 - `cereal-rules-check` — `public/cereal-rules.js` on the rulebook's worked examples: exact-3 killer path with subway / blocking / cornering, kill + witness placement, the one no-kill day, calendar minimums, all six question cards, the detective's café bonus and arrest reach, Lola's moves, abilities, Sniff and Bark, the side-B train, the seam
 
 ## What usually lies
+
+- `#cerealModal .ck button { width: auto }` out-ranks a plain `.ck-x { width: 30px }` (one id + two classes + a type beats one id + one class): the ✕ and ↺ were tall thin pills for two releases. Size rules for buttons inside `.ck` need `.ck` in the selector.
 
 - `userId` in index.html is a top-level `let`: `window.userId` is undefined in a module file, so the storage key silently became `cereal_v1_anon` until the harness read localStorage back. Read the bare global.
 - A coach card placed below its target covers the row that appears next (the witness row under the kill row, ▸ End turn under 🛡️ arrest). A hint rings every element of its step (`#ck-kill, #ck-wit`) and the card goes below the union; Playwright's retry-scroll also exposed a one-frame lag, so the card re-places synchronously on scroll.

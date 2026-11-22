@@ -81,7 +81,7 @@ const stored = page => page.evaluate(() => JSON.parse(localStorage.getItem('cere
         for (const id of [3, 2, 1]) await page.click(cell(id));
         assert.equal(await txt(page, '#ck-path'), '8 › 3 › 2 › 1', 'the rulebook path');
         assert.equal(await page.evaluate(() => document.querySelectorAll('#cerealModal .ck-cell:not([disabled])').length), 0, 'no 4th step');
-        assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#ck-kill .ck-chip')].map(b => b.textContent.trim())), ['🏠 8', '🏠 3', '🏠 1', '⏭ skip'], 'kill chips = the houses on the path + skip');
+        assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#ck-kill .ck-chip')].map(b => b.textContent.trim())), ['🏠 8', '🏠 3', '🏠 1', '⏭ เว้น'], 'kill chips = the houses on the path + skip');
         assert.ok(await page.isDisabled('#ck-lock'), 'lock waits for the kill choice');
         await page.click('#ck-kill .ck-chip:has-text("🏠 3")');
         assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#ck-wit .ck-chip')].map(b => b.textContent.trim())), ['🌳 2', '🌳 4'], 'witness parks next to 3');
@@ -92,7 +92,7 @@ const stored = page => page.evaluate(() => JSON.parse(localStorage.getItem('cere
 
         // hand-off to the detective: nothing of the killer's turn on screen
         const hand = await txt(page, '#cerealModal');
-        assert.ok(hand.includes('Pass the phone to Mint') && hand.includes('👁️ at 4') && hand.includes('🥣 1/6'), 'public state on the hand-off: ' + hand);
+        assert.ok(hand.includes('Pass the phone to Mint') && hand.includes('👁️ ที่ 4') && hand.includes('🥣 1/6'), 'public state on the hand-off: ' + hand);
         assert.ok(!hand.includes('8 › 3') && !hand.includes('home'), 'the path and home are not on the hand-off screen');
         assert.equal(await page.evaluate(() => document.querySelectorAll('#cerealModal .ck-cell, #cerealModal .ck-nb').length), 0, 'no board, no notebook');
         let g = await game(page);
@@ -110,14 +110,14 @@ const stored = page => page.evaluate(() => JSON.parse(localStorage.getItem('cere
         assert.equal(await txt(page, '#cerealModal .ck-pill.acc'), '👣 1', 'two steps used, no bonus for starting on the café');
         assert.ok(!(await page.isDisabled('#ck-ask [data-q="building"]')), 'next to 👁️ 4 → may ask');
         await page.click('#ck-ask [data-q="building"]');
-        assert.ok((await txt(page, '#ck-answer')).includes('→ yes'), 'killer stands on house 1 → in a building');
+        assert.ok((await txt(page, '#ck-answer')).includes('→ ใช่'), 'killer stands on house 1 → in a building');
         assert.ok(await page.isDisabled('#ck-ask [data-q="dir"]'), 'one card per witness');
-        assert.ok((await txt(page, '#cerealModal .ck-nb')).includes('❓ 🏠 → yes'), 'answer in the public log');
+        assert.ok((await txt(page, '#cerealModal .ck-nb')).includes('❓ 🏠 → ใช่'), 'answer in the public log');
         await page.click('#ck-arrest');
         assert.deepEqual((await enabledCells(page)).sort((a, b) => a - b), [4, 8, 9, 10, 14], 'arrest = own cell or a neighbour');
         assert.ok(await page.isDisabled('#ck-end'), 'cannot end the turn mid-arrest');
         await page.click(cell(4));
-        assert.ok((await txt(page, '#ck-confirm')).includes('Arrest at 4') && (await txt(page, '#ck-confirm')).includes('4 → 3'), 'quoted confirm with the cost');
+        assert.ok((await txt(page, '#ck-confirm')).includes('จับที่ 4') && (await txt(page, '#ck-confirm')).includes('4 → 3'), 'quoted confirm with the cost');
         await page.click('#ck-confirm .yes');
         g = await game(page);
         assert.deepEqual({ arrests: g.arrestsLeft, day: g.day, phase: g.phase, hand: g.hand, pos: g.detectivePos, witness: g.witness, used: g.usedQuestions }, { arrests: 3, day: 2, phase: 'killer', hand: 'killer', pos: 9, witness: null, used: ['building'] }, 'a wrong arrest ends the turn');
@@ -135,9 +135,9 @@ const stored = page => page.evaluate(() => JSON.parse(localStorage.getItem('cere
         assert.ok((await cls(page, 9)).includes('r') && (await txt(page, cell(9))).includes('🕵️'), 'the detective token is public');
         assert.deepEqual((await enabledCells(page)).sort((a, b) => a - b), [2, 6], 'steps from 1');
         for (const id of [6, 11, 12]) await page.click(cell(id));
-        assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#ck-kill .ck-chip')].map(b => b.textContent.trim() + (b.disabled ? '×' : ''))), ['🏠 1', '🏠 11', '⏭ skip'], 'the start house 1 (no cereal yet) and 11 are both legal on 1›6›11›12');
+        assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#ck-kill .ck-chip')].map(b => b.textContent.trim() + (b.disabled ? '×' : ''))), ['🏠 1', '🏠 11', '⏭ เว้น'], 'the start house 1 (no cereal yet) and 11 are both legal on 1›6›11›12');
         await page.click('#ck-kill .ck-chip:has-text("🏠 11")');
-        assert.ok((await txt(page, '#ck-wit')).includes('no park next to 11'), 'no witness when no park touches the house');
+        assert.ok((await txt(page, '#ck-wit')).includes('ไม่มีสวนติดบ้าน 11'), 'no witness when no park touches the house');
         await page.click('#ck-lock');
         await page.click('#ck-hand-go');
         assert.ok((await txt(page, '#ck-ask')).length && await page.isDisabled('#ck-ask [data-q="dir"]'), 'no witness → nothing to ask');
@@ -150,7 +150,7 @@ const stored = page => page.evaluate(() => JSON.parse(localStorage.getItem('cere
         assert.ok((await cls(page, 12)).includes('caught') && (await cls(page, 8)).includes('home'), 'caught cell + home ring');
         assert.ok((await txt(page, cell(13))).includes('🕵️'), 'the detective is drawn where the arrest was made from (13), not where the turn began');
         const nb = await txt(page, '#cerealModal .ck-nb');
-        assert.ok(nb.includes('8 › 3 › 2 › 1') && nb.includes('1 › 6 › 11 › 12') && nb.includes('🏠 yes'), 'the notebook is revealed with the answers: ' + nb);
+        assert.ok(nb.includes('8 › 3 › 2 › 1') && nb.includes('1 › 6 › 11 › 12') && nb.includes('🏠 ใช่'), 'the notebook is revealed with the answers: ' + nb);
         await page.click('#cerealModal .ck-days button:has-text("D1")');
         assert.ok((await cls(page, 1)).includes('on') && (await txt(page, cell(1))).includes('🔪'), 'day rail replays day 1');
         g = await game(page);
