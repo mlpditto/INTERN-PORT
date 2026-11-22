@@ -155,7 +155,9 @@ Out of scope here: a bot for the 3-player game (Lola) — Phase 3 decides. Size:
 | Turn timer: optional `turnDeadline` (default 48 h); on expiry the next actor may tap "⏳ claim" to end the stale turn (no scheduler job → nothing to deploy on a schedule, no LINE quota) | included in `cereal-act-check` |
 | Deep link `?cereal=<gameId>` so the shared card opens the sheet on that game | QA asserts the router handles the prefix before substring routes (memory: router prefix first) |
 
-Deploy: `firebase deploy --only functions:cerealAct` and `--only firestore:rules,firestore:indexes` by the owner (manual, from the non-OneDrive clone). Add both to `docs/OWNER_ACTIONS.md`.
+Deploy: `firebase deploy --only functions:cerealAct` and `--only firestore:rules` — **owner 2026-11-22: Claude deploys from HP** after each merge (the non-OneDrive clone). No composite index: the game list is one `array-contains` on `authUids`, and the function's code / creator lookups are equality-only.
+
+**Owner decisions 2026-11-22:** the app picks the less telling compass answer (no wait for the killer) · turn timer **1 hour**, then the waiting player may tap ⏳ claim (stale killer → detective wins on time; stale detective → the turn ends where it stands) · `join` starts the game at once (no separate `start`). **PR 1 built: `functions/cereal-act.js` (`create · join · killerMove · ask · detectiveEnd · claim · resign`), `functions/cereal-rules.js` + `cereal-maps.js` byte copies of public/ (a deploy uploads functions/ only), the `cereal_games` rules, `scripts/cereal-act-check.cjs`.**
 
 Size: 3 PRs (function + rules, lobby UI, share cards). Version: intern V101.287–289.
 
