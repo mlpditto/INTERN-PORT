@@ -8,7 +8,8 @@
    V101.343 (owner, voice Foi Thong · mockup-cereal-voice/): each How to play card reads itself aloud — public/cereal-voice/s1…s9.mp3, made once
    with Paxa TTS (no call at play time). 🔊 / 🔇 in the card header is the game's own sound switch (CKSound, localStorage cerealSound).
    A clip starts on the tap that opened the tour or turned the card; when the phone refuses (no tap yet) the 🔊 chip pulses and a tap plays it.
-   Close / ข้าม / a new card stop it. With ▶ auto on, the card turns 0.8 s after its clip ends instead of every 6 s. */
+   Close / ข้าม / a new card stop it. With ▶ auto on, the card turns 0.8 s after its clip ends instead of every 6 s.
+   Each first-turn coach mark reads itself too (cereal-voice/c-<key>.mp3, same voice); it stops when the hint closes. */
 (function () {
     'use strict';
     var R = window.CerealRules, M = window.CEREAL_MAPS;
@@ -240,7 +241,15 @@
         ask: { ring: '#ck-ask', k: 'เทิร์นแรกของคุณ · 3 / 4', t: 'ถามพยานได้ 1 ใบ', b: 'แอปตอบตามความจริงแทนฆาตกร ใบที่ใช้แล้วใช้ซ้ำไม่ได้ทั้งเกม', en: 'Spend one question card; the app answers truthfully.' },
         arrest: { ring: '#ck-arrest, #ck-end', k: 'เทิร์นแรกของคุณ · 4 / 4', t: '🛡️ จับกุม หรือ ▸ จบเทิร์น', b: 'จับได้เฉพาะช่องที่ยืนหรือช่องติดกัน ผิดเสีย 1 ใน 4 ครั้งและจบเทิร์นทันที', en: 'Arrest your cell or a neighbour, or end the turn.' }
     };
-    var croot = null, ckey = null, raf = 0;
+    var croot = null, ckey = null, raf = 0, cau = null;
+    function stopCoachVoice() { if (cau) { try { cau.pause(); } catch (_) { /* not started */ } } }
+    function playCoachVoice(key) {   // V101.343: the hint reads itself; coach() runs after a tap re-rendered the game, so the phone allows it
+        stopCoachVoice(); if (!voiceOn()) return;
+        if (!cau) { try { cau = new Audio(); } catch (_) { return; } }
+        cau.src = 'cereal-voice/c-' + key + '.mp3?v=' + VOICE_V;
+        var p; try { p = cau.play(); } catch (_) { p = null; }
+        if (p && p.catch) p.catch(function () { /* refused: the text is on screen */ });
+    }
     function coachSeen() { var v = get(COACH); if (v === 'all') return { all: true }; try { return JSON.parse(v || '{}') || {}; } catch (_) { return {}; } }
     function markCoach(key) { var s = coachSeen(); if (s.all) return; s[key] = 1; set(COACH, JSON.stringify(s)); }
     function shown(el) { if (!el) return false; var r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; }
@@ -265,6 +274,7 @@
     function onScroll() { if (raf) { cancelAnimationFrame(raf); raf = 0; } place(); }
     function hideCoach() {
         if (!croot) return;
+        stopCoachVoice();
         croot.remove(); croot = null; ckey = null;
         window.removeEventListener('resize', schedule); window.removeEventListener('scroll', onScroll, true);
     }
@@ -286,6 +296,7 @@
         document.body.appendChild(croot);
         window.addEventListener('resize', schedule); window.addEventListener('scroll', onScroll, true);
         place(); setTimeout(place, 50);
+        playCoachVoice(key);
     }
 
     window.CKTour = {

@@ -1,4 +1,4 @@
-// V101.343 (owner, voice Foi Thong): each How to play card reads itself aloud from public/cereal-voice/s1…s9.mp3 (made once with Paxa TTS).
+// V101.343 (owner, voice Foi Thong): each How to play card reads itself aloud from public/cereal-voice/s1…s9.mp3 + c-<hint>.mp3 (made once with Paxa TTS).
 // 🔊 / 🔇 in the card header is the game's sound switch (CKSound, cerealSound); a refused play (no tap yet) makes the chip pulse and a tap
 // plays; a new card / ✕ stop the clip; with ▶ auto on, the clip's end turns the card. The REAL index.html on a phone, nothing leaves the page.
 const fs = require('node:fs');
@@ -9,10 +9,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
 (async () => {
   // the nine files exist, are small, and are real MP3s
-  for (let i = 1; i <= 9; i++) {
-    const f = path.resolve('public/cereal-voice/s' + i + '.mp3'), b = fs.readFileSync(f);
-    assert.ok(b.length > 20000 && b.length < 150000, 's' + i + '.mp3 size ' + b.length);
-    assert.ok(b[0] === 0xff || b.slice(0, 3).toString() === 'ID3', 's' + i + '.mp3 is an MP3');
+  for (const n of ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 'c-home', 'c-path', 'c-chips', 'c-lock', 'c-cafe', 'c-move', 'c-ask', 'c-arrest']) {
+    const f = path.resolve('public/cereal-voice/' + n + '.mp3'), b = fs.readFileSync(f);
+    assert.ok(b.length > 15000 && b.length < 150000, n + '.mp3 size ' + b.length);
+    assert.ok(b[0] === 0xff || b.slice(0, 3).toString() === 'ID3', n + '.mp3 is an MP3');
   }
   const browser = await chromium.launch();
   try {
@@ -77,7 +77,20 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     await page.click('#cerealTour [data-ct="auto"]');
     await page.keyboard.press('Escape');
 
+    // first-turn coach marks read themselves (c-<key>.mp3); closing the hint stops it; 🔇 = silent
+    await page.evaluate(() => { localStorage.setItem('cerealSound', 'on'); localStorage.removeItem('cerealCoachSeen'); window.__pauses = 0; });
+    for (const k of ['home', 'path', 'chips', 'lock', 'cafe', 'move', 'ask', 'arrest']) {
+      const before = (await v()).plays.length;
+      await page.evaluate((k) => CKTour.coach(k), k);
+      const p = (await v()).plays;
+      assert.equal(p.length, before + 1, 'coach ' + k + ' plays once'); assert.equal(p[p.length - 1], 'cereal-voice/c-' + k + '.mp3');
+    }
+    await page.evaluate(() => CKTour.hideCoach());
+    assert.ok(await page.evaluate(() => window.__pauses > 0), 'closing the hint stops its clip');
+    await page.evaluate(() => { localStorage.setItem('cerealSound', 'off'); localStorage.removeItem('cerealCoachSeen'); });
+    const nC = (await v()).plays.length; await page.evaluate(() => CKTour.coach('home'));
+    assert.equal((await v()).plays.length, nC, '🔇: hints stay silent');
     assert.deepEqual(errors, []);
-    console.log('cereal-voice-qa: OK — 9 clips (< 150 KB, MP3), card n plays s<n>, refused play → pulsing 🔊 → tap plays, ปิด stops, 🔇 = game switch (cerealSound off, silent), ▶ auto turns on the clip end');
+    console.log('cereal-voice-qa: OK — 8 coach clips play with their hint, stop when it closes, silent on 🔇; — 9 clips (< 150 KB, MP3), card n plays s<n>, refused play → pulsing 🔊 → tap plays, ปิด stops, 🔇 = game switch (cerealSound off, silent), ▶ auto turns on the clip end');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
