@@ -206,9 +206,9 @@
         var det = g.hand === 'detective', who = det ? '🕵️' : '🔪', name = det ? g.names.detective : g.names.killer;
         return '<div class="ck ' + (det ? 'detective' : 'killer') + '">' + topHtml(who + ' วันที่ ' + g.day)
             + '<div class="ck-hand"><div class="ck-note">' + (det ? '🔪 ล็อกวันที่ ' + g.day + ' แล้ว 🔒' : g.day === 1 ? 'เกมใหม่ · ฆาตกรเลือกบ้านลับก่อน' : '🕵️ จบวันที่ ' + (g.day - 1)) + '</div>'
-            + '<div class="who" aria-hidden="true">' + who + '</div><h4>ส่งมือถือให้ ' + esc(name) + '</h4><p class="th">Pass the phone to ' + esc(name) + '</p>'
+            + '<div class="who" aria-hidden="true">' + who + '</div><h4>ส่งมือถือให้ <span class="nm" title="' + esc(name) + '">' + esc(name) + '</span></h4>'   // V101.341 (break-ui 3): the name once — no English repeat, not on the button
             + '<div class="ck-row" style="justify-content:center"><span class="ck-pill">วันที่ ' + g.day + ' / 7</span>' + pills(g) + (g.witness != null ? '<span class="ck-pill">👁️ ที่ ' + g.witness + '</span>' : '') + '</div>'
-            + '<button type="button" class="ck-primary" id="ck-hand-go" onclick="CK.hand()"' + t('Tap when the phone is in your hands', 'แตะเมื่อถึงมือคุณ') + '>👆 ฉันคือ ' + who + ' ' + esc(name) + '</button></div></div>';
+            + '<button type="button" class="ck-primary" id="ck-hand-go" onclick="CK.hand()"' + t('Tap when the phone is in your hands', 'แตะเมื่อถึงมือคุณ') + '>👆 ฉันคือ ' + who + '</button></div></div>';
     }
 
     // ---- killer turn ---------------------------------------------------------------------------------------
