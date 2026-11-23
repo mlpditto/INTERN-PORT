@@ -93,7 +93,7 @@ const thai = /[฀-๿]/;
         await page.click('#cerealModal .ck-top .ck-pill'); await page.keyboard.press('Escape'); assert.ok(!(await tour(page)).open, 'Esc closes');
 
         // ▶ auto: advances by itself, remembered, off again
-        await page.evaluate(() => CKTour._interval(250));
+        await page.evaluate(() => { CKTour._interval(250); localStorage.setItem('cerealSound', 'off'); });   // V101.343: with 🔊 on the clip end turns the card (cereal-voice-qa); the 6 s timer is the 🔇 path
         await page.click('#cerealModal .ck-top .ck-pill');
         assert.equal((await tour(page)).auto, 'false');
         await page.click('#cerealTour .auto');

@@ -4,7 +4,11 @@
    (1) How to play — 8 scenes on a demo board (side A) that animates by itself; opens the first time the 🥣 sheet opens.
    (2) Coach marks — one hint at a time on the REAL first killer / detective turn (home · 3 cells · chips · lock · café · move · ask · arrest),
        each shown once; "ข้ามคำใบ้" stops them all. cereal.js calls CKTour.coach(key) after every render.
-   Reads and writes nothing but localStorage cerealTourSeen / cerealCoachSeen / cerealTourAuto. */
+   Reads and writes nothing but localStorage cerealTourSeen / cerealCoachSeen / cerealTourAuto.
+   V101.343 (owner, voice Foi Thong · mockup-cereal-voice/): each How to play card reads itself aloud — public/cereal-voice/s1…s9.mp3, made once
+   with Paxa TTS (no call at play time). 🔊 / 🔇 in the card header is the game's own sound switch (CKSound, localStorage cerealSound).
+   A clip starts on the tap that opened the tour or turned the card; when the phone refuses (no tap yet) the 🔊 chip pulses and a tap plays it.
+   Close / ข้าม / a new card stop it. With ▶ auto on, the card turns 0.8 s after its clip ends instead of every 6 s. */
 (function () {
     'use strict';
     var R = window.CerealRules, M = window.CEREAL_MAPS;
@@ -22,6 +26,8 @@
         + '#cerealTour .ct-top{display:flex;align-items:center;gap:6px}'
         + '#cerealTour .ct-top h3{margin:0;font-size:1.05em;font-weight:900;color:#6d28d9;white-space:nowrap}'
         + '#cerealTour .ct-pill{border:1px solid #e2e8f0;border-radius:999px;background:#fff;padding:3px 9px;font-size:.72em;font-weight:800;color:#475569;white-space:nowrap}'
+        + '#cerealTour .ct-voice{margin-left:auto;width:30px;height:30px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;padding:0;font-size:15px;line-height:1}'
+        + '#cerealTour .ct-voice.wait{border-color:#a78bfa;box-shadow:0 0 0 3px #ede9fe;animation:ct-vwait 1.2s ease-in-out infinite}@keyframes ct-vwait{50%{box-shadow:0 0 0 6px #ddd6fe}}#cerealTour .ct-voice+.ct-x{margin-left:6px}'
         + '#cerealTour .ct-x{width:30px;height:30px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;color:#475569;margin-left:auto;padding:0}'
         + '#cerealTour .ct-board{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;position:relative;--acc:#be123c}'
         + '#cerealTour .ct-board.det{--acc:#4338ca}'
@@ -140,13 +146,35 @@
     ];
 
     var root = null, cur = 0, timer = 0, lastFocus = null;
+    // ---- 🔊 voice (V101.343) ----
+    var VOICE_V = 'V101.343', au = null, voiceBlocked = false;
+    function voiceOn() { return window.CKSound ? CKSound.on() : get('cerealSound') !== 'off'; }
+    function stopVoice() { if (au) { au.onended = null; try { au.pause(); } catch (_) { /* not started */ } } }
+    function playVoice() {
+        stopVoice();
+        if (!voiceOn() || !root) return;
+        if (!au) { try { au = new Audio(); } catch (_) { return; } au.preload = 'auto'; }
+        au.src = 'cereal-voice/s' + (cur + 1) + '.mp3?v=' + VOICE_V;
+        au.onended = function () { if (root && autoOn() && !SCENES[cur].last) { clearTimeout(timer); timer = setTimeout(function () { go(1); }, 800); } };
+        var p; try { p = au.play(); } catch (_) { p = null; }
+        voiceBlocked = false; paintVoice();
+        if (p && p.catch) p.catch(function () { voiceBlocked = true; paintVoice(); arm(); });   // no tap yet (iPhone / LINE): the chip pulses, a tap plays
+        au.onerror = function () { arm(); };   // a clip that cannot load never holds ▶ auto
+    }
+    function paintVoice() {
+        var b = root && root.querySelector('.ct-voice'); if (!b) return;
+        var on = voiceOn();
+        b.textContent = on ? '🔊' : '🔇'; b.setAttribute('aria-pressed', String(on));
+        b.classList.toggle('wait', on && voiceBlocked);
+    }
     function style() { if (!document.getElementById('ct-style')) { var st = document.createElement('style'); st.id = 'ct-style'; st.textContent = css; document.head.appendChild(st); } }
     function dots(n) { var h = '<div class="dots" aria-hidden="true">'; for (var i = 1; i <= 8; i++) h += '<i class="' + (i === n ? 'on' : '') + '"></i>'; return h + '</div>'; }
     function autoOn() { return get(AUTO) === '1'; }
-    function arm() { clearTimeout(timer); timer = 0; if (root && autoOn() && !SCENES[cur].last) timer = setTimeout(function () { go(1); }, INTERVAL); }
+    function arm() { clearTimeout(timer); timer = 0; if (root && autoOn() && !SCENES[cur].last && !(voiceOn() && au && !voiceBlocked && !au.error)) timer = setTimeout(function () { go(1); }, INTERVAL); }   // a clip that plays turns the card at its end; refused / failed → the 6 s timer
     function render() {
         var sc = SCENES[cur];
         root.innerHTML = '<div class="ct"><div class="ct-top"><h3>🥣 How to play</h3><span class="ct-pill">' + (sc.last ? '🏁' : (cur + 1) + ' / 8') + '</span>'
+            + '<button type="button" class="ct-voice" data-ct="voice" aria-label="Voice" title="เสียงบรรยาย · voice">🔊</button>'
             + '<button type="button" class="ct-x" data-ct="skip" title="ปิด · กด ? ใน lobby ดูซ้ำได้" aria-label="ปิด">✕</button></div>'
             + '<div style="position:relative">' + board(sc.ex, sc.det) + (sc.finger ? '<span class="ct-fing" aria-hidden="true">👆</span>' : '') + '</div>'
             + '<div class="ct-wid">' + (sc.wid || '') + '</div>'
@@ -161,12 +189,12 @@
             + '</div></div></div>';
         root.scrollTop = 0;
         var next = root.querySelector('.next'); if (next) next.focus({ preventScroll: true });
-        arm();
+        playVoice(); arm();
     }
     function go(d) { var n = cur + d; if (n < 0 || n >= SCENES.length) return; cur = n; render(); }
     function close() {
         if (!root) return;
-        clearTimeout(timer); timer = 0;
+        clearTimeout(timer); timer = 0; stopVoice();
         root.remove(); root = null;
         document.removeEventListener('keydown', onKey, true);
         if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
@@ -187,7 +215,13 @@
             var a = b.getAttribute('data-ct');
             if (a === 'skip' || a === 'close') close();
             else if (a === 'bot-killer' || a === 'bot-detective') { close(); var me = a.slice(4); CK.tab('local'); CK.vs('bot'); CK.level(me, 1); CK.start(); }
-            else if (a === 'auto') { set(AUTO, autoOn() ? '0' : '1'); render(); }
+            else if (a === 'auto') { set(AUTO, autoOn() ? '0' : '1'); arm(); var ab = root.querySelector('[data-ct="auto"]'); if (ab) ab.setAttribute('aria-pressed', autoOn() ? 'true' : 'false'); }   // V101.343: no re-render, the clip keeps playing
+            else if (a === 'voice') {
+                if (voiceOn() && voiceBlocked) { playVoice(); return; }   // the first tap that the phone allows
+                if (window.CKSound) CKSound.toggle(); else set('cerealSound', voiceOn() ? 'off' : 'on');
+                if (voiceOn()) playVoice(); else { stopVoice(); paintVoice(); }
+                arm();
+            }
             else go(a === 'back' ? -1 : 1);
         });
         document.body.appendChild(root);
@@ -256,6 +290,8 @@
 
     window.CKTour = {
         open: open, close: close, seen: function () { return get(SEEN) === '1'; },
+        _voice: function () { return au ? { src: au.src, paused: au.paused, blocked: voiceBlocked } : null; },   // QA hook
+        _end: function () { if (au && au.onended) au.onended(); },   // QA hook: the clip ends
         coach: coach, hideCoach: hideCoach,
         _interval: function (ms) { INTERVAL = ms; }   // QA hook: shorten the auto-advance
     };
