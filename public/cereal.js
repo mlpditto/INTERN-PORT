@@ -169,32 +169,31 @@
         }
         if (ui.rules) h += '<div class="ck-rules">🔪 moves exactly 3 steps a day, unseen, and drops 🥣 on a house it touched — 6 victims in 7 days (≥1 by day 2, ≥3 by day 4). A kill next to a park puts a 👁️ witness there.<br>🕵️ moves up to 3 (+1 through ☕), stands by 👁️ and asks one of 5 cards; the app answers truthfully. 🛡️ arrest = own or next cell, 4 tries. 🚇 S to S is one step for both.</div>';
         var solo = ui.vs === 'bot' && !!B;
-        h += '<div class="ck-row"><span class="ck-mini">เล่นกับ</span><button type="button" id="ck-vs-friend" class="ck-chip' + (solo ? '' : ' on') + '" onclick="CK.vs(\'friend\')">👤 เพื่อน</button>'
-            + '<button type="button" id="ck-vs-bot" class="ck-chip' + (solo ? ' on' : '') + '"' + (B ? ' onclick="CK.vs(\'bot\')"' : ' disabled') + t('Play against the bot on this phone', 'เล่นกับบอทในเครื่องนี้') + '>🤖 บอท</button></div>';
+        // V101.344 (owner pick B + "inline card มากขึ้น ลด text ซ้ำซ้อน", mockup-cereal-local/): one row 👤 | 🤖 … 🗺 A | B (like ＋ สร้างห้อง),
+        // then the two seat cards in the How to play colours — 🔪 red / 🕵️ indigo, one line each: the name box (friend) or "ฉัน" (bot);
+        // vs 🤖 the 🥄 level sits beside ▸ เริ่ม. No row labels, no English lines, no breakfast pill (its rule is the 🔪 title).
+        h += '<div class="ck-row ck-mkrow"><button type="button" id="ck-vs-friend" class="ck-chip' + (solo ? '' : ' on') + '" onclick="CK.vs(\'friend\')">👤 เพื่อน</button>'
+            + '<button type="button" id="ck-vs-bot" class="ck-chip' + (solo ? ' on' : '') + '"' + (B ? ' onclick="CK.vs(\'bot\')"' : ' disabled') + t('Play against the bot on this phone', 'เล่นกับบอทในเครื่องนี้') + '>🤖 บอท</button>'
+            + '<span class="ck-mkmap"><button type="button" id="ck-side-A" class="ck-chip' + (ui.side === 'A' ? ' on' : '') + '" onclick="CK.side(\'A\')"' + t('Map A — favours the killer', 'แผนที่ A · ฆาตกรได้เปรียบ') + '>🗺 A</button>'
+            + '<button type="button" id="ck-side-B" class="ck-chip' + (ui.side === 'B' ? ' on' : '') + '" onclick="CK.side(\'B\')"' + t('Map B — favours the detective', 'แผนที่ B · นักสืบได้เปรียบ') + '>B</button></span></div>';
         if (solo) {
-            var card = function (me, ic, th, en) {
-                var on = ui.me === me, lv = ui.level[me], chips = '';
-                for (var n = 1; n <= 3; n++) chips += '<button type="button" class="ck-chip ck-lv' + (lv === n ? ' on' : '') + '" data-lv="' + n + '" onclick="event.stopPropagation();CK.level(\'' + me + '\',' + n + ')"' + t(['', 'easy', 'medium', 'hard'][n], ['', 'ง่าย', 'กลาง', 'ยาก'][n]) + '>' + '🥄'.repeat(n) + '</button>';
-                return '<div class="ck-solo' + (on ? ' on' : '') + '" id="ck-me-' + me + '" role="button" tabindex="0" onclick="CK.me(\'' + me + '\')"><span class="big">' + ic + ' vs 🤖</span><span class="tx">' + L(th, en) + '</span><span class="lv">' + chips + '</span></div>';
-            };
-            h += '<div class="ck-solos">' + card('killer', '🔪', 'คุณซ่อน · บอทไล่จับ', 'you hide, the bot hunts') + card('detective', '🕵️', 'คุณไล่จับ · บอทซ่อน', 'you hunt, the bot hides') + '</div>';
+            var seat = function (me, ic, en, th) { return '<button type="button" class="ck-seat ' + me + (ui.me === me ? ' on' : '') + '" id="ck-me-' + me + '" aria-pressed="' + (ui.me === me) + '" onclick="CK.me(\'' + me + '\')"' + t(en, th) + '>' + ic + ' ฉัน</button>'; };
+            h += '<div class="ck-seats">' + seat('killer', '🔪', 'You hide, the bot hunts', 'คุณซ่อน · บอทไล่จับ') + seat('detective', '🕵️', 'You hunt, the bot hides', 'คุณไล่จับ · บอทซ่อน') + '</div>';
+            var lvs = '';
+            for (var n = 1; n <= 3; n++) lvs += '<button type="button" class="ck-chip ck-lv' + (ui.level[ui.me] === n ? ' on' : '') + '" data-lv="' + n + '" onclick="CK.level(\'' + ui.me + '\',' + n + ')"' + t('Bot: ' + ['', 'easy', 'medium', 'hard'][n], 'บอท ' + ['', 'ง่าย', 'กลาง', 'ยาก'][n]) + '>' + '🥄'.repeat(n) + '</button>';
+            h += '<div class="ck-row ck-gorow"><span class="ck-lvs">🤖 ' + lvs + '</span><button type="button" class="ck-primary" id="ck-start" onclick="CK.start()">▸ เริ่ม</button></div>';
+        } else {
+            h += '<div class="ck-seats"><label class="ck-seat killer on"><span' + t('The rulebook: whoever just had breakfast is the killer', 'ใครเพิ่งกินข้าวเช้า = ฆาตกร') + '>🔪</span><input type="text" id="ck-n1" maxlength="20" placeholder="ฆาตกร" value="' + esc(ui.names.killer) + '" aria-label="Killer name" data-th-placeholder="ฆาตกร"></label>'
+                + '<label class="ck-seat detective on"><span>🕵️</span><input type="text" id="ck-n2" maxlength="20" placeholder="นักสืบ" value="' + esc(ui.names.detective) + '" aria-label="Detective name" data-th-placeholder="นักสืบ"></label></div>'
+                + '<button type="button" class="ck-primary" id="ck-start" onclick="CK.start()"' + t('Start day 1 — the phone goes to the killer first', 'เริ่มวันที่ 1 · มือถืออยู่กับฆาตกรก่อน') + '>▸ เริ่ม</button>';
         }
-        h += '<div class="ck-row"><span class="ck-mini">แผนที่</span>'
-            + '<button type="button" id="ck-side-A" class="ck-chip' + (ui.side === 'A' ? ' on' : '') + '" onclick="CK.side(\'A\')"' + t('Side A — favours the killer', 'ด้าน A · ฆาตกรได้เปรียบ') + '>A <small>🥄🥄 ฆาตกร+</small></button>'
-            + '<button type="button" id="ck-side-B" class="ck-chip' + (ui.side === 'B' ? ' on' : '') + '" onclick="CK.side(\'B\')"' + t('Side B — favours the detective', 'ด้าน B · นักสืบได้เปรียบ') + '>B <small>🥄 นักสืบ+</small></button></div>';
-        if (!solo) h += '<div class="ck-row"><span class="ck-mini">ผู้เล่น</span>'
-            + '<label class="ck-name"><span>🔪</span><input type="text" id="ck-n1" maxlength="20" placeholder="ฆาตกร" value="' + esc(ui.names.killer) + '" aria-label="Killer name" data-th-placeholder="ฆาตกร"></label>'
-            + '<label class="ck-name"><span>🕵️</span><input type="text" id="ck-n2" maxlength="20" placeholder="นักสืบ" value="' + esc(ui.names.detective) + '" aria-label="Detective name" data-th-placeholder="นักสืบ"></label></div>';
-        if (!solo) h += '<div class="ck-row" style="padding-left:68px"><span class="ck-pill"' + t('The rulebook: whoever just had breakfast is the killer', 'ใครเพิ่งทานอาหารเช้า = ฆาตกร') + '>🥣 ใครเพิ่งกินข้าวเช้า = 🔪</span></div>';
-        h += solo ? '<button type="button" class="ck-primary" id="ck-start" onclick="CK.start()">' + L('▸ เริ่ม · ' + (ui.me === 'killer' ? '🔪' : '🕵️') + ' vs 🤖 ' + '🥄'.repeat(ui.level[ui.me]), 'Start vs bot') + '</button>'
-            : '<button type="button" class="ck-primary" id="ck-start" onclick="CK.start()"' + t('Start day 1 — the phone goes to the killer first', 'เริ่มวันที่ 1 · มือถืออยู่กับฆาตกรก่อน') + '>' + L('▸ เริ่ม · 🔪 เล่นก่อน', 'Start · killer first') + '</button>';
         var games = store.games.filter(function (x) { return x.status === 'playing' || x.status === 'finished'; });
         if (games.length) {
-            h += '<div class="ck-nb"><div class="lbl">เกมของฉัน · ในเครื่องนี้</div>';
+            h += '<div class="ck-nb"><div class="lbl">🎮 ' + games.length + '</div>';   // V101.344: the tab already says เครื่องนี้
             games.forEach(function (x) {
-                var fin = x.status === 'finished', res = fin ? (x.result.winner === 'good' ? '🕵️ won · D' + x.result.day : '🔪 won · D' + x.result.day) : '';
-                h += '<button type="button" class="ck-game" onclick="CK.resume(\'' + esc(x.id) + '\')"><span class="d">' + (fin ? '🏁' : 'D' + x.day) + '</span><span class="who">🔪 ' + esc(x.names.killer) + ' · 🕵️ ' + esc(x.names.detective) + '</span>'
-                    + (fin ? '<span class="ck-pill">' + res + '</span>' : '<span class="ck-pill">🥣 ' + x.kills + '/6</span><span class="ck-pill">🛡️ ' + x.arrestsLeft + '</span>') + '<span class="go">' + (fin ? '↺' : '▸') + '</span></button>';
+                var fin = x.status === 'finished', res = fin ? (x.result.winner === 'good' ? '🕵️ 🏆 D' : '🔪 🏆 D') + x.result.day : '';
+                h += '<button type="button" class="ck-game" onclick="CK.resume(\'' + esc(x.id) + '\')"><span class="d">' + (fin ? '🏁' : 'D' + x.day) + '</span><span class="who">🔪 ' + esc(x.names.killer) + ' <small>vs</small> 🕵️ ' + esc(x.names.detective) + '</span>'
+                    + '<span class="ck-pill">' + (fin ? res : '🥣 ' + x.kills + '/6 · 🛡️ ' + x.arrestsLeft) + '</span><span class="go">' + (fin ? '↺' : '▸') + '</span></button>';
             });
             h += '</div>';
         }
