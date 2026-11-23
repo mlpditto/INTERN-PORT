@@ -13,12 +13,20 @@
    no "ยังไม่มีเกม…" line, no sub-lines).
    V101.349 Phase 3 online: ＋ สร้างห้อง gets a 🐕 3 คน chip (and the 🗺 🥄 pair chip); a 3-seat room starts when all three are in
    (join takes the first free seat 🔪 → 🐕 → 🕵️). Lola's turn is drawn by cereal.js (lolaHtml); her walk is local until she uses an
-   ability — lolaUse sends walk + ability and gets HER answer back; lolaNotes (cerealAct, Lola only) refills her 🔒 notebook. */
+   ability — lolaUse sends walk + ability and gets HER answer back; lolaNotes (cerealAct, Lola only) refills her 🔒 notebook.
+   Phase 4 (owner pick B, mockup-cereal-stats/): two chips on the 🌐 list — 🏆 n ชนะ and 🏅 k/10; either opens the per-role wins and a
+   2-column grid of the ten achievements (earned in colour). The reveal gets one 🏅 ได้ใหม่ line. Read from cereal_stats/{userId},
+   which only cerealAct writes; online games only. */
 (function () {
     'use strict';
     var R = window.CerealRules;
     var st = { uid: null, list: [], unList: null, unGame: null, gameId: null, doc: null, secret: {}, err: '', busy: false, view: null, code: '', side: 'A', role: 'killer', timer: null, authTried: false, pending: null, listed: false, sent: '',
-        lola: false, pair: 1, lnotes: {} };
+        lola: false, pair: 1, lnotes: {}, stats: null, unStats: null, achOpen: false };
+    // Phase 4 🏅 — ids match functions/cereal-act.js ACH (owner 2026-11-23 "Use these 10"): id · emoji · name · seat · how
+    var ACHS = [['instinct', '🧠', 'สัญชาตญาณ', '🕵️', 'จับถูกครั้งแรก'], ['distrust', '🤨', 'ไม่ไว้ใจ', '🕵️', 'ชนะด้วย 🛡️ ครั้งสุดท้าย'], ['cornered', '🧱', 'จนมุม', '🕵️', 'ต้อนจนไม่มีทางเดิน'],
+        ['quick', '⚡', 'ปิดคดีไว', '🕵️', 'ชนะภายในวันที่ 3'], ['nocards', '🙈', 'ไม่ถามเลย', '🕵️', 'ชนะโดยไม่ใช้การ์ด'], ['k9', '🐕', 'K9', '🐕', 'กัดถูกตัว'],
+        ['planner', '🗓', 'วางแผน', '🔪', 'ชนะโดยใช้วันเว้น'], ['bowl', '🥣', 'ครบชาม', '🔪', 'ชนะ เหยื่อครบ 6'], ['invisible', '🫥', 'ล่องหน', '🔪', 'รอด 7 วัน ไม่โดนจับสักครั้ง'],
+        ['scentless', '👃', 'ไร้กลิ่น', '🔪', 'ชนะเกม 3 คน']];
     var IC = { killer: '🔪', lola: '🐕', detective: '🕵️' }, TH = { killer: 'ฆาตกร', lola: 'Lola', detective: 'นักสืบ' };
     function rolesOf(doc) { return doc && doc.mode === 3 ? ['killer', 'lola', 'detective'] : ['killer', 'detective']; }
     var C = function () { return window.CK && CK._; };
@@ -43,6 +51,7 @@
                 st.list = s.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); }).filter(function (x) { return x.status !== 'cancelled'; });
                 st.listed = true; rerender(); runPending();
             }, function () { st.err = 'โหลดเกมออนไลน์ไม่ได้'; rerender(); });
+            if (typeof userId === 'string' && userId && !st.unStats) st.unStats = db.collection('cereal_stats').doc(userId).onSnapshot(function (s) { st.stats = s.exists ? s.data() : null; rerender(); }, function () { /* no stats yet */ });
             rerender();
         }).catch(function () { st.err = 'ต้องเปิดจาก LINE เพื่อเล่นออนไลน์'; st.authTried = false; rerender(); });
     }
@@ -68,6 +77,7 @@
                 + '<button type="button" class="ck-primary" id="ck-on-create" onclick="CKOnline.create()"' + (st.busy || !st.uid ? ' disabled' : '') + '>▸ สร้าง · ได้รหัส 6 ตัว</button>';
             return h;
         }
+        h += achHtml();
         var order = function (x) { return myTurn(x) ? 0 : x.status === 'playing' ? 1 : x.status === 'lobby' ? 2 : 3; };
         var games = st.list.slice().sort(function (a, b) { return order(a) - order(b) || (b.updatedAt || 0) - (a.updatedAt || 0); }).slice(0, 12);
         if (games.length) {
@@ -87,6 +97,28 @@
             + '<label class="ck-name ck-code"><span>🔑</span><input type="text" id="ck-on-code" maxlength="6" autocomplete="off" autocapitalize="characters" enterkeyhint="go" placeholder="รหัส 6 ตัว" value="' + esc(st.code) + '" aria-label="Room code" onkeydown="if(event.key===\'Enter\'){event.preventDefault();CKOnline.join();}">'
             + '<button type="button" class="ck-go" id="ck-on-join" onclick="CKOnline.join()" aria-label="Join"' + off + '>▸</button></label></div>';
         return h;
+    }
+
+    /** Phase 4 pick B: 🏆 n ชนะ · 🏅 k/10 — either chip opens the per-role wins + the grid of ten. */
+    function achHtml() {
+        var s = st.stats || {}, a = s.ach || {}, got = ACHS.filter(function (x) { return a[x[0]]; }).length, open = st.achOpen;
+        var wins = (s.winsKiller || 0) + (s.winsDetective || 0) + (s.winsLola || 0), ex = ' aria-expanded="' + open + '" onclick="CKOnline.ach()"';
+        var h = '<div class="ck-row ck-st">' + (s.played ? '<button type="button" class="ck-chip" id="ck-on-wins"' + ex + '>🏆 ' + wins + ' ชนะ'
+            + (open ? ' · 🔪 ' + (s.winsKiller || 0) + ' · 🕵️ ' + (s.winsDetective || 0) + ' · 🐕 ' + (s.winsLola || 0) : '') + '</button>' : '')
+            + '<button type="button" class="ck-chip' + (open ? ' on' : '') + '" id="ck-on-ach"' + ex + '>🏅 ' + got + '/' + ACHS.length + (open ? ' ⌄' : ' ›') + '</button></div>';
+        if (open) h += '<div class="ck-achgrid" id="ck-on-achgrid">' + ACHS.map(function (x) {
+            return '<div class="' + (a[x[0]] ? 'got' : '') + '" data-ach="' + x[0] + '"><b>' + x[1] + '</b><span>' + x[2] + '<small>' + x[3] + ' ' + x[4] + '</small></span></div>';
+        }).join('') + '</div>';
+        return h;
+    }
+    /** The reveal's one line: what this game earned me (🏅 ได้ใหม่ when it is the first time). '' when nothing. */
+    function achLine(g) {
+        var ids = g && g.online && g.result && g.result.ach && g.result.ach[g.online.me];
+        var list = (ids || []).map(function (id) { return ACHS.filter(function (x) { return x[0] === id; })[0]; }).filter(Boolean);
+        if (!list.length) return '';
+        var a = (st.stats && st.stats.ach) || {}, fresh = list.some(function (x) { return a[x[0]] === 1; });
+        return '<div class="ck-ach-new" id="ck-ach-new"><b>' + list.map(function (x) { return x[1]; }).join('') + '</b><span>🏅 ' + (fresh ? 'ได้ใหม่' : 'ได้') + ' · '
+            + list.map(function (x) { return x[2]; }).join(' · ') + '<small>' + list.map(function (x) { return x[4]; }).join(' · ') + '</small></span></div>';
     }
 
     // ---- one game -------------------------------------------------------------------------------------------
@@ -288,7 +320,7 @@
 
     window.CKOnline = {
         invite: invite, nudge: nudge, deepLink: deepLink,
-        lobbyHtml: lobbyHtml, screen: screen, open: open, leave: leave, myTurnCount: myTurnCount, start: start,
+        lobbyHtml: lobbyHtml, achLine: achLine, ach: function () { st.achOpen = !st.achOpen; rerender(); }, screen: screen, open: open, leave: leave, myTurnCount: myTurnCount, start: start,
         lock: lock, ask: ask, end: end, cornered: cornered, lolaUse: lolaUse, lolaEnd: lolaEnd,
         toggleLola: function () { st.lola = !st.lola; if (!st.lola && st.role === 'lola') st.role = 'killer'; st.err = ''; rerender(); },
         nextPair: function () { st.pair = (st.pair + 1) % ((window.CEREAL_MAPS && CEREAL_MAPS.difficulty.length) || 4); rerender(); },

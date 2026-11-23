@@ -174,6 +174,8 @@ Size: 2 PRs. Version: intern V101.290–291.
 
 ### Phase 4 — Meta: stats, achievements, feature map, admin peek
 
+**PR 1 built 2026-11-23 as V101.350 (owner pick B from `mockup-cereal-stats/`):** `cereal_stats/{uid}` + `result.ach` from `cerealAct` (online games only), ten achievements drafted by Claude and accepted ("Use these 10" — the printed list was not to hand), 🏆 / 🏅 chips + grid on the 🌐 list, 🏅 line on the reveal. Self-reported ones and the admin count are not built (admin: owner asked for pros/cons first). Redeploy `functions:cerealAct` and `firestore:rules` after merge.
+
 | Deliverable | Verify |
 |---|---|
 | `cereal_stats/{uid}` written by the function on finish; a one-line stats strip in the 🥣 sheet (`🔪 2 · 🕵️ 3 · 🐕 1 wins`) | act-check asserts the increments |

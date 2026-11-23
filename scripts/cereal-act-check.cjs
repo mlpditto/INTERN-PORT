@@ -173,5 +173,32 @@ const secret = (id) => db.store.get('cereal_games/' + id + '/secret/killer');
     assert.deepEqual({ day: g.day, phase: g.phase, pos: g.detectivePos, witness: g.witness }, { day: 2, phase: 'killer', pos: 7, witness: null }, 'stale detective: turn ends at the first café');
     await call('authD', { action: 'resign', gameId: c3.gameId });
     assert.deepEqual({ s: pub(c3.gameId).status, w: pub(c3.gameId).result.winner }, { s: 'finished', w: 'killer' }, 'resign hands the win over');
-    console.log('cereal-act-check: OK — engine copies match, create/join (1 h deadline), scripted game to a correct arrest with revealedPath, secret never public while playing, illegal actions refused with codes, claim after 1 h (killer → loses, detective → turn ends), resign');
+
+    // Phase 4: 🏅 on the result + cereal_stats/{LINE uid}. Game 1 = an arrest on day 2 after one miss, one card → ⚡ only;
+    // game 2 = ⏳ timeout and game 3 = resign earn nothing but still count as played / won.
+    assert.deepEqual(pub(id).result.ach, { detective: ['quick'] }, 'game 1 earns ⚡ ปิดคดีไว for the detective only');
+    assert.deepEqual(pub(c2.gameId).result.ach, {}, 'a timeout earns nothing');
+    assert.deepEqual(pub(c3.gameId).result.ach, {}, 'a resign earns nothing');
+    const stat = (u) => { const s = db.store.get('cereal_stats/' + u); return s && { p: s.played, k: s.winsKiller, d: s.winsDetective, l: s.winsLola, a: s.ach, t: typeof s.updatedAt }; };
+    assert.deepEqual(stat('Udet'), { p: 3, k: 0, d: 2, l: 0, a: { quick: 1 }, t: 'number' }, 'detective stats');
+    assert.deepEqual(stat('Ukiller'), { p: 3, k: 1, d: 0, l: 0, a: {}, t: 'number' }, 'killer stats');
+    assert.equal(db.store.get('cereal_stats/Uout'), undefined, 'a cancelled room writes no stats');
+    assert.ok(/match \/cereal_stats\/\{userId\} \{\s*allow read: if isAdmin\(\) \|\| isSelfOrLinked\(userId\);\s*allow write: if false;/.test(rules), 'rules: own stats readable, nobody writes');
+    // every achievement from a crafted finished game (pure)
+    const A = (f) => C.achievementsOf(Object.assign({ mode: 2, arrestsLeft: 4, usedQuestions: ['row'], skipUsed: false, kills: 3 }, f));
+    const fin = (winner, reason, day) => ({ winner, reason, day: day || 5 });
+    assert.deepEqual(A({ result: fin('good', 'arrest') }), { detective: ['instinct'] }, '🧠 first try');
+    assert.deepEqual(A({ arrestsLeft: 1, result: fin('good', 'arrest') }), { detective: ['distrust'] }, '🤨 last 🛡️');
+    assert.deepEqual(A({ arrestsLeft: 2, result: fin('good', 'cornered') }), { detective: ['cornered'] }, '🧱 cornered');
+    assert.deepEqual(A({ arrestsLeft: 2, mode: 3, result: fin('good', 'cornered') }), { lola: ['cornered'], detective: ['cornered'] }, '🧱 goes to 🐕 too');
+    assert.deepEqual(A({ arrestsLeft: 2, result: fin('good', 'calendar', 3) }), { detective: ['quick'] }, '⚡ by day 3');
+    assert.deepEqual(A({ arrestsLeft: 2, usedQuestions: [], result: fin('good', 'calendar') }), { detective: ['nocards'] }, '🙈 no card');
+    assert.deepEqual(A({ mode: 3, arrestsLeft: 2, result: fin('good', 'bite') }), { lola: ['k9'] }, '🐕 K9');
+    assert.deepEqual(A({ skipUsed: true, kills: 6, arrestsLeft: 4, result: fin('killer', 'survived', 7) }), { killer: ['planner', 'bowl', 'invisible'] }, '🗓 🥣 🫥');
+    assert.deepEqual(A({ mode: 3, arrestsLeft: 0, result: fin('killer', 'arrests') }), { killer: ['scentless'] }, '👃 a 3-player win');
+    assert.deepEqual(A({ skipUsed: true, kills: 6, result: fin('killer', 'resigned') }), {}, 'resign earns none');
+    assert.equal(C.ACH.length, 10);
+    const onl = fs.readFileSync(path.join(root, 'public', 'cereal-online.js'), 'utf8');
+    C.ACH.forEach((x) => assert.ok(onl.includes("['" + x + "', "), 'cereal-online.js names ' + x));
+    console.log('cereal-act-check: OK — engine copies match, create/join (1 h deadline), scripted game to a correct arrest with revealedPath, secret never public while playing, illegal actions refused with codes, claim after 1 h (killer → loses, detective → turn ends), resign, 🏅 + cereal_stats');
 })().catch((e) => { console.error(e); process.exit(1); });
