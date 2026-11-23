@@ -49,10 +49,12 @@
         var c = C(), L = c.L, h = '';
         if (st.err) h += '<div class="ck-warn" id="ck-on-err">' + esc(st.err) + '</div>';
         if (st.view === 'create') {
-            h += '<div class="ck-row"><span class="ck-mini">ฉันเป็น</span><button type="button" class="ck-chip' + (st.role === 'killer' ? ' on' : '') + '" id="ck-on-role-killer" onclick="CKOnline.pick(\'role\',\'killer\')">🔪 ฆาตกร</button><button type="button" class="ck-chip' + (st.role === 'detective' ? ' on' : '') + '" id="ck-on-role-detective" onclick="CKOnline.pick(\'role\',\'detective\')">🕵️ นักสืบ</button></div>'
-                + '<div class="ck-row"><span class="ck-mini">แผนที่</span><button type="button" class="ck-chip' + (st.side === 'A' ? ' on' : '') + '" onclick="CKOnline.pick(\'side\',\'A\')">A <small>🥄🥄 ฆาตกร+</small></button><button type="button" class="ck-chip' + (st.side === 'B' ? ' on' : '') + '" onclick="CKOnline.pick(\'side\',\'B\')">B <small>🥄 นักสืบ+</small></button></div>'
-                + '<button type="button" class="ck-primary" id="ck-on-create" onclick="CKOnline.create()"' + (st.busy || !st.uid ? ' disabled' : '') + '>' + L('＋ สร้างห้อง', 'Create a room') + '</button>'
-                + '<button type="button" class="ck-chip" style="align-self:center" onclick="CKOnline.pick(\'view\',null)">✕ ยกเลิก</button>';
+            // V101.340 (owner pick B, mockup-cereal-lola/): one row ‹ · 🔪 / 🕵️ · 🗺 A | B, then ▸ สร้าง — no row labels, no English line, no ✕ ยกเลิก button
+            var mapChip = function (s, lbl, en, th) { return '<button type="button" class="ck-chip' + (st.side === s ? ' on' : '') + '" id="ck-on-side-' + s + '" onclick="CKOnline.pick(\'side\',\'' + s + '\')" title="' + en + '" data-th-title="' + th + '">' + lbl + '</button>'; };
+            h += '<div class="ck-row ck-mkrow"><button type="button" class="ck-chip" id="ck-on-back" onclick="CKOnline.pick(\'view\',null)" aria-label="Back" title="Back" data-th-title="กลับ">‹</button>'
+                + '<button type="button" class="ck-chip' + (st.role === 'killer' ? ' on' : '') + '" id="ck-on-role-killer" onclick="CKOnline.pick(\'role\',\'killer\')">🔪 ฆาตกร</button><button type="button" class="ck-chip' + (st.role === 'detective' ? ' on' : '') + '" id="ck-on-role-detective" onclick="CKOnline.pick(\'role\',\'detective\')">🕵️ นักสืบ</button>'
+                + '<span class="ck-mkmap">' + mapChip('A', '🗺 A', 'Map A · 🥄🥄 easier for the killer', 'แผนที่ A · ฆาตกรได้เปรียบ') + mapChip('B', 'B', 'Map B · 🥄 easier for the detective', 'แผนที่ B · นักสืบได้เปรียบ') + '</span></div>'
+                + '<button type="button" class="ck-primary" id="ck-on-create" onclick="CKOnline.create()"' + (st.busy || !st.uid ? ' disabled' : '') + '>▸ สร้าง · ได้รหัส 6 ตัว</button>';
             return h;
         }
         var order = function (x) { return myTurn(x) ? 0 : x.status === 'playing' ? 1 : x.status === 'lobby' ? 2 : 3; };
