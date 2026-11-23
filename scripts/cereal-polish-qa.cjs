@@ -50,7 +50,7 @@ const txt = (page, sel) => page.evaluate(s => { const e = document.querySelector
             await page.fill('#ck-n1', 'Pond'); await page.fill('#ck-n2', 'Mint');
             await page.click('#ck-start');
             const hand = await txt(page, '#cerealModal .ck-hand');
-            assert.ok(hand.includes('ส่งมือถือให้ Pond') && hand.includes('Pass the phone to Pond'), 'hand-off: Thai heading + English line: ' + hand);
+            assert.ok(/ส่งมือถือให้\s+Pond/.test(hand) && !hand.includes('Pass the phone') && (hand.match(/Pond/g) || []).length === 1, 'hand-off: the name once (V101.341): ' + hand);
             assert.ok(!/nothing of that turn|opens only after/.test(hand), 'no meta lines on the hand-off');
             await page.click('#ck-hand-go');
             await page.click(cell(8)); for (const id of [3, 2, 1]) await page.click(cell(id));

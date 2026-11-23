@@ -748,13 +748,13 @@
         var s = document.getElementById('u-score'), b = document.getElementById('u-beri'), bx = document.getElementById('u-beri-box');
         if (!s) return;
         if (on) {
-            s.textContent = (Number(window.myCafePts) || 0).toFixed(2);
-            if (b) b.textContent = '🪙 ' + (parseInt(window.myCafeBeri, 10) || 0);
+            s.textContent = (Number(window.myCafePts) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });   // V101.341: separators
+            if (b) b.textContent = '🪙 ' + (parseInt(window.myCafeBeri, 10) || 0).toLocaleString('en-US');
             if (bx) { if (!bx.dataset.def) bx.dataset.def = bx.title; bx.title = 'CAFE Beri — separate from the Explore Beri'; }
             s.title = 'CAFE points — from content posts';
         } else {
-            if (typeof myScore === 'number') s.textContent = myScore.toFixed(2);
-            if (b && typeof myBeri === 'number') b.textContent = '🪙 ' + myBeri;
+            if (typeof myScore === 'number') s.textContent = myScore.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            if (b && typeof myBeri === 'number') b.textContent = '🪙 ' + myBeri.toLocaleString('en-US');
             if (bx && bx.dataset.def) bx.title = bx.dataset.def;
             s.removeAttribute('title');
         }

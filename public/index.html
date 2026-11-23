@@ -3,13 +3,13 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.344)</title>
+    <title>Internship Portfolio (V101.345)</title>
     <script>document.addEventListener('touchstart', function () {}, { passive: true }); /* V101.337: lets iOS show :active on tap */</script>
     <link rel="stylesheet" href="nika-ask.css?v=V101.308">
     <link rel="stylesheet" href="daily-canvas.css?v=V101.266">
     <link rel="stylesheet" href="halloween.css?v=V101.249">
     <link rel="stylesheet" href="christmas.css?v=V101.283">
-    <link rel="stylesheet" href="cereal.css?v=V101.344">
+    <link rel="stylesheet" href="cereal.css?v=V101.345">
     <link rel="stylesheet" href="lv-card.css?v=V101.283">
     <link rel="stylesheet" href="wave-theme.css?v=V101.285">
     <script defer src="christmas.js?v=V101.296"></script>
@@ -317,6 +317,8 @@
             transition: 0.2s;
             border: 1px solid #f0f0f0;
         }
+        /* V101.341 (break-ui 1): a long name / group ends in … instead of wrapping to 3 lines and squeezing the column */
+        .lb-item .lb-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         /* -----------------------
            5. Chat System
@@ -9044,11 +9046,11 @@
                     myScore = score; // V95.33: live score drives quiz unlock gate (renderAssignments runs below)
                     // V101.130: CAFE points / Beri are their own balances (users.cafePts / users.cafeBeri — written by the admin when a content post is scored); the header shows them in the CAFE UI and the normal score / Beri everywhere else.
                     window.myCafePts = parseFloat(da.cafePts || 0) || 0; window.myCafeBeri = parseInt(da.cafeBeri || 0, 10) || 0;
-                    document.getElementById('u-score').innerText = score.toFixed(2);
+                    document.getElementById('u-score').innerText = score.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });   // V101.341: 12,345.68
                     // V96.50: Beri (Explore tab currency, separate from score above)
                     myBeri = parseInt(da.beri || 0, 10);
                     const beriEl = document.getElementById('u-beri');
-                    if (beriEl) beriEl.innerText = '🪙 ' + myBeri;
+                    if (beriEl) beriEl.innerText = '🪙 ' + myBeri.toLocaleString('en-US');
                     window.cafeContentPaintHeader?.();   // V101.130: in the CAFE UI the header shows the CAFE balances instead
                     // V98.04: sync the persistent "ever unlocked" flag; if this is the FIRST
                     // time myBeri crosses the threshold, persist it once so the shop never
@@ -10908,7 +10910,8 @@
             leaderboardContainer.innerHTML = "";
             finalUsers.forEach((u, i) => {
                 const isMe = u.id === userId;
-                const lv = Math.floor((u.score || 0) / 10) + 1;
+                // V101.341 (break-ui 5): the same LV as the header chip (capped at LV.10), not score / 10 + 1
+                const lv = getCrewRankByScore(u.score || 0).split(' ')[0];
                 const rankColor = i === 0 ? '#ffd700' : (i === 1 ? '#c0c0c0' : (i === 2 ? '#cd7f32' : '#666'));
 
                 // Blind Logic V77.17
@@ -10916,27 +10919,26 @@
                 const pictureUrl = isMe ? (u.pictureUrl || "https://via.placeholder.com/150") : "https://cdn-icons-png.flaticon.com/512/847/847969.png";
                 const infoText = isMe
                     ? (leaderboardMode === 'reflective'
-                        ? `📝 ${u.reflectiveTotalLogs || 0} logs | 🔥 Best ${u.reflectiveBestStreak || 0} วัน`
-                        : `Lv.${lv} | <span class="lang-no-toggle" style="color:${getGroupColor(u.group)}; font-weight:bold;"><i class="fa-solid ${getGroupIcon(u.group)}"></i> ${u.group || 'Public'}</span>`)
+                        ? `🔥 Best ${u.reflectiveBestStreak || 0}<span class="lang-th"> วัน</span>`   // V101.341 (break-ui 2): the log count shows once, on the right; the number stays when Thai is off
+                        : `<span style="flex-shrink:0;">${lv} |</span> <span class="lang-no-toggle" style="color:${getGroupColor(u.group)}; font-weight:bold; overflow:hidden; text-overflow:ellipsis;"><i class="fa-solid ${getGroupIcon(u.group)}"></i> ${u.group || 'Public'}</span>`)
                     : `<span style="color:#ccc;"><i>Identity Hidden</i></span>${myDiv && userDivisionOf(u) !== myDiv ? ' <span class="lang-no-toggle" style="color:#94a3b8;" title="Also in this division">· also</span>' : ''}`;
 
+                // V101.341 (break-ui 2 + 4): 📝 n instead of "n logs" (no "1 logs", no wrap); thousands separators
                 const valueText = leaderboardMode === 'reflective'
-                    ? `${u.reflectiveTotalLogs || 0}`
-                    : `${parseFloat((u.score || 0).toFixed(2))}`;
-
-                const valueSuffix = leaderboardMode === 'reflective' ? ' logs' : '';
+                    ? `📝 ${(u.reflectiveTotalLogs || 0).toLocaleString('en-US')}`
+                    : `${parseFloat((u.score || 0).toFixed(2)).toLocaleString('en-US')}`;
 
                 leaderboardContainer.innerHTML += `
                     <div class="lb-item" style="${isMe ? 'background:#eef2ff; border:1px solid #4361ee;' : ''}">
-                        <div style="display:flex; align-items:center; gap:15px;">
-                            <div style="font-weight:bold; color:${rankColor}; min-width:25px; font-size:${i < 3 ? '1.2em' : '1em'};">#${i + 1}</div>
-                            <img src="${pictureUrl}" style="width:40px; height:40px; border-radius:50%; border:2px solid #fff; box-shadow:0 2px 5px rgba(0,0,0,0.1); background:#eee;">
-                            <div style="text-align:left;">
-                                <div style="font-weight:600; font-size:0.95em;">${displayName} ${isMe ? '⭐' : ''}</div>
-                                <div style="font-size:0.75em; color:#999;">${infoText}</div>
+                        <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
+                            <div style="font-weight:bold; color:${rankColor}; min-width:25px; flex-shrink:0; font-size:${i < 3 ? '1.2em' : '1em'};">#${i + 1}</div>
+                            <img src="${pictureUrl}" style="width:40px; height:40px; flex-shrink:0; border-radius:50%; border:2px solid #fff; box-shadow:0 2px 5px rgba(0,0,0,0.1); background:#eee;">
+                            <div style="text-align:left; min-width:0;">
+                                <div class="lb-line lang-no-toggle" style="font-weight:600; font-size:0.95em;">${displayName} ${isMe ? '⭐' : ''}</div>
+                                <div class="lb-line" style="font-size:0.75em; color:#999; display:flex; gap:4px;">${infoText}</div>
                             </div>
                         </div>
-                        <div style="font-weight:800; color:#4361ee; font-size:1.1em;">${valueText}${valueSuffix}</div>
+                        <div style="font-weight:800; color:#4361ee; font-size:1.05em; flex-shrink:0; white-space:nowrap; margin-left:8px;">${valueText}</div>
                     </div>
                 `;
             });
@@ -16269,7 +16271,7 @@
         }
 
         function updateGrandLineDashboard() {
-            const scoreRaw = typeof myScore === 'number' ? myScore : parseFloat((document.getElementById('u-score') || {}).innerText || '0');   // V101.130: not the header text — in the CAFE UI that shows the CAFE points
+            const scoreRaw = typeof myScore === 'number' ? myScore : parseFloat(((document.getElementById('u-score') || {}).innerText || '0').replace(/,/g, ''));   // V101.130: not the header text — in the CAFE UI that shows the CAFE points
             const score = Number.isFinite(scoreRaw) ? scoreRaw : 0;
             const nextRank = getNextCrewRankProgress(score);
 
@@ -28509,13 +28511,13 @@ async function archiveDoneCard(cardId) {
 <script src="cereal-rules.js?v=V101.327"></script>
 <script src="cereal-bot.js?v=V101.331"></script>
 <script src="cereal-sound.js?v=V101.333"></script>
-<script src="cereal.js?v=V101.344" defer></script>
+<script src="cereal.js?v=V101.345" defer></script>
 <script src="cereal-tutorial.js?v=V101.343" defer></script>
 <script src="cereal-online.js?v=V101.340" defer></script>
 <script src="intern-guide.js?v=V101.136" defer></script>
 <script src="complete-moments.js?v=V101.212" defer></script>
 <script src="articles.js?v=V101.342" defer></script>
-<script src="cafe-content.js?v=V101.140" defer></script>
+<script src="cafe-content.js?v=V101.345" defer></script>
 <script src="intern-messages.js?v=V101.247"></script><script src="ln-plan.js?v=V101.298"></script><script src="history-lean.js?v=V101.298"></script><script src="history-compact.js?v=V101.189"></script><script src="delete-requests.js?v=V101.114"></script>
 </body>
 

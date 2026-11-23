@@ -70,7 +70,7 @@ const stored = page => page.evaluate(() => JSON.parse(localStorage.getItem('cere
         await page.click('#ck-start');
 
         // hand-off to the killer, then the killer's day 1
-        assert.ok((await txt(page, '#ck-hand-go')).includes('🔪 Pond'), 'phone goes to the killer first');
+        assert.ok((await txt(page, '#cerealModal .ck-hand h4')).includes('Pond') && (await txt(page, '#ck-hand-go')).includes('🔪'), 'phone goes to the killer first');
         assert.equal(await page.evaluate(() => document.querySelectorAll('#cerealModal .ck-cell').length), 0, 'no board on the hand-off screen');
         await page.click('#ck-hand-go');
         assert.deepEqual(await enabledCells(page), [1, 3, 5, 8, 11, 15, 18, 19], 'day 1: only houses can be the home');
@@ -92,7 +92,7 @@ const stored = page => page.evaluate(() => JSON.parse(localStorage.getItem('cere
 
         // hand-off to the detective: nothing of the killer's turn on screen
         const hand = await txt(page, '#cerealModal');
-        assert.ok(hand.includes('Pass the phone to Mint') && hand.includes('👁️ ที่ 4') && hand.includes('🥣 1/6'), 'public state on the hand-off: ' + hand);
+        assert.ok(/ส่งมือถือให้\s+Mint/.test(hand) && hand.includes('👁️ ที่ 4') && hand.includes('🥣 1/6'), 'public state on the hand-off: ' + hand);
         assert.ok(!hand.includes('8 › 3') && !hand.includes('home'), 'the path and home are not on the hand-off screen');
         assert.equal(await page.evaluate(() => document.querySelectorAll('#cerealModal .ck-cell, #cerealModal .ck-nb').length), 0, 'no board, no notebook');
         let g = await game(page);
@@ -129,7 +129,7 @@ const stored = page => page.evaluate(() => JSON.parse(localStorage.getItem('cere
         await page.evaluate(() => { userId = 'u1'; document.getElementById('main-app').style.setProperty('display', 'block', 'important'); cerealOpen(); });
         assert.equal(await txt(page, '#cerealModal .ck-game'), 'D2 🔪 Pond vs 🕵️ Mint 🥣 1/6 · 🛡️ 3 ▸');   // V101.344: one pill, "vs"
         await page.click('#cerealModal .ck-game');
-        assert.ok((await txt(page, '#ck-hand-go')).includes('🔪 Pond'));
+        assert.ok((await txt(page, '#cerealModal .ck-hand h4')).includes('Pond') && (await txt(page, '#ck-hand-go')).includes('🔪'));
         await page.click('#ck-hand-go');
         assert.ok((await txt(page, '#cerealModal .ck-nb')).includes('8 › 3 › 2 › 1'), 'the killer sees his notebook again');
         assert.ok((await cls(page, 9)).includes('r') && (await txt(page, cell(9))).includes('🕵️'), 'the detective token is public');
