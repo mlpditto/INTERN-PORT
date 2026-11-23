@@ -89,6 +89,7 @@
         + '.ct-tip .dots{display:flex;gap:5px;flex:1}.ct-tip .dots i{width:6px;height:6px;border-radius:50%;background:#ddd6fe}.ct-tip .dots i.on{width:16px;border-radius:4px;background:#7c3aed}'
         + '.ct-tip .skip{border:0;background:none;color:#8a7fa3;font-weight:700;font-size:13px;padding:6px 8px}'
         + '.ct-tip .back{border:0;background:none;color:#7c3aed;font-weight:800;font-size:13px;padding:6px 6px}'
+        + '.ct-tip .cr{margin:8px 0 0;font-size:10.5px;color:#a39bb8;text-align:center}'
         + '.ct-tip .try{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 4px}'
         + '.ct-tip .try button{display:flex;flex-direction:column;align-items:center;gap:2px;border:0;border-radius:14px;padding:10px 6px;color:#fff;font-weight:800;font-size:13px}'
         + '.ct-tip .try .tk{background:#be123c}.ct-tip .try .td{background:#4338ca}.ct-tip .try small{font-weight:600;font-size:11px;opacity:.85}'
@@ -182,6 +183,7 @@
             + '<div class="ct-tip" role="dialog" aria-modal="true" aria-labelledby="ct-title" aria-live="polite"><div class="k">' + sc.k + '</div><p class="t" id="ct-title">' + sc.t + '</p><p class="b">' + sc.b + '</p><p class="en">' + sc.en + '</p>'
             // V101.339 (owner pick B, mockup-cereal-tour-bot/): the last card starts a first round vs the easiest 🤖 🥄 in the seat picked here
             + (sc.last && window.CK ? '<div class="try"><button type="button" class="tk" data-ct="bot-killer">🔪 เป็นฆาตกร<small>vs 🤖 🥄</small></button><button type="button" class="td" data-ct="bot-detective">🕵️ เป็นนักสืบ<small>vs 🤖 🥄</small></button></div>' : '')
+            + (sc.last ? '<p class="cr">Cereal Killer · Julián Tunni · Primigenio / Super Noob Games</p>' : '')   // V101.346 (owner): the game's credit lives here now
             + '<div class="f">' + dots(Math.min(cur + 1, 8))
             + (sc.last ? '' : '<button type="button" class="auto" data-ct="auto" aria-pressed="' + (autoOn() ? 'true' : 'false') + '" title="เลื่อนฉากเองทุก 6 วินาที · auto-advance">▶ auto</button>')
             + (cur > 0 && !sc.last ? '<button type="button" class="back" data-ct="back" aria-label="ย้อนกลับ">‹</button>' : '')

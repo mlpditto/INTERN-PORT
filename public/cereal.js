@@ -21,7 +21,8 @@
         { q: 'row', ic: '↔', w: 'แถว', en: 'Same row as the witness?', th: 'อยู่แถวเดียวกับพยานไหม?' },
         { q: 'col', ic: '↕', w: 'คอลัมน์', en: 'Same column as the witness?', th: 'อยู่คอลัมน์เดียวกับพยานไหม?' },
         { q: 'building', ic: '🏠', w: 'อาคาร', en: 'In a building? (house · café · S)', th: 'อยู่ในอาคารไหม? (บ้าน · ☕ · S)' },
-        { q: 'parity', ic: '2·1', w: 'คู่/คี่', en: 'Even or odd cell?', th: 'ช่องเลขคู่หรือคี่?' }
+        { q: 'parity', ic: '2·1', w: 'คู่/คี่', en: 'Even or odd cell?', th: 'ช่องเลขคู่หรือคี่?' },
+        { q: 'area', ic: '🏡', w: 'เมือง?', en: 'City or suburb? (3 players)', th: 'อยู่ในเมืองหรือชานเมือง?' }   // V101.346: only on the 3-player map
     ];
     var MAX_GAMES = 10;
 
@@ -32,30 +33,41 @@
     function save() { if (g) g.upd = Date.now(); try { localStorage.setItem(key(), JSON.stringify(store)); } catch (_) { /* storage may be blocked (LIFF) */ } }
 
     var store = { games: [] }, g = null;                 // g = the open game; null = lobby
-    var ui = { tab: 'local', side: 'A', names: { killer: '', detective: '' }, arrest: null, revealDay: null, rules: false, vs: 'friend', me: 'killer', level: { killer: 2, detective: 2 }, beat: null };
+    var ui = { tab: 'local', side: 'A', names: { killer: '', detective: '', lola: '' }, arrest: null, revealDay: null, rules: false, vs: 'friend', me: 'killer', level: { killer: 2, detective: 2 }, beat: null,
+        lola: false, pair: 1, lolaPick: null };   // V101.346 Phase 3: 🐕 3 คน on this phone; pair = index into CEREAL_MAPS.difficulty (city + suburb)
     var BOT_MS = 700;                                     // the bot's "thinking" beat (≥ 0.6 s so its move is seen to happen); CK.botDelay() sets it for QA
 
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function t(en, th) { return ' title="' + esc(en) + '" data-th-title="' + esc(th) + '" aria-label="' + esc(en) + '"'; }
     function L(th, en) { return th + '<small class="en">' + en + '</small>'; }   // V101.330: Thai first, a small English line under it
-    function ansTh(q, a) { return q === 'dir' ? dirWord(a) : ({ yes: 'ใช่', no: 'ไม่ใช่', even: 'คู่', odd: 'คี่' }[a] || a); }
-    function mapOf(game) { return R.buildMap(M, game.citySide, null); }
+    function ansTh(q, a) { return q === 'dir' ? dirWord(a) : ({ yes: 'ใช่', no: 'ไม่ใช่', even: 'คู่', odd: 'คี่', city: '🏙 เมือง', suburb: '🏡 ชานเมือง' }[a] || a); }
+    function mapOf(game) { return R.buildMap(M, game.citySide, game.suburbSide || null); }   // V101.346: 3 คน adds the suburb under the city
     function snd(k, d) { if (window.CKSound) CKSound.play(k, d); }   // V101.333
     var DAYC = ['#f97316', '#2563eb', '#7c3aed', '#16a34a', '#db2777', '#0891b2', '#ca8a04'];   // V101.333: one colour per day on the reveal
     /* V101.333 (owner pick 1A): true when a day without a victim today loses the game — the calendar minimum, or as many kills
        still owed as days left (today included). */
     function mustKill(game) { if (game.kills >= R.MAX_KILLS) return false; if (!R.calendarOk(game.day, game.kills)) return true; return R.MAX_KILLS - game.kills >= R.DAYS - game.day + 1; }
     function kpos(game) { var days = Object.keys(game.secret.path).map(Number).sort(function (a, b) { return b - a; }); return days.length ? game.secret.path[days[0]].slice(-1)[0] : game.secret.home; }
-    function blockedFor(game) { return game.detectivePos != null ? [game.detectivePos] : []; }
+    function blockedFor(game) { var b = game.detectivePos != null ? [game.detectivePos] : []; if (game.lola && game.lola.pos != null) b.push(game.lola.pos); return b; }   // 🐕 blocks the killer like 🕵️
 
     function newGame() {
         var solo = ui.vs === 'bot' && !!B, botSeat = ui.me === 'killer' ? 'detective' : 'killer', lv = ui.level[ui.me];
         if (solo) ui.names = ui.me === 'killer' ? { killer: 'คุณ', detective: '🤖 ' + '🥄'.repeat(lv) } : { killer: '🤖 ' + '🥄'.repeat(lv), detective: 'คุณ' };
         return { bot: solo ? { seat: botSeat, level: lv } : null, pubDays: [], id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), created: Date.now(), upd: Date.now(), citySide: ui.side,
-            names: { killer: (ui.names.killer || '').trim() || 'Killer', detective: (ui.names.detective || '').trim() || 'Detective' },
+            names: { killer: (ui.names.killer || '').trim() || 'Killer', detective: (ui.names.detective || '').trim() || 'Detective', lola: (ui.names.lola || '').trim() || 'Lola' },
             status: 'playing', day: 1, phase: 'killer', hand: 'killer',
             secret: { home: null, path: {}, kills: {} }, detectivePos: null, cereals: [], witness: null, arrestsLeft: R.ARRESTS, kills: 0,
             usedQuestions: [], skipUsed: false, log: [], draft: { path: [], kill: null, witness: null }, dd: { path: [], asked: null }, result: null };
+    }
+    /* V101.346 Phase 3: a 3-player game = the printed pair (city + suburb) and 🐕 Lola on the bowl. Turn order 🔪 → 🐕 → 🕵️.
+       Lola walks ≤ 4 (+1 once through the bowl), never rides 🚇 / 🚆, blocks the killer, and each turn may use one ability that is
+       not last turn's: 👃 sniff (own or next cell: was the killer there today, which way now) · 📢 bark (is the killer on or around me,
+       diagonals count) · 🦷 bite (= arrest, shares the 🛡️ tries). Her answers are hers alone: only "🐕 ดมช่อง n" reaches the case log. */
+    function withLola(game) {
+        var pr = M.difficulty[ui.pair] || M.difficulty[1];
+        game.citySide = pr.city; game.suburbSide = pr.suburb; game.pair = ui.pair;
+        game.lola = { pos: R.lolaStart(mapOf(game)), last: null, notes: [], dd: { path: [], used: null } };
+        return game;
     }
 
     // ---- shell ------------------------------------------------------------------------------------------
@@ -86,7 +98,7 @@
         root();
         var body = document.getElementById('ck-body');
         var on = g && g.online && window.CKOnline ? CKOnline.screen() : null;   // V101.335: room / waiting screens
-        var html = !g ? lobbyHtml() : on ? on : g.status === 'finished' ? revealHtml() : ui.beat ? beatHtml() : g.hand ? handHtml() : g.phase === 'killer' ? killerHtml() : detectiveHtml();
+        var html = !g ? lobbyHtml() : on ? on : g.status === 'finished' ? revealHtml() : ui.beat ? beatHtml() : g.hand ? handHtml() : g.phase === 'killer' ? killerHtml() : g.phase === 'lola' ? lolaHtml() : detectiveHtml();
         body.innerHTML = html;
         var sc = document.querySelector('#cerealModal .modal-content'); if (sc) sc.scrollTop = 0;
         if (window.CKTour) CKTour.coach(coachKey());   // V101.329: first-turn hints follow the step the player is on
@@ -94,6 +106,7 @@
     /* Which first-turn hint fits the screen just drawn (cereal-tutorial.js shows each once). null = nothing to coach. */
     function coachKey() {
         if (!g || g.status !== 'playing' || g.hand || ui.beat) return null;
+        if (g.phase === 'lola') return null;
         if (g.phase === 'killer') {
             if (g.secret.home == null) return 'home';
             if (g.draft.path.length < R.STEPS.killer + 1) return 'path';
@@ -131,10 +144,11 @@
     }
     /* extra[id] = { cls, st (step badge), tk (tokens), me (actor mark) }; tap = cells call CK.tap(id); enabled(id) gates the taps */
     function boardHtml(game, opt) {
-        var m = mapOf(game), h = '<div class="ck-board" aria-label="City map, side ' + game.citySide + '">';
+        var m = mapOf(game), sub = !!game.suburbSide, h = '<div class="ck-board' + (sub ? ' tall' : '') + '" aria-label="City map, side ' + game.citySide + (sub ? ' · suburb ' + game.suburbSide : '') + '">';
+        if (sub) h += '<div class="ck-seam" aria-hidden="true"><i></i>🏙 ▲ · ▼ 🏡<i></i></div>';   // V101.346: the suburb sits under the city; cells keep their x / y (holes stay empty)
         m.ids.forEach(function (id) {
             var c = m.cells[id], e = (opt.extra && opt.extra[id]) || {}, on = !!opt.tap && (!opt.enabled || opt.enabled(id));
-            h += '<button type="button" class="ck-cell ' + CLS[c.t] + (e.cls ? ' ' + e.cls : '') + '" data-id="' + id + '"' + (on ? ' onclick="CK.tap(' + id + ')"' : ' disabled') + ' aria-label="cell ' + id + '">'
+            h += '<button type="button" class="ck-cell ' + CLS[c.t] + (e.cls ? ' ' + e.cls : '') + '" data-id="' + id + '"' + (sub ? ' style="grid-row:' + (c.y > 4 ? c.y + 1 : c.y) + ';grid-column:' + c.x + '"' : '') + (on ? ' onclick="CK.tap(' + id + ')"' : ' disabled') + ' aria-label="cell ' + id + '">'
                 + '<span class="n">' + id + '</span><span class="ic">' + ICON[c.t] + '</span>'
                 + (e.st ? '<span class="st">' + e.st + '</span>' : '') + (e.me ? '<span class="me">' + e.me + '</span>' : '') + (e.tk ? '<span class="tk">' + e.tk + '</span>' : '') + '</button>';
         });
@@ -145,6 +159,7 @@
         var add = function (id, k, v) { ex[id] = ex[id] || {}; ex[id][k] = (ex[id][k] || '') + v; };
         game.cereals.forEach(function (id) { add(id, 'tk', '🥣'); });
         if (game.witness != null) { add(game.witness, 'tk', '👁️'); add(game.witness, 'cls', ' wit'); }
+        if (game.lola && game.lola.pos != null && !(game.phase === 'lola' && !game.hand)) add(game.lola.pos, 'tk', '🐕');
         return ex;
     }
     function logHtml(game, label) {
@@ -172,10 +187,13 @@
         // V101.344 (owner pick B + "inline card มากขึ้น ลด text ซ้ำซ้อน", mockup-cereal-local/): one row 👤 | 🤖 … 🗺 A | B (like ＋ สร้างห้อง),
         // then the two seat cards in the How to play colours — 🔪 red / 🕵️ indigo, one line each: the name box (friend) or "ฉัน" (bot);
         // vs 🤖 the 🥄 level sits beside ▸ เริ่ม. No row labels, no English lines, no breakfast pill (its rule is the 🔪 title).
-        h += '<div class="ck-row ck-mkrow"><button type="button" id="ck-vs-friend" class="ck-chip' + (solo ? '' : ' on') + '" onclick="CK.vs(\'friend\')">👤 เพื่อน</button>'
+        h += '<div class="ck-row ck-mkrow' + (solo ? '' : ' four') + '"><button type="button" id="ck-vs-friend" class="ck-chip' + (solo ? '' : ' on') + '" onclick="CK.vs(\'friend\')">👤 เพื่อน</button>'
             + '<button type="button" id="ck-vs-bot" class="ck-chip' + (solo ? ' on' : '') + '"' + (B ? ' onclick="CK.vs(\'bot\')"' : ' disabled') + t('Play against the bot on this phone', 'เล่นกับบอทในเครื่องนี้') + '>🤖 บอท</button>'
-            + '<span class="ck-mkmap"><button type="button" id="ck-side-A" class="ck-chip' + (ui.side === 'A' ? ' on' : '') + '" onclick="CK.side(\'A\')"' + t('Map A — favours the killer', 'แผนที่ A · ฆาตกรได้เปรียบ') + '>🗺 A</button>'
-            + '<button type="button" id="ck-side-B" class="ck-chip' + (ui.side === 'B' ? ' on' : '') + '" onclick="CK.side(\'B\')"' + t('Map B — favours the detective', 'แผนที่ B · นักสืบได้เปรียบ') + '>B</button></span></div>';
+            // V101.346 (owner pick A, mockup-cereal-lola/lobby.html): 🐕 3 คน shows Lola's card; the map becomes one chip that cycles the 4 printed pairs
+            + (solo ? '' : '<button type="button" id="ck-lola" class="ck-chip lola' + (ui.lola ? ' on' : '') + '" aria-pressed="' + ui.lola + '" onclick="CK.lola()"' + t('Three players: Lola the dog joins', '3 คน · เพิ่ม Lola สุนัขนักดม') + '>🐕 3 คน</button>')
+            + (!solo && ui.lola ? '<span class="ck-mkmap"><button type="button" id="ck-pair" class="ck-chip on" onclick="CK.pair()"' + t('Map: ' + M.difficulty[ui.pair].name + ' (tap to change)', 'แผนที่ ' + M.difficulty[ui.pair].th + ' · แตะเพื่อเปลี่ยน') + '>🗺 ' + '🥄'.repeat(M.difficulty[ui.pair].spoons) + '</button></span></div>' : '')
+            + (!solo && ui.lola ? '' : '<span class="ck-mkmap"><button type="button" id="ck-side-A" class="ck-chip' + (ui.side === 'A' ? ' on' : '') + '" onclick="CK.side(\'A\')"' + t('Map A — favours the killer', 'แผนที่ A · ฆาตกรได้เปรียบ') + '>🗺 A</button>'
+            + '<button type="button" id="ck-side-B" class="ck-chip' + (ui.side === 'B' ? ' on' : '') + '" onclick="CK.side(\'B\')"' + t('Map B — favours the detective', 'แผนที่ B · นักสืบได้เปรียบ') + '>B</button></span></div>');
         if (solo) {
             var seat = function (me, ic, en, th) { return '<button type="button" class="ck-seat ' + me + (ui.me === me ? ' on' : '') + '" id="ck-me-' + me + '" aria-pressed="' + (ui.me === me) + '" onclick="CK.me(\'' + me + '\')"' + t(en, th) + '>' + ic + ' ฉัน</button>'; };
             h += '<div class="ck-seats">' + seat('killer', '🔪', 'You hide, the bot hunts', 'คุณซ่อน · บอทไล่จับ') + seat('detective', '🕵️', 'You hunt, the bot hides', 'คุณไล่จับ · บอทซ่อน') + '</div>';
@@ -183,7 +201,8 @@
             for (var n = 1; n <= 3; n++) lvs += '<button type="button" class="ck-chip ck-lv' + (ui.level[ui.me] === n ? ' on' : '') + '" data-lv="' + n + '" onclick="CK.level(\'' + ui.me + '\',' + n + ')"' + t('Bot: ' + ['', 'easy', 'medium', 'hard'][n], 'บอท ' + ['', 'ง่าย', 'กลาง', 'ยาก'][n]) + '>' + '🥄'.repeat(n) + '</button>';
             h += '<div class="ck-row ck-gorow"><span class="ck-lvs">🤖 ' + lvs + '</span><button type="button" class="ck-primary" id="ck-start" onclick="CK.start()">▸ เริ่ม</button></div>';
         } else {
-            h += '<div class="ck-seats"><label class="ck-seat killer on"><span' + t('The rulebook: whoever just had breakfast is the killer', 'ใครเพิ่งกินข้าวเช้า = ฆาตกร') + '>🔪</span><input type="text" id="ck-n1" maxlength="20" placeholder="ฆาตกร" value="' + esc(ui.names.killer) + '" aria-label="Killer name" data-th-placeholder="ฆาตกร"></label>'
+            h += '<div class="ck-seats' + (ui.lola ? ' three' : '') + '"><label class="ck-seat killer on"><span' + t('The rulebook: whoever just had breakfast is the killer', 'ใครเพิ่งกินข้าวเช้า = ฆาตกร') + '>🔪</span><input type="text" id="ck-n1" maxlength="20" placeholder="ฆาตกร" value="' + esc(ui.names.killer) + '" aria-label="Killer name" data-th-placeholder="ฆาตกร"></label>'
+                + (ui.lola ? '<label class="ck-seat lola on"><span>🐕</span><input type="text" id="ck-n3" maxlength="20" placeholder="Lola" value="' + esc(ui.names.lola) + '" aria-label="Lola name"></label>' : '')
                 + '<label class="ck-seat detective on"><span>🕵️</span><input type="text" id="ck-n2" maxlength="20" placeholder="นักสืบ" value="' + esc(ui.names.detective) + '" aria-label="Detective name" data-th-placeholder="นักสืบ"></label></div>'
                 + '<button type="button" class="ck-primary" id="ck-start" onclick="CK.start()"' + t('Start day 1 — the phone goes to the killer first', 'เริ่มวันที่ 1 · มือถืออยู่กับฆาตกรก่อน') + '>▸ เริ่ม</button>';
         }
@@ -192,7 +211,7 @@
             h += '<div class="ck-nb"><div class="lbl">🎮 ' + games.length + '</div>';   // V101.344: the tab already says เครื่องนี้
             games.forEach(function (x) {
                 var fin = x.status === 'finished', res = fin ? (x.result.winner === 'good' ? '🕵️ 🏆 D' : '🔪 🏆 D') + x.result.day : '';
-                h += '<button type="button" class="ck-game" onclick="CK.resume(\'' + esc(x.id) + '\')"><span class="d">' + (fin ? '🏁' : 'D' + x.day) + '</span><span class="who">🔪 ' + esc(x.names.killer) + ' <small>vs</small> 🕵️ ' + esc(x.names.detective) + '</span>'
+                h += '<button type="button" class="ck-game" onclick="CK.resume(\'' + esc(x.id) + '\')"><span class="d">' + (fin ? '🏁' : 'D' + x.day) + '</span><span class="who">🔪 ' + esc(x.names.killer) + ' <small>vs</small> 🕵️ ' + esc(x.names.detective) + (x.lola ? ' · 🐕 ' + esc(x.names.lola) : '') + '</span>'
                     + '<span class="ck-pill">' + (fin ? res : '🥣 ' + x.kills + '/6 · 🛡️ ' + x.arrestsLeft) + '</span><span class="go">' + (fin ? '↺' : '▸') + '</span></button>';
             });
             h += '</div>';
@@ -203,12 +222,105 @@
 
     // ---- hand-off -----------------------------------------------------------------------------------------
     function handHtml() {
-        var det = g.hand === 'detective', who = det ? '🕵️' : '🔪', name = det ? g.names.detective : g.names.killer;
-        return '<div class="ck ' + (det ? 'detective' : 'killer') + '">' + topHtml(who + ' วันที่ ' + g.day)
-            + '<div class="ck-hand"><div class="ck-note">' + (det ? '🔪 ล็อกวันที่ ' + g.day + ' แล้ว 🔒' : g.day === 1 ? 'เกมใหม่ · ฆาตกรเลือกบ้านลับก่อน' : '🕵️ จบวันที่ ' + (g.day - 1)) + '</div>'
+        var seat = g.hand, who = { killer: '🔪', lola: '🐕', detective: '🕵️' }[seat] || '🔪', name = g.names[seat] || '';
+        var note = seat === 'lola' ? '🔪 ล็อกวันที่ ' + g.day + ' แล้ว 🔒' : seat === 'detective' ? (g.lola ? '🐕 จบตาแล้ว' : '🔪 ล็อกวันที่ ' + g.day + ' แล้ว 🔒') : g.day === 1 ? 'เกมใหม่ · ฆาตกรเลือกบ้านลับก่อน' : '🕵️ จบวันที่ ' + (g.day - 1);
+        return '<div class="ck ' + seat + '">' + topHtml(who + ' วันที่ ' + g.day)
+            + '<div class="ck-hand"><div class="ck-note">' + note + '</div>'
             + '<div class="who" aria-hidden="true">' + who + '</div><h4>ส่งมือถือให้ <span class="nm" title="' + esc(name) + '">' + esc(name) + '</span></h4>'   // V101.341 (break-ui 3): the name once — no English repeat, not on the button
             + '<div class="ck-row" style="justify-content:center"><span class="ck-pill">วันที่ ' + g.day + ' / 7</span>' + pills(g) + (g.witness != null ? '<span class="ck-pill">👁️ ที่ ' + g.witness + '</span>' : '') + '</div>'
             + '<button type="button" class="ck-primary" id="ck-hand-go" onclick="CK.hand()"' + t('Tap when the phone is in your hands', 'แตะเมื่อถึงมือคุณ') + '>👆 ฉันคือ ' + who + '</button></div></div>';
+    }
+
+    // ---- 🐕 Lola turn (V101.346, owner pick: whole board with short cells + abilities as a rail like ❓ ถาม, mockup-cereal-lola/) ----
+    var ABIL = [{ a: 'sniff', ic: '👃', w: 'ดม', th: 'ดมช่องที่ยืนหรือช่องติดกัน · ฆาตกรผ่านวันนี้ไหม อยู่ทางไหน', en: 'Sniff your cell or a neighbour' },
+                { a: 'bark', ic: '📢', w: 'เห่า', th: 'ฆาตกรอยู่ช่องนี้หรือ 8 ช่องรอบตัวไหม', en: 'Bark: is the killer on or around you (diagonals too)' },
+                { a: 'bite', ic: '🦷', w: 'กัด', th: 'กัด = จับกุม · ใช้ 🛡️ ร่วมกับนักสืบ', en: 'Bite = arrest, shares the 🛡️ tries' }];
+    function abil(a) { for (var i = 0; i < ABIL.length; i++) if (ABIL[i].a === a) return ABIL[i]; return ABIL[0]; }
+    function lolaAnsText(u) {
+        if (u.a === 'bark') return u.ans === 'yes' ? '✔ อยู่รอบตัว' : '✗ ไม่อยู่รอบตัว';
+        if (u.ans === 'center') return '🎯 อยู่ช่องนี้!';
+        if (u.ans === 'no') return '✗ ไม่ได้ผ่านวันนี้';
+        return '→ ' + dirWord(u.ans);
+    }
+    function lolaLast(game) { var p = game.lola.dd.path; return p.length ? p[p.length - 1] : game.lola.pos; }
+    function lolaHtml() {
+        var L0 = g.lola, m = mapOf(g), ex = publicExtra(g), add = function (id, k, v) { ex[id] = ex[id] || {}; ex[id][k] = (ex[id][k] || '') + v; };
+        var path = L0.dd.path.length ? L0.dd.path : (L0.dd.path = [L0.pos]), last = path[path.length - 1];
+        var v = R.validateLolaPath(m, path), left = R.STEPS.lola + (v.bonus ? 1 : 0) - v.steps;
+        var picking = ui.lolaPick === 'sniff' || ui.lolaPick === 'bite';
+        var targets = picking || L0.dd.used ? [] : R.stepTargets(m, last, { canRide: false }).filter(function (id) { return R.validateLolaPath(m, path.concat(id)).ok; });
+        var near = picking ? m.ids.filter(function (id) { return R.arrestValid(m, last, id); }) : [];
+        add(last, 'cls', ' ring'); add(last, 'me', '🐕');
+        if (g.detectivePos != null) add(g.detectivePos, 'tk', '🕵️');
+        path.slice(1).forEach(function (id, i) { add(id, 'cls', ' on'); ex[id].st = String(i + 1); });
+        targets.forEach(function (id) { add(id, 'cls', ' hint'); });
+        near.forEach(function (id) { add(id, 'cls', ' pick'); });
+        if (typeof ui.lolaBite === 'number') add(ui.lolaBite, 'cls', ' ring');
+        L0.notes.forEach(function (u) { if (u.cell != null && u.day === g.day) add(u.cell, 'tk', u.ans === 'center' ? '🎯' : '👃'); });
+        var enabled = function (id) { return picking ? near.indexOf(id) >= 0 : targets.indexOf(id) >= 0; };
+        var h = '<div class="ck lola">' + topHtml('🐕 วันที่ ' + g.day, '<span class="ck-pill acc"' + t('steps left' + (v.bonus ? ' (🦴 +1)' : ''), 'ก้าวที่เหลือ') + '>👣 ' + left + '</span>' + pills(g)) + boardHtml(g, { extra: ex, tap: true, enabled: enabled });
+        if (path.length > 1) h += '<div class="ck-path"><span class="ck-mini">เส้นทาง</span><b>' + path.join(' › ') + '</b>' + (L0.dd.used ? '' : '<button type="button" class="ck-undo" onclick="CK.undo()"' + t('Undo one step', 'ถอยหนึ่งก้าว') + '>↺</button>') + '</div>';
+        h += '<div class="ck-row rail" id="ck-lola-ab"><span class="ck-mini">🐕 ท่า</span>';
+        ABIL.forEach(function (x) {
+            var rest = L0.last === x.a, used = !!L0.dd.used, on = ui.lolaPick === x.a || (used && L0.dd.used.a === x.a);
+            h += '<button type="button" class="ck-chip ck-q' + (rest ? ' used' : '') + (on ? ' on' : '') + '" data-ab="' + x.a + '"' + (rest || used ? ' disabled' : ' onclick="CK.lolaPick(\'' + x.a + '\')"') + t(x.en + (rest ? ' — used last turn' : ''), x.th + (rest ? ' · ใช้เมื่อตาที่แล้ว' : '')) + '><span class="qi">' + x.ic + '</span><span class="qw">' + x.w + (rest ? ' 🦴' : '') + '</span></button>';
+        });
+        h += '</div>';
+        if (L0.dd.used && L0.dd.used.a !== 'bite') h += '<div class="ck-ans" id="ck-lola-ans">' + abil(L0.dd.used.a).ic + (L0.dd.used.cell != null ? ' ' + L0.dd.used.cell : '') + ' <b>' + esc(lolaAnsText(L0.dd.used)) + '</b><span class="ck-note" style="margin-left:auto">🔒 เห็นคนเดียว</span></div>';
+        if (typeof ui.lolaBite === 'number') h += '<div class="ck-confirm" id="ck-confirm">🦷 กัดที่ <b>' + ui.lolaBite + '</b>? <span style="font-weight:700;opacity:.8">ผิด = 🛡️ ' + g.arrestsLeft + ' → ' + (g.arrestsLeft - 1) + '</span><button type="button" class="yes" onclick="CK.lolaBite()">กัด</button><button type="button" class="no" onclick="CK.lolaPick(null)"' + t('Cancel', 'ยกเลิก') + '>✕</button></div>';
+        else if (picking) h += '<div class="ck-confirm">' + abil(ui.lolaPick).ic + ' แตะช่องที่ยืนหรือช่องติดกัน<button type="button" class="no" style="margin-left:auto" onclick="CK.lolaPick(null)"' + t('Cancel', 'ยกเลิก') + '>✕</button></div>';
+        h += '<button type="button" class="ck-primary" id="ck-lola-end" onclick="CK.lolaEnd()"' + (picking ? ' disabled' : '') + '>' + L('▸ จบเทิร์น', 'End turn') + '</button>';
+        // her own notebook: every answer she got (never shown on another seat's screen)
+        h += '<div class="ck-nb"><div class="lbl">🔒 สมุด Lola · เห็นคนเดียว</div>';
+        if (!L0.notes.length) h += '<div class="r"><span class="d">—</span>ยังไม่ได้ใช้ท่า</div>';
+        L0.notes.forEach(function (u) { h += '<div class="r' + (u.day === g.day ? ' now' : '') + '"><span class="d">D' + u.day + '</span>' + abil(u.a).ic + (u.cell != null ? ' ' + u.cell : '') + ' <b>' + esc(lolaAnsText(u)) + '</b></div>'; });
+        return h + '</div>' + logHtml(g) + '</div>';
+    }
+    function tapLola(id) {
+        var L0 = g.lola, m = mapOf(g), last = lolaLast(g);
+        if (ui.lolaPick === 'sniff') { if (R.arrestValid(m, last, id)) lolaSniff(id); return; }
+        if (ui.lolaPick === 'bite') { if (R.arrestValid(m, last, id)) { ui.lolaBite = id; render(); } return; }
+        if (L0.dd.used) return;
+        var path = L0.dd.path.length ? L0.dd.path : [L0.pos];
+        if (!R.validateLolaPath(m, path.concat(id)).ok) return;
+        L0.dd.path = path.concat(id); snd('stepD'); save(); render();
+    }
+    function lolaPick(a) {
+        ui.lolaBite = null;
+        if (!a) { ui.lolaPick = null; render(); return; }
+        if (g.lola.dd.used || g.lola.last === a) return;
+        if (a === 'bark') { ui.lolaPick = null; lolaUse({ a: 'bark', cell: null, ans: R.bark(mapOf(g), lolaLast(g), kpos(g)) }); return; }
+        ui.lolaPick = a; render();
+    }
+    function lolaSniff(cell) {
+        var m = mapOf(g), ans = R.sniff(m, g.secret.path[g.day] || [kpos(g)], cell, kpos(g));
+        ui.lolaPick = null;
+        lolaUse({ a: 'sniff', cell: cell, ans: ans.length > 1 ? R.leastInformative(m, cell, ans) : ans[0] });
+    }
+    function lolaUse(u) {
+        u.day = g.day; g.lola.dd.used = u; g.lola.notes.push(u);
+        g.log.push({ day: g.day, type: 'lola', text: '🐕 ' + abil(u.a).ic + ' ' + abil(u.a).w + (u.cell != null ? 'ช่อง ' + u.cell : '') });
+        snd('ding'); save(); render();
+    }
+    function lolaBite() {
+        var cell = ui.lolaBite; if (typeof cell !== 'number' || g.lola.dd.used) return;
+        ui.lolaBite = null; ui.lolaPick = null;
+        var u = { a: 'bite', cell: cell, day: g.day }; g.lola.dd.used = u;
+        g.lola.pos = lolaLast(g);
+        if (cell === kpos(g)) { g.log.push({ day: g.day, type: 'arrest', cell: cell, text: '🐕 🦷 ' + cell + ' ✔' }); finish('good', 'bite', { cell: cell }); render(); return; }
+        g.arrestsLeft -= 1; pubToday().misses.push(cell);
+        g.log.push({ day: g.day, type: 'arrest', cell: cell, text: '🐕 🦷 ' + cell + ' ✗ (เหลือ ' + g.arrestsLeft + ')' });
+        snd('buzz');
+        if (g.arrestsLeft <= 0) { finish('killer', 'arrests'); render(); return; }
+        lolaEnd();
+    }
+    function lolaEnd() {
+        if (ui.lolaPick || typeof ui.lolaBite === 'number') return;
+        var L0 = g.lola;
+        L0.pos = lolaLast(g); L0.last = L0.dd.used ? L0.dd.used.a : null; L0.dd = { path: [], used: null };
+        g.log.push({ day: g.day, type: 'lola-move', text: '🐕 อยู่ที่ ' + L0.pos });   // her cell is public (she is a piece on the board)
+        g.phase = 'detective'; g.hand = 'detective'; snd('whoosh', 0.6);
+        save(); render();
     }
 
     // ---- killer turn ---------------------------------------------------------------------------------------
@@ -293,7 +405,7 @@
         if (v.kill != null) snd('crunch'); if (v.witness != null) snd('gasp', 0.45);
         g.draft = { path: [], kill: null, witness: null };
         if (!R.calendarOk(g.day, g.kills)) finish('good', 'calendar');
-        else { g.phase = 'detective'; g.hand = g.bot ? null : 'detective'; if (!g.bot) snd('whoosh', 1); }
+        else { g.phase = g.lola ? 'lola' : 'detective'; g.hand = g.bot ? null : g.phase; if (!g.bot) snd('whoosh', 1); }
         save(); render();
         botNext();
     }
@@ -323,7 +435,7 @@
         // question cards
         var canAsk = g.witness != null && R.canQuestion(m, last, g.witness) && !g.dd.asked;
         h += '<div class="ck-row rail" id="ck-ask"><span class="ck-mini">❓ ถาม' + (g.witness != null ? ' 👁️' + g.witness : '') + '</span>';
-        QCARDS.forEach(function (c) {
+        QCARDS.filter(function (c) { return c.q !== 'area' || g.suburbSide; }).forEach(function (c) {
             var used = g.usedQuestions.indexOf(c.q) >= 0, past = used ? g.log.filter(function (e) { return e.type === 'ask' && e.q === c.q; })[0] : null;
             h += '<button type="button" class="ck-chip ck-q' + (used ? ' used' : '') + '" data-q="' + c.q + '"' + (used || !canAsk ? ' disabled' : ' onclick="CK.ask(\'' + c.q + '\')"') + t(c.th + ' · ' + c.en + (past ? ' — D' + past.day + ' → ' + past.ans : ''), c.th) + '><span class="qi">' + c.ic + '</span><span class="qw">' + c.w + '</span></button>';
         });
@@ -499,24 +611,27 @@
     }
 
     // ---- actions ---------------------------------------------------------------------------------------------
-    function readNames() { var a = document.getElementById('ck-n1'), b = document.getElementById('ck-n2'); if (a) ui.names.killer = a.value; if (b) ui.names.detective = b.value; }
+    function readNames() { var a = document.getElementById('ck-n1'), b = document.getElementById('ck-n2'), c = document.getElementById('ck-n3'); if (a) ui.names.killer = a.value; if (b) ui.names.detective = b.value; if (c) ui.names.lola = c.value; }
     window.CK = {
-        tap: function (id) { if (!g || g.status !== 'playing' || g.hand) return; if (g.phase === 'killer') tapKiller(id); else tapDetective(id); },
-        undo: function () { if (!g) return; if (g.phase === 'killer') undo(); else if (g.dd.path.length > 1) { g.dd.path.pop(); save(); render(); } },
+        tap: function (id) { if (!g || g.status !== 'playing' || g.hand) return; if (g.phase === 'killer') tapKiller(id); else if (g.phase === 'lola') tapLola(id); else tapDetective(id); },
+        lolaPick: function (a) { lolaPick(a); }, lolaBite: lolaBite, lolaEnd: lolaEnd,
+        lola: function () { readNames(); ui.lola = !ui.lola; render(); },
+        pair: function () { readNames(); ui.pair = (ui.pair + 1) % M.difficulty.length; render(); },
+        undo: function () { if (!g) return; if (g.phase === 'killer') undo(); else if (g.phase === 'lola') { if (!g.lola.dd.used && g.lola.dd.path.length > 1) { g.lola.dd.path.pop(); save(); render(); } } else if (g.dd.path.length > 1) { g.dd.path.pop(); save(); render(); } },
         kill: kill, witness: witness, lock: lock,
-        hand: function () { if (!g) return; g.hand = null; snd(g.phase === 'killer' ? 'heartbeat' : 'tick'); save(); render(); },
+        hand: function () { if (!g) return; g.hand = null; ui.lolaPick = null; ui.lolaBite = null; snd(g.phase === 'killer' ? 'heartbeat' : 'tick'); save(); render(); },
         sound: function () { if (window.CKSound) CKSound.toggle(); render(); },
         ask: ask, arrestMode: arrestMode, arrest: arrest, cancelArrest: cancelArrest, endTurn: endTurn,
         side: function (s) { readNames(); ui.side = s; render(); },
         rules: function () { readNames(); if (window.CKTour) { CKTour.open(); return; } ui.rules = !ui.rules; render(); },
-        start: function () { readNames(); g = newGame(); if (g.bot) g.hand = null; store.games.unshift(g); store.games = store.games.slice(0, MAX_GAMES); ui.beat = null; if (g.bot && g.bot.seat === 'detective') snd('heartbeat'); save(); render(); botNext(); },
+        start: function () { readNames(); g = newGame(); if (!g.bot && ui.lola) withLola(g); if (g.bot) g.hand = null; store.games.unshift(g); store.games = store.games.slice(0, MAX_GAMES); ui.beat = null; if (g.bot && g.bot.seat === 'detective') snd('heartbeat'); save(); render(); botNext(); },
         vs: function (v) { readNames(); ui.vs = v; render(); },
         me: function (r) { ui.me = r; render(); },
         level: function (r, n) { ui.me = r; ui.level[r] = n; render(); },
         botOk: function () { ui.beat = null; if (g && g.status === 'playing') snd(g.phase === 'killer' ? 'heartbeat' : 'tick'); render(); },
         botDelay: function (ms) { BOT_MS = ms; },   // QA
         resume: function (id) { var x = store.games.filter(function (y) { return y.id === id; })[0]; if (!x) return; g = x; ui.arrest = null; ui.beat = null; if (g.status === 'playing') g.hand = g.bot ? null : g.phase; else ui.revealDay = 0; save(); render(); botNext(); },
-        rematch: function () { if (g && g.online) { if (window.CKOnline) CKOnline.leave(); ui.tab = 'online'; g = null; render(); return; } if (g && g.bot) { ui.vs = 'bot'; ui.me = g.bot.seat; } else if (g) { ui.vs = 'friend'; ui.names = { killer: g.names.detective, detective: g.names.killer }; } g = null; ui.beat = null; render(); },
+        rematch: function () { if (g && g.online) { if (window.CKOnline) CKOnline.leave(); ui.tab = 'online'; g = null; render(); return; } if (g && g.bot) { ui.vs = 'bot'; ui.me = g.bot.seat; } else if (g) { ui.vs = 'friend'; ui.names = { killer: g.names.detective, detective: g.names.killer, lola: g.lola ? g.names.lola : '' }; ui.lola = !!g.lola; if (g.lola) ui.pair = g.pair; } g = null; ui.beat = null; render(); },
         lobby: function () { if (g && g.online) { if (window.CKOnline) CKOnline.leave(); ui.tab = 'online'; } g = null; render(); },
         tab: function (tb) { readNames(); ui.tab = tb; render(); },
         revealDay: function (d) { ui.revealDay = d; render(); },
