@@ -2855,6 +2855,32 @@ exports.cerealAct = onCall({ timeoutSeconds: 30 }, async (request) => {
     return require('./cereal-act').handle(request, { db: admin.firestore(), FieldValue: admin.firestore.FieldValue, HttpsError, isAdmin: isAdminToken, now: Date.now(), rand: Math.random });
 });
 
+// 🐺 Werewolf Phase 1 (owner 2026-11-23, docs/WEREWOLF-PLAN.md): the Telegram game bot's webhook — a NEW bot, not the admin
+// alerts bot. Telegram sends each update with the secret_token set in setWebhook; anything without it gets 403. Always 200
+// after that, so Telegram does not retry a bad update forever. Errors never log the token (it is in the request URL).
+let wolfBotName = null;
+async function wolfTg(method, body) {
+    try {
+        return (await axios.post('https://api.telegram.org/bot' + process.env.TELEGRAM_WOLF_TOKEN + '/' + method, body, { timeout: 8000 })).data.result;
+    } catch (e) {
+        const desc = (e && e.response && e.response.data && e.response.data.description) || 'network';
+        throw new Error(method + ' ' + (e && e.response ? e.response.status : 'no-response') + ' ' + String(desc).slice(0, 200));
+    }
+}
+exports.wolfBot = onRequest({ secrets: ['TELEGRAM_WOLF_TOKEN', 'TELEGRAM_WOLF_HOOK_SECRET'], timeoutSeconds: 60 }, async (req, res) => {
+    const want = process.env.TELEGRAM_WOLF_HOOK_SECRET;
+    if (req.method !== 'POST' || !want || req.get('X-Telegram-Bot-Api-Secret-Token') !== want) return res.status(403).send('forbidden');
+    try {
+        await require('./wolf-bot').handle(req.body, {
+            db: admin.firestore(), tg: wolfTg, now: Date.now(), rng: Math.random,
+            botName: async () => wolfBotName || (wolfBotName = (await wolfTg('getMe', {})).username)
+        });
+    } catch (e) {
+        console.error('[wolfBot] ' + (e && e.message));
+    }
+    res.status(200).send('ok');
+});
+
 exports.askNika = onCall({ timeoutSeconds: 60 }, async (request) => {
     const auth = new GoogleAuth({ scopes: 'https://www.googleapis.com/auth/cloud-platform' });
     return require('./nika-ask').handle(request, {
