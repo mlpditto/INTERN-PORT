@@ -298,10 +298,11 @@
         ui.lolaBite = null;
         if (!a) { ui.lolaPick = null; render(); return; }
         if (g.lola.dd.used || g.lola.last === a) return;
-        if (a === 'bark') { ui.lolaPick = null; lolaUse({ a: 'bark', cell: null, ans: R.bark(mapOf(g), lolaLast(g), kpos(g)) }); return; }
+        if (a === 'bark') { ui.lolaPick = null; if (g.online) { CKOnline.lolaUse('bark', null); return; } lolaUse({ a: 'bark', cell: null, ans: R.bark(mapOf(g), lolaLast(g), kpos(g)) }); return; }
         ui.lolaPick = a; render();
     }
     function lolaSniff(cell) {
+        if (g.online) { ui.lolaPick = null; CKOnline.lolaUse('sniff', cell); return; }   // V101.349: only the referee knows the killer
         var m = mapOf(g), ans = R.sniff(m, g.secret.path[g.day] || [kpos(g)], cell, kpos(g));
         ui.lolaPick = null;
         lolaUse({ a: 'sniff', cell: cell, ans: ans.length > 1 ? R.leastInformative(m, cell, ans) : ans[0] });
@@ -313,6 +314,7 @@
     }
     function lolaBite() {
         var cell = ui.lolaBite; if (typeof cell !== 'number' || g.lola.dd.used) return;
+        if (g.online) { ui.lolaBite = null; ui.lolaPick = null; CKOnline.lolaUse('bite', cell); return; }
         ui.lolaBite = null; ui.lolaPick = null;
         var u = { a: 'bite', cell: cell, day: g.day }; g.lola.dd.used = u;
         g.lola.pos = lolaLast(g);
@@ -325,6 +327,7 @@
     }
     function lolaEnd() {
         if (ui.lolaPick || typeof ui.lolaBite === 'number') return;
+        if (g.online) { CKOnline.lolaEnd(); return; }
         var L0 = g.lola;
         L0.pos = lolaLast(g); L0.last = L0.dd.used ? L0.dd.used.a : null; L0.dd = { path: [], used: null };
         g.log.push({ day: g.day, type: 'lola-move', text: '🐕 อยู่ที่ ' + L0.pos });   // her cell is public (she is a piece on the board)

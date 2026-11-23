@@ -10,11 +10,17 @@
    ?cereal=<gameId>. Sent only when the player taps (shareTargetPicker → OS share → clipboard), so no LINE OA quota. Cards carry the
    room code, names and the day — never the killer's home or path. deepLink() is called by applyTabDeepLink in index.html.
    V101.339 (owner pick C, mockup-cereal-tour-bot/): the lobby is one row — ＋ สร้างห้อง + 🔑 [รหัส 6 ตัว] ▸ typed in place (no join screen,
-   no "ยังไม่มีเกม…" line, no sub-lines). */
+   no "ยังไม่มีเกม…" line, no sub-lines).
+   V101.349 Phase 3 online: ＋ สร้างห้อง gets a 🐕 3 คน chip (and the 🗺 🥄 pair chip); a 3-seat room starts when all three are in
+   (join takes the first free seat 🔪 → 🐕 → 🕵️). Lola's turn is drawn by cereal.js (lolaHtml); her walk is local until she uses an
+   ability — lolaUse sends walk + ability and gets HER answer back; lolaNotes (cerealAct, Lola only) refills her 🔒 notebook. */
 (function () {
     'use strict';
     var R = window.CerealRules;
-    var st = { uid: null, list: [], unList: null, unGame: null, gameId: null, doc: null, secret: {}, err: '', busy: false, view: null, code: '', side: 'A', role: 'killer', timer: null, authTried: false, pending: null, listed: false, sent: '' };
+    var st = { uid: null, list: [], unList: null, unGame: null, gameId: null, doc: null, secret: {}, err: '', busy: false, view: null, code: '', side: 'A', role: 'killer', timer: null, authTried: false, pending: null, listed: false, sent: '',
+        lola: false, pair: 1, lnotes: {} };
+    var IC = { killer: '🔪', lola: '🐕', detective: '🕵️' }, TH = { killer: 'ฆาตกร', lola: 'Lola', detective: 'นักสืบ' };
+    function rolesOf(doc) { return doc && doc.mode === 3 ? ['killer', 'lola', 'detective'] : ['killer', 'detective']; }
     var C = function () { return window.CK && CK._; };
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function call(data) { return firebase.functions().httpsCallable('cerealAct')(data).then(function (r) { return r.data || {}; }); }
@@ -23,7 +29,7 @@
         return { 'no-game': 'ไม่พบห้องที่เปิดอยู่ด้วยรหัสนี้', 'own-game': 'นี่คือห้องของคุณเอง', started: 'เกมเริ่มไปแล้ว', 'not-your-turn': 'ยังไม่ถึงตาคุณ', 'too-early': 'ยังไม่ครบ 1 ชม.' }[c]
             || (e && e.code === 'permission-denied' ? 'เปิดแอปจาก LINE ก่อน' : 'ส่งไม่สำเร็จ ลองอีกครั้ง');
     }
-    function meRole(doc) { return ['killer', 'detective'].filter(function (r) { return doc.players && doc.players[r] && doc.players[r].authUid === st.uid; })[0] || null; }
+    function meRole(doc) { return rolesOf(doc).filter(function (r) { return doc.players && doc.players[r] && doc.players[r].authUid === st.uid; })[0] || null; }
     function rerender() { var c = C(); if (c) c.render(); }
 
     // ---- list of my online games (live) --------------------------------------------------------------------
@@ -52,8 +58,13 @@
             // V101.340 (owner pick B, mockup-cereal-lola/): one row ‹ · 🔪 / 🕵️ · 🗺 A | B, then ▸ สร้าง — no row labels, no English line, no ✕ ยกเลิก button
             var mapChip = function (s, lbl, en, th) { return '<button type="button" class="ck-chip' + (st.side === s ? ' on' : '') + '" id="ck-on-side-' + s + '" onclick="CKOnline.pick(\'side\',\'' + s + '\')" title="' + en + '" data-th-title="' + th + '">' + lbl + '</button>'; };
             h += '<div class="ck-row ck-mkrow"><button type="button" class="ck-chip" id="ck-on-back" onclick="CKOnline.pick(\'view\',null)" aria-label="Back" title="Back" data-th-title="กลับ">‹</button>'
-                + '<button type="button" class="ck-chip' + (st.role === 'killer' ? ' on' : '') + '" id="ck-on-role-killer" onclick="CKOnline.pick(\'role\',\'killer\')">🔪 ฆาตกร</button><button type="button" class="ck-chip' + (st.role === 'detective' ? ' on' : '') + '" id="ck-on-role-detective" onclick="CKOnline.pick(\'role\',\'detective\')">🕵️ นักสืบ</button>'
-                + '<span class="ck-mkmap">' + mapChip('A', '🗺 A', 'Map A · 🥄🥄 easier for the killer', 'แผนที่ A · ฆาตกรได้เปรียบ') + mapChip('B', 'B', 'Map B · 🥄 easier for the detective', 'แผนที่ B · นักสืบได้เปรียบ') + '</span></div>'
+                + '<button type="button" class="ck-chip' + (st.role === 'killer' ? ' on' : '') + '" id="ck-on-role-killer" onclick="CKOnline.pick(\'role\',\'killer\')">🔪 ฆาตกร</button>'
+                + (st.lola ? '<button type="button" class="ck-chip' + (st.role === 'lola' ? ' on' : '') + '" id="ck-on-role-lola" onclick="CKOnline.pick(\'role\',\'lola\')">🐕 Lola</button>' : '')
+                + '<button type="button" class="ck-chip' + (st.role === 'detective' ? ' on' : '') + '" id="ck-on-role-detective" onclick="CKOnline.pick(\'role\',\'detective\')">🕵️ นักสืบ</button>'
+                + (st.lola ? '' : '<span class="ck-mkmap">' + mapChip('A', '🗺 A', 'Map A · 🥄🥄 easier for the killer', 'แผนที่ A · ฆาตกรได้เปรียบ') + mapChip('B', 'B', 'Map B · 🥄 easier for the detective', 'แผนที่ B · นักสืบได้เปรียบ') + '</span>') + '</div>'
+                // V101.349: 🐕 3 คน + the printed pair (city + suburb), as on 📱 เครื่องนี้
+                + '<div class="ck-row" style="gap:6px"><button type="button" class="ck-chip lola' + (st.lola ? ' on' : '') + '" id="ck-on-lola" aria-pressed="' + st.lola + '" onclick="CKOnline.toggleLola()">🐕 3 คน</button>'
+                + (st.lola && window.CEREAL_MAPS ? '<button type="button" class="ck-chip on" id="ck-on-pair" onclick="CKOnline.nextPair()" title="' + esc(CEREAL_MAPS.difficulty[st.pair].name) + '" data-th-title="' + esc(CEREAL_MAPS.difficulty[st.pair].th) + '">🗺 ' + '🥄'.repeat(CEREAL_MAPS.difficulty[st.pair].spoons) + '</button>' : '') + '</div>'
                 + '<button type="button" class="ck-primary" id="ck-on-create" onclick="CKOnline.create()"' + (st.busy || !st.uid ? ' disabled' : '') + '>▸ สร้าง · ได้รหัส 6 ตัว</button>';
             return h;
         }
@@ -62,12 +73,12 @@
         if (games.length) {
             h += '<div class="ck-nb"><div class="lbl">🌐 เกมออนไลน์ของฉัน</div>';
             games.forEach(function (x) {
-                var me = meRole(x), other = me === 'killer' ? 'detective' : 'killer', on = other && x.names ? x.names[other] : '', mine = myTurn(x), tail;
+                var me = meRole(x), others = rolesOf(x).filter(function (r) { return r !== me; }), on = x.names ? (x.names[x.phase] || x.names[others[0]] || '') : '', mine = myTurn(x), tail;
                 if (x.status === 'lobby') tail = '<span class="ck-wait">👥 รอเพื่อน · ' + esc(x.code) + '</span>';
                 else if (x.status === 'finished') tail = '<span class="ck-pill">' + (x.result && x.result.winner === (me === 'killer' ? 'killer' : 'good') ? '🏆 ชนะ' : '🏁 แพ้') + '</span>';
                 else if (mine) tail = '<span class="ck-turn">ตาคุณ</span>';
                 else tail = '<span class="ck-wait">⏳ รอ ' + esc(on) + ' · ' + mins(Date.now() - (x.updatedAt || Date.now())) + '</span>';
-                h += '<button type="button" class="ck-game' + (mine ? ' mine' : '') + '" data-game="' + esc(x.id) + '" onclick="CKOnline.open(\'' + esc(x.id) + '\')"><span class="d">' + (x.status === 'playing' ? 'D' + x.day : x.status === 'lobby' ? '—' : '🏁') + '</span><span class="who">' + (me === 'killer' ? '🔪' : '🕵️') + ' คุณ' + (on ? ' · ' + (me === 'killer' ? '🕵️ ' : '🔪 ') + esc(on) : '') + '</span>' + tail + '<span class="go">▸</span></button>';
+                h += '<button type="button" class="ck-game' + (mine ? ' mine' : '') + '" data-game="' + esc(x.id) + '" onclick="CKOnline.open(\'' + esc(x.id) + '\')"><span class="d">' + (x.status === 'playing' ? 'D' + x.day : x.status === 'lobby' ? '—' : '🏁') + '</span><span class="who">' + IC[me] + ' คุณ' + others.map(function (r) { return x.names && x.names[r] ? ' · ' + IC[r] + ' ' + esc(x.names[r]) : ''; }).join('') + '</span>' + tail + '<span class="go">▸</span></button>';
             });
             h += '</div>';
         }
@@ -86,13 +97,32 @@
         var dd = doc.dd && doc.dd.asked ? doc.dd : same && prev.dd ? prev.dd : { path: [], asked: null };
         return {
             online: { id: doc.id, me: me, code: doc.code, status: doc.status, turnDeadline: doc.turnDeadline, updatedAt: doc.updatedAt, players: doc.players },
-            id: doc.id, citySide: doc.citySide, names: doc.names || { killer: '', detective: '' }, status: fin ? 'finished' : 'playing', day: doc.day, phase: doc.phase, hand: null, bot: null,
+            id: doc.id, citySide: doc.citySide, suburbSide: doc.suburbSide || null, pair: doc.pair, lola: lolaOf(doc, prev, same), names: doc.names || { killer: '', detective: '' }, status: fin ? 'finished' : 'playing', day: doc.day, phase: doc.phase, hand: null, bot: null,
             secret: secret, detectivePos: same && prev.detectivePos != null && doc.detectivePos == null ? prev.detectivePos : doc.detectivePos,
             cereals: doc.cereals || [], witness: doc.witness, arrestsLeft: doc.arrestsLeft, kills: doc.kills, usedQuestions: doc.usedQuestions || [], skipUsed: !!doc.skipUsed,
             log: doc.log || [], draft: same && prev.draft ? prev.draft : { path: [], kill: null, witness: null }, dd: dd, result: doc.result || null, pubDays: []
         };
     }
+    /* V101.349: the public Lola + (for Lola only) her notes; her walk stays local until she uses an ability. */
+    function lolaOf(doc, prev, same) {
+        if (!doc.lola) return null;
+        var mine = meRole(doc) === 'lola', notes = mine && st.lnotes[doc.id] ? st.lnotes[doc.id].notes : [];
+        var used = doc.lola.dd && doc.lola.dd.used ? Object.assign({}, doc.lola.dd.used) : null, dd;
+        if (used) { var n = notes.filter(function (x) { return x.day === doc.day && x.a === used.a && x.cell === used.cell; }).pop(); if (n) used.ans = n.ans; dd = { path: doc.lola.dd.path, used: used }; }
+        else dd = same && prev.lola && prev.lola.dd && !prev.lola.dd.used ? prev.lola.dd : { path: [], used: null };
+        return { pos: doc.lola.pos, last: doc.lola.last, dd: dd, notes: notes };
+    }
+    function loadNotes(doc) {
+        if (doc.status !== 'playing' || meRole(doc) !== 'lola') return;
+        var have = st.lnotes[doc.id];
+        if (have && have._day === doc.day && have._phase === doc.phase && have._used === !!(doc.lola && doc.lola.dd && doc.lola.dd.used)) return;
+        call({ action: 'lolaNotes', gameId: doc.id }).then(function (r) {
+            st.lnotes[doc.id] = { _day: doc.day, _phase: doc.phase, _used: !!(doc.lola && doc.lola.dd && doc.lola.dd.used), notes: r.notes || [] };
+            var c = C(); if (c && c.get() && c.get().online && c.get().online.id === doc.id) { c.set(toGame(doc, c.get())); c.render(); }
+        }).catch(function (e) { st.err = msg(e); rerender(); });
+    }
     function loadSecret(doc) {
+        loadNotes(doc);
         if (doc.status !== 'playing' || meRole(doc) !== 'killer') return;
         var have = st.secret[doc.id];
         if (have && have._day === doc.day && have._phase === doc.phase) return;
@@ -132,13 +162,14 @@
     }
     function roomHtml() {
         var c = C(), g = c.get(), on = g.online, me = on.me;
-        var seat = function (r) { var p = on.players && on.players[r]; return '<div class="seat' + (p ? ' on' : ' wait') + '">' + (r === 'killer' ? '🔪' : '🕵️') + '<b>' + (p ? (r === me ? 'คุณ' : esc(p.name)) : '…') + '</b><small>' + (p ? (r === 'killer' ? 'ฆาตกร' : 'นักสืบ') : 'รอเพื่อน') + '</small></div>'; };
+        var seat = function (r) { var p = on.players && on.players[r]; return '<div class="seat' + (p ? ' on' : ' wait') + '">' + IC[r] + '<b>' + (p ? (r === me ? 'คุณ' : esc(p.name)) : '…') + '</b><small>' + (p ? TH[r] : 'รอเพื่อน') + '</small></div>'; };
+        var three = !!(on.players && 'lola' in on.players);
         return '<div class="ck lobby">' + c.topHtml('🌐 ห้อง ' + esc(on.code))
             + (st.err ? '<div class="ck-warn">' + esc(st.err) + '</div>' : '')
             + '<div class="ck-room"><div class="code" id="ck-on-room-code">' + esc(on.code) + '</div>'
             + '<div class="ck-row" style="justify-content:center"><button type="button" class="ck-chip line" id="ck-on-invite" onclick="CKOnline.invite()">' + (st.sent === 'invite' ? '✓ ส่งแล้ว' : '📤 LINE') + '</button><button type="button" class="ck-chip on" id="ck-on-copy" onclick="CKOnline.copy()">📋 คัดลอกรหัส</button></div>'
-            + '<div class="seats">' + seat('killer') + seat('detective') + '</div>'
-            + '<div class="ck-note" style="text-align:center">เพื่อนกด 🥣 → 🌐 ออนไลน์ → 🔑 ใส่รหัส · เกมเริ่มทันทีที่เข้าห้อง</div></div>'
+            + '<div class="seats' + (three ? ' three' : '') + '">' + seat('killer') + (three ? seat('lola') : '') + seat('detective') + '</div>'
+            + '<div class="ck-note" style="text-align:center">เพื่อนกด 🥣 → 🌐 ออนไลน์ → 🔑 ใส่รหัส · ' + (three ? 'เกมเริ่มเมื่อครบ 3 คน' : 'เกมเริ่มทันทีที่เข้าห้อง') + '</div></div>'
             + '<div class="ck-row" style="justify-content:center"><button type="button" class="ck-chip" id="ck-on-cancel" onclick="CKOnline.cancel()">✕ ยกเลิกห้อง</button><button type="button" class="ck-chip" onclick="CK.lobby()">📋 เกมของฉัน</button></div></div>';
     }
     function waitHtml() {
@@ -146,9 +177,9 @@
         var ex = c.publicExtra(g); if (g.detectivePos != null) { ex[g.detectivePos] = ex[g.detectivePos] || {}; ex[g.detectivePos].tk = (ex[g.detectivePos].tk || '') + '🕵️'; }
         if (on.me === 'killer' && st.secret[on.id]) { var kp = c.kposOf(g); if (kp != null) { ex[kp] = ex[kp] || {}; ex[kp].cls = (ex[kp].cls || '') + ' ring'; ex[kp].me = '🔪'; } }
         var card = late
-            ? '<div class="ck-waitcard late" id="ck-on-wait"><span>⏳ ' + esc(name) + ' หายไป ' + mins(now - (on.updatedAt || now)) + '</span><small>เกินเวลาแล้ว · กดเคลมเพื่อจบตาที่ค้าง' + (other === 'killer' ? ' (ฆาตกรค้าง = นักสืบชนะ)' : ' (นักสืบค้าง = จบตาที่จุดเดิม)') + '</small><button type="button" class="ck-claim" id="ck-on-claim" onclick="CKOnline.claim()"' + (st.busy ? ' disabled' : '') + '>⏳ เคลม</button></div>'
-            : '<div class="ck-waitcard" id="ck-on-wait"><span>⏳ ตา <b>' + esc(name) + '</b> (' + (other === 'killer' ? '🔪' : '🕵️') + ') · ผ่านมา ' + mins(now - (on.updatedAt || now)) + '</span><small>หน้านี้อัปเดตเองเมื่อ ' + esc(name) + ' เล่นเสร็จ · เคลมได้เมื่อครบ 1 ชม.</small></div>';
-        return '<div class="ck ' + on.me + '">' + c.topHtml('🌐 ' + (on.me === 'killer' ? '🔪' : '🕵️') + ' วันที่ ' + g.day, c.pills(g)) + (st.err ? '<div class="ck-warn">' + esc(st.err) + '</div>' : '') + card
+            ? '<div class="ck-waitcard late" id="ck-on-wait"><span>⏳ ' + esc(name) + ' หายไป ' + mins(now - (on.updatedAt || now)) + '</span><small>เกินเวลาแล้ว · กดเคลมเพื่อจบตาที่ค้าง' + (other === 'killer' ? ' (ฆาตกรค้าง = นักสืบชนะ)' : other === 'lola' ? ' (Lola ค้าง = ข้ามตา Lola)' : ' (นักสืบค้าง = จบตาที่จุดเดิม)') + '</small><button type="button" class="ck-claim" id="ck-on-claim" onclick="CKOnline.claim()"' + (st.busy ? ' disabled' : '') + '>⏳ เคลม</button></div>'
+            : '<div class="ck-waitcard" id="ck-on-wait"><span>⏳ ตา <b>' + esc(name) + '</b> (' + IC[other] + ') · ผ่านมา ' + mins(now - (on.updatedAt || now)) + '</span><small>หน้านี้อัปเดตเองเมื่อ ' + esc(name) + ' เล่นเสร็จ · เคลมได้เมื่อครบ 1 ชม.</small></div>';
+        return '<div class="ck ' + on.me + '">' + c.topHtml('🌐 ' + IC[on.me] + ' วันที่ ' + g.day, c.pills(g)) + (st.err ? '<div class="ck-warn">' + esc(st.err) + '</div>' : '') + card
             + c.boardHtml(g, { extra: ex, tap: false }) + c.logHtml(g) + '<div class="ck-row" style="justify-content:center"><button type="button" class="ck-chip line" id="ck-on-nudge" onclick="CKOnline.nudge()">' + (st.sent === 'nudge:' + on.id + ':' + g.day + g.phase ? '✓ สะกิดแล้ว' : '📤 สะกิด') + '</button><button type="button" class="ck-chip" onclick="CK.lobby()">📋 เกมของฉัน</button><button type="button" class="ck-chip" id="ck-on-resign" onclick="CKOnline.resign()">🏳️ ยอมแพ้</button></div></div>';
     }
 
@@ -173,6 +204,21 @@
     function end(cell) {
         var c = C(), g = c.get(), path = g.dd.path.length ? g.dd.path : [g.detectivePos];
         return act({ action: 'detectiveEnd', gameId: g.online.id, path: path, arrest: cell }, function (r) { c.ui.arrest = null; if (cell != null) c.snd(r.caught ? 'siren' : 'buzz'); });
+    }
+    /* V101.349 🐕: walk + one ability in one call; the referee answers her alone (bite = shared 🛡️ arrest). */
+    function lolaUse(a, cell) {
+        var c = C(), g = c.get(), L0 = g.lola, path = L0.dd.path.length ? L0.dd.path : [L0.pos];
+        return act({ action: 'lolaUse', gameId: g.online.id, path: path, ability: a, cell: cell == null ? null : cell }, function (r) {
+            if (!r) return;
+            if (a === 'bite') { c.snd(r.caught ? 'siren' : 'buzz'); return; }
+            var n = { day: g.day, a: a, cell: cell == null ? null : cell, from: path[path.length - 1], ans: r.answer };
+            var rec = st.lnotes[g.online.id] || (st.lnotes[g.online.id] = { notes: [] }); rec.notes = rec.notes.concat(n); rec._used = true;
+            L0.notes = rec.notes; L0.dd = { path: path, used: { a: a, cell: n.cell, ans: r.answer } }; c.snd('ding');
+        });
+    }
+    function lolaEnd() {
+        var c = C(), g = c.get(), L0 = g.lola, path = L0.dd.path.length ? L0.dd.path : [L0.pos];
+        return act({ action: 'lolaEnd', gameId: g.online.id, path: path });
     }
     function cornered() {
         var c = C(), g = c.get(), pos = c.kposOf(g);
@@ -206,15 +252,15 @@
         });
     }
     function invite() {
-        var g = C().get(), on = g.online, me = on.me, my = (g.names && g.names[me]) || 'เพื่อน', theirs = me === 'killer' ? '🕵️ นักสืบ' : '🔪 ฆาตกร';
+        var g = C().get(), on = g.online, me = on.me, my = (g.names && g.names[me]) || 'เพื่อน', theirs = g.lola ? '🥣 3 คน · 🐕' : me === 'killer' ? '🕵️ นักสืบ' : '🔪 ฆาตกร';
         return share({ alt: '🥣 ' + my + ' ชวนเล่น Cereal Killer · รหัส ' + on.code, color: '#92400e', kicker: '🥣 CEREAL KILLER', title: my + ' ชวนเล่น ' + theirs,
             lines: ['รหัสห้อง', 'แตะแล้วเข้าห้องเลย ไม่ต้องพิมพ์'], big: on.code, button: '🔑 เข้าห้อง', uri: link(on.code) })
             .then(function (ok) { if (ok) { st.sent = 'invite'; rerender(); } return ok; });
     }
     function nudge() {
         var g = C().get(), on = g.online, to = g.phase, from = on.me, mine = (g.names && g.names[from]) || 'เพื่อน', key = 'nudge:' + on.id + ':' + g.day + g.phase;
-        return share({ alt: '🥣 ถึงตาคุณแล้ว · Cereal Killer วันที่ ' + g.day, color: to === 'killer' ? '#be123c' : '#4338ca', kicker: '🥣 CEREAL KILLER · วันที่ ' + g.day,
-            title: 'ถึงตาคุณแล้ว ' + (to === 'killer' ? '🔪' : '🕵️'), lines: [mine + ' (' + (from === 'killer' ? '🔪' : '🕵️') + ') เล่นเสร็จแล้ว · รอคุณอยู่'], button: '▸ เล่นต่อ', uri: link(on.id) })
+        return share({ alt: '🥣 ถึงตาคุณแล้ว · Cereal Killer วันที่ ' + g.day, color: { killer: '#be123c', lola: '#92400e', detective: '#4338ca' }[to], kicker: '🥣 CEREAL KILLER · วันที่ ' + g.day,
+            title: 'ถึงตาคุณแล้ว ' + IC[to], lines: [mine + ' (' + IC[from] + ') เล่นเสร็จแล้ว · รอคุณอยู่'], button: '▸ เล่นต่อ', uri: link(on.id) })
             .then(function (ok) { if (ok) { st.sent = key; rerender(); } return ok; });
     }
     /** ?cereal=<6-letter code> joins (or opens, if I am already in it) that room; ?cereal=<gameId> opens that game. */
@@ -243,9 +289,11 @@
     window.CKOnline = {
         invite: invite, nudge: nudge, deepLink: deepLink,
         lobbyHtml: lobbyHtml, screen: screen, open: open, leave: leave, myTurnCount: myTurnCount, start: start,
-        lock: lock, ask: ask, end: end, cornered: cornered,
+        lock: lock, ask: ask, end: end, cornered: cornered, lolaUse: lolaUse, lolaEnd: lolaEnd,
+        toggleLola: function () { st.lola = !st.lola; if (!st.lola && st.role === 'lola') st.role = 'killer'; st.err = ''; rerender(); },
+        nextPair: function () { st.pair = (st.pair + 1) % ((window.CEREAL_MAPS && CEREAL_MAPS.difficulty.length) || 4); rerender(); },
         pick: function (k, v) { st[k] = v; st.err = ''; rerender(); },
-        create: function () { return act({ action: 'create', role: st.role, side: st.side }, function (r) { st.view = null; if (r && r.gameId) open(r.gameId); }); },
+        create: function () { return act({ action: 'create', role: st.role, side: st.side, lola: st.lola, pair: st.pair }, function (r) { st.view = null; if (r && r.gameId) open(r.gameId); }); },
         join: function () {
             var el = document.getElementById('ck-on-code'); st.code = ((el && el.value) || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
             if (st.code.length !== 6) { st.err = 'รหัสห้องมี 6 ตัว'; rerender(); return Promise.resolve(null); }
