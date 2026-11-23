@@ -77,6 +77,14 @@ const until = (page, fn, arg, msg) => page.waitForFunction(fn, arg, { timeout: 5
         assert.ok(await K.page.isVisible('#ck-tab-local') && await K.page.isVisible('#ck-tab-online'), 'two tabs (pick B)');
         await K.page.click('#ck-tab-online');
         await until(K.page, () => !!document.getElementById('ck-on-new'), null, 'online tab loads');
+        await K.page.click('#ck-on-new');
+        // V101.340 pick B: the create screen is one row ‹ · 🔪 · 🕵️ · 🗺 A · B, then ▸ สร้าง; no row labels, no ✕ ยกเลิก, no English line
+        assert.deepEqual(await K.page.evaluate(() => [...document.querySelectorAll('#cerealModal .ck-mkrow button')].map(b => b.innerText.trim())), ['‹', '🔪 ฆาตกร', '🕵️ นักสืบ', '🗺 A', 'B'], 'create: one row');
+        assert.equal(await K.page.evaluate(() => document.getElementById('ck-on-create').innerText.trim()), '▸ สร้าง · ได้รหัส 6 ตัว');
+        assert.ok(!/ยกเลิก|Create a room|ฉันเป็น|แผนที่/.test(await K.page.evaluate(() => document.getElementById('cerealModal').innerText)), 'create: no repeated words');
+        const oneLine = await K.page.evaluate(() => { const r = [...document.querySelectorAll('#cerealModal .ck-mkrow button')].map(b => b.getBoundingClientRect().top); return Math.max(...r) - Math.min(...r); });
+        assert.ok(oneLine < 4, 'create row stays on one line at 390 px');
+        await K.page.click('#ck-on-back'); await until(K.page, () => !!document.getElementById('ck-on-new'), null, '‹ back to the lobby');
         await K.page.click('#ck-on-new'); await K.page.click('#ck-on-role-killer'); await K.page.click('#ck-on-create');
         await until(K.page, () => /^[A-Z2-9]{6}$/.test((document.getElementById('ck-on-room-code') || {}).textContent || ''), null, 'room code shown (pick C)');
         const code = await K.page.textContent('#ck-on-room-code');
