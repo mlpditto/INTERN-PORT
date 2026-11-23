@@ -1,7 +1,7 @@
 // V101.350: 🥣 Cereal Killer Phase 4 (owner pick B, mockup-cereal-stats/) — online wins + 🏅 achievements. Two/three real pages over the
 // REAL functions/cereal-act.js handler (the harness below is the one from cereal-online-qa.cjs). Proves the referee puts result.ach
-// and writes cereal_stats/{LINE uid}; the 🌐 list shows 🏆 n ชนะ · 🏅 k/10, either opens per-role wins + the grid of ten; the
-// winner's reveal gets one 🏅 ได้ใหม่ line, the loser's none; a newcomer sees only 🏅 0/10; 320 px fits; the page never writes.
+// and writes cereal_stats/{LINE uid}; the 🌐 list shows 🏆 n ชนะ · 🏅 k/13, either opens per-role wins + the grid of ten; the
+// winner's reveal gets one 🏅 ได้ใหม่ line, the loser's none; a newcomer sees only 🏅 0/13; 320 px fits; the page never writes.
 const path = require('node:path'), assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -96,15 +96,15 @@ async function playToArrest() {
         assert.deepEqual(store.get('cereal_games/' + gid).result.ach, { detective: ['instinct', 'quick', 'nocards'] });
         const D = await open(browser, 'authD'), K = await open(browser, 'authK');
         for (const [P, u] of [[D, 'Udet'], [K, 'Ukiller']]) await P.page.evaluate((u) => { userId = u; }, u);   // stats are keyed by the LINE uid
-        // detective: 🌐 → 🏆 1 ชนะ · 🏅 3/10 › (closed), one tap opens the wins per role and the grid of ten
+        // detective: 🌐 → 🏆 1 ชนะ · 🏅 3/13 › (closed), one tap opens the wins per role and the grid of ten
         await D.page.evaluate(() => cerealOpen());
         await D.page.click('#ck-tab-online');
-        await until(D.page, () => /🏅 3\/10/.test((document.getElementById('ck-on-ach') || {}).textContent || ''), null, 'detective 🏅 3/10');
+        await until(D.page, () => /🏅 3\/13/.test((document.getElementById('ck-on-ach') || {}).textContent || ''), null, 'detective 🏅 3/13');
         assert.equal(await txt(D.page, '#ck-on-wins'), '🏆 1 ชนะ', 'closed: wins only');
         assert.ok(!(await D.page.$('#ck-on-achgrid')), 'grid closed at first');
         await D.page.click('#ck-on-ach');
         assert.equal(await txt(D.page, '#ck-on-wins'), '🏆 1 ชนะ · 🔪 0 · 🕵️ 1 · 🐕 0', 'open: per role');
-        assert.equal(await D.page.$$eval('#ck-on-achgrid > div', (d) => d.length), 10, 'ten in the grid');
+        assert.equal(await D.page.$$eval('#ck-on-achgrid > div', (d) => d.length), 13, 'ten + three 🙋 in the grid');
         assert.deepEqual(await D.page.$$eval('#ck-on-achgrid > div.got', (d) => d.map((x) => x.dataset.ach)), ['instinct', 'quick', 'nocards'], 'earned ones in colour');
         assert.equal(await D.page.$eval('#ck-on-ach', (b) => b.getAttribute('aria-expanded')), 'true');
         const shot = async (P, n) => { if (process.env.SHOT) await (await P.page.$('#cerealModal .modal-content')).screenshot({ path: process.env.SHOT + '/' + n + '.png' }); };
@@ -125,24 +125,24 @@ async function playToArrest() {
         assert.ok(await D.page.evaluate(() => document.querySelector('#cerealModal .ck-win').nextElementSibling.id === 'ck-ach-new'), 'right under the winner card');
         if (process.env.SHOT) await D.page.waitForTimeout(700);
         await shot(D, 'built-reveal');
-        // killer: played 1, won 0, nothing earned → 🏆 0 ชนะ · 🏅 0/10, no 🏅 line on the reveal
+        // killer: played 1, won 0, nothing earned → 🏆 0 ชนะ · 🏅 0/13, no 🏅 line on the reveal
         await K.page.evaluate(() => cerealOpen());
         await K.page.click('#ck-tab-online');
-        await until(K.page, () => /🏅 0\/10/.test((document.getElementById('ck-on-ach') || {}).textContent || '') && !!document.getElementById('ck-on-wins'), null, 'killer chips');
+        await until(K.page, () => /🏅 0\/13/.test((document.getElementById('ck-on-ach') || {}).textContent || '') && !!document.getElementById('ck-on-wins'), null, 'killer chips');
         assert.equal(await txt(K.page, '#ck-on-wins'), '🏆 0 ชนะ');
         await K.page.click('#cerealModal .ck-game[data-game="' + gid + '"]');
         await until(K.page, () => !!document.querySelector('#cerealModal .ck-win'), null, 'killer reveal');
         assert.ok(!(await K.page.$('#ck-ach-new')), 'no 🏅 line for the loser');
-        // a newcomer with no stats doc: only 🏅 0/10, no 🏆 chip
+        // a newcomer with no stats doc: only 🏅 0/13, no 🏆 chip
         store.set('user_auth_links/authN', { effectiveUserId: 'Unew' }); store.set('users/Unew', { nickName: 'New' });
         const N = await open(browser, 'authN');
         await N.page.evaluate(() => { userId = 'Unew'; cerealOpen(); });
         await N.page.click('#ck-tab-online');
         await until(N.page, () => !!document.getElementById('ck-on-ach'), null, 'newcomer chip');
         assert.ok(!(await N.page.$('#ck-on-wins')), 'no 🏆 before a first game');
-        assert.equal(await txt(N.page, '#ck-on-ach'), '🏅 0/10 ›');
+        assert.equal(await txt(N.page, '#ck-on-ach'), '🏅 0/13 ›');
         assert.equal(await D.page.evaluate(() => window.__writes), 0, 'the page never writes');
         for (const P of [D, K, N]) assert.deepEqual(P.errors, [], 'no page errors');
-        console.log('cereal-stats-qa: OK — referee writes 🏅 + cereal_stats; 🏆 n ชนะ · 🏅 k/10 chips (pick B) open per-role wins + the grid of ten (earned in colour), fits 320 px; reveal 🏅 ได้ใหม่ line for the winner only; newcomer sees 🏅 0/10; no client writes');
+        console.log('cereal-stats-qa: OK — referee writes 🏅 + cereal_stats; 🏆 n ชนะ · 🏅 k/13 chips (pick B) open per-role wins + the grid of ten (earned in colour), fits 320 px; reveal 🏅 ได้ใหม่ line for the winner only; newcomer sees 🏅 0/13; no client writes');
     } finally { await browser.close(); }
 })().catch((e) => { console.error(e); process.exit(1); });

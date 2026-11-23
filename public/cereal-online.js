@@ -26,7 +26,11 @@
     var ACHS = [['instinct', '🧠', 'สัญชาตญาณ', '🕵️', 'จับถูกครั้งแรก'], ['distrust', '🤨', 'ไม่ไว้ใจ', '🕵️', 'ชนะด้วย 🛡️ ครั้งสุดท้าย'], ['cornered', '🧱', 'จนมุม', '🕵️', 'ต้อนจนไม่มีทางเดิน'],
         ['quick', '⚡', 'ปิดคดีไว', '🕵️', 'ชนะภายในวันที่ 3'], ['nocards', '🙈', 'ไม่ถามเลย', '🕵️', 'ชนะโดยไม่ใช้การ์ด'], ['k9', '🐕', 'K9', '🐕', 'กัดถูกตัว'],
         ['planner', '🗓', 'วางแผน', '🔪', 'ชนะโดยใช้วันเว้น'], ['bowl', '🥣', 'ครบชาม', '🔪', 'ชนะ เหยื่อครบ 6'], ['invisible', '🫥', 'ล่องหน', '🔪', 'รอด 7 วัน ไม่โดนจับสักครั้ง'],
-        ['scentless', '👃', 'ไร้กลิ่น', '🔪', 'ชนะเกม 3 คน']];
+        ['scentless', '👃', 'ไร้กลิ่น', '🔪', 'ชนะเกม 3 คน'],
+        // 🙋 asked for on the game-over screen, confirmed by the other players (owner pick A, mockup-cereal-self-ach/); SELF in cerealAct
+        ['real', '🥛', 'ซีเรียลจริง', '🙋', 'กินซีเรียลระหว่างเล่น'], ['gooddog', '🐶', 'หมาดี', '🐕', 'Lola ไม่หลุดคำใบ้สักคำ'], ['dolittle', '🦜', 'ดูลิตเติล', '🙋', 'เล่นแบบ Lola พูดได้']];
+    var SELF = ['real', 'gooddog', 'dolittle'];
+    function achOf(id) { return ACHS.filter(function (x) { return x[0] === id; })[0]; }
     var IC = { killer: '🔪', lola: '🐕', detective: '🕵️' }, TH = { killer: 'ฆาตกร', lola: 'Lola', detective: 'นักสืบ' };
     function rolesOf(doc) { return doc && doc.mode === 3 ? ['killer', 'lola', 'detective'] : ['killer', 'detective']; }
     var C = function () { return window.CK && CK._; };
@@ -114,11 +118,36 @@
     /** The reveal's one line: what this game earned me (🏅 ได้ใหม่ when it is the first time). '' when nothing. */
     function achLine(g) {
         var ids = g && g.online && g.result && g.result.ach && g.result.ach[g.online.me];
-        var list = (ids || []).map(function (id) { return ACHS.filter(function (x) { return x[0] === id; })[0]; }).filter(Boolean);
-        if (!list.length) return '';
+        var list = (ids || []).map(achOf).filter(Boolean);
+        if (!list.length) return selfHtml(g);
         var a = (st.stats && st.stats.ach) || {}, fresh = list.some(function (x) { return a[x[0]] === 1; });
         return '<div class="ck-ach-new" id="ck-ach-new"><b>' + list.map(function (x) { return x[1]; }).join('') + '</b><span>🏅 ' + (fresh ? 'ได้ใหม่' : 'ได้') + ' · '
-            + list.map(function (x) { return x[2]; }).join(' · ') + '<small>' + list.map(function (x) { return x[4]; }).join(' · ') + '</small></span></div>';
+            + list.map(function (x) { return x[2]; }).join(' · ') + '<small>' + list.map(function (x) { return x[4]; }).join(' · ') + '</small></span></div>' + selfHtml(g);
+    }
+    /* 🙋 (owner pick A, mockup-cereal-self-ach/): the other players' asks I have not answered (✓ / ✕), then my own chips —
+       tap = ask, ⏳ while the others decide, ✓ earned, ✕ turned down. Online, finished games only. */
+    function selfHtml(g) {
+        var o = g && g.online;
+        if (!o || o.status !== 'finished' || !o.me || !o.players) return '';
+        var claims = o.claims || {}, seats = rolesOf(o).filter(function (r) { return o.players[r]; }), h = '';
+        seats.forEach(function (seat) {
+            if (seat === o.me) return;
+            Object.keys(claims[seat] || {}).forEach(function (id) {
+                var c = claims[seat][id], a = achOf(id);
+                if (!a || c.state || (c.votes || {})[o.me] != null) return;
+                h += '<div class="ck-self-ask" data-seat="' + seat + '" data-ach="' + id + '"><b>' + a[1] + '</b><span class="sp">' + esc(g.names[seat] || TH[seat]) + ' ขอ ' + a[2] + '<small>' + a[4] + ' · จริงไหม?</small></span>'
+                    + '<button type="button" class="y" onclick="CKOnline.vote(\'' + seat + '\',\'' + id + '\',true)"' + (st.busy ? ' disabled' : '') + ' aria-label="Yes" title="จริง">✓</button>'
+                    + '<button type="button" class="n" onclick="CKOnline.vote(\'' + seat + '\',\'' + id + '\',false)"' + (st.busy ? ' disabled' : '') + ' aria-label="No" title="ไม่จริง">✕</button></div>';
+            });
+        });
+        var mine = SELF.filter(function (id) { return id === 'real' || (id === 'gooddog' && o.me === 'lola') || (id === 'dolittle' && o.mode === 3); });
+        var who = seats.filter(function (r) { return r !== o.me; }).map(function (r) { return esc(g.names[r] || TH[r]); }).join(' · ');
+        h += '<div class="ck-self" id="ck-self"><div class="h">🙋 ขอเอง · ' + who + ' ยืนยัน</div><div class="ck-row">' + mine.map(function (id) {
+            var a = achOf(id), c = (claims[o.me] || {})[id], s = !c ? '' : c.state === 'ok' ? ' ✓' : c.state === 'no' ? ' ✕' : ' ⏳';
+            return '<button type="button" class="ck-chip' + (c ? (c.state === 'ok' ? ' on' : c.state === 'no' ? ' no' : ' wait') : '') + '" data-ach="' + id + '"'
+                + (c || st.busy ? ' disabled' : ' onclick="CKOnline.claimAch(\'' + id + '\')"') + ' title="' + esc(a[4]) + '">' + a[1] + ' ' + a[2] + s + '</button>';
+        }).join('') + '</div></div>';
+        return h;
     }
 
     // ---- one game -------------------------------------------------------------------------------------------
@@ -128,7 +157,7 @@
         var secret = fin && doc.result ? { home: doc.result.revealedHome, path: doc.result.revealedPath || {}, kills: doc.result.revealedKills || {} } : (st.secret[doc.id] || { home: null, path: {}, kills: {} });
         var dd = doc.dd && doc.dd.asked ? doc.dd : same && prev.dd ? prev.dd : { path: [], asked: null };
         return {
-            online: { id: doc.id, me: me, code: doc.code, status: doc.status, turnDeadline: doc.turnDeadline, updatedAt: doc.updatedAt, players: doc.players },
+            online: { id: doc.id, me: me, code: doc.code, status: doc.status, turnDeadline: doc.turnDeadline, updatedAt: doc.updatedAt, players: doc.players, mode: doc.mode, claims: doc.claims || {} },
             id: doc.id, citySide: doc.citySide, suburbSide: doc.suburbSide || null, pair: doc.pair, lola: lolaOf(doc, prev, same), names: doc.names || { killer: '', detective: '' }, status: fin ? 'finished' : 'playing', day: doc.day, phase: doc.phase, hand: null, bot: null,
             secret: secret, detectivePos: same && prev.detectivePos != null && doc.detectivePos == null ? prev.detectivePos : doc.detectivePos,
             cereals: doc.cereals || [], witness: doc.witness, arrestsLeft: doc.arrestsLeft, kills: doc.kills, usedQuestions: doc.usedQuestions || [], skipUsed: !!doc.skipUsed,
@@ -335,6 +364,8 @@
         cancel: function () { var g = C().get(); return act({ action: 'cancel', gameId: g.online.id }, function () { leave(); C().set(null); }); },
         claim: function () { var g = C().get(); return act({ action: 'claim', gameId: g.online.id }); },
         resign: function () { var g = C().get(); return act({ action: 'resign', gameId: g.online.id }); },
+        claimAch: function (id) { var g = C().get(); return act({ action: 'claimAch', gameId: g.online.id, id: id }); },
+        vote: function (seat, id, ok) { var g = C().get(); return act({ action: 'voteAch', gameId: g.online.id, seat: seat, id: id, ok: ok }); },
         state: function () { return st; }   // QA
     };
 })();

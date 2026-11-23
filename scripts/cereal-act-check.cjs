@@ -200,5 +200,23 @@ const secret = (id) => db.store.get('cereal_games/' + id + '/secret/killer');
     assert.equal(C.ACH.length, 10);
     const onl = fs.readFileSync(path.join(root, 'public', 'cereal-online.js'), 'utf8');
     C.ACH.forEach((x) => assert.ok(onl.includes("['" + x + "', "), 'cereal-online.js names ' + x));
+
+    // 🙋 self-reported (owner pick A): ask on a finished game, the other player votes; ✓ = earned in cereal_stats, ✕ = no
+    await refused(call('authD', { action: 'claimAch', gameId: id, id: 'gooddog' }), null, '🐶 is Lola-only');
+    await refused(call('authD', { action: 'claimAch', gameId: id, id: 'dolittle' }), null, '🦜 needs a 3-player game');
+    await call('authD', { action: 'claimAch', gameId: id, id: 'real' });
+    assert.deepEqual(pub(id).claims.detective.real, { votes: {}, state: null, at: NOW }, 'the ask waits');
+    await refused(call('authD', { action: 'claimAch', gameId: id, id: 'real' }), 'claimed', 'one ask per achievement');
+    await refused(call('authD', { action: 'voteAch', gameId: id, seat: 'detective', id: 'real', ok: true }), null, 'no vote on your own ask');
+    assert.equal(stat('Udet').a.real, undefined, 'nothing earned while it waits');
+    const v1 = await call('authK', { action: 'voteAch', gameId: id, seat: 'detective', id: 'real', ok: true });
+    assert.equal(v1.state, 'ok');
+    assert.deepEqual(stat('Udet'), { p: 3, k: 0, d: 2, l: 0, a: { quick: 1, real: 1 }, t: 'number' }, '✓ → 🥛 counted, the rest unchanged');
+    await refused(call('authK', { action: 'voteAch', gameId: id, seat: 'detective', id: 'real', ok: false }), 'voted', 'decided once');
+    await call('authK', { action: 'claimAch', gameId: c3.gameId, id: 'real' });
+    assert.equal((await call('authD', { action: 'voteAch', gameId: c3.gameId, seat: 'killer', id: 'real', ok: false })).state, 'no');
+    assert.equal(stat('Ukiller').a.real, undefined, '✕ earns nothing');
+    assert.deepEqual(C.SELF, ['real', 'gooddog', 'dolittle']);
+    C.SELF.forEach((x) => assert.ok(onl.includes("['" + x + "', "), 'cereal-online.js names ' + x));
     console.log('cereal-act-check: OK — engine copies match, create/join (1 h deadline), scripted game to a correct arrest with revealedPath, secret never public while playing, illegal actions refused with codes, claim after 1 h (killer → loses, detective → turn ends), resign, 🏅 + cereal_stats');
 })().catch((e) => { console.error(e); process.exit(1); });

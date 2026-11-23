@@ -31,6 +31,10 @@ function publicAnswer(map, q, cell, witness) {
 // rulebook. Pure: read off the finished game (public doc + this turn's update). A win by resign or ⏳ timeout earns none.
 // Returns { seat: [ids] }; good-side ones go to every good seat that played (🕵️, and 🐕 in a 3-player game).
 const ACH = ['instinct', 'distrust', 'cornered', 'quick', 'nocards', 'k9', 'planner', 'bowl', 'invisible', 'scentless'];
+// 🙋 asked for by the player, confirmed by the others (claimAch / voteAch): 🥛 real cereal (anyone) · 🐶 good dog (Lola only) ·
+// 🦜 Dolittle (a 3-player game played with Lola allowed to talk; anyone in it). Meanings are Claude's guess from the names.
+const SELF = ['real', 'gooddog', 'dolittle'];
+const selfAchOk = (g, role, id) => (id === 'real') || (id === 'gooddog' && role === 'lola') || (id === 'dolittle' && g.mode === 3);
 function achievementsOf(f) {
     const r = f.result, out = {};
     if (!r || r.reason === 'resigned' || r.reason === 'timeout') return out;
@@ -157,6 +161,34 @@ async function handle(request, deps) {
             if (g.status !== 'lobby') fail('started', 'The game has started — resign instead');
             tx.update(ref, { status: 'cancelled', updatedAt: now });
             return { ok: true };
+        }
+        // 🙋 self-reported (owner pick A, mockup-cereal-self-ach/): on the game-over screen a player asks for one; every other player
+        // votes ✓ / ✕ on theirs. One ✕ = no; all ✓ = earned, and cereal_stats.ach[id] goes up in this same transaction.
+        if (d.action === 'claimAch' || d.action === 'voteAch') {
+            if (g.status !== 'finished') fail('not-finished', 'The game is not over');
+            const id = String(d.id || ''), claims = JSON.parse(JSON.stringify(g.claims || {}));
+            if (d.action === 'claimAch') {
+                if (!selfAchOk(g, role, id)) bad('id');
+                if ((claims[role] || {})[id]) fail('claimed', 'Already asked');
+                (claims[role] = claims[role] || {})[id] = { votes: {}, state: null, at: now };
+                tx.update(ref, { claims });
+                return { ok: true };
+            }
+            const seat = String(d.seat || ''), c = (claims[seat] || {})[id];
+            if (!c || seat === role) bad('claim');
+            if (c.state || c.votes[role] != null) fail('voted', 'Already decided');
+            c.votes[role] = d.ok === true;
+            const others = rolesOf(g).filter((r) => r !== seat);
+            c.state = others.some((r) => c.votes[r] === false) ? 'no' : others.every((r) => c.votes[r] === true) ? 'ok' : null;
+            const uid = g.players[seat] && g.players[seat].uid, sref = uid && c.state === 'ok' ? db.collection('cereal_stats').doc(uid) : null;
+            const ss = sref ? await tx.get(sref) : null;   // every read before the writes
+            tx.update(ref, { claims });
+            if (sref) {
+                const s = (ss.exists && ss.data()) || {}, ach = Object.assign({}, s.ach || {});
+                ach[id] = (ach[id] || 0) + 1;
+                tx.set(sref, Object.assign({ played: 0, winsKiller: 0, winsDetective: 0, winsLola: 0 }, s, { ach, updatedAt: now }));
+            }
+            return { ok: true, state: c.state };
         }
         if (g.status !== 'playing') fail('not-playing', 'Game is not running');
         const sec = (await tx.get(secRef)).data() || { home: null, path: {}, kills: {} };
@@ -316,4 +348,4 @@ async function handle(request, deps) {
     return out;
 }
 
-module.exports = { handle, TURN_MS, publicAnswer, kposOf, achievementsOf, ACH };
+module.exports = { handle, TURN_MS, publicAnswer, kposOf, achievementsOf, ACH, SELF };
