@@ -603,6 +603,7 @@
         if (g.detectivePos != null) add(g.detectivePos, 'tk', '🕵️');
         var h = '<div class="ck lobby">' + topHtml('🏁 จบเกม', pills(g))
             + '<div class="ck-win"><span class="big" aria-hidden="true">' + (good ? '🕵️' : '🔪') + '</span><div><p class="t">' + title + '</p><p class="s">' + sub + '</p></div></div>'
+            + (g.online && window.CKOnline && CKOnline.achLine ? CKOnline.achLine(g) : '')   // Phase 4: 🏅 what this game earned
             + '<div class="ck-days" aria-label="Replay by day"><button type="button" class="all' + (sel ? '' : ' on') + '" onclick="CK.revealDay(0)">ทั้งหมด</button>';
         for (var d = 1; d <= R.DAYS; d++) h += '<button type="button" class="' + (d === sel ? 'on' : '') + '"' + (days.indexOf(d) >= 0 ? ' onclick="CK.revealDay(' + d + ')" style="--dc:' + DAYC[d - 1] + '"' : ' disabled') + '>D' + d + '</button>';
         // V101.333 pick 2D: the killer's route drawn on the board, one colour per day (all days, or the one picked)

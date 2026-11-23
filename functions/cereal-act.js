@@ -27,6 +27,49 @@ function publicAnswer(map, q, cell, witness) {
     return a.length > 1 ? R.leastInformative(map, witness, a) : a[0];
 }
 
+// Phase 4 (owner 2026-11-23, pick B, mockup-cereal-stats/): 🏅 ten achievements — Claude's draft, "Use these 10", not the printed
+// rulebook. Pure: read off the finished game (public doc + this turn's update). A win by resign or ⏳ timeout earns none.
+// Returns { seat: [ids] }; good-side ones go to every good seat that played (🕵️, and 🐕 in a 3-player game).
+const ACH = ['instinct', 'distrust', 'cornered', 'quick', 'nocards', 'k9', 'planner', 'bowl', 'invisible', 'scentless'];
+function achievementsOf(f) {
+    const r = f.result, out = {};
+    if (!r || r.reason === 'resigned' || r.reason === 'timeout') return out;
+    const give = (seat, id) => { (out[seat] = out[seat] || []).push(id); };
+    const good = rolesOf(f).filter((s) => s !== 'killer');
+    if (r.winner === 'good') {
+        if (r.reason === 'arrest' && f.arrestsLeft === R.ARRESTS) give('detective', 'instinct');   // 🧠 caught on the first try
+        if (r.reason === 'arrest' && f.arrestsLeft === 1) give('detective', 'distrust');          // 🤨 the last 🛡️
+        if (r.reason === 'bite') give('lola', 'k9');                                               // 🐕 K9
+        if (r.reason === 'cornered') good.forEach((s) => give(s, 'cornered'));                     // 🧱
+        if (r.day <= 3) good.forEach((s) => give(s, 'quick'));                                     // ⚡ by day 3
+        if (!(f.usedQuestions || []).length) good.forEach((s) => give(s, 'nocards'));             // 🙈 no card asked
+    } else {
+        if (f.skipUsed) give('killer', 'planner');                                                 // 🗓 used the skip day
+        if (f.kills >= R.MAX_KILLS) give('killer', 'bowl');                                        // 🥣 all 6
+        if (r.reason === 'survived' && f.arrestsLeft === R.ARRESTS) give('killer', 'invisible');   // 🫥 no arrest even tried
+        if (f.mode === 3) give('killer', 'scentless');                                             // 👃 beat 🐕 and 🕵️
+    }
+    return out;
+}
+
+// cereal_stats/{LINE uid}: { played, winsKiller, winsDetective, winsLola, ach: { id: n }, updatedAt } — written here only (rules:
+// the owner reads, nobody writes). Its own transaction after the game's, so the game never fails on a stats write.
+async function recordStats(db, f, now) {
+    const seats = rolesOf(f).filter((s) => f.players[s] && f.players[s].uid);
+    await db.runTransaction(async (tx) => {
+        const refs = seats.map((s) => db.collection('cereal_stats').doc(f.players[s].uid));
+        const snaps = [];
+        for (const ref of refs) snaps.push(await tx.get(ref));
+        seats.forEach((seat, i) => {
+            const s = (snaps[i].exists && snaps[i].data()) || {};
+            const key = 'wins' + seat[0].toUpperCase() + seat.slice(1), won = f.result.winner === (seat === 'killer' ? 'killer' : 'good');
+            const ach = Object.assign({}, s.ach || {});
+            ((f.result.ach || {})[seat] || []).forEach((id) => { ach[id] = (ach[id] || 0) + 1; });
+            tx.set(refs[i], { played: (s.played || 0) + 1, winsKiller: s.winsKiller || 0, winsDetective: s.winsDetective || 0, winsLola: s.winsLola || 0, [key]: (s[key] || 0) + (won ? 1 : 0), ach, updatedAt: now });
+        });
+    });
+}
+
 // deps: { db, FieldValue, HttpsError, isAdmin(token), now, rand() }
 async function handle(request, deps) {
     const { db, HttpsError } = deps;
@@ -101,7 +144,9 @@ async function handle(request, deps) {
     // every other action acts on one game the caller plays in
     if (typeof d.gameId !== 'string' || !/^[A-Za-z0-9]{10,40}$/.test(d.gameId)) bad('gameId');
     const ref = games.doc(d.gameId), secRef = ref.collection('secret').doc('killer'), lsecRef = ref.collection('secret').doc('lola');
-    return db.runTransaction(async (tx) => {
+    let ended = null;   // the finished game, for the stats write after the transaction (reset on every attempt)
+    const out = await db.runTransaction(async (tx) => {
+        ended = null;
         const s = await tx.get(ref);
         if (!s.exists) fail('no-game', 'No such game');
         const g = s.data();
@@ -126,7 +171,11 @@ async function handle(request, deps) {
             up.result = Object.assign({ winner, reason, day: g.day, cell: null, kpos: kposOf(sec), revealedHome: sec.home, revealedPath: sec.path, revealedKills: sec.kills }, extra || {});
             log.push({ day: g.day, type: 'end', text: (winner === 'good' ? (reason === 'bite' ? '🐕 wins · ' : '🕵️ wins · ') : '🔪 wins · ') + reason });
         };
-        const commit = (ret) => { up.log = log; tx.update(ref, up); return Object.assign({ ok: true }, ret || {}); };
+        const commit = (ret) => {
+            up.log = log;
+            if (up.result) { up.result.ach = achievementsOf(Object.assign({}, g, up)); ended = Object.assign({}, g, up); }
+            tx.update(ref, up); return Object.assign({ ok: true }, ret || {});
+        };
 
         if (d.action === 'resign') { finish(role === 'killer' ? 'good' : 'killer', 'resigned'); return commit(); }
 
@@ -263,6 +312,8 @@ async function handle(request, deps) {
         }
         bad('action');
     });
+    if (ended) await recordStats(db, ended, now).catch((e) => console.error('cereal stats', e && e.message));
+    return out;
 }
 
-module.exports = { handle, TURN_MS, publicAnswer, kposOf };
+module.exports = { handle, TURN_MS, publicAnswer, kposOf, achievementsOf, ACH };
