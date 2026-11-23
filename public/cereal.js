@@ -85,6 +85,7 @@
     }
     function open() {
         store = load(); g = null; ui.arrest = null; ui.rules = false;
+        if (window.CKOnline) CKOnline.leave();   // V101.351: the last online game's listener would pull the lobby back into it on its next change
         render();
         root().style.display = 'flex';
         if (window.CKTour && !CKTour.seen()) CKTour.open();   // V101.329: How to play, the first time on this device
