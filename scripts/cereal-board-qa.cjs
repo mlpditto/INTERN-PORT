@@ -127,7 +127,7 @@ const stored = page => page.evaluate(() => JSON.parse(localStorage.getItem('cere
         // survives a reload: the lobby lists the game and resumes through the hand-off
         await page.reload({ waitUntil: 'load' });
         await page.evaluate(() => { userId = 'u1'; document.getElementById('main-app').style.setProperty('display', 'block', 'important'); cerealOpen(); });
-        assert.equal(await txt(page, '#cerealModal .ck-game'), 'D2 🔪 Pond · 🕵️ Mint 🥣 1/6 🛡️ 3 ▸');
+        assert.equal(await txt(page, '#cerealModal .ck-game'), 'D2 🔪 Pond vs 🕵️ Mint 🥣 1/6 · 🛡️ 3 ▸');   // V101.344: one pill, "vs"
         await page.click('#cerealModal .ck-game');
         assert.ok((await txt(page, '#ck-hand-go')).includes('🔪 Pond'));
         await page.click('#ck-hand-go');

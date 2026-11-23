@@ -44,14 +44,17 @@ async function waitBeatDone(page) { await page.waitForSelector('#ck-bot-ok, #cer
             assert.ok(await page.isVisible('#ck-n1'), 'friend game: names row');
             await page.click('#ck-vs-bot');
             assert.ok(!(await page.isVisible('#ck-n1')), 'vs bot: no names row');
-            const cards = await page.evaluate(() => [...document.querySelectorAll('#cerealModal .ck-solo')].map(c => ({ id: c.id, on: c.classList.contains('on'), lv: c.querySelectorAll('.ck-lv').length, t: c.innerText.replace(/\s+/g, ' ') })));
-            assert.equal(cards.length, 2); assert.ok(cards[0].t.includes('คุณซ่อน · บอทไล่จับ') && cards[1].t.includes('คุณไล่จับ · บอทซ่อน'), 'card words');
-            assert.ok(cards.every(c => c.lv === 3), 'three 🥄 levels in each card');
+            // V101.344 (owner pick B, inline): two one-line seat cards 🔪 ฉัน / 🕵️ ฉัน (meaning in the title), 🥄 levels beside ▸ เริ่ม
+            const cards = await page.evaluate(() => [...document.querySelectorAll('#cerealModal .ck-seat')].map(c => ({ id: c.id, on: c.classList.contains('on'), t: c.innerText.trim(), title: c.dataset.thTitle })));
+            assert.deepEqual(cards.map(c => c.t), ['🔪 ฉัน', '🕵️ ฉัน'], 'seat cards, one line each');
+            assert.deepEqual(cards.map(c => c.title), ['คุณซ่อน · บอทไล่จับ', 'คุณไล่จับ · บอทซ่อน'], 'card meaning in the title');
+            assert.equal(await page.evaluate(() => document.querySelectorAll('#cerealModal .ck-gorow .ck-lv').length), 3, 'three 🥄 levels beside start');
+            assert.ok(!/Start vs bot|you hide|เล่นกับ|แผนที่/.test(await page.evaluate(() => document.querySelector('#cerealModal .ck').innerText)), 'no English lines, no row labels');
             const fit = await page.evaluate(() => { const sc = document.querySelector('#cerealModal .modal-content'); return sc.scrollWidth <= sc.clientWidth + 1; });
             assert.ok(fit, width + ': lobby has no horizontal scroll');
             // ---- solo 1: I am the killer, the bot (🥄🥄🥄) hunts
-            await page.click('#ck-me-killer .ck-lv[data-lv="3"]');
-            assert.ok((await txt(page, '#ck-start')).includes('🔪 vs 🤖 🥄🥄🥄'), 'start names the pick: ' + await txt(page, '#ck-start'));
+            await page.click('#ck-me-killer'); await page.click('#cerealModal .ck-gorow .ck-lv[data-lv="3"]');
+            assert.ok(await page.evaluate(() => document.getElementById('ck-me-killer').classList.contains('on') && document.querySelector('.ck-gorow .ck-lv.on').dataset.lv === '3'), 'pick shows on the card and the 🥄 chip');
             await page.evaluate(() => CK.botDelay(120));
             await page.click('#ck-start');
             assert.equal(await page.$('#ck-hand-go'), null, 'no hand-off screen in a solo game');

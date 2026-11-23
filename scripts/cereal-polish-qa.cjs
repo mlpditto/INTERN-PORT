@@ -45,8 +45,8 @@ const txt = (page, sel) => page.evaluate(s => { const e = document.querySelector
             let x = await box(page, '#cerealModal .ck-x');
             const xs = width < 360 ? 26 : 30;   // V101.333: under 360 px ✕ and 🔊 are 26 px so the killer header fits
             assert.ok(x.w === xs && x.h === xs, width + ' lobby ✕ is a ' + xs + ' px square: ' + JSON.stringify(x));
-            assert.ok((await txt(page, '#ck-start')).includes('เริ่ม') && (await txt(page, '#ck-start')).includes('Start'), 'Start: Thai first + small English');
-            assert.ok((await txt(page, '#cerealModal .ck.lobby')).includes('ผู้เล่น'), 'lobby labels in Thai');
+            assert.equal(await txt(page, '#ck-start'), '▸ เริ่ม', 'Start: one word, no English line (V101.344 owner: ลด text ซ้ำซ้อน)');
+            assert.ok(!/ผู้เล่น|เล่นกับ|แผนที่|Start/.test(await txt(page, '#cerealModal .ck.lobby')) && (await txt(page, '#cerealModal .ck.lobby')).includes('👤 เพื่อน'), 'lobby: Thai chips, no row labels (V101.344)');
             await page.fill('#ck-n1', 'Pond'); await page.fill('#ck-n2', 'Mint');
             await page.click('#ck-start');
             const hand = await txt(page, '#cerealModal .ck-hand');
