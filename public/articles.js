@@ -230,7 +230,7 @@
             '.art-hist .art-md{font-size:13.5px;line-height:1.55}.art-hist .art-md p{margin:0 0 6px}.art-hist .art-md.art-clamp{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:6;overflow:hidden}' +
             '.art-hist .art-more-h{display:inline-block;width:auto;min-height:0;margin:2px 0 6px;padding:2px 0;border:0;background:none;box-shadow:none;color:#4361ee;font:700 13px/1 Kanit,sans-serif;cursor:pointer}.art-hist .art-more-h[hidden]{display:none}' +
             '@media (min-width:1100px){.art-hist .art-md{columns:2;column-gap:36px}.art-hist .art-md.art-clamp{display:block;-webkit-line-clamp:unset;overflow:visible}.art-hist .art-more-h{display:none}}' +
-            '.hl-pill.art-ok{background:#dcfce7;color:#166534}.hl-pill.art-new{background:#eef2ff;color:#4361ee}.art-hist{padding:0 0 6px}.hl-row .art-tfl{display:none}.hl-row[aria-expanded="true"] .art-tfl{display:inline-block;vertical-align:middle;margin:0 0 0 8px;padding:3px 8px;min-height:0;width:auto;border:1px solid #c7d2fe;background:#eef2ff;color:#4361ee;font:800 11px/1.2 Kanit,sans-serif;border-radius:999px;box-shadow:none;cursor:pointer}.art-sh{display:inline-flex;align-items:center;gap:5px;margin-left:6px;vertical-align:middle}.art-sh i{font-style:normal;color:#cbd5e1;margin-right:1px}.art-src .art-sh button{display:inline-flex;align-items:center;justify-content:center;height:24px;min-width:24px;min-height:0;margin:0;padding:0 6px;border-radius:7px;border:0;box-shadow:none;color:#fff;font:900 10px/1 Arial,sans-serif;text-decoration:none;cursor:pointer}.art-src .art-sh .ln{background:#06c755}.art-src .art-sh .fb{background:#1877f2;font-size:15px;padding:0 8px}.art-src .art-sh button.on{background:linear-gradient(135deg,#0461c4,#3ea6ef);box-shadow:0 0 0 2px #d0ebfb}.art-hist .art-links{margin:8px 0 2px}' +
+            '.hl-pill.art-ok{background:#dcfce7;color:#166534}.hl-pill.art-new{background:#eef2ff;color:#4361ee}.art-hist{padding:0 0 6px}.hl-row .art-tfl{display:none}.hl-row[aria-expanded="true"] .art-tfl{display:inline-block;vertical-align:middle;margin:0 0 0 8px;padding:3px 8px;min-height:0;width:auto;border:1px solid #c7d2fe;background:#eef2ff;color:#4361ee;font:800 11px/1.2 Kanit,sans-serif;border-radius:999px;box-shadow:none;cursor:pointer}.art-sh{display:inline-flex;align-items:center;gap:5px;margin-left:6px;vertical-align:middle}.art-sh i{font-style:normal;color:#cbd5e1;margin-right:1px}.art-src .art-sh button{display:inline-flex;align-items:center;justify-content:center;height:24px;min-width:24px;min-height:0;margin:0;padding:0 6px;border-radius:7px;border:0;box-shadow:none;color:#fff;font:900 10px/1 Arial,sans-serif;text-decoration:none;cursor:pointer}.art-src .art-sh .ln{background:#06c755}.art-src .art-sh .fb{background:#1877f2;font-size:15px;padding:0 8px}.art-src .art-sh .cp{background:#f1f5f9;color:#334155;font-size:13px;padding:0 5px}.art-src .art-sh .cp.ok{background:#16a34a;color:#fff}.art-src .art-sh button.on{background:linear-gradient(135deg,#0461c4,#3ea6ef);box-shadow:0 0 0 2px #d0ebfb}.art-hist .art-links{margin:8px 0 2px}' +
             // V101.213: the intern's 💬 questions under the article in History, the admin's reply as a green bubble
             '.art-qa{margin:10px 0 2px;padding-top:8px;border-top:1px dashed #e2e8f0;font:400 13px/1.45 Kanit,sans-serif;color:#334155}.art-qa>b{display:block;font-weight:800;font-size:12.5px;color:#4338ca;margin-bottom:4px}' +
             '.art-qa .q{padding:5px 0;overflow-wrap:anywhere}.art-qa .q small{display:block;color:#94a3b8;font-size:11.5px}.art-qa .r{margin-top:4px;background:#ecfdf5;color:#065f46;border-radius:4px 12px 12px 12px;padding:5px 10px;white-space:pre-wrap}';
@@ -700,7 +700,30 @@
     function shareHtml(a) {
         var on = sharedOf((me().articleSeen || {})[a.id]), id = esc(JSON.stringify(a.id));
         var b = function (k, cls, label, txt) { return '<button type="button" class="' + cls + (on.indexOf(k) >= 0 ? ' on' : '') + '" data-sh="' + k + '" aria-label="Share on ' + label + '" title="' + label + '" onclick="internArticles.share(' + id + ',\'' + k + '\')">' + txt + '</button>'; };
-        return '<span class="art-sh"><i>·</i>📤 ' + b('line', 'ln', 'LINE', 'LINE') + (srcUrl(a) ? b('fb', 'fb', 'Facebook', 'f') : '') + '</span>';
+        // V101.342 (owner): 📋 beside LINE copies the whole article (title, body, source link) — not a share, no score
+        var cp = '<button type="button" class="cp" aria-label="Copy the article" title="Copy" data-th-title="คัดลอก" onclick="internArticles.copy(' + id + ',this)">📋</button>';
+        return '<span class="art-sh"><i>·</i>📤 ' + b('line', 'ln', 'LINE', 'LINE') + cp + (srcUrl(a) ? b('fb', 'fb', 'Facebook', 'f') : '') + '</span>';
+    }
+    function copyAllText(a) {
+        var tx = textOf(a, S.cl), u = srcUrl(a);
+        var body = String(tx.body || '').split('\n').map(function (l) { return l.replace(/[*_#>`]/g, '').replace(/\s+$/, ''); }).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+        return tx.title + (body ? '\n\n' + body : '') + (u ? '\n\n' + u : '');
+    }
+    function copy(id, btn) {
+        var a = find(id); if (!a) return Promise.resolve(false);
+        var text = copyAllText(a);
+        var done = function (ok) {
+            if (ok && btn) { btn.textContent = '✓'; btn.classList.add('ok'); setTimeout(function () { btn.textContent = '📋'; btn.classList.remove('ok'); }, 1500); }
+            return ok;
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(function () { return done(true); }, function () { return done(fallbackCopy(text)); });
+        return Promise.resolve(done(fallbackCopy(text)));
+    }
+    function fallbackCopy(text) {   // the LINE in-app browser may refuse the async clipboard
+        var ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+        document.body.appendChild(ta); ta.select();
+        var ok = false; try { ok = document.execCommand('copy'); } catch (e) { /* no clipboard */ }
+        ta.remove(); return ok;
     }
     function shareText(a) {
         var tx = textOf(a, S.cl), u = srcUrl(a);
@@ -757,7 +780,7 @@
             else refreshHistory(false);
         },
         historyItems: function () { return historyItems(S.list, me(), Date.now(), S.qs); },
-        histMore: histMore, flagHtml: flagHtml, share: share,
+        histMore: histMore, flagHtml: flagHtml, share: share, copy: copy,
         owed: function () { return owed(S.list, me(), Date.now()); },
         detailHtml: detailHtml, pillHtml: pillHtml, discHtml: discHtml, listen: listen, stopListen: stopListen, close: close, histLang: histLang,
         gotIt: gotIt, anyQ: anyQ, askSend: askSend,
