@@ -12,7 +12,11 @@
                    (entropy), arrests when half the suspects are in reach (a third from day 5 with arrests to spare, anything on day 7)
                    · 3 = as 2, and moves to keep more suspects within arrest reach
      killer    1 = greedy: any legal kill, random · 2 = scores how many cells the detective could still suspect, distance from the
-                   detective, a far witness park, a fresh house in reach tomorrow, keeps the quiet day for an emergency · 3 = leans harder on hiding */
+                   detective, a far witness park, a fresh house in reach tomorrow, keeps the quiet day for an emergency · 3 = leans harder on hiding
+   V101.347 (Phase 3 bot): 3 players — pub.lolaPos and days[].lola (where 🐕 stood while the killer moved) block like the detective; the
+   🏡 city / suburb card is open on the 3-player map; lolaTurn() is the 🐕 bot: it reads the public facts plus ITS OWN answers
+   (notes: sniff / bark, never shared) and picks a walk + one ability (not last turn's) — 🥄 random-ish · 🥄🥄 the most telling sniff /
+   bark, bites when half the suspects are in reach · 🥄🥄🥄 as 🥄🥄 and walks to stand near the suspects (it blocks the killer too). */
 (function (root, factory) {
   'use strict';
   if (typeof module === 'object' && module.exports) module.exports = factory(require('./cereal-rules.js'));
@@ -50,7 +54,7 @@
   }
   /** Ends of every legal killer day from `starts`, given that day's public facts. */
   function stepDay(map, starts, d) {
-    const out = new Set(), blocked = d.det != null ? [d.det] : [];
+    const out = new Set(), blocked = [d.det, d.lola].filter(x => x != null);
     for (const s of starts) {
       for (const p of paths3(map, s, blocked)) {
         const end = p[p.length - 1];
@@ -94,7 +98,7 @@
     let s = 0; for (const c of cands) s += dist(map, cell, c); return s / cands.length;
   }
   function moveScore(map, end, cands, pub, level) {
-    const askable = pub.witness != null && R.QUESTIONS.some(q => q !== 'area' && !pub.usedQuestions.includes(q)) && R.canQuestion(map, end, pub.witness);
+    const askable = pub.witness != null && R.QUESTIONS.some(q => (q !== 'area' || map.suburbSide) && !pub.usedQuestions.includes(q)) && R.canQuestion(map, end, pub.witness);
     return (askable ? 100 : 0) + (level >= 3 ? 14 : 10) * reachOf(map, end, cands) - meanDist(map, end, cands);
   }
   /** Where to start (day 1) and how to walk. Returns { start: café|null, path }. */
@@ -119,7 +123,7 @@
   /** Which card to ask from `cell` (null = none possible). */
   function detectiveAsk(map, pub, level, rand, cell) {
     if (pub.witness == null || !R.canQuestion(map, cell, pub.witness)) return null;
-    const open = R.QUESTIONS.filter(q => q !== 'area' && !pub.usedQuestions.includes(q));
+    const open = R.QUESTIONS.filter(q => (q !== 'area' || map.suburbSide) && !pub.usedQuestions.includes(q));
     if (!open.length) return null;
     if (level === 1) return pick(open, rand);
     const cands = [...candidates(map, pub)];
@@ -141,7 +145,7 @@
 
   // ---- killer ------------------------------------------------------------------------------------------
   function killerOptions(map, pub, me) {
-    const out = [], blocked = pub.detectivePos != null ? [pub.detectivePos] : [];
+    const out = [], blocked = [pub.detectivePos, pub.lolaPos].filter(x => x != null);
     const homes = me.pos == null ? R.killerHomeOptions(map) : [me.pos];
     for (const home of homes) for (const path of paths3(map, home, blocked)) {
       const kills = R.killOptions(map, path, pub.cereals);
@@ -174,7 +178,7 @@
     if (need > left) return -1e6 + o.kills;                        // can no longer reach 6
     const taken = o.kill != null ? pub.cereals.concat(o.kill) : pub.cereals;
     // what the detective could still suspect after today — the heart of hiding
-    const d = { day: pub.day, det: pub.detectivePos, kill: o.kill, witness: o.witness, asks: [], misses: [] };
+    const d = { day: pub.day, det: pub.detectivePos, lola: pub.lolaPos, kill: o.kill, witness: o.witness, asks: [], misses: [] };
     const after = [...stepDay(map, ctx.starts, d)];
     let s = 3 * Math.log2(1 + after.length);
     if (o.witness != null) s += 1.5 * Math.min(dist(map, o.witness, end), 6);   // the detective walks to the witness to ask
@@ -201,5 +205,61 @@
     return best;
   }
 
-  return { rng, publicAnswer, candidates, stepDay, detectivePaths, detectiveMove, detectiveAsk, detectiveArrest, killerOptions, killerTurn, LEVELS: [1, 2, 3] };
+  // ---- 🐕 Lola (V101.347) --------------------------------------------------------------------------------
+  /** What one of Lola's own answers says about where the killer stands now (keeps the truth: cereal-bot-check proves it). */
+  function noteKeeps(map, n, c) {
+    if (n.a === 'bark') { const near = c === n.from || R.neighbors8(map, n.from).includes(c); return n.ans === 'yes' ? near : !near; }
+    if (n.a !== 'sniff') return true;
+    if (n.ans === 'center') return c === n.cell;
+    if (n.ans === 'no') return c !== n.cell;
+    return c !== n.cell && R.directions(map, n.cell, c).includes(n.ans);
+  }
+  /** The killer's possible cells from the public facts plus Lola's own answers (notes = [{ day, a, cell, from, ans }]). */
+  function lolaCandidates(map, pub, notes) {
+    let set = null;
+    for (const d of pub.days) {
+      const starts = set == null ? R.killerHomeOptions(map) : [...set];
+      set = applyClues(map, stepDay(map, starts, d), d);
+      for (const n of notes || []) if (n.day === d.day && n.a !== 'bite') set = new Set([...set].filter(c => noteKeeps(map, n, c)));
+    }
+    return set == null ? new Set(R.killerHomeOptions(map)) : set;
+  }
+  /** Every Lola walk from `from` (≤ 4, +1 once through the bowl, no S / T rides), shortest per end cell. */
+  function lolaPaths(map, from) {
+    const best = new Map(), max = R.STEPS.lola + 1;
+    (function walk(path) {
+      if (R.validateLolaPath(map, path).ok) { const e = path[path.length - 1]; if (!best.has(e) || best.get(e).length > path.length) best.set(e, path); }
+      if (path.length - 1 >= max) return;
+      for (const t of R.stepTargets(map, path[path.length - 1], { canRide: false })) walk(path.concat(t));
+    })([from]);
+    return [...best.values()];
+  }
+  function splitBits(groups, n) { let h = 0; for (const k in groups) { const p = groups[k] / n; h -= p * Math.log2(p); } return h; }
+  function sniffAnswerOf(map, s, c) { return c === s ? 'center' : R.leastInformative(map, s, R.directions(map, s, c)); }
+  /** One 🐕 turn: { path, ability: { a: 'sniff' | 'bark' | 'bite', cell } | null }. me = { pos, last, notes }. */
+  function lolaTurn(map, pub, me, level, rand) {
+    const cands = [...lolaCandidates(map, pub, me.notes)], n = Math.max(1, cands.length);
+    const ok = a => a !== me.last;
+    let best = null, bs = -Infinity;
+    for (const path of lolaPaths(map, me.pos)) {
+      const e = path[path.length - 1], opts = [];
+      const reach = cands.filter(c => R.arrestValid(map, e, c));
+      if (ok('bite') && reach.length && (level === 1 ? cands.length <= 2 : (reach.length / n >= 0.5 || pub.day >= R.DAYS) && pub.arrestsLeft > (cands.length <= reach.length ? 0 : 1)))
+        opts.push({ a: 'bite', cell: level === 1 ? pick(reach, rand) : reach.slice().sort((x, y) => x - y)[0], s: 50 + 40 * reach.length / n });
+      if (ok('bark')) { const near = cands.filter(c => c === e || R.neighbors8(map, e).includes(c)).length; opts.push({ a: 'bark', cell: null, s: 10 * splitBits({ y: near, n: cands.length - near }, n) }); }
+      if (ok('sniff')) for (const s of map.ids.filter(id => R.arrestValid(map, e, id))) {
+        const g = {}; for (const c of cands) { const k = sniffAnswerOf(map, s, c); g[k] = (g[k] || 0) + 1; }
+        opts.push({ a: 'sniff', cell: s, s: 10 * splitBits(g, n) });
+      }
+      const stand = level >= 3 ? -0.6 * meanDist(map, e, cands) : 0;
+      for (const o of opts.length ? opts : [{ a: null, cell: null, s: 0 }]) {
+        const sc = (level === 1 ? (rand ? rand() * 10 : 0) : o.s) + stand - 0.01 * path.length;
+        if (sc > bs) { bs = sc; best = { path, ability: o.a ? { a: o.a, cell: o.cell } : null }; }
+      }
+    }
+    return best;
+  }
+
+  return { rng, publicAnswer, candidates, stepDay, detectivePaths, detectiveMove, detectiveAsk, detectiveArrest, killerOptions, killerTurn,
+    lolaCandidates, lolaPaths, lolaTurn, LEVELS: [1, 2, 3] };
 });
