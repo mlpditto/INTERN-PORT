@@ -108,7 +108,10 @@
     /* Which first-turn hint fits the screen just drawn (cereal-tutorial.js shows each once). null = nothing to coach. */
     function coachKey() {
         if (!g || g.status !== 'playing' || g.hand || ui.beat) return null;
-        if (g.phase === 'lola') return null;
+        if (g.phase === 'lola') {   // V101.348: Lola's first-turn hints (none for a bot Lola)
+            var L0 = g.lola; if (!L0 || isBot('lola')) return null;
+            return L0.dd.used ? (L0.dd.used.a === 'bite' ? null : 'lend') : (ui.lolaPick || L0.dd.path.length > 1 ? 'lab' : 'lwalk');
+        }
         if (g.phase === 'killer') {
             if (g.secret.home == null) return 'home';
             if (g.draft.path.length < R.STEPS.killer + 1) return 'path';

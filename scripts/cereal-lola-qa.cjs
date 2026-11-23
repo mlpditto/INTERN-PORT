@@ -60,12 +60,23 @@ const cell = id => '#cerealModal .ck-cell[data-id="' + id + '"]';
       assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#ck-lola-ab .ck-q')].map(b => b.dataset.ab)), ['sniff', 'bark', 'bite'], 'abilities as a rail');
       assert.equal(await txt('#cerealModal .ck-top .ck-pill.acc'), '👣 4');
       assert.equal(await page.isDisabled(cell(16)), true, 'Lola never steps onto the subway from 17');
-      for (const id of [17, 18, 13]) await page.click(cell(id));
+      // V101.348: her first-turn hints, one at a time: walk → ability → the answer is yours alone
+      const coach = () => page.evaluate(() => { const c = document.getElementById('cerealCoach'); return c ? c.getAttribute('data-key') : null; });
+      await page.evaluate(() => { localStorage.setItem('cerealCoachSeen', JSON.stringify({ home: 1, path: 1, chips: 1, lock: 1, cafe: 1, move: 1, ask: 1, arrest: 1 })); CK._.render(); });
+      assert.equal(await coach(), 'lwalk', 'hint 1: walk');
+      await page.click('#cerealCoach [data-ct="ok"]');
+      await page.click(cell(17));
+      assert.equal(await coach(), 'lab', 'hint 2 after the first step: one ability');
+      await page.click('#cerealCoach [data-ct="ok"]');
+      for (const id of [18, 13]) await page.click(cell(id));
       assert.equal(await txt('#cerealModal .ck-top .ck-pill.acc'), '👣 1');
       await page.click('#ck-lola-ab [data-ab="sniff"]');
       assert.equal(await page.isDisabled('#ck-lola-end'), true, 'pick a cell first (or ✕)');
       assert.equal(await page.isDisabled(cell(7)), true, 'sniff: own or next cell only');
       await page.click(cell(8));
+      assert.equal(await coach(), 'lend', 'hint 3 with the answer: yours alone');
+      await page.click('#cerealCoach [data-ct="ok"]');
+      await page.evaluate(() => localStorage.setItem('cerealCoachSeen', 'all'));
       const ans = await txt('#ck-lola-ans');
       assert.ok(ans.includes('8') && ans.includes('อยู่ช่องนี้') && ans.includes('🔒'), 'private answer: ' + ans);
       assert.ok(/สมุด lola/i.test(await txt('#cerealModal .ck.lola')), 'her notebook');
@@ -111,6 +122,6 @@ const cell = id => '#cerealModal .ck-cell[data-id="' + id + '"]';
       assert.deepEqual(errors, []);
       await ctx.close();
     }
-    console.log('cereal-lola-qa: OK — 🐕 3 คน chip shows her card, pair chip cycles 4 maps, city + suburb board with seam (holes kept), 🔪 → 🐕 → 🕵️ hand-offs, Lola starts on the bowl, never rides S, blocks the killer, sniff 🎯 private + notebook, log names the sniff only, 6th card 🏡, ability rests with 🦴, wrong bite shares 🛡️ (390 + 320)');
+    console.log('cereal-lola-qa: OK — 🐕 3 คน chip shows her card, pair chip cycles 4 maps, city + suburb board with seam (holes kept), 🔪 → 🐕 → 🕵️ hand-offs, Lola starts on the bowl, never rides S, blocks the killer, sniff 🎯 private + notebook, log names the sniff only, 6th card 🏡, ability rests with 🦴, wrong bite shares 🛡️, her 3 first-turn hints (390 + 320)');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

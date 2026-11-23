@@ -241,7 +241,11 @@
         cafe: { ring: '#cerealModal .ck-board', finger: true, k: 'เทิร์นแรกของคุณ · 1 / 4', t: 'แตะร้านกาแฟ ☕ ที่จะเริ่ม', b: 'นักสืบเริ่มที่ร้านกาแฟเสมอ วันต่อ ๆ ไปเดินต่อจากที่ยืนอยู่', en: 'Tap a café to start.' },
         move: { ring: '#cerealModal .ck-board', finger: true, k: 'เทิร์นแรกของคุณ · 2 / 4', t: 'เดินได้ถึง 3 ช่อง (+1 ถ้าผ่าน ☕)', b: 'จุดสีน้ำเงินคือช่องที่ไปได้ จะหยุดก่อนครบก็ได้ ไปยืนติด 👁️ แล้วจะถามได้', en: 'Up to 3 steps; stand on or next to the witness to ask.' },
         ask: { ring: '#ck-ask', k: 'เทิร์นแรกของคุณ · 3 / 4', t: 'ถามพยานได้ 1 ใบ', b: 'แอปตอบตามความจริงแทนฆาตกร ใบที่ใช้แล้วใช้ซ้ำไม่ได้ทั้งเกม', en: 'Spend one question card; the app answers truthfully.' },
-        arrest: { ring: '#ck-arrest, #ck-end', k: 'เทิร์นแรกของคุณ · 4 / 4', t: '🛡️ จับกุม หรือ ▸ จบเทิร์น', b: 'จับได้เฉพาะช่องที่ยืนหรือช่องติดกัน ผิดเสีย 1 ใน 4 ครั้งและจบเทิร์นทันที', en: 'Arrest your cell or a neighbour, or end the turn.' }
+        arrest: { ring: '#ck-arrest, #ck-end', k: 'เทิร์นแรกของคุณ · 4 / 4', t: '🛡️ จับกุม หรือ ▸ จบเทิร์น', b: 'จับได้เฉพาะช่องที่ยืนหรือช่องติดกัน ผิดเสีย 1 ใน 4 ครั้งและจบเทิร์นทันที', en: 'Arrest your cell or a neighbour, or end the turn.' },
+        // V101.348 (owner): Lola's first turn — walk · one ability · the answer is yours alone (voice c-lwalk / c-lab / c-lend)
+        lwalk: { ring: '#cerealModal .ck-board', finger: true, k: 'ตาแรกของ Lola · 1 / 3', t: 'เดินได้ถึง 4 ช่อง (+1 ถ้าผ่าน 🦴)', b: 'ขึ้น 🚇 🚆 ไม่ได้ · ช่องที่ 🐕 ยืนขวางฆาตกร · ไม่เดินก็ได้', en: 'Walk up to 4 (+1 through the bowl); no subway or train.' },
+        lab: { ring: '#ck-lola-ab', k: 'ตาแรกของ Lola · 2 / 3', t: 'ใช้ท่าได้ตาละ 1 ท่า', b: '👃 ดม = ฆาตกรผ่านไหม อยู่ทางไหน · 📢 เห่า = อยู่รอบตัวไหม · 🦷 กัด = จับกุม · ท่าเดิมใช้ 2 ตาติดไม่ได้', en: 'One ability a turn, never the same twice in a row.' },
+        lend: { ring: '#ck-lola-ans, #ck-lola-end', k: 'ตาแรกของ Lola · 3 / 3', t: 'คำตอบเห็นคนเดียว 🔒 แล้ว ▸ จบเทิร์น', b: 'Lola พูดไม่ได้ · ห้ามบอกใคร · คำตอบเก็บใน 🔒 สมุด Lola', en: 'Your answer is yours alone; then end the turn.' }
     };
     var croot = null, ckey = null, raf = 0, cau = null;
     function stopCoachVoice() { if (cau) { try { cau.pause(); } catch (_) { /* not started */ } } }

@@ -9,7 +9,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
 (async () => {
   // the nine files exist, are small, and are real MP3s
-  for (const n of ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 'c-home', 'c-path', 'c-chips', 'c-lock', 'c-cafe', 'c-move', 'c-ask', 'c-arrest']) {
+  for (const n of ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 'c-home', 'c-path', 'c-chips', 'c-lock', 'c-cafe', 'c-move', 'c-ask', 'c-arrest', 'c-lwalk', 'c-lab', 'c-lend']) {
     const f = path.resolve('public/cereal-voice/' + n + '.mp3'), b = fs.readFileSync(f);
     assert.ok(b.length > 15000 && b.length < 150000, n + '.mp3 size ' + b.length);
     assert.ok(b[0] === 0xff || b.slice(0, 3).toString() === 'ID3', n + '.mp3 is an MP3');
@@ -79,7 +79,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
     // first-turn coach marks read themselves (c-<key>.mp3); closing the hint stops it; 🔇 = silent
     await page.evaluate(() => { localStorage.setItem('cerealSound', 'on'); localStorage.removeItem('cerealCoachSeen'); window.__pauses = 0; });
-    for (const k of ['home', 'path', 'chips', 'lock', 'cafe', 'move', 'ask', 'arrest']) {
+    for (const k of ['home', 'path', 'chips', 'lock', 'cafe', 'move', 'ask', 'arrest', 'lwalk', 'lab', 'lend']) {
       const before = (await v()).plays.length;
       await page.evaluate((k) => CKTour.coach(k), k);
       const p = (await v()).plays;
@@ -91,6 +91,6 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     const nC = (await v()).plays.length; await page.evaluate(() => CKTour.coach('home'));
     assert.equal((await v()).plays.length, nC, '🔇: hints stay silent');
     assert.deepEqual(errors, []);
-    console.log('cereal-voice-qa: OK — 8 coach clips play with their hint, stop when it closes, silent on 🔇; — 9 clips (< 150 KB, MP3), card n plays s<n>, refused play → pulsing 🔊 → tap plays, ปิด stops, 🔇 = game switch (cerealSound off, silent), ▶ auto turns on the clip end');
+    console.log('cereal-voice-qa: OK — 11 coach clips (8 + Lola 3) play with their hint, stop when it closes, silent on 🔇; — 9 clips (< 150 KB, MP3), card n plays s<n>, refused play → pulsing 🔊 → tap plays, ปิด stops, 🔇 = game switch (cerealSound off, silent), ▶ auto turns on the clip end');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
