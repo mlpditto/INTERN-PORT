@@ -247,6 +247,7 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
         const t = q('textarea'), sheet = () => q('#art-sheet'), bh = () => Math.round(q('#art-sheet .b').getBoundingClientRect().height), btn = () => q('#art-pv-more');
         t.value = Array.from({ length: 14 }, (_, i) => 'Line ' + (i + 1) + ' of a long body that needs Read more.').join('\n\n'); t.dispatchEvent(new Event('input', { bubbles: true }));
         const closedH = bh();
+        const fullAtOnce = [btn().style.visibility, q('#art-sheet .b').scrollHeight <= q('#art-sheet .b').clientHeight + 2];   // V102.703: ≥ 1101 px the preview shows the whole body, Read more hides
         btn().click();
         const open = [sheet().classList.contains('more'), btn().textContent, btn().getAttribute('aria-expanded'), bh() > closedH * 2];
         t.value += '\n\nOne more.'; t.dispatchEvent(new Event('input', { bubbles: true }));
@@ -254,7 +255,7 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
         btn().click();
         const closed = [sheet().classList.contains('more'), btn().textContent, bh() === closedH];
         t.value = 'Short.'; t.dispatchEvent(new Event('input', { bubbles: true }));
-        out.readMore = { open, typed, closed, shortHidden: btn().style.visibility };
+        out.readMore = { open, typed, closed, shortHidden: btn().style.visibility, fullAtOnce };
         Articles.edit('b1');
       }
       const wRead = writes.length;   // V102.701: re-opening b1 auto-saved the typing above (a draft) — the ✨ checks below count from here
@@ -340,9 +341,7 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
     assert.equal(r3.noChip, true, 'an intern with articles for them gets a chip');
     assert.match(r3.card || '', /Read\s*2 \/ 4 · 50%\s*✓ 2\s*👁 1\s*⏳ 1\s*🔖 1\s*🧪 1\s*👥 Who read it/, 'the read card under the preview: ' + r3.card);
     assert.deepEqual(r3.previewG4, [true, '👍 Got it'], 'the preview is the V101.177 intern sheet');
-    assert.deepEqual(r3.readMore.open, [true, 'Show less ▴', 'true', true], 'preview Read more opens the whole body');
-    assert.deepEqual(r3.readMore.typed, [true, 'Show less ▴'], 'typing keeps it open');
-    assert.deepEqual(r3.readMore.closed, [false, 'Read more ▾', true], 'Show less closes it');
+    assert.deepEqual(r3.readMore.fullAtOnce, ['hidden', true], 'V102.703: at 1360 px the preview phone shows the whole long body at once (no clamp) and Read more hides itself (articles-preview-fit-qa)');
     assert.equal(r3.readMore.shortHidden, 'hidden', 'a short body needs no Read more');
     assert.deepEqual(r3.who[0], 4, 'who read it lists everyone it is for'); assert.deepEqual(r3.who[1], ['✓ Read', '✓ Read', '👁 Closed', '⏳ Not yet'], 'read first, then closed, then not yet');
     assert.deepEqual(r3.who[2], ['all:4', 'read:2', 'closed:1', 'wait:1'], 'filters with counts (no 🔁 chip when nobody is a re-run)');
