@@ -91,7 +91,7 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
           await pick.click();
           if (my === 'seer') { await page.click('#ww-night-go'); assert.match(await page.textContent('#wolfModal .ww-top'), /= (🐺 หมาป่า|👤 ไม่ใช่หมาป่า)/, '🔮 answer before ☀️'); seen.seerAnswer++; }
         }
-        assert.equal(await page.$eval('#ww-night-go', (b) => b.disabled), false, 'the night button is ready');
+        assert.equal(await page.$eval('#ww-night-go', (b) => b.disabled), false, 'the night button is ready: ' + await page.evaluate(() => { const g = WW._game(); return JSON.stringify({ me: g.st.roles.p1, alive: g.st.alive, draft: g.draft, last: g.st.lastGuard, checks: g.checks.p1, ask: document.querySelector('#wolfModal .ww-top').textContent, picks: document.querySelectorAll('#wolfModal .ww-seat.pick').length }); }));
         await page.click('#ww-night-go');
         continue;
       }
@@ -108,6 +108,8 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
           await page.click('#wolfModal .ww-seat.pick');
           const chips = await page.$$eval('#ww-say button', (b) => b.map((x) => x.textContent.slice(0, 2)));
           assert.equal(chips.length, 4, '🤨 👍 🔮🐺 🔮👤');
+          const claimTxt = await page.$$eval('#ww-say button', (b) => b.slice(2).map((x) => x.textContent));
+          assert.ok(claimTxt.every((t) => /^🔮 อ้าง .+ (🐺|👤)$/.test(t)), 'V101.356: the 🔮 chips say they are a claim: ' + claimTxt);
           await page.click('#ww-say button:first-child');
           assert.match(await page.$eval('#wolfModal .ww-seat.me .tag', (t) => t.textContent), /^🤨 /, 'my tag lands on my seat'); seen.myTag++;
         }
@@ -149,6 +151,34 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
   assert.ok(seen.mates, 'covered a wolf with mates');
   assert.ok(seen.seerAnswer && seen.myTag && seen.voteCounts && seen.deadRole && seen.peek, JSON.stringify(seen));
 
+  // V101.356: the guard's "last night you covered X" disappears once X is dead
+  {
+    for (let s = 300; s < 420; s++) {
+      const guard = await page.evaluate((s) => { let a = s * 7; WW._rng(() => { a = (a * 1103515245 + 12345) % 2147483648; return a / 2147483648; }); WW.set('n', 5); WW.start(); return WW._game().st.roles.p1 === 'guard'; }, s);
+      if (!guard) { await page.evaluate(() => WW.back()); continue; }
+      const notes = await page.evaluate(() => {
+        WW.night(); const g = WW._game(), other = g.ids.find((id) => id !== g.me);
+        g.st.lastGuard = other; WW.tap(other); WW.tap(other);   // re-render with a last guard that is alive
+        const alive = (document.getElementById('ww-night-note') || {}).textContent || '';
+        g.st.alive[other] = false; g.draft = {}; WW.tap(g.me);
+        const dead = (document.getElementById('ww-night-note') || {}).textContent || '';
+        return [alive, dead];
+      });
+      if (!/เมื่อคืนคุ้มกัน/.test(notes[0])) throw new Error('setup: the alive note is missing: ' + notes[0]);
+      if (/เมื่อคืนคุ้มกัน/.test(notes[1])) throw new Error('the note still names a dead player: ' + notes[1]);
+      await page.evaluate(() => WW.back());
+      break;
+    }
+  }
+  // V101.356: a 🔮 who has checked everyone alive can still end the night (the button used to stay disabled for good)
+  for (let s = 500; s < 640; s++) {
+    const seer = await page.evaluate((s) => { let a = s * 11; WW._rng(() => { a = (a * 1103515245 + 12345) % 2147483648; return a / 2147483648; }); WW.set('n', 5); WW.start(); return WW._game().st.roles.p1 === 'seer'; }, s);
+    if (!seer) { await page.evaluate(() => WW.back()); continue; }
+    const r = await page.evaluate(() => { WW.night(); const g = WW._game(); g.checks.p1 = {}; g.ids.forEach((id) => { if (id !== 'p1') g.checks.p1[id] = g.st.roles[id] === 'wolf'; }); WW.tap('p1');
+      return [document.querySelector('#wolfModal .ww-top').textContent, document.getElementById('ww-night-go').disabled]; });
+    assert.match(r[0], /ส่องครบทุกคนแล้ว/); assert.equal(r[1], false, 'the night button works when nobody is left to check');
+    await page.evaluate(() => WW.back()); break;
+  }
   // an unfinished game: framed, ▸, back on reopen
   await page.evaluate(() => { WW.set('n', 7); WW.start(); WW.night(); WW.close(); wolfOpen(); });
   const cur = await page.$eval('#wolfModal .ww-game.cur', (r) => ({ go: r.querySelector('.go').textContent, cls: r.className }));

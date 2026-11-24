@@ -222,10 +222,11 @@
         } else if (r === 'seer') {
             var done = g.checks[me] || {};
             if (d.seer) { ask = '🔮 ' + esc(nm(d.seer)) + ' = ' + (done[d.seer] ? '🐺 หมาป่า' : '👤 ไม่ใช่หมาป่า'); btn = '☀️ ไปเช้า'; on = d.seer; }
+            else if (!alive().some(function (id) { return id !== me && !(id in done); })) { ask = '🔮 ส่องครบทุกคนแล้ว'; btn = '☀️ ไปเช้า'; }   // V101.356: nobody left to check — the night must still go on
             else { ask = '🔮 เช็กใคร?'; can = function (id) { return id !== me && !(id in done); }; btn = sel ? '🔮 ดู ' + esc(nm(sel)) : ''; }
         } else if (r === 'guard') {
             ask = '🛡️ คุ้มกันใคร?'; can = function (id) { return id !== g.st.lastGuard; }; on = d.guard || sel;
-            if (g.st.lastGuard) note = (note ? note + ' · ' : '') + 'เมื่อคืนคุ้มกัน ' + esc(nm(g.st.lastGuard)) + ' · คืนนี้เลือกคนอื่น';
+            if (g.st.lastGuard && g.st.alive[g.st.lastGuard]) note = (note ? note + ' · ' : '') + 'เมื่อคืนคุ้มกัน ' + esc(nm(g.st.lastGuard)) + ' · คืนนี้เลือกคนอื่น';   // V101.356: not about someone already dead
             btn = d.guard ? '🛡️ คุ้มกัน ' + esc(nm(d.guard)) + ' ▸' : '';
         } else if (r === 'witch' && (g.st.witch.heal || g.st.witch.poison)) {
             ask = '🧪 ใช้ยาไหม?'; on = d.poison || null;
@@ -256,7 +257,7 @@
         if (meAlive() && sel) {
             var n = esc(nm(sel));
             h += '<div class="ww-say" id="ww-say"><button type="button" class="ww-chip" onclick="WW.say(\'sus\')">🤨 สงสัย ' + n + '</button><button type="button" class="ww-chip" onclick="WW.say(\'trust\')">👍 เชื่อ ' + n + '</button>'
-                + '<button type="button" class="ww-chip" onclick="WW.say(\'claim\',true)">🔮 ' + n + ' 🐺</button><button type="button" class="ww-chip" onclick="WW.say(\'claim\',false)">🔮 ' + n + ' 👤</button></div>';
+                + '<button type="button" class="ww-chip" onclick="WW.say(\'claim\',true)">🔮 อ้าง ' + n + ' 🐺</button><button type="button" class="ww-chip" onclick="WW.say(\'claim\',false)">🔮 อ้าง ' + n + ' 👤</button></div>';
         }
         h += '<button type="button" class="ww-primary" id="ww-to-vote" onclick="WW.toVote()">🗳 ไปโหวต</button>';
         return h + '</div>';
