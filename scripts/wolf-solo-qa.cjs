@@ -43,9 +43,23 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
   await page.evaluate(() => wolfOpen());
   const lobby = await page.$eval('#wolfModal', (m) => ({ shown: getComputedStyle(m).display, txt: m.textContent, empty: !!m.querySelector('#ww-empty') }));
   assert.equal(lobby.shown, 'flex'); assert.ok(lobby.empty, 'no games → the empty line');
-  assert.match(lobby.txt, /👥 คน5799|👥 คน579/); assert.match(lobby.txt, /🥄🥄🥄/); assert.match(lobby.txt, /🐺 2/, 'the 7-player deck shows 🐺 2');
+  // V101.355 (owner picks B + L4): role tiles with a short name + count, a one-line tip under the tapped tile, three nights for the bot level
+  assert.match(lobby.txt, /👥 คน579/);
+  const tiles = () => page.$$eval('#ww-roles .ww-tile', (t) => t.map((x) => [x.dataset.role, x.textContent, x.getAttribute('aria-pressed')]));
+  assert.deepEqual(await tiles(), [['wolf', '🐺หมาป่า2', 'true'], ['seer', '🔮ผู้หยั่งรู้1', 'false'], ['guard', '🛡️การ์ด1', 'false'], ['witch', '🧪แม่มด1', 'false'], ['villager', '👤ชาวบ้าน2', 'false']], '7 players: 5 tiles, 🐺 tip open by default');
+  assert.match(await page.textContent('#ww-tip'), /^🐺 หมาป่า กัด 1 คนทุกคืน/);
+  await page.click('#ww-roles .ww-tile[data-role="guard"]');
+  assert.match(await page.textContent('#ww-tip'), /^🛡️ การ์ด คุ้มกัน 1 คนทุกคืน · ห้ามคนเดิม 2 คืนติด$/, 'tap a tile = its tip, inline');
+  await page.click('#ww-roles .ww-tile[data-role="guard"]');
+  assert.equal(await page.$('#ww-tip'), null, 'tap it again = the tip closes');
+  assert.deepEqual(await page.$$eval('#ww-levels button', (b) => b.map((x) => [x.textContent, x.getAttribute('aria-pressed')])), [['🌆หัวค่ำง่าย', 'false'], ['🌙เที่ยงคืนกลาง', 'true'], ['🌕คืนเดือนเพ็ญยาก', 'false']], 'three nights, เที่ยงคืน by default');
+  assert.equal(await page.$eval('#ww-levels button.on', (b) => getComputedStyle(b).backgroundColor), 'rgb(49, 46, 129)', 'night tiles are dark');
+  await page.click('#ww-levels button:has-text("คืนเดือนเพ็ญ")');
+  assert.equal(await page.evaluate(() => WW._game ? null : null), null); assert.match(await page.$eval('#ww-levels button.on', (b) => b.textContent), /คืนเดือนเพ็ญ/, 'tap a night = that level');
+  await page.click('#ww-levels button:has-text("เที่ยงคืน")');
+  assert.equal(await page.textContent('#ww-start'), '▸ เริ่มเกม · สุ่มบท');
   await page.click('#wolfModal button.ww-chip:has-text("5")');
-  assert.match(await page.textContent('#wolfModal'), /🐺 1/, '5 players → 🐺 1');
+  assert.deepEqual((await tiles()).map((t) => t[1]), ['🐺หมาป่า1', '🔮ผู้หยั่งรู้1', '🛡️การ์ด1', '👤ชาวบ้าน2'], '5 players → 4 tiles, 🐺 1');
 
   const roles = new Set(); const seen = { mates: 0, seerAnswer: 0, witchBite: 0, myTag: 0, voteCounts: 0, deadRole: 0, quietOrTag: 0 };
   let seed = 1, games = 0;
@@ -63,6 +77,7 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
     const card = await page.$eval('#wolfModal .ww-card', (c) => c.textContent);
     assert.match(card, /มนุษย์หมาป่า|ผู้หยั่งรู้|บอดี้การ์ด|แม่มด|ชาวบ้าน/);
     if (my === 'wolf' && n >= 7) { assert.match(card, /เพื่อน:/, 'a wolf sees its mates'); seen.mates++; }
+    assert.equal(await page.textContent('#ww-goal'), my === 'wolf' ? '🏆 ชนะเมื่อ 🐺 เท่ากับคนที่เหลือ' : '🏆 ชนะเมื่อ 🐺 ออกครบ', 'V101.355: the side\'s goal on the card');
     await page.click('#ww-go');
     for (let step = 0; step < 60; step++) {
       const ph = await page.evaluate(() => { const g = WW._game(); return g ? g.phase : 'lobby'; });
@@ -81,6 +96,10 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
         continue;
       }
       if (ph === 'day') {
+        if (!seen.peek && await page.$('#ww-me')) {   // V101.355: tap 👤 คุณ = the role card again, ↩ back to the same day
+          await page.click('#ww-me'); assert.equal(await page.textContent('#ww-goal') !== '', true); assert.ok(await page.$('#ww-peek-back'));
+          await page.click('#ww-peek-back'); assert.ok(await page.$('#ww-to-vote'), 'back on the day'); seen.peek = 1;
+        }
         const tags = await page.evaluate(() => { const g = WW._game(); return g.ids.filter((id) => id !== 'p1' && g.st.alive[id]).map((id) => [!!g.tags[id], !!document.querySelector('#wolfModal .ww-seat[data-id="' + id + '"] .tag')]); });
         tags.forEach(([has]) => assert.ok(has, 'every living bot has a tag entry (maybe quiet)')); seen.quietOrTag += tags.length;
         const deadRole = await page.$$eval('#wolfModal .ww-seat.dead .tag', (t) => t.map((x) => x.textContent));
@@ -128,7 +147,7 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
     seen.mates++; await page.evaluate(() => WW.back());
   }
   assert.ok(seen.mates, 'covered a wolf with mates');
-  assert.ok(seen.seerAnswer && seen.myTag && seen.voteCounts && seen.deadRole, JSON.stringify(seen));
+  assert.ok(seen.seerAnswer && seen.myTag && seen.voteCounts && seen.deadRole && seen.peek, JSON.stringify(seen));
 
   // an unfinished game: framed, ▸, back on reopen
   await page.evaluate(() => { WW.set('n', 7); WW.start(); WW.night(); WW.close(); wolfOpen(); });

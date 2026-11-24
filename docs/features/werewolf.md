@@ -22,7 +22,7 @@ Files: `public/wolf-rules.js` (a byte copy of `functions/wolf-rules.js`, UMD) ·
 
 ## Scripts that drive it
 
-- `wolf-solo-qa` (A, phone harness): whole games by tapping until "me" held all 5 roles; 🐺 beside 🥣; lobby deck; role card + mates; dark night, 🔮 answer before ☀️, 🧪 sees the bite; day tags + 🤨/👍/🔮 chips; vote counts on seats + ⏭; dead show roles; end lists everyone; lobby bar; reopen keeps the game; no sideways scroll at 320 px.
+- `wolf-solo-qa` (A, phone harness): whole games by tapping until "me" held all 5 roles; 🐺 beside 🥣; lobby deck; role card + mates; dark night, 🔮 answer before ☀️, 🧪 sees the bite; day tags + 🤨/👍/🔮 chips; vote counts on seats + ⏭; dead show roles; end lists everyone; lobby bar; reopen keeps the game; no sideways scroll at 320 px. V101.355: role tiles + inline tip (tap again closes), 🌆 / 🌙 / 🌕 night levels (dark tiles), ▸ เริ่มเกม · สุ่มบท, the card's 🏆 goal, tap 👤 คุณ = the card again (↩ กลับเกม).
 - `wolf-ai-check` (D, node): 1350 all-bot games (5/7/9 × 🥄 levels) — every pick passes pickError, no mate accused or voted, true claims match checks, fakes only from wolves, one claim per bot per day, all games end, 🥄🥄🥄 village beats 🥄 at 7.
 - `wolf-rules-check` (D, node): every default deck 5–10 deals exactly its roles; bad decks refused by code; each refused pick; night order cases; wolf tie by rng; vote ties / skips / dead voters; both win conditions; two scripted 7-player games (village win, wolf win); inputs never mutated; public/wolf-rules.js = functions/wolf-rules.js.
 
