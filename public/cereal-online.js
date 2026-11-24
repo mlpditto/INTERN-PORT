@@ -92,14 +92,17 @@
                 else if (x.status === 'finished') tail = '<span class="ck-pill">' + (x.result && x.result.winner === (me === 'killer' ? 'killer' : 'good') ? '🏆 ชนะ' : '🏁 แพ้') + '</span>';
                 else if (mine) tail = '<span class="ck-turn">ตาคุณ</span>';
                 else tail = '<span class="ck-wait">⏳ รอ ' + esc(on) + ' · ' + mins(Date.now() - (x.updatedAt || Date.now())) + '</span>';
-                h += '<button type="button" class="ck-game' + (mine ? ' mine' : '') + '" data-game="' + esc(x.id) + '" onclick="CKOnline.open(\'' + esc(x.id) + '\')"><span class="d">' + (x.status === 'playing' ? 'D' + x.day : x.status === 'lobby' ? '—' : '🏁') + '</span><span class="who">' + IC[me] + ' คุณ' + others.map(function (r) { return x.names && x.names[r] ? ' · ' + IC[r] + ' ' + esc(x.names[r]) : ''; }).join('') + '</span>' + tail + '<span class="go">▸</span></button>';
+                h += '<button type="button" class="ck-game' + (mine ? ' mine' : '') + (x.status === 'finished' ? (x.result && x.result.winner === (me === 'killer' ? 'killer' : 'good') ? ' r-w' : ' r-l') : ' r-p') + '" data-game="' + esc(x.id) + '" onclick="CKOnline.open(\'' + esc(x.id) + '\')"><span class="d">' + (x.status === 'playing' ? 'D' + x.day : x.status === 'lobby' ? '—' : '🏁') + '</span><span class="who">' + IC[me] + ' คุณ' + others.map(function (r) { return x.names && x.names[r] ? ' · ' + IC[r] + ' ' + esc(x.names[r]) : ''; }).join('') + '</span>' + tail + '<span class="go">▸</span></button>';
             });
             h += '</div>';
         }
-        var off = st.busy || !st.uid ? ' disabled' : '';
+        var off = st.busy || !st.uid ? ' disabled' : '', full = st.code.length === 6;
         h += '<div class="ck-onrow"><button type="button" class="ck-primary" id="ck-on-new" onclick="CKOnline.pick(\'view\',\'create\')">＋ สร้างห้อง</button>'
-            + '<label class="ck-name ck-code"><span>🔑</span><input type="text" id="ck-on-code" maxlength="6" autocomplete="off" autocapitalize="characters" enterkeyhint="go" placeholder="รหัส 6 ตัว" value="' + esc(st.code) + '" aria-label="Room code" onkeydown="if(event.key===\'Enter\'){event.preventDefault();CKOnline.join();}">'
-            + '<button type="button" class="ck-go" id="ck-on-join" onclick="CKOnline.join()" aria-label="Join"' + off + '>▸</button></label></div>';
+            + '<label class="ck-name ck-code"><span>🔑</span><input type="text" id="ck-on-code" maxlength="6" autocomplete="off" autocapitalize="characters" enterkeyhint="go" placeholder="รหัส 6 ตัว" value="' + esc(st.code) + '" aria-label="Room code" oninput="CKOnline.typed(this)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();CKOnline.join();}">'
+            // V101.352 (owner pick E): 📋 วาง until 6 letters are in, then ▸ in the same place
+            + '<button type="button" class="ck-paste" id="ck-on-paste" onclick="CKOnline.paste()"' + (full ? ' hidden' : '') + '>📋 วาง</button>'
+            + '<button type="button" class="ck-go" id="ck-on-join" onclick="CKOnline.join()" aria-label="Join"' + off + (full ? '' : ' hidden') + '>▸</button></label></div>';
+        if (!games.length && st.listed) h += '<div class="ck-empty" id="ck-on-empty">🌐 ยังไม่มีเกม · ＋ สร้างห้อง แล้วส่งรหัสให้เพื่อน</div>';
         return h;
     }
 
@@ -359,6 +362,22 @@
             var el = document.getElementById('ck-on-code'); st.code = ((el && el.value) || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
             if (st.code.length !== 6) { st.err = 'รหัสห้องมี 6 ตัว'; rerender(); return Promise.resolve(null); }
             return act({ action: 'join', code: st.code }, function (r) { if (r && r.gameId) { st.code = ''; open(r.gameId); } });
+        },
+        typed: function (el) {
+            st.code = (el.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+            var full = st.code.length === 6, p = document.getElementById('ck-on-paste'), j = document.getElementById('ck-on-join');
+            if (p) p.hidden = full; if (j) j.hidden = !full;
+        },
+        /** 📋 วาง: the room code from the clipboard — the copied code itself, or the LINE invite (?cereal=CODE wins over any 6-letter word). */
+        paste: function () {
+            var fail = function () { st.err = '📋 อ่านไม่ได้ · กดค้างในช่องแล้ววาง'; rerender(); var el = document.getElementById('ck-on-code'); if (el) el.focus(); };
+            var p; try { p = navigator.clipboard.readText(); } catch (_) { p = null; }
+            if (!p || !p.then) { fail(); return Promise.resolve(null); }
+            return p.then(function (t) {
+                var s = String(t || '').toUpperCase(), m = /CEREAL=([A-Z0-9]{6})(?![A-Z0-9])/.exec(s) || /(?:^|[^A-Z0-9])([A-Z0-9]{6})(?![A-Z0-9])/.exec(s);
+                if (!m) { fail(); return null; }
+                st.code = m[1]; st.err = ''; rerender(); return m[1];
+            }, function () { fail(); return null; });
         },
         copy: function () { var g = C().get(); try { navigator.clipboard.writeText(g.online.code); } catch (_) { /* old webview */ } var b = document.getElementById('ck-on-copy'); if (b) b.textContent = '📋 คัดลอกแล้ว'; },
         cancel: function () { var g = C().get(); return act({ action: 'cancel', gameId: g.online.id }, function () { leave(); C().set(null); }); },

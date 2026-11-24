@@ -95,7 +95,8 @@ const until = (page, fn, arg, msg) => page.waitForFunction(fn, arg, { timeout: 5
         await until(D.page, () => !!document.getElementById('ck-on-code'), null, 'online tab (detective)');
         // V101.339 lobby pick C: one row ＋ สร้างห้อง + 🔑 [code] ▸, no empty-state line, no credit line, typed in place (Enter joins)
         assert.deepEqual(await D.page.evaluate(() => [...document.querySelectorAll('#cerealModal .ck-onrow > *')].map(e => e.id || e.className)), ['ck-on-new', 'ck-name ck-code'], 'lobby: one row');
-        assert.ok(!/ยังไม่มีเกม|Julián|เลือกบทบาท|พิมพ์รหัส 6/.test(await D.page.evaluate(() => document.getElementById('cerealModal').innerText)), 'no repeated lines, no credit line');
+        // V101.352: the owner reversed 'no empty-state line' (pick C, mockup-cereal-lobby-ux/) — cereal-lobby-ux-qa checks that line
+        assert.ok(!/Julián|เลือกบทบาท|พิมพ์รหัส 6/.test(await D.page.evaluate(() => document.getElementById('cerealModal').innerText)), 'no repeated lines, no credit line');
         await D.page.fill('#ck-on-code', code.toLowerCase()); await D.page.press('#ck-on-code', 'Enter');
         await until(D.page, () => !!document.getElementById('ck-on-wait'), null, 'detective waits for the killer');
         assert.ok((await txt(D.page, '#ck-on-wait')).includes('ตา Pond'), 'waiting card names the killer');

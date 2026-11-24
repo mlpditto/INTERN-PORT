@@ -219,15 +219,24 @@
         var games = store.games.filter(function (x) { return x.status === 'playing' || x.status === 'finished'; });
         if (games.length) {
             h += '<div class="ck-nb"><div class="lbl">🎮 ' + games.length + '</div>';   // V101.344: the tab already says เครื่องนี้
+            var cur = games.filter(function (x) { return x.status === 'playing'; })[0];
             games.forEach(function (x) {
                 var fin = x.status === 'finished', res = fin ? (x.result.winner === 'good' ? '🕵️ 🏆 D' : '🔪 🏆 D') + x.result.day : '';
-                h += '<button type="button" class="ck-game" onclick="CK.resume(\'' + esc(x.id) + '\')"><span class="d">' + (fin ? '🏁' : 'D' + x.day) + '</span><span class="who">🔪 ' + esc(x.names.killer) + ' <small>vs</small> 🕵️ ' + esc(x.names.detective) + (x.lola ? ' · 🐕 ' + esc(x.names.lola) : '') + '</span>'
+                h += '<button type="button" class="ck-game ' + rowBar(x) + (x === cur ? ' cur' : '') + '" onclick="CK.resume(\'' + esc(x.id) + '\')"><span class="d">' + (fin ? '🏁' : 'D' + x.day) + '</span><span class="who">🔪 ' + esc(x.names.killer) + ' <small>vs</small> 🕵️ ' + esc(x.names.detective) + (x.lola ? ' · 🐕 ' + esc(x.names.lola) : '') + '</span>'
                     + '<span class="ck-pill">' + (fin ? res : '🥣 ' + x.kills + '/6 · 🛡️ ' + x.arrestsLeft) + '</span><span class="go">' + (fin ? '↺' : '▸') + '</span></button>';
             });
             h += '</div>';
-        }
+        } else h += '<div class="ck-empty" id="ck-empty">🎮 ยังไม่มีเกม · เลือกบท แล้ว ▸ เริ่ม</div>';
         h += '</div>';
         return h;
+    }
+    /* V101.352 (owner pick B, mockup-cereal-lobby-ux/): a thin bar on the left of each game row. Not finished = grey; vs 🤖 with
+       2 players = did I win (green / red); a friend game (or 3 players, mixed sides) = the winner's colour (🔪 red / 🕵️ violet). */
+    function rowBar(x) {
+        if (x.status !== 'finished') return 'r-p';
+        var evil = x.result.winner !== 'good';
+        if (x.bot && !x.lola) return (x.bot.seat === 'killer') !== evil ? 'r-w' : 'r-l';
+        return evil ? 'r-k' : 'r-d';
     }
 
     // ---- hand-off -----------------------------------------------------------------------------------------
