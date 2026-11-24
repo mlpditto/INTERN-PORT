@@ -181,5 +181,14 @@
     return out;
   }
 
-  return { sus: sus, consensus: consensus, wolfScore: wolfScore, wolfVotes: wolfVotes, seerPick: seerPick, guardPick: guardPick, witchPick: witchPick, talk: talk, votes: votes, hash: hash };
+  /** V101.358 (owner pick D on 🌕): why the wolves want t, in a few words — what the day showed (a 🔮 claim, a finger at a wolf,
+   *  the table trusting t). null = nothing to say (a first-night guess). */
+  function wolfWhy(g, t) {
+    if (g.claims.some(function (c) { return c.by === t && c.wolf && role(g, c.t) === 'wolf'; })) return 'ชี้ตัว 🐺';   // named one of us
+    if (g.claims.some(function (c) { return c.by === t; })) return 'อ้างเป็น 🔮';
+    if (g.said.some(function (x) { return x.by === t && x.k === 'sus' && role(g, x.t) === 'wolf'; })) return 'สงสัย 🐺';
+    var con = consensus(g); if ((con[t] || 0) <= -1.5) return 'คนไว้ใจเยอะ';
+    return null;
+  }
+  return { sus: sus, consensus: consensus, wolfScore: wolfScore, wolfVotes: wolfVotes, wolfWhy: wolfWhy, seerPick: seerPick, guardPick: guardPick, witchPick: witchPick, talk: talk, votes: votes, hash: hash };
 });

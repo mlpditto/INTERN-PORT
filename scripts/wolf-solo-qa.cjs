@@ -178,6 +178,33 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
       break;
     }
   }
+  // V101.358 (owner pick A + D on 🌕): a 🐺 player sees the bot mates' wish as a tag on the seat; 🌕 adds why + how many; the bite stays yours
+  for (const level of [2, 3]) {
+    for (let s = 700; s < 900; s++) {
+      const ok = await page.evaluate(([s, level]) => { let a = s * 19; WW._rng(() => { a = (a * 1103515245 + 12345) % 2147483648; return a / 2147483648; }); WW.set('n', 9); WW.set('level', level); WW.start(); const g = WW._game(); return g.st.roles.p1 === 'wolf'; }, [s, level]);
+      if (!ok) { await page.evaluate(() => WW.back()); continue; }
+      const r = await page.evaluate(() => {
+        const g = WW._game();
+        if (g.level === 3) { const v = g.ids.filter((id) => g.st.roles[id] !== 'wolf'); g.claims.push({ by: v[0], day: 1, t: v[1], wolf: false }); }   // a 🔮 claim to give 🌕 a reason
+        WW.night();
+        const mates = g.draft.mates || {}, want = {}; Object.keys(mates).forEach((m) => { (want[mates[m]] = want[mates[m]] || []).push(g.names[m]); });
+        const seatsOut = Object.keys(want).map((t) => { const s = document.querySelector('#wolfModal .ww-seat[data-id="' + t + '"]'); return { t, names: want[t], tag: (s.querySelector('.ww-want') || {}).textContent || '', why: (s.querySelector('.ww-why') || {}).textContent || '', count: (s.querySelector('.ww-wc') || {}).textContent || '', exp: window.WolfAI.wolfWhy(g, t) || '' }; });
+        const other = g.ids.find((id) => id !== 'p1' && g.st.roles[id] !== 'wolf' && !want[id]);
+        WW.tap(other);
+        return { pill: document.querySelector('#wolfModal .ww-pill').textContent, seatsOut, tags: document.querySelectorAll('#wolfModal .ww-want').length, bite: g.draft.bite === other, level: g.level };
+      });
+      assert.match(r.pill, /เพื่อนเลือกแล้ว/, 'the pill says the mates chose');
+      assert.ok(r.seatsOut.length >= 1 && r.tags === r.seatsOut.length, 'one tag per wanted seat: ' + JSON.stringify(r));
+      for (const x of r.seatsOut) {
+        assert.ok(x.names.every((n) => x.tag.includes(n)), 'the tag names the mates');
+        if (level === 2) { assert.equal(x.tag, '🐺 ' + x.names.join(' · '), 'just the names (fits the seat)'); assert.equal(x.why, ''); assert.equal(x.count, '', 'no why / count below 🌕'); }
+        else { if (x.names.length > 1) assert.equal(x.count, String(x.names.length), '🌕: how many agree'); assert.equal(x.why, x.exp, '🌕: the shown reason is the bot\'s own'); }
+      }
+      assert.ok(r.bite, 'tapping another seat = your bite (the mates only suggest)');
+      await page.evaluate(() => WW.back());
+      break;
+    }
+  }
   // V101.356: a 🔮 who has checked everyone alive can still end the night (the button used to stay disabled for good)
   for (let s = 500; s < 640; s++) {
     const seer = await page.evaluate((s) => { let a = s * 11; WW._rng(() => { a = (a * 1103515245 + 12345) % 2147483648; return a / 2147483648; }); WW.set('n', 5); WW.start(); return WW._game().st.roles.p1 === 'seer'; }, s);
