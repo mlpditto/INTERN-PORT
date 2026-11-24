@@ -20,13 +20,13 @@
         ko: { sound: '탭하면 소리', read: '위로 밀어 읽기', skip: '기사 읽기', rx: '약사', q: '질문' }
     };
     var T = {
-        en: { source: 'Source', kicker: 'Article', min: 'min', more: 'Read more', less: 'Show less', got: 'Got it', save: 'Save', saved: 'Saved', mute: 'Don’t pop up articles', hist: 'All articles in History', rerun: 'For new interns', close: 'Close',
+        en: { copy: 'Copy the article', source: 'Source', kicker: 'Article', min: 'min', more: 'Read more', less: 'Show less', got: 'Got it', save: 'Save', saved: 'Saved', mute: 'Don’t pop up articles', hist: 'All articles in History', rerun: 'For new interns', close: 'Close',
             read: 'Read', anyq: 'Any Q?', askSub: 'Goes to the article’s author · your name is not shown', ask: 'A question', wrong: 'Wrong / out of date', add: 'Please add',
             phAsk: 'What would you like to ask?', phWrong: 'Which part looks wrong or out of date?', phAdd: 'What should the article add?', hint: 'Replies show up in History', send: 'Send', sending: 'Sending…', fail: 'Could not send — your text is kept. Try again.' },
-        th: { source: 'ที่มา', kicker: 'บทความ', min: 'นาที', more: 'อ่านต่อ', less: 'ย่อ', got: 'รับทราบ', save: 'เก็บไว้', saved: 'เก็บแล้ว', mute: 'ไม่ต้องเด้งบทความ', hist: 'บทความทั้งหมด ใน History', rerun: 'สำหรับน้องใหม่', close: 'ปิด',
+        th: { copy: 'คัดลอกบทความ', source: 'ที่มา', kicker: 'บทความ', min: 'นาที', more: 'อ่านต่อ', less: 'ย่อ', got: 'รับทราบ', save: 'เก็บไว้', saved: 'เก็บแล้ว', mute: 'ไม่ต้องเด้งบทความ', hist: 'บทความทั้งหมด ใน History', rerun: 'สำหรับน้องใหม่', close: 'ปิด',
             read: 'อ่านแล้ว', anyq: 'Any Q?', askSub: 'ส่งถึงผู้เขียนบทความ · ไม่แสดงชื่อคุณ', ask: 'สงสัย', wrong: 'ข้อมูลผิด/ล้าสมัย', add: 'อยากให้เพิ่ม',
             phAsk: 'อยากถามอะไร?', phWrong: 'ส่วนไหนดูผิดหรือล้าสมัย?', phAdd: 'อยากให้บทความเพิ่มเรื่องอะไร?', hint: 'ตอบกลับดูได้ใน History', send: 'ส่ง', sending: 'กำลังส่ง…', fail: 'ส่งไม่สำเร็จ ข้อความยังอยู่ ลองอีกครั้ง' },
-        ko: { source: '출처', kicker: '아티클', min: '분', more: '더 보기', less: '접기', got: '확인', save: '저장', saved: '저장됨', mute: '아티클 팝업 끄기', hist: 'History의 모든 아티클', rerun: '신규 인턴용', close: '닫기',
+        ko: { copy: '기사 복사', source: '출처', kicker: '아티클', min: '분', more: '더 보기', less: '접기', got: '확인', save: '저장', saved: '저장됨', mute: '아티클 팝업 끄기', hist: 'History의 모든 아티클', rerun: '신규 인턴용', close: '닫기',
             read: '읽음', anyq: 'Any Q?', askSub: '글쓴이에게 전달 · 이름은 표시되지 않아요', ask: '질문', wrong: '틀림/오래됨', add: '추가 요청',
             phAsk: '무엇이 궁금한가요?', phWrong: '어느 부분이 틀리거나 오래되었나요?', phAdd: '어떤 내용을 더하면 좋을까요?', hint: '답변은 History에서 볼 수 있어요', send: '보내기', sending: '보내는 중…', fail: '보내지 못했어요. 글은 남아 있어요. 다시 시도하세요.' }
     };
@@ -217,7 +217,7 @@
             '#art-sheet .aq-e{margin:8px 0 0;font:600 12.5px/1.4 Kanit,sans-serif;color:#b91c1c}#art-sheet .aq-e:empty{display:none}' +
             '@media (prefers-reduced-motion: reduce){#art-sheet .anyq{animation:none}}' +
             // V101.306 🌞 Ask Nika about this article
-            '#art-sheet .bm.nkb{background:linear-gradient(135deg,#fff7ed,#fde68a)}#art-sheet .bm.nkb[aria-pressed="true"]{box-shadow:inset 0 0 0 2px #f59e0b}' +
+            '#art-sheet .bm.cpb.ok{background:#16a34a;color:#fff}#art-sheet .bm.nkb{background:linear-gradient(135deg,#fff7ed,#fde68a)}#art-sheet .bm.nkb[aria-pressed="true"]{box-shadow:inset 0 0 0 2px #f59e0b}' +
             '#art-sheet .art-nk{margin:4px 0 8px;padding:10px 0 0;border-top:1.5px dashed #fcd34d}#art-sheet .nk-c{display:flex;flex-wrap:wrap;gap:6px}' +
             '#art-sheet .nk-c button{min-height:0;margin:0;width:auto;border:1px solid #fcd34d;background:#fffbeb;color:#92400e;font:700 12.5px/1 Kanit,sans-serif;padding:8px 11px;border-radius:999px;cursor:pointer}' +
             '#art-sheet .nk-c button[aria-pressed="true"]{background:#f59e0b;border-color:#f59e0b;color:#fff}#art-sheet .nk-c button:disabled{opacity:.6;cursor:default}' +
@@ -225,7 +225,7 @@
             '#art-sheet .nk-i button{width:auto;min-height:0;margin:0;border:0;border-radius:12px;background:#4361ee;color:#fff;padding:0 14px;font:800 13px/1 Kanit,sans-serif;cursor:pointer}' +
             '#art-sheet .nk-a{font:400 13.5px/1.55 Kanit,sans-serif;color:#334155;margin-top:8px}#art-sheet .nk-a ul{margin:0;padding-left:18px}#art-sheet .nk-a p{margin:0 0 4px}' +
             '#art-sheet .nk-w,#art-sheet .nk-n{margin:8px 0 0;font:600 13px/1.4 Kanit,sans-serif;color:#64748b}#art-sheet .nk-l{margin:6px 0 0;text-align:right;font:400 11.5px/1 Kanit,sans-serif;color:#94a3b8}' +
-            '@media (max-width:400px){#art-sheet .foot{gap:4px}#art-sheet .bm{width:32px}#art-sheet .more{padding:12px 0}#art-sheet .ok{padding:0 12px}}' +
+            '@media (max-width:400px){#art-sheet .foot{gap:4px}#art-sheet .bm{width:32px}#art-sheet .more{padding:12px 0}#art-sheet .ok{padding:0 12px}}@media (max-width:400px){#art-sheet .foot{gap:3px}#art-sheet .bm{width:27px}#art-sheet .ok{padding:0 10px}}' +   // V101.354: room for 📋 at 360 px
 
             '.art-hist .art-md{font-size:13.5px;line-height:1.55}.art-hist .art-md p{margin:0 0 6px}.art-hist .art-md.art-clamp{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:6;overflow:hidden}' +
             '.art-hist .art-more-h{display:inline-block;width:auto;min-height:0;margin:2px 0 6px;padding:2px 0;border:0;background:none;box-shadow:none;color:#4361ee;font:700 13px/1 Kanit,sans-serif;cursor:pointer}.art-hist .art-more-h[hidden]{display:none}' +
@@ -447,6 +447,7 @@
             '<div class="foot"><button type="button" class="bm" onclick="internArticles.save()" aria-pressed="' + saved + '" title="' + (saved ? t.saved : t.save) + '" aria-label="' + (saved ? t.saved : t.save) + '">🔖</button>' +
             '<button type="button" class="bm mute" onclick="internArticles.mute()" title="' + t.mute + '" aria-label="' + t.mute + '">🔕</button>' +
             (S.got ? '' : histBtn(t)) +   // V101.269: not in the 7 s ✓ Read · 💬 moment (the sheet closes itself; that row is full)
+            '<button type="button" class="bm cpb" onclick="internArticles.copy(' + esc(JSON.stringify(a.id)) + ',this,\'' + tx.lang + '\')" title="' + t.copy + '" aria-label="' + t.copy + '">📋</button>' +   // V101.354 (owner): 📋 left of 🌞 copies this article as shown
             '<button type="button" class="bm nkb" onclick="internArticles.nika()" aria-pressed="' + !!S.nk + '" title="' + esc((NKT[S.lang] || NKT.en).nk) + '" aria-label="' + esc((NKT[S.lang] || NKT.en).nk) + '">🌞</button>' +
             '<button type="button" class="more" id="art-more" onclick="internArticles.toggleMore()">' + (S.more ? t.less + ' ▴' : t.more + ' ▾') + '</button>' +
             (S.got ? '<span class="rd">✓ ' + t.read + '</span><button type="button" class="anyq" onclick="internArticles.anyQ()">💬 ' + t.anyq + '</button>'
@@ -704,14 +705,14 @@
         var cp = '<button type="button" class="cp" aria-label="Copy the article" title="Copy" data-th-title="คัดลอก" onclick="internArticles.copy(' + id + ',this)">📋</button>';
         return '<span class="art-sh"><i>·</i>📤 ' + b('line', 'ln', 'LINE', 'LINE') + cp + (srcUrl(a) ? b('fb', 'fb', 'Facebook', 'f') : '') + '</span>';
     }
-    function copyAllText(a) {
-        var tx = textOf(a, S.cl), u = srcUrl(a);
-        var body = String(tx.body || '').split('\n').map(function (l) { return l.replace(/[*_#>`]/g, '').replace(/\s+$/, ''); }).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    function copyAllText(a, lang) {
+        var tx = textOf(a, lang || S.cl), u = srcUrl(a);
+        var body = String(tx.body || '').split('\n').map(function (l) { return l.replace(/^\s*(#+|>)\s*/, '').replace(/[*_#>`]/g, '').replace(/\s+$/, ''); }).join('\n').replace(/\n{3,}/g, '\n\n').trim();
         return tx.title + (body ? '\n\n' + body : '') + (u ? '\n\n' + u : '');
     }
-    function copy(id, btn) {
-        var a = find(id); if (!a) return Promise.resolve(false);
-        var text = copyAllText(a);
+    function copy(id, btn, lang) {
+        var a = find(id) || (S.cur && S.cur.a && S.cur.a.id === id ? S.cur.a : null); if (!a) return Promise.resolve(false);   // V101.354: the open sheet's article
+        var text = copyAllText(a, lang);
         var done = function (ok) {
             if (ok && btn) { btn.textContent = '✓'; btn.classList.add('ok'); setTimeout(function () { btn.textContent = '📋'; btn.classList.remove('ok'); }, 1500); }
             return ok;
