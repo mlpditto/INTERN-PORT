@@ -48,7 +48,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         // 1. Thai sheet: 🌞 sits in the footer after 🔕; the footer still fits at 360 px
         const foot = await page.evaluate(() => { const f = document.querySelector('#art-sheet .foot'), r = f.getBoundingClientRect();
             return { btns: [...f.querySelectorAll('button')].map(b => b.textContent.trim().slice(0, 2)), fits: [...f.children].every(x => x.getBoundingClientRect().right <= r.right + 1), w: [...f.children].map(x => Math.round(x.getBoundingClientRect().width)), fw: Math.round(r.width), scroll: f.scrollWidth <= f.clientWidth + 1, title: f.querySelector('.nkb').title }; });
-        assert.equal(foot.btns[3], '🌞', '🌞 after 🔖 🔕 📰: ' + foot.btns);
+        assert.equal(foot.btns[4], '🌞', '🌞 after 🔖 🔕 📰 📋 (V101.354): ' + foot.btns);
         assert.ok(foot.fits && foot.scroll, 'the footer fits a 360 px phone: ' + JSON.stringify(foot));
         assert.equal(foot.title, 'ถาม Nika เรื่องบทความนี้');
         let s = await st(); assert.deepEqual([s.on, s.strip], ['false', false], 'closed at first');
