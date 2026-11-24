@@ -179,25 +179,48 @@
     function editorEmail() {
         try { var u = (window.adminApp && window.adminApp.auth().currentUser) || (firebase.auth && firebase.auth().currentUser); return (u && typeof u.email === 'string') ? u.email : ''; } catch (e) { return ''; }
     }
-    function save(schedule) {
+    function save(schedule, quiet) {
         var a = S.cur; if (!a || S.saving) return Promise.resolve();
         var st = schedule ? 'scheduled' : 'draft', err = validate(a, schedule);
-        if (err) { S.err = err; render(); return Promise.resolve(); }
+        if (err) { if (quiet) return Promise.resolve(); S.err = err; render(); return Promise.resolve(); }
         var doc = toDoc(a, st), ts = firebase.firestore.FieldValue.serverTimestamp();
         if (a.id && !doc.clip && S.clipWas === a.id) doc.clip = firebase.firestore.FieldValue.delete();   // V102.625: the clip it had is gone (every line removed)
         doc.updatedAt = ts; doc.updatedBy = editorEmail();
-        S.saving = true; S.err = ''; render();
-        var p = a.id ? db.collection('articles').doc(a.id).update(doc) : (doc.createdAt = ts, doc.createdBy = doc.updatedBy, db.collection('articles').add(doc));
+        S.saving = true; S.autoErr = ''; if (quiet) paintBar(); else { S.err = ''; render(); }
+        var p; try { p = a.id ? db.collection('articles').doc(a.id).update(doc) : (doc.createdAt = ts, doc.createdBy = doc.updatedBy, db.collection('articles').add(doc)); } catch (e) { p = Promise.reject(e); }   // V102.701: an auto-save from close() must not throw
         return p.then(function (ref) {
             if (!a.id && ref) a.id = ref.id;
-            a.status = st; S.clipWas = clipOf(a.clip) ? a.id : ''; S.base = JSON.stringify(a); S.savedAt = Date.now(); S.savedVia = schedule ? 'p' : 's';   // V102.474: the pressed button turns green until the next edit
+            a.status = st;
+            if (S.cur === a) { S.clipWas = clipOf(a.clip) ? a.id : ''; S.base = JSON.stringify(a); S.savedAt = Date.now(); S.savedVia = quiet ? 'a' : schedule ? 'p' : 's'; }   // V102.474: the pressed button turns green until the next edit · V102.701: 'a' = auto-saved (no button turns green); another article opened meanwhile keeps its own state
             var i = S.list.findIndex(function (x) { return x.id === a.id; });
             var copy = fromDoc(a.id, Object.assign({}, doc, { startAt: a.startAt, endAt: a.endAt, dx: a.dx, dc: a.dc }));
             if (i >= 0) S.list[i] = copy; else S.list.push(copy);
-            if (typeof showToast === 'function') showToast(schedule ? '📅 Scheduled' : '💾 Saved as draft');
-            if (!S.hintOff[a.id]) loadDz().then(function () { if (S.cur === a) { S.hint = findHint(a); if (S.hint) render(); } });   // V102.374: "… is in the Disease Codex — link it?"
-        }).catch(function (e) { S.err = (e && e.message) || 'Save failed.'; }).then(function () { S.saving = false; render(); });
+            if (!quiet && typeof showToast === 'function') showToast(schedule ? '📅 Scheduled' : '💾 Saved as draft');
+            if (!quiet && !S.hintOff[a.id]) loadDz().then(function () { if (S.cur === a) { S.hint = findHint(a); if (S.hint) render(); } });   // V102.374: "… is in the Disease Codex — link it?"
+        }).catch(function (e) { if (quiet) S.autoErr = 'x'; else S.err = (e && e.message) || 'Save failed.'; }).then(function () { S.saving = false; if (quiet) { paintBar(); armAuto(); } else render(); });
     }
+    /* V102.701 (owner 2026-11-24 "ปรับให้ auto save"): a DRAFT saves itself 2 s after the last edit — as a draft, never scheduled,
+       so nothing reaches interns by itself. A scheduled / live article keeps 💾 Save by hand: an edit to something interns can
+       already see should be a choice. Not saved while the draft has no title or is over the length limit (the bar says why). */
+    var AUTO_MS = 2000;
+    function autoOk(a) { return !!a && a.status === 'draft'; }
+    function armAuto() {
+        clearTimeout(S.autoT); S.autoT = null;
+        var a = S.cur; if (!autoOk(a) || JSON.stringify(a) === S.base) return;
+        S.autoT = setTimeout(function () {
+            S.autoT = null;
+            var b = S.cur; if (b !== a || !autoOk(b) || JSON.stringify(b) === S.base) return;
+            if (S.saving) { armAuto(); return; }
+            save(false, true);
+        }, AUTO_MS);
+    }
+    /* Save a dirty draft now (before ✨ the next episode, ＋ New, opening another article, or closing). */
+    function flushAuto() {
+        clearTimeout(S.autoT); S.autoT = null;
+        var a = S.cur; if (!autoOk(a) || JSON.stringify(a) === S.base || validate(a, false)) return Promise.resolve();
+        return save(false, true);
+    }
+    function paintBar() { var a = S.cur; if (!a) return; var sl = document.getElementById('art-stl'); if (sl) sl.outerHTML = statusLine(a, Date.now()); var bt = document.getElementById('art-btns'); if (bt) bt.outerHTML = btnsHtml(a); }
     // V102.374 (owner's pick 4): after Save, if the article's title or body names a published disease (name, Thai name or a synonym of
     // 4+ characters) and the article is not linked to or drafted into the Disease Codex yet, a banner offers the link — no AI, no click
     // needed to find it. "Not this one" is remembered for the session.
@@ -492,7 +515,11 @@
         var st = status(a, now), dirty = JSON.stringify(a) !== S.base;
         var msg = { draft: 'Not live yet', scheduled: 'Goes live ' + dateLong(a.startAt), live: 'Showing now · ends ' + dateLong(a.endAt), ended: 'Ended ' + dateLong(a.endAt) + (a.rerun === 'off' ? '' : ' · 🔁 still reaches new interns') }[st];
         var mins = S.savedAt ? Math.max(0, Math.round((now - S.savedAt) / 60000)) : -1;
-        var save = dirty ? '<span class="art-save dirty">● Unsaved</span>' : mins >= 0 ? '<span class="art-save">Saved' + (mins ? ' · ' + agoText(mins) : '') + '</span>' : '';
+        var auto = autoOk(a), why = auto && dirty ? validate(a, false) : '';
+        var save = auto && S.saving ? '<span class="art-save">⏳ Saving…</span>'
+            : auto && S.autoErr && dirty ? '<span class="art-save dirty">⚠️ Not saved · tap Save draft</span>'
+            : auto && dirty ? '<span class="art-save' + (why ? ' dirty' : '') + '">' + (why ? '● ' + esc(why) : '● Unsaved · ⏳ auto-saves') + '</span>'
+            : dirty ? '<span class="art-save dirty">● Unsaved</span>' : mins >= 0 ? '<span class="art-save">Saved' + (mins ? ' · ' + agoText(mins) : '') + '</span>' : '';
         return '<div class="art-stl" id="art-stl"><span class="art-st ' + st + '">' + { draft: 'Draft', scheduled: 'Scheduled', live: 'Live', ended: 'Ended' }[st] + '</span><span>' + msg + '</span>' + save + '</div>';
     }
     // V102.474: Save turns green ("✓ Saved") once it has gone through and stays green until the next edit; the pressed button is the one that turns
@@ -1207,6 +1234,7 @@
     }
     function render() {
         var host = document.getElementById('art-body'); if (!host) return;
+        if (S.cur && !S.saving) armAuto();   // V102.701: chips, dates, audience… every edit ends in render()
         var now = Date.now(), counts = { all: 0 };
         S.list.forEach(function (a) { if (S.tag && (a.tags || []).indexOf(S.tag) < 0) return; counts.all++; var st = status(a, now); counts[st] = (counts[st] || 0) + 1; });   // V102.382: counts follow the tag filter
         var list = sorted(now);
@@ -1243,6 +1271,7 @@
         var w = document.getElementById('art-warn'); if (w) { var mm = mismatch(a, S.lang), NAME = { en: 'English', th: 'Thai', ko: 'Korean' }; w.innerHTML = mm ? '<div class="art-warn" role="status">⚠️ This looks like ' + NAME[mm] + ', not ' + NAME[S.lang] + (((a.title || {})[mm] || (a.body || {})[mm]) ? '' : '<button type="button" onclick="Articles.moveLang(\'' + S.lang + '\',\'' + mm + '\')">Move to ' + mm.toUpperCase() + '</button>') + '</div>' : ''; }
         var dots = document.querySelectorAll('#art-body .art-ed > .art-ln:nth-child(2) i.d'), have = langsOf(a);
         LANGS.forEach(function (l, i) { if (dots[i]) dots[i].className = 'd' + (have.indexOf(l[0]) >= 0 ? ' ok' : ''); });
+        armAuto();
     }
 
     // ---- actions
@@ -1252,8 +1281,9 @@
         render();
         if (!S.loaded) load();
     }
-    function close() { clipStopNow(); var m = document.getElementById('articlesModal'); if (m) { m.style.display = 'none'; m.style.removeProperty('z-index'); } S.pick = ''; S.del = false; }
+    function close() { flushAuto(); clipStopNow(); var m = document.getElementById('articlesModal'); if (m) { m.style.display = 'none'; m.style.removeProperty('z-index'); } S.pick = ''; S.del = false; }
     function edit(id) {
+        flushAuto();
         var a = id ? S.list.find(function (x) { return x.id === id; }) : null;
         S.cur = a ? fromDoc(a.id, Object.assign({}, a)) : blank(Date.now());
         S.imgs = []; S.paste = null; S.tagOpen = false; S.linksShow = false; S.prevOpen = false; S.prevQ = ''; S.recapBusy = false; clipStopNow(); S.clipErr = ''; S.clipWas = S.cur.id && clipOf(S.cur.clip) ? S.cur.id : ''; S.lang = 'en'; S.err = ''; S.del = false; S.pick = ''; S.base = JSON.stringify(S.cur); S.savedAt = 0; S.hint = null; S.titleSug = null; S.hintOff = S.hintOff || {}; S.open = secOpen(); S.who = false; S.whoF = 'all'; S.qs = false; S.qsF = 'open'; S.qErr = ''; S.qAiErr = ''; S.aiNote = ''; S.modelOpen = false; S.pvMore = false;
@@ -1375,6 +1405,7 @@
         // V102.511: ✨ Episode n+1 — the saved episode stays; a NEW article (same cover / audience / tags / pictures, title "… (n+1)") is drafted from the same source
         episode: function () {
             var a = S.cur, src = epSrcOf(a); if (!a || S.aiBusy || !src) return Promise.resolve();
+            if (autoOk(a) && (!a.id || JSON.stringify(a) !== S.base) && !validate(a, false)) return save(false, true).then(function () { if (S.cur !== a) return null; if (a.id && JSON.stringify(a) === S.base) return api.episode(); S.err = '✨ Save this episode first (💾 or 📅), then start the next one.'; render(); return null; });   // V102.701: a draft saves itself, then goes on (if that fails, the old note)
             if (!a.id || JSON.stringify(a) !== S.base) { S.err = '✨ Save this episode first (💾 or 📅), then start the next one.'; render(); return Promise.resolve(); }
             var L = src.L, n = src.n + 1, base = String(a.title[L] || a.title.en || '').replace(/\s*\(\d+\)\s*$/, '').trim();
             var imgs = imgList(a).map(function (m) { return Object.assign({}, m); }), prevBody = String(a.body[L] || '');
