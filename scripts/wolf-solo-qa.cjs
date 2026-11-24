@@ -13,7 +13,7 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
 
 (async () => {
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true, reducedMotion: 'no-preference' });   // V101.357: motion on, so the card flip-in is checked (wolf-tutorial-qa checks reduce = none)
   const page = await ctx.newPage();
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
   await page.addInitScript(() => {
@@ -78,6 +78,12 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
     const card = await page.$eval('#wolfModal .ww-card', (c) => c.textContent);
     assert.match(card, /มนุษย์หมาป่า|ผู้หยั่งรู้|บอดี้การ์ด|แม่มด|ชาวบ้าน/);
     if (my === 'wolf' && n >= 7) { assert.match(card, /เพื่อน:/, 'a wolf sees its mates'); seen.mates++; }
+    const cardInfo = await page.evaluate(() => { const c = document.getElementById('ww-card'); return { cls: c.className, sp: !!c.querySelector('.sp'), me: (document.querySelector('#ww-cnt span.me') || {}).textContent || '', vil: !!document.getElementById('ww-vil'), border: getComputedStyle(c).borderTopColor, anim: getComputedStyle(c).animationName }; });
+    assert.ok(cardInfo.cls.includes('r-' + my) && cardInfo.cls.includes('flip'), 'V101.357 pick A: the card carries its role colour and turns in: ' + cardInfo.cls);
+    assert.equal(cardInfo.sp, my !== 'villager', '✨ บทพิเศษ above a power role only'); assert.equal(cardInfo.vil, my === 'villager', 'the villager line for villagers only');
+    assert.match(cardInfo.me, { wolf: /หมาป่า/, seer: /ผู้หยั่งรู้/, guard: /การ์ด/, witch: /แม่มด/, villager: /ชาวบ้าน/ }[my], 'your role is framed in the icon row');
+    assert.equal(cardInfo.border, { wolf: 'rgb(190, 18, 60)', seer: 'rgb(124, 58, 237)', guard: 'rgb(37, 99, 235)', witch: 'rgb(22, 163, 74)', villager: 'rgb(180, 83, 9)' }[my], 'role colour: ' + my);
+    assert.equal(cardInfo.anim, 'ww-flip', 'the flip-in runs (motion allowed)');
     assert.equal(await page.textContent('#ww-goal'), my === 'wolf' ? '🏆 ชนะเมื่อ 🐺 เท่ากับคนที่เหลือ' : '🏆 ชนะเมื่อ 🐺 ออกครบ', 'V101.355: the side\'s goal on the card');
     await page.click('#ww-go');
     for (let step = 0; step < 60; step++) {
@@ -99,6 +105,7 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
       if (ph === 'day') {
         if (!seen.peek && await page.$('#ww-me')) {   // V101.355: tap 👤 คุณ = the role card again, ↩ back to the same day
           await page.click('#ww-me'); assert.equal(await page.textContent('#ww-goal') !== '', true); assert.ok(await page.$('#ww-peek-back'));
+          assert.equal(await page.$eval('#ww-card', (c) => c.classList.contains('flip')), false, 'the peek does not turn the card again');
           await page.click('#ww-peek-back'); assert.ok(await page.$('#ww-to-vote'), 'back on the day'); seen.peek = 1;
         }
         const tags = await page.evaluate(() => { const g = WW._game(); return g.ids.filter((id) => id !== 'p1' && g.st.alive[id]).map((id) => [!!g.tags[id], !!document.querySelector('#wolfModal .ww-seat[data-id="' + id + '"] .tag')]); });

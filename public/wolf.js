@@ -219,12 +219,15 @@
     function roleHtml(peek) {
         var r = myRole(), mates = r === 'wolf' ? g.ids.filter(function (id) { return id !== g.me && g.st.roles[id] === 'wolf'; }) : [];
         var c = W.defaultCounts(g.n);
-        return '<div class="ww' + (r === 'wolf' ? ' wolf' : '') + '">' + top('🎭 บทของคุณ')
-            + '<div class="ww-card"><div class="big">' + E[r] + '</div><h4>' + RNAME[r] + '</h4><p>' + RHOW[r] + '</p>'
+        // V101.357 (owner pick A + flip-in, mockup-werewolf-card/): a colour per role (🐺 red · 🔮 violet · 🛡️ blue · 🧪 green · 👤 amber), ✨ บทพิเศษ
+        // above a power role, the deck as an icon row with your role framed, a villager line, more air; the card turns in once (not on 👤 คุณ peek)
+        var rs = W.ROLES.filter(function (x) { return c[x]; });
+        return '<div class="ww ww-rolepg' + (r === 'wolf' ? ' wolf' : '') + '">' + top('🎭 บทของคุณ')
+            + '<div class="ww-card r-' + r + (peek ? '' : ' flip') + '" id="ww-card">' + (r === 'villager' ? '' : '<div class="sp">✨ บทพิเศษ</div>') + '<div class="big">' + E[r] + '</div><h4>' + RNAME[r] + '</h4><p>' + RHOW[r] + '</p>'
             + (mates.length ? '<p class="mates">🐺 เพื่อน: ' + mates.map(function (id) { return g.faces[id] + ' ' + esc(nm(id)) + (g.st.alive[id] ? '' : ' 💀'); }).join(' · ') + '</p>' : '')
             + '<span class="ww-goal" id="ww-goal">' + goal(r) + '</span></div>'
-            + '<div class="ww-note">' + W.ROLES.filter(function (x) { return c[x]; }).map(function (x) { return E[x] + ' ' + SHORT[x] + ' ' + c[x]; }).join(' · ')
-            + (peek ? '' : '<br>แตะ ' + E[r] + ' คุณ บนหัวเพื่อดูบทนี้อีกครั้ง') + '</div>'
+            + '<div class="ww-cnt r-' + r + '" id="ww-cnt" style="grid-template-columns:repeat(' + rs.length + ',minmax(0,1fr))">' + rs.map(function (x) { return '<span class="' + (x === r ? 'me' : '') + '"><i>' + E[x] + '</i>' + SHORT[x] + ' <b>' + c[x] + '</b></span>'; }).join('') + '</div>'
+            + (r === 'villager' ? '<div class="ww-vil" id="ww-vil">🌙 ชาวบ้านไม่ต้องทำอะไรตอนกลางคืน · กด 🌙 แล้วไปเช้าได้เลย</div>' : '')
             + (peek ? '<button type="button" class="ww-primary" id="ww-peek-back" onclick="WW.peek(false)">↩ กลับเกม</button>'
                 : '<button type="button" class="ww-primary" id="ww-go" onclick="WW.night()">🌙 เข้าสู่คืนแรก</button>') + '</div>';
     }

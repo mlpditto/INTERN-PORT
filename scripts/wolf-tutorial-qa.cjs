@@ -65,6 +65,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   const seed = (s) => page.evaluate((s) => { let a = s; WW._rng(() => { a = (a * 1103515245 + 12345) % 2147483648; return a / 2147483648; }); }, s);
   let role = null;
   for (let s = 3; s < 80; s++) { await seed(s); role = await page.evaluate(() => { WW.set('n', 7); WW.start(); return WW._game().st.roles.p1; }); if (role !== 'witch') break; await page.evaluate(() => WW.back()); }
+  assert.equal(await page.$eval('#ww-card', (c) => getComputedStyle(c).animationName), 'none', 'reduced motion: the card does not turn');
   await page.click('#ww-go');   // 🌙 เข้าสู่คืนแรก — a tap
   const coach = () => page.$eval('#ww-coach', (c) => [c.previousElementSibling.className, c.textContent]).catch(() => null);
   const c1 = await coach();
