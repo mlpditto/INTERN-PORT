@@ -65,6 +65,13 @@ Strong output says "I loaded the page, clicked the button, and here is the resul
   one sentence before closing.
 - Resist the first plausible explanation. Generate at least two candidate causes
   and pick between them with evidence, not vibes.
+- **Two failed fixes = stop patching.** After the second "fix" that didn't hold,
+  stop editing. Go back to the reproduction, write the check that fails *because
+  of* the bug, and only then change code. A third guess on top of two is how a
+  small bug becomes a tangled diff.
+- **One change per attempt.** Change one thing, re-run the same reproduction,
+  compare. Two changes at once means you cannot tell which one mattered, or
+  whether one of them broke something else.
 
 ## 5. Surgical scope, minimum code
 
@@ -93,6 +100,27 @@ Before finishing, reread your full diff as a hostile reviewer:
    requires it?
 
 If any answer is uncertain, resolve it now — don't ship the uncertainty.
+
+### Evidence before "done"
+
+Every "done", "fixed", "passes" or "green" in a report must point at output you
+produced **after the last edit**, from the command that proves that exact claim.
+
+- **Fresh, not remembered.** A run from before your last change, on another
+  branch, or on another SHA does not count. "QA green" means the qa.yml run for
+  the PR's current head SHA, not `gh pr checks` and not an earlier push.
+- **The right command for the claim.** "The page works" needs the page opened;
+  "the bot game ends" needs a game played to the end; a syntax check proves only
+  syntax.
+- **A check that never failed proves little.** Before trusting a new QA script,
+  see it fail once (break the code, or assert on a count that must be > 0). Watch
+  the counters it prints: `{"mates":0}` meant the wolf-mates branch was never run,
+  even though the script said OK.
+- **Run the neighbours.** Adding a button, chip or row shifts the scripts that pin
+  counts or positions (header rail, model chips). Grep `scripts/` for the area's
+  ids and run those too, before CI finds them for you.
+- If you cannot produce the evidence (needs LINE, a signed-in admin, a deploy, a
+  real Telegram group), the report says so in those words: "not tried in LINE".
 
 ## 7. Report outcomes factually
 
