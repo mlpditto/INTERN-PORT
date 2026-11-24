@@ -30,6 +30,7 @@ Walk the areas top to bottom for a broad regression: intern surfaces first, then
 - [flood-watch](flood-watch.md): Open-Meteo / canal-gauge flood alerts: the intern popup, the profile river strip, the 10 km summary, district tables and tiers in functions.
 - [cereal-killer](cereal-killer.md): The 🥣 Cereal Killer deduction game: board + engine, the pass-and-play game from Schedule ▸ 🥣 (lobby, killer / hand-off / detective turns, reveal).
 - [werewolf](werewolf.md): The 🐺 Werewolf party game — solo vs 🤖 on LIFF (V101.353); Telegram bot planned.
+- [count-game](count-game.md): 🧊 นับไว — solo Count the Rectangles + Count the Cubes, number pad, answer then the answer shows (V101.362).
 - [content-creator](content-creator.md): The social-content division: intern post form, admin content board, separate CAFE points.
 - [guides](guides.md): Markdown guides served through guide.js with chip rails, feedback boxes and built PDFs.
 - [translations](translations.md): EN / TH / KO toggle, Translate Missing, stale quiz translations, the Korean gap ratchet.
