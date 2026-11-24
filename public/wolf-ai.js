@@ -133,7 +133,7 @@
         var mine = (g.checks && g.checks[b]) || {}, told = old.map(function (x) { return x.t; });
         var fresh = Object.keys(mine).filter(function (t) { return told.indexOf(t) < 0; });
         var hit = fresh.filter(function (t) { return mine[t] && !dead(g, t); })[0];
-        var pick = hit || ((old.length || (g.level >= 2 && g.day >= 2)) ? fresh[fresh.length - 1] : null);
+        var pick = hit || ((old.length || g.level >= 2) ? fresh[fresh.length - 1] : null);   // V101.356: 🥄🥄+ claims from day 1
         if (pick) c = { by: b, day: g.day, t: pick, wolf: !!mine[pick], fake: false };
       } else if (r === 'wolf' && g.level >= 2 && (old.length || !fakedBefore)) {
         var accuser = g.claims.filter(function (x) { return x.wolf && role(g, x.t) === 'wolf' && !dead(g, x.by) && x.by !== b; })[0];
@@ -154,8 +154,11 @@
       var m = r === 'wolf' ? (function () { var o = {}; ids.forEach(function (t) { o[t] = role(g, t) === 'wolf' ? -99 : (con[t] || 0) + noise(g, b, t); }); return o; })() : sus(g, b);
       var hi = argmax(m, ids), lo = argmin(m, ids);
       // a low bar to speak (day 1 has only noise to go on), a higher one to vote (votes() needs ≥ 1)
-      if (hi && m[hi] >= 0.4) tags[b] = { k: 'sus', t: hi, soft: m[hi] < 1 };
-      else if (lo && m[lo] <= -0.4 && r !== 'wolf') tags[b] = { k: 'trust', t: lo, soft: m[lo] > -1 };
+      // V101.356 (owner's playthrough): day 1 has only noise — a bot speaks only on a strong hunch (90 % of its level's noise), so about
+      // a quarter accuse, a quarter say 👍, the rest stay quiet, instead of a wall of red 🤨
+      var bar = g.day === 1 ? (NOISE[g.level] || 1.5) * 0.9 : 0.4;
+      if (hi && m[hi] >= bar) tags[b] = { k: 'sus', t: hi, soft: m[hi] < 1 };
+      else if (lo && m[lo] <= -bar && r !== 'wolf') tags[b] = { k: 'trust', t: lo, soft: m[lo] > -1 };
       else tags[b] = { k: 'quiet' };
     });
     return { tags: tags, claims: claims };

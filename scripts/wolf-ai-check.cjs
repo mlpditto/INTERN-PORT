@@ -59,6 +59,21 @@ function play(n, level, seed) {
   throw new Error('game ' + seed + ' did not end');
 }
 
+// V101.356 (owner's playthrough): day 1 is mostly quiet / 👍, not a wall of 🤨; from 🥄🥄 the seer bot claims on day 1, a 👤 result too
+{
+  let sus = 0, said = 0, seerDay1 = 0, seerTries = 0;
+  for (let s = 1; s <= 200; s++) {
+    const rng = mulberry(s * 17 + 3), ids = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7'];
+    const g = { id: 'd1-' + s, ids, me: 'nobody', level: 2, day: 1, st: W.newState(W.deal(ids, W.defaultCounts(7), rng)), checks: {}, claims: [], said: [], votes: [] };
+    const seer = ids.find((id) => g.st.roles[id] === 'seer'), t = ids.find((id) => id !== seer && g.st.roles[id] !== 'wolf');
+    g.checks[seer] = { [t]: false };   // night 1 found a villager
+    const r = AI.talk(g);
+    Object.entries(r.tags).forEach(([b, x]) => { if (b === seer) return; said++; if (x.k === 'sus') sus++; });
+    seerTries++; if (r.claims.some((c) => c.by === seer && c.t === t && c.wolf === false && !c.fake)) seerDay1++;
+  }
+  assert.ok(sus / said < 0.4, 'day 1: fewer than 40 % of the bots accuse (' + sus + '/' + said + ')');
+  assert.equal(seerDay1, seerTries, '🥄🥄: the seer bot claims its 👤 result on day 1 every time');
+}
 const tally = {};
 let fakes = 0, trues = 0;
 for (const n of [5, 7, 9]) for (const level of [1, 2, 3]) {
