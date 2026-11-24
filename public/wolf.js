@@ -27,6 +27,9 @@
         witch: '💊 ชุบคนถูกกัด 1 ครั้ง · ☠️ วางยา 1 ครั้ง', villager: 'ไม่มีพลัง · หา 🐺 จากคำพูดแล้วโหวตออก' };
     // V101.359 (owner pick C, round3): the chosen night says what the bots do, in one line under the row (like the role tip)
     var LVTIP = { 1: 'บอทเดาเกือบสุ่ม · เหมาะเล่นครั้งแรก', 2: 'บอทจำว่าใครพูดอะไร · 🔮 เปิดตัว · 🐺 แย้งกลับ', 3: 'บอทหลอกเก่ง · 🐺 อาจอ้างเป็น 🔮' };
+    // V101.360 (owner pick B, mockup-werewolf-telegram-guide/): play with friends — the Telegram bot (no bots in the game). One row under
+    // ▸ เริ่ม; a tap opens the guide in place (▾ / ▴), a tap on the row again folds it. The bot is public (@NikaWerewolf_bot), no token here.
+    var TG_BOT = 'NikaWerewolf_bot';
     var NIGHTS = [[1, '🌆', 'หัวค่ำ', 'ง่าย'], [2, '🌙', 'เที่ยงคืน', 'กลาง'], [3, '🌕', 'คืนเดือนเพ็ญ', 'ยาก']];
     function goal(r) { return r === 'wolf' ? '🏆 ชนะเมื่อ 🐺 เท่ากับคนที่เหลือ' : '🏆 ชนะเมื่อ 🐺 ออกครบ'; }
 
@@ -208,6 +211,12 @@
         var lv = NIGHTS.filter(function (x) { return x[0] === ui.level; })[0];
         if (lv) h += '<div class="ww-lvtip" id="ww-lvtip">' + lv[1] + ' <b>' + lv[2] + '</b> ' + LVTIP[lv[0]] + '</div>';
         h += '<button type="button" class="ww-primary" id="ww-start" onclick="WW.start()">▸ เริ่มเกม · สุ่มบท</button>';
+        h += '<button type="button" class="ww-tgrow' + (ui.tg ? ' open' : '') + '" id="ww-tgrow" aria-expanded="' + !!ui.tg + '" onclick="WW.tg()"><span>✈️</span><span>เล่นกับเพื่อนใน Telegram · ไม่มีบอท</span><span class="ar">' + (ui.tg ? '▴' : '▾') + '</span></button>';
+        if (ui.tg) h += '<div class="ww-tg" id="ww-tg">'
+            + '<ol><li><i>➕</i><span>เพิ่มบอทเข้ากลุ่ม Telegram ของแก๊ง</span></li><li><i>⌨️</i><span>ในกลุ่มพิมพ์ <b>/werewolf</b></span></li>'
+            + '<li><i>👥</i><span>เพื่อน 5–10 คนกด <b>▸ เข้าร่วม</b> แล้วกด <b>Start</b> ในแชทบอท</span></li><li><i>🌙</i><span>หัวห้องกด <b>▸ เริ่ม</b> · บทส่งทาง DM · โหวตในกลุ่ม</span></li></ol>'
+            + '<div class="ww-tgb"><button type="button" class="p" id="ww-tg-add" onclick="WW.tgOpen(\'add\')">➕ เพิ่มบอทเข้ากลุ่ม</button><button type="button" class="s" id="ww-tg-chat" onclick="WW.tgOpen(\'chat\')">💬 เปิดแชทบอท</button></div>'
+            + '<div class="ww-tgnote">➕ จะเปิด Telegram ให้เลือกกลุ่ม · บอท @' + TG_BOT + '</div></div>';
         var games = store.games.slice().sort(function (a, b) { return b.upd - a.upd; });
         if (games.length) {
             var cur = games.filter(function (x) { return x.status === 'playing'; })[0];
@@ -333,6 +342,13 @@
         close: function () { if (g) put(); else save(); var m = document.getElementById('wolfModal'); if (m) m.style.display = 'none'; },
         back: function () { if (ui.peek) { ui.peek = false; render(); return; } if (g) { put(); g = null; sel = null; render(); } else WW.close(); },
         peek: function (on) { ui.peek = !!on; render(); },
+        tg: function () { ui.tg = !ui.tg; render(); },
+        // t.me/<bot>?startgroup=… asks Telegram to pick a group and add the bot; outside LINE a new tab, inside LINE the phone's browser / app
+        tgOpen: function (k) {
+            var url = 'https://t.me/' + TG_BOT + (k === 'add' ? '?startgroup=werewolf' : '');
+            try { if (window.liff && liff.isInClient && liff.isInClient()) { liff.openWindow({ url: url, external: true }); return url; } } catch (_) { /* fall through */ }
+            window.open(url, '_blank', 'noopener'); return url;
+        },
         set: function (k, v) { if (k === 'n' && ui.n !== v) ui.prevN = ui.n; ui[k] = v || null; if (k !== 'tip') ui[k] = v; render(); if (k === 'n') ui.prevN = null; },
         start: function () { g = newGame(ui.n, ui.level); put(); render(); },
         resume: function (id) { g = store.games.filter(function (x) { return x.id === id; })[0] || null; sel = null; ui.peek = false; render(); },
