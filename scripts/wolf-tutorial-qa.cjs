@@ -35,6 +35,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     if (i < 5) await page.click('#wt-next');
   }
   assert.deepEqual(scenes.map((x) => x.dot), [0, 1, 2, 3, 4, 5], 'six scenes, the dot follows');
+  for (let i = 0; i < 30 && !voice.includes('s6'); i++) await page.waitForTimeout(100);   // the last clip's request can land after the click on a slow runner
   assert.deepEqual([...new Set(voice)].sort(), ['s1', 's2', 's3', 's4', 's5', 's6'], 'each scene reads itself (wolf-voice/sN.mp3): ' + voice);
   assert.ok(require('fs').existsSync('public/wolf-voice/c-vote.mp3') && require('fs').existsSync('public/wolf-voice/c-night-villager.mp3'), 'all 13 clips are in the repo');
   assert.deepEqual(scenes.map((x) => x.dark), [false, true, false, false, false, false], 'the night scene is dark');
