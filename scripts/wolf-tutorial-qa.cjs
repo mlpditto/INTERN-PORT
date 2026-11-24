@@ -4,6 +4,9 @@
 // (night-<role> under the seats, day, vote) and "ข้ามคำใบ้" stops them all; 🔊 / 🔇 in the game header is remembered and the tour
 // shows the same; a whole game logs its cues in order (night first, vote, out / death / morning, win or lose last) and nothing
 // plays before the first tap; with 🔇 the cues still log (for this script) but Web Audio is never created.
+// V101.361 (pick D, fixed height): the tour plays INSIDE the 🐺 popup (not fixed / full screen), the lobby hides under it and comes back
+// on close, ถัดไป ▸ stays in one place across scenes, the night scene darkens the popup; on a 927×960 PC screen the buttons sit inside
+// the popup right under the content (the old full-screen page left ~500 px of empty space); closing the popup mid-tour ends the tour.
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -29,6 +32,13 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   await page.evaluate(() => wolfOpen());
   assert.equal(await page.evaluate(() => WWSound._log.length), 0, 'nothing plays before a tap');
   assert.equal(await page.$eval('#wolfTour', (e) => getComputedStyle(e).display), 'block', 'the first open shows 📖 วิธีเล่น');
+  const inPop = await page.evaluate(() => { const t = document.getElementById('wolfTour'); return { parent: t.parentElement.matches('#wolfModal .modal-content'), pos: getComputedStyle(t).position, lobby: getComputedStyle(document.getElementById('ww-body')).display }; });
+  assert.deepEqual(inPop, { parent: true, pos: 'static', lobby: 'none' }, 'pick D: inside the 🐺 popup, the lobby hidden under it');
+  const navTop = [], popDark = [];
+  for (let i = 0; i < 6; i++) { await page.evaluate((i) => WWTour.go(i), i); navTop.push(await page.$eval('#wt-next', (b) => Math.round(b.getBoundingClientRect().top))); popDark.push(await page.$eval('#wolfModal .modal-content', (m) => getComputedStyle(m).backgroundColor === 'rgb(30, 27, 75)')); }
+  assert.equal(new Set(navTop).size, 1, 'fixed height: ถัดไป ▸ does not move between scenes ' + navTop);
+  assert.deepEqual(popDark, [false, true, false, false, false, false], 'the night scene darkens the whole popup');
+  await page.evaluate(() => WWTour.go(0));
   const scenes = [];
   for (let i = 0; i < 6; i++) {
     scenes.push(await page.evaluate(() => ({ t: document.querySelector('#wolfTour .wt-top h3').innerText, dark: document.getElementById('wolfTour').classList.contains('dark'), dot: [...document.querySelectorAll('#wolfTour .wt-dots i')].findIndex((d) => d.classList.contains('on')), say: document.getElementById('wt-say').innerText })));
@@ -41,9 +51,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.deepEqual(scenes.map((x) => x.dark), [false, true, false, false, false, false], 'the night scene is dark');
   assert.match(scenes[0].t, /วิธีเล่น/, 'Thai is VISIBLE (innerText — lang-toggle.js hides Thai outside .lang-no-toggle)');
   assert.match(scenes[0].say, /บทลับ/); assert.match(scenes[3].say, /สงสัย/); assert.match(scenes[4].say, /เสมอ = ไม่มีใครออก/);
-  const w = await page.$eval('#wolfTour', (e) => e.scrollWidth - e.clientWidth); assert.ok(w <= 1);
+  const w = await page.$eval('#wolfModal .modal-content', (e) => e.scrollWidth - e.clientWidth); assert.ok(w <= 1);
   await page.setViewportSize({ width: 320, height: 700 }); await page.evaluate(() => WWTour.go(3));
-  assert.ok(await page.$eval('#wolfTour', (e) => e.scrollWidth <= e.clientWidth + 1), 'no sideways scroll at 320 px');
+  assert.ok(await page.$eval('#wolfModal .modal-content', (e) => e.scrollWidth <= e.clientWidth + 1), 'no sideways scroll at 320 px');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => WWTour.go(0)); await page.click('#wt-auto');
   assert.equal(await page.evaluate(() => localStorage.getItem('wolfTourAuto')), 'on', '▶ auto is remembered');
@@ -61,6 +71,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   await page.click('#ww-help');
   assert.equal(await page.$eval('#wolfTour', (e) => getComputedStyle(e).display), 'block', '❓ replays it');
   await page.evaluate(() => WWTour.close());
+  assert.equal(await page.$eval('#ww-body', (e) => getComputedStyle(e).display), 'block', 'close → the lobby is back in the same popup');
+  // a tall PC screen (the owner's 927×960): the buttons sit right under the content, inside the popup
+  await page.setViewportSize({ width: 927, height: 960 }); await page.click('#ww-help');
+  const pc = await page.evaluate(() => { const m = document.querySelector('#wolfModal .modal-content').getBoundingClientRect(), d = document.querySelector('#wolfTour .wt-dots').getBoundingClientRect(), n = document.getElementById('wt-next').getBoundingClientRect(); return { inside: n.bottom <= m.bottom && n.top >= m.top, gap: Math.round(n.top - d.bottom), popH: Math.round(m.height) }; });
+  assert.ok(pc.inside && pc.gap < 200 && pc.popH < 760, 'PC: ถัดไป inside the popup, near the content ' + JSON.stringify(pc));
+  await page.evaluate(() => WW.close()); await page.evaluate(() => wolfOpen());
+  assert.deepEqual(await page.evaluate(() => [getComputedStyle(document.getElementById('wolfTour')).display, getComputedStyle(document.getElementById('ww-body')).display]), ['none', 'block'], 'closing the popup mid-tour ends the tour; the next open shows the lobby');
+  await page.setViewportSize({ width: 390, height: 844 });
 
   // B · first-turn hints, once each
   const seed = (s) => page.evaluate((s) => { let a = s; WW._rng(() => { a = (a * 1103515245 + 12345) % 2147483648; return a / 2147483648; }); }, s);

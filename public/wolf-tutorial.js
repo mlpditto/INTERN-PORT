@@ -5,7 +5,10 @@
        "ข้ามคำใบ้" stops them all. wolf.js calls WWTour.coach(key) after every render.
    Voice: each scene / hint reads itself — public/wolf-voice/s1…s6.mp3 and c-<key>.mp3, made once with Paxa TTS (voice foithong, like
    🥣 Cereal; no call at play time, no personal data). Only with 🔊 on; 🔇 / close / the next card stop it. 🔊 / 🔇 = WWSound.
-   Reads and writes nothing but localStorage wolfTourSeen / wolfCoachSeen / wolfTourAuto. window.WWTour. */
+   Reads and writes nothing but localStorage wolfTourSeen / wolfCoachSeen / wolfTourAuto. window.WWTour.
+   V101.361 (owner pick D, fixed height — mockup-werewolf-tour-gap/D-all.png): the tour plays INSIDE the 🐺 popup (#wolfModal
+   .modal-content, beside #ww-body which it hides), not as a full screen — no empty gap on a tall PC screen. The box keeps the height of
+   the tallest scene, so ถัดไป ▸ stays in one place; a night scene turns the whole popup dark. */
 (function () {
     'use strict';
     var SEEN = 'wolfTourSeen', COACH = 'wolfCoachSeen', AUTO = 'wolfTourAuto', INTERVAL = 6000, VOICE = true;   // V101.357: public/wolf-voice/ (13 clips, Paxa foithong) exist
@@ -15,9 +18,10 @@
     function reduce() { return !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); }
 
     var css = ''
-        + '#wolfTour{position:fixed;inset:0;z-index:10001;background:#f8fafc;font-family:inherit;color:#0f172a;overflow:auto;-webkit-overflow-scrolling:touch}'
-        + '#wolfTour .wt{max-width:430px;margin:0 auto;min-height:100%;box-sizing:border-box;display:flex;flex-direction:column;gap:10px;padding:14px 14px calc(18px + env(safe-area-inset-bottom))}'
-        + '#wolfTour.dark{background:#1e1b4b;color:#e0e7ff}'
+        + '#wolfTour{font-family:inherit;color:#0f172a}#wolfModal .modal-content.wt-on>#ww-body{display:none}'
+        + '#wolfModal .modal-content.wt-dark{background:#1e1b4b}'
+        + '#wolfTour .wt{box-sizing:border-box;display:flex;flex-direction:column;gap:10px}'
+        + '#wolfTour.dark{color:#e0e7ff}'
         + '#wolfTour button{font-family:inherit;width:auto;min-height:0;margin:0;box-shadow:none;cursor:pointer}'
         + '#wolfTour .wt-top{display:flex;align-items:center;gap:6px}#wolfTour .wt-top h3{margin:0;font-size:1.05em;font-weight:900;color:#6d28d9;white-space:nowrap}#wolfTour.dark .wt-top h3{color:#c4b5fd}'
         + '#wolfTour .wt-pill{border:1px solid #e2e8f0;border-radius:999px;background:#fff;padding:2px 9px;font-size:.72em;font-weight:800;color:#475569}#wolfTour.dark .wt-pill{background:transparent;border-color:#4338ca;color:#c7d2fe}'
@@ -74,7 +78,7 @@
         { t: '📖 พร้อมแล้ว', body: function () { return ''; },
           say: '💡 ครั้งแรกลอง 👥 7 · 🌙 เที่ยงคืน<br>ฟัง 🔮 ให้ดี · หมาป่ามักกล่าวหาคนอื่นก่อน', en: 'Try 7 players, midnight bots. ❓ in the lobby replays this.' }
     ];
-    var st = { i: 0, timer: null, audio: null };
+    var st = { i: 0, timer: null, audio: null, h: 0 };
     function auto() { return get(AUTO) === 'on'; }
     function voice(name) {
         stopVoice();
@@ -83,16 +87,21 @@
     }
     function stopVoice() { if (st.audio) { try { st.audio.pause(); } catch (_) {} st.audio = null; } }
     function ensureCss() { if (document.getElementById('wolfTourCss')) return; var s = document.createElement('style'); s.id = 'wolfTourCss'; s.textContent = css; document.head.appendChild(s); }
-    function draw() {
-        var el = document.getElementById('wolfTour'), sc = SCENES[st.i], last = st.i === SCENES.length - 1, on = window.WWSound ? WWSound.on() : true;
+    function paint(el) {
+        var sc = SCENES[st.i], last = st.i === SCENES.length - 1, on = window.WWSound ? WWSound.on() : true;
         el.className = 'lang-no-toggle' + (sc.dark ? ' dark' : '');
-        el.innerHTML = '<div class="wt"><div class="wt-top"><h3>' + sc.t + '</h3>' + (sc.pill ? '<span class="wt-pill">' + sc.pill + '</span>' : '') + '<span class="wt-pill">' + (st.i + 1) + '/' + SCENES.length + '</span>'
+        if (el.parentNode && el.parentNode.classList) el.parentNode.classList.toggle('wt-dark', !!sc.dark);
+        el.innerHTML = '<div class="wt"' + (st.h ? ' style="min-height:' + st.h + 'px"' : '') + '><div class="wt-top"><h3>' + sc.t + '</h3>' + (sc.pill ? '<span class="wt-pill">' + sc.pill + '</span>' : '') + '<span class="wt-pill">' + (st.i + 1) + '/' + SCENES.length + '</span>'
             + '<button type="button" class="wt-ib first" id="wt-snd" onclick="WWTour.sound()" aria-label="Sound">' + (on ? '🔊' : '🔇') + '</button><button type="button" class="wt-ib" onclick="WWTour.close()" aria-label="Close">✕</button></div>'
             + sc.body() + '<div class="wt-say" id="wt-say">' + sc.say + '<small>' + sc.en + '</small></div>'
             + '<div class="wt-dots">' + SCENES.map(function (x, i) { return '<i' + (i === st.i ? ' class="on"' : '') + '></i>'; }).join('') + '</div>'
             + '<div class="wt-nav">' + (last ? '<button type="button" class="wt-skip" onclick="WWTour.go(0)">↺ ดูใหม่</button><button type="button" class="wt-next" id="wt-next" onclick="WWTour.close()">▸ เริ่มเกม</button>'
                 : '<button type="button" class="wt-auto' + (auto() ? ' on' : '') + '" id="wt-auto" onclick="WWTour.auto()">▶ auto</button><button type="button" class="wt-skip" onclick="WWTour.close()">ข้าม</button><button type="button" class="wt-next" id="wt-next" onclick="WWTour.next()">ถัดไป ▸</button>')
             + '</div></div>';
+        return last;
+    }
+    function draw() {
+        var last = paint(document.getElementById('wolfTour'));
         clearTimeout(st.timer);
         if (auto() && !last && !reduce()) st.timer = setTimeout(function () { WWTour.next(); }, INTERVAL);
         voice('s' + (st.i + 1));
@@ -112,10 +121,19 @@
         open: function () {
             ensureCss();
             var el = document.getElementById('wolfTour');
-            if (!el) { el = document.createElement('div'); el.id = 'wolfTour'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'How to play'); el.className = ''; document.body.appendChild(el); }
-            el.style.display = 'block'; st.i = 0; draw();   // draw() keeps lang-no-toggle: lang-toggle.js hides Thai outside it
+            var box = document.querySelector('#wolfModal .modal-content') || document.body;
+            if (!el) { el = document.createElement('div'); el.id = 'wolfTour'; el.setAttribute('role', 'region'); el.setAttribute('aria-label', 'How to play'); el.className = ''; }
+            if (el.parentNode !== box) box.appendChild(el);   // the popup is rebuilt on first open, so re-home it every time
+            box.classList.add('wt-on'); el.style.display = 'block';
+            // fixed height = the tallest scene at this width, so the buttons never jump between scenes
+            st.h = 0; var h = 0; for (st.i = 0; st.i < SCENES.length; st.i++) { paint(el); h = Math.max(h, el.firstChild.offsetHeight); } st.h = h;
+            st.i = 0; draw();   // draw() keeps lang-no-toggle: lang-toggle.js hides Thai outside it
         },
-        close: function () { clearTimeout(st.timer); stopVoice(); set(SEEN, '1'); var el = document.getElementById('wolfTour'); if (el) el.style.display = 'none'; },
+        isOpen: function () { var el = document.getElementById('wolfTour'); return !!el && el.style.display === 'block'; },
+        close: function () {
+            clearTimeout(st.timer); stopVoice(); set(SEEN, '1'); var el = document.getElementById('wolfTour'); if (!el) return;
+            el.style.display = 'none'; if (el.parentNode && el.parentNode.classList) el.parentNode.classList.remove('wt-on', 'wt-dark');
+        },
         next: function () { if (st.i < SCENES.length - 1) { st.i++; draw(); } },
         go: function (i) { st.i = i; draw(); },
         auto: function () { set(AUTO, auto() ? 'off' : 'on'); draw(); },
