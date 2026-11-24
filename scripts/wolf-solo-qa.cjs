@@ -18,6 +18,7 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
   await page.addInitScript(() => {
     for (const k of ['internGuideSeen', 'journalTourSeen', 'cerealTourSeen']) localStorage.setItem(k, '1');
+    localStorage.setItem('wolfTourSeen', '1'); localStorage.setItem('wolfCoachSeen', 'all');   // V101.357: the tour / hints are tested in wolf-tutorial-qa
     window.firebase = { auth: () => ({ currentUser: { uid: 'u1' }, onAuthStateChanged: () => () => {}, signInAnonymously: () => Promise.resolve() }), functions: () => ({ httpsCallable: () => () => Promise.resolve({ data: {} }) }), firestore: Object.assign(() => ({}), { FieldValue: { serverTimestamp: () => 0 } }) };
     const st = window.setTimeout; window.setTimeout = function (fn, ms, ...a) { if (ms === 15000) return 0; return st.call(this, fn, ms, ...a); };
   });

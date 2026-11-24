@@ -57,9 +57,12 @@
             checks: {}, claims: [], said: [], votes: [], deaths: [], tags: {}, draft: {}, botVotes: null, lastNight: null, lastVote: null,
             saves: 0, heals: 0, poisoned: null, result: null };
     }
+    // V101.357 sound (owner pick B, wolf-sound.js): every cue comes from a tap
+    function snd(k) { if (window.WWSound) WWSound.play(k); }
     function finishIf() {
         var w = W.winner(g.st); if (!w) return false;
         g.status = 'finished'; g.phase = 'over'; g.result = { winner: w, day: g.day };
+        snd((w === 'wolf') === (myRole() === 'wolf') ? 'win' : 'lose');
         return true;
     }
     function startNight() {
@@ -88,6 +91,7 @@
         r.dead.forEach(function (id) { g.deaths.push({ id: id, day: g.day, how: 'night' }); });
         g.lastNight = r.dead;
         if (finishIf()) return;
+        snd(r.dead.length ? 'death' : 'morning');
         startDay();
     }
     function startDay() { g.phase = 'day'; sel = null; g.tags = {}; botsTalk(); }
@@ -114,6 +118,7 @@
     function toVote() {
         Object.keys(g.tags).forEach(function (b) { var x = g.tags[b]; if (b !== g.me && (x.k === 'sus' || x.k === 'trust')) g.said.push({ day: g.day, by: b, k: x.k, t: x.t, soft: !!x.soft }); });
         g.phase = 'vote'; sel = null; g.botVotes = AI.votes(g);
+        snd('vote');
     }
     function castVote(t) {
         var v = {}; Object.keys(g.botVotes || {}).forEach(function (b) { v[b] = g.botVotes[b]; });
@@ -121,9 +126,10 @@
         var r = W.tallyVotes(g.st, v);
         Object.keys(v).forEach(function (b) { g.votes.push({ day: g.day, by: b, t: v[b] }); });
         g.lastVote = { out: r.out, counts: r.counts };
-        if (r.out) { g.st = W.eliminate(g.st, r.out); g.deaths.push({ id: r.out, day: g.day, how: 'vote' }); }
+        if (r.out) { g.st = W.eliminate(g.st, r.out); g.deaths.push({ id: r.out, day: g.day, how: 'vote' }); snd('out'); }
         if (finishIf()) return;
         g.day++; startNight();
+        if (r.out) setTimeout(function () { snd('night'); }, 900); else snd('night');
     }
 
     // ---- drawing ----------------------------------------------------------------------------------------
@@ -141,8 +147,18 @@
         var m = root(), html = !g ? lobbyHtml() : ui.peek ? roleHtml(true) : g.phase === 'role' ? roleHtml() : g.phase === 'night' ? nightHtml() : g.phase === 'day' ? dayHtml() : g.phase === 'vote' ? voteHtml() : endHtml();
         m.classList.toggle('dark', !!g && g.phase === 'night' && !ui.peek);
         document.getElementById('ww-body').innerHTML = html;
+        if (window.WWTour) WWTour.coach(coachKey());   // V101.357 (pick B): one hint at a time on the first real turn
     }
-    function top(title, pills) { return '<div class="ww-top"><h3>' + title + '</h3>' + (pills || '') + '<button type="button" class="ww-x" onclick="WW.back()" aria-label="Close">✕</button></div>'; }
+    function coachKey() {
+        if (!g || ui.peek || g.status !== 'playing' || !meAlive()) return null;
+        if (g.phase === 'night') { var r = myRole(); if (r === 'witch' && !(g.st.witch.heal || g.st.witch.poison)) r = 'villager'; return 'night-' + r; }
+        return g.phase === 'day' ? 'day' : g.phase === 'vote' ? 'vote' : null;
+    }
+    function top(title, pills, noSound) {   // V101.357: 🔊 / 🔇 in the game screens (the lobby header has ❓ instead — one row at 320 px)
+        var on = !window.WWSound || WWSound.on();
+        return '<div class="ww-top"><h3>' + title + '</h3>' + (pills || '') + (noSound ? '' : '<button type="button" class="ww-x" id="ww-snd" onclick="WW.snd()" aria-label="Sound" aria-pressed="' + on + '">' + (on ? '🔊' : '🔇') + '</button>')
+            + '<button type="button" class="ww-x"' + (noSound ? '' : ' style="margin-left:6px"') + ' onclick="WW.back()" aria-label="Close">✕</button></div>';
+    }
     function pill(s, cls) { return '<span class="ww-pill' + (cls ? ' ' + cls : '') + '">' + s + '</span>'; }
     function rolePill() { return '<button type="button" class="ww-pill acc ww-me" id="ww-me" onclick="WW.peek(true)" title="ดูบทของคุณ">' + E[myRole()] + ' ' + (meAlive() ? 'คุณ' : '💀') + '</button>'; }   // V101.355: tap = the role card again
     function count() { return pill('👥 ' + alive().length + '/' + g.n); }
@@ -176,7 +192,7 @@
     function voteWords() { var v = g.lastVote; return !v ? '' : v.out ? '🗳 ' + esc(nm(v.out)) + ' ถูกโหวตออก ' + E[g.st.roles[v.out]] : '🗳 เสมอ · ไม่มีใครออก'; }
 
     function lobbyHtml() {
-        var c = W.defaultCounts(ui.n), h = '<div class="ww">' + top('🐺 มนุษย์หมาป่า', pill('🤖 เล่นกับบอท', 'acc'));
+        var c = W.defaultCounts(ui.n), h = '<div class="ww">' + top('🐺 มนุษย์หมาป่า', pill('🤖<span class="tx"> เล่นกับบอท</span>', 'acc') + (window.WWTour ? '<button type="button" class="ww-pill ww-help" id="ww-help" onclick="WWTour.open()" title="วิธีเล่น">❓</button>' : ''), true);
         h += '<div class="ww-row"><span class="ww-mini">👥 คน</span>' + [5, 7, 9].map(function (n) { return '<button type="button" class="ww-chip' + (ui.n === n ? ' on' : '') + '" onclick="WW.set(\'n\',' + n + ')">' + n + '</button>'; }).join('') + '</div>';
         var rs = W.ROLES.filter(function (r) { return c[r]; }), tip = rs.indexOf(ui.tip) >= 0 ? ui.tip : null;
         h += '<div class="ww-tiles" id="ww-roles" style="grid-template-columns:repeat(' + rs.length + ',minmax(0,1fr))">' + rs.map(function (r) {
@@ -295,7 +311,8 @@
     // ---- actions ----------------------------------------------------------------------------------------
     function put() { store.games = store.games.filter(function (x) { return x.id !== g.id; }); store.games.unshift(g); store.games = store.games.slice(0, MAX_GAMES); save(); }
     window.WW = {
-        open: function () { store = load(); g = null; sel = null; ui.peek = false; render(); root().style.display = 'flex'; },
+        open: function () { store = load(); g = null; sel = null; ui.peek = false; render(); root().style.display = 'flex'; if (window.WWTour && !WWTour.seen()) WWTour.open(); },
+        snd: function () { if (window.WWSound) WWSound.toggle(); render(); },
         close: function () { if (g) put(); else save(); var m = document.getElementById('wolfModal'); if (m) m.style.display = 'none'; },
         back: function () { if (ui.peek) { ui.peek = false; render(); return; } if (g) { put(); g = null; sel = null; render(); } else WW.close(); },
         peek: function (on) { ui.peek = !!on; render(); },
@@ -303,21 +320,21 @@
         start: function () { g = newGame(ui.n, ui.level); put(); render(); },
         resume: function (id) { g = store.games.filter(function (x) { return x.id === id; })[0] || null; sel = null; ui.peek = false; render(); },
         again: function () { var n = g.n, l = g.level; put(); g = newGame(n, l); put(); render(); },
-        night: function () { startNight(); put(); render(); },
+        night: function () { startNight(); put(); render(); snd('night'); },
         tap: function (id) {
             if (g.phase === 'night') {
                 var r = myRole();
-                if (r === 'wolf') g.draft.bite = id; else if (r === 'guard') g.draft.guard = id;
-                else if (r === 'witch' && g.draft.aim) g.draft.poison = id;
+                if (r === 'wolf') { g.draft.bite = id; snd('bite'); } else if (r === 'guard') { g.draft.guard = id; snd('guard'); }
+                else if (r === 'witch' && g.draft.aim) { g.draft.poison = id; snd('poison'); }
                 else sel = id;
             } else sel = sel === id ? null : id;
             render();
         },
-        heal: function () { g.draft.heal = !g.draft.heal; render(); },
+        heal: function () { g.draft.heal = !g.draft.heal; if (g.draft.heal) snd('heal'); render(); },
         aim: function () { if (g.draft.aim) { g.draft.aim = false; g.draft.poison = null; } else g.draft.aim = true; render(); },
         nightGo: function () {
             if (meAlive() && myRole() === 'seer' && !g.draft.seer && sel) {   // see the answer first, then ☀️
-                g.draft.seer = sel; g.checks[g.me] = g.checks[g.me] || {}; g.checks[g.me][sel] = g.st.roles[sel] === 'wolf'; sel = null; put(); render(); return;
+                g.draft.seer = sel; g.checks[g.me] = g.checks[g.me] || {}; g.checks[g.me][sel] = g.st.roles[sel] === 'wolf'; snd(g.checks[g.me][sel] ? 'seeWolf' : 'seeGood'); sel = null; put(); render(); return;
             }
             endNight(); put(); render();
         },
