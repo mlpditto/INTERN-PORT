@@ -24,7 +24,7 @@ assert.ok(zTag && zLine && +zLine[1] > +zTag[1] && +zTag[1] > 100200, 'LINE moda
 assert.ok(!/Send LINE|> LINE<|LINE<\/button>/.test(html.slice(html.indexOf('function renderTagDrillDownContent('), html.indexOf('function drawQuizSpiderChart('))), 'no text on any LINE button in the drill-down');
 
 const fns = ['function registerLineReminderAction(', 'function registerAssignAction(', 'function registerCopyAction(', 'function drillQuestionPlainText(', 'window.drillCopyQuestion = function(', 'function renderAnswerLabel(', 'function fmtDrillDownDate(',
-    'function buildWrongQuestionReminderTemplate(', 'function buildSuggestedQuizReminderTemplate(', 'function renderTagDrillDownContent('].map(grab).join('\n') + '\n' + line('const drillLineBtn =') + '\n' + line('const drillCopyBtn =');
+    'function buildWrongQuestionReminderTemplate(', 'function buildSuggestedQuizReminderTemplate(', 'function buildSuggestedQuizListTemplate(', 'function drillAdded(', 'function renderTagDrillDownContent('].map(grab).join('\n') + '\n' + line('const drillLineBtn =') + '\n' + line('const drillCopyBtn =');
 
 const WRONG = [
     { question: { q: 'A 32-year-old patient prescribed fexofenadine 180 mg daily reports inadequate symptom relief. The patient mentions taking the pill every morning with breakfast. Which drink should be avoided?', options: ['Water', 'Fruit juices', 'Black coffee', 'Milk'], correct: 1, type: 'choice' }, userAnswer: 2, quizTitle: 'Allergen Immunotherapy', timestamp: null, qIdx: 3 },
@@ -85,7 +85,7 @@ const WRONG = [
         assert.match(r.full, /Which drink should be avoided\?$/, 'the FULL question (no 220-character cut)');
         assert.deepEqual(r.opts, [['', '1. Water'], ['ok', '2. Fruit juices ✓'], ['bad', '3. Black coffee ✗'], ['', '4. Milk']], 'choices: ✓ correct, ✗ the one chosen');
         assert.match(r.textRow, /Your answer: x Correct: ans/, 'a non-choice question keeps the your answer / correct lines');
-        assert.equal(r.suggest, 3, 'the suggested quiz has the same icon-only LINE button (2 questions + 1 suggestion)');
+        assert.equal(r.suggest, 2, 'V102.702 (pick A): icon-only LINE on each wrong question; the suggestions share ONE 📤 ส่งทั้งหมด (no LINE per row)');
         assert.ok(+r.z[1] > +r.z[0] && +r.z[0] > 9999, 'the LINE modal computes ABOVE the drill-down and both above the 9999 pin: ' + r.z);
         console.log('PASS: drill-down wrong questions — folded one-line rows, tap = full question + choices, one-click copy without the answer, icon-only LINE buttons, LINE modal on top');
     } finally { await browser.close(); }

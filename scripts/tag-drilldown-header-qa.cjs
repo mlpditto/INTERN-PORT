@@ -32,7 +32,7 @@ function grab(marker) {
             }, [grab('function renderTagDrillDownContent('), long]);
             assert.ok(r.sameLine, `title and stats share ONE line @${vw}${long ? ' (long title)' : ''}: ${JSON.stringify(r)}`);
             assert.ok(r.headerH <= 60, `the header is one line tall @${vw}: ${r.headerH}px`);
-            assert.match(r.stats, /^9\/14 correct · 64\.3% · 1 attempt/, 'stats text unchanged'); assert.ok(r.statsWhole && r.noScroll, 'stats stay whole, no sideways scroll');
+            assert.match(r.stats, long ? /^9\/14 🏷 x$/ : /^9\/14 🏷 Rhinitis \+1$/, 'V102.702 (pick A): the score once (9/14, the % is its tooltip), the co-occurring tag as a chip, no attempts when 1: ' + r.stats); assert.ok(r.statsWhole && r.noScroll, 'stats stay whole, no sideways scroll');
             assert.match(r.titleTip, /Allergic rhinitis/, 'the full tag list is the tooltip');
             await page.close();
         }

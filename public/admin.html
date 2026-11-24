@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.701)</title>
+    <title>Nika Admin (V102.702)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -5152,6 +5152,19 @@
             .quiz-insight-tags { grid-row:3; }
         }
         /* V102.218: drill-down wrong questions — one folded line each (Qn · question · copy · LINE · ▾); the full question + choices open on tap */
+        /* V102.702 drill-down pick A */
+        #tagDrillDownModal .modal-content { height:auto; align-self:flex-start; }   /* the flex .modal stretched it to 88vh */
+        .dd-pill { display:inline-flex; align-items:center; gap:3px; padding:2px 9px; border-radius:999px; font-size:0.95em; font-weight:800; white-space:nowrap; background:#f1f5f9; color:#475569; margin-right:6px; }
+        .dd-pill.dd-ok { background:#dcfce7; color:#15803d; } .dd-pill.dd-mid { background:#fef3c7; color:#92400e; } .dd-pill.dd-low { background:#fee2e2; color:#b91c1c; }
+        .dd-pill.dd-tag { background:#f5f3ff; color:#6d28d9; border:1px solid #ddd6fe; } .dd-pill.dd-part { background:#fff7ed; color:#9a3412; font-size:0.72em; margin:0; }
+        .dd-sec { display:flex; align-items:center; gap:8px; font-size:0.8em; font-weight:900; color:#475569; margin:14px 0 8px; } .dd-sec.dd-sec-bad { color:#991b1b; margin-top:0; }
+        .dd-ans { flex:none; font-size:0.74em; font-weight:800; white-space:nowrap; } .dd-ans .x { color:#b91c1c; } .dd-ans .o { color:#15803d; }
+        .dd-line-all { display:inline-flex; align-items:center; gap:5px; width:auto; min-height:0; margin:0; padding:4px 10px; border-radius:999px; border:1px solid #86efac; background:#f0fdf4; color:#15803d; font-size:1em; font-weight:800; cursor:pointer; box-shadow:none; }
+        .dd-sug { display:flex; align-items:center; gap:8px; padding:7px 10px; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; margin-bottom:6px; } .dd-sug.rt { background:#fffbeb; border-color:#fde68a; } .dd-sug[hidden] { display:none; }
+        .dd-sug .t { flex:1; min-width:0; font-size:0.85em; font-weight:700; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .dd-add { flex:none; width:auto; min-height:0; margin:0; padding:5px 10px; border:none; border-radius:8px; background:#6366f1; color:#fff; font-size:0.72em; font-weight:800; white-space:nowrap; cursor:pointer; box-shadow:none; }
+        .dd-sug.rt .dd-add { background:#f59e0b; } .dd-add.done, .dd-sug.rt .dd-add.done { background:#dcfce7; color:#15803d; cursor:default; }
+        .dd-more { width:auto; min-height:0; margin:0; padding:4px 2px; border:none; background:none; color:#6366f1; font-size:0.78em; font-weight:800; cursor:pointer; box-shadow:none; }
         .dd-q { border:1px solid #fecaca; border-radius:12px; background:#fef2f2; margin-bottom:6px; }
         .dd-q > summary { list-style:none; display:flex; align-items:center; gap:8px; padding:7px 10px; cursor:pointer; }
         .dd-q > summary::-webkit-details-marker { display:none; }
@@ -16853,10 +16866,7 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                     <div id="drilldown-stats" style="flex:none; white-space:nowrap; font-size:0.78em; color:#64748b; font-weight:700;">-</div>
                 </div>
             </div>
-            <div class="lang-no-toggle" id="drilldown-body" style="flex:1; overflow-y:auto; padding-right:5px; min-height:200px;"></div>
-            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid #f1f5f9;">
-                <button onclick="closeTagDrillDown()" style="padding:8px 18px; background:#f1f5f9; color:#475569; border:none; border-radius:10px; font-weight:700; font-size:0.85em; cursor:pointer;">Close</button>
-            </div>
+            <div class="lang-no-toggle" id="drilldown-body" style="flex:0 1 auto; overflow-y:auto; padding-right:5px; min-height:0;"></div>
         </div>
     </div>
 
@@ -62846,9 +62856,11 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     sourceKind: 'quiz-insight-suggestion'
                 });
                 showToast(`✓ Side Quest created — ${user.displayName || 'user'}`);
+                return true;   // V102.702: the drill-down marks ✓ Added
             } catch (err) {
                 console.error('[assignSideQuestForQuiz] failed:', err);
                 alert('Failed to create Side Quest: ' + (err.message || 'unknown'));
+                return false;
             }
         };
 
@@ -62861,6 +62873,14 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 'ลองทบทวนหัวข้อนี้และทำซ้ำได้นะ — มีตรงไหนสงสัยถามได้เลย'
             ];
             return lines.join('\n');
+        }
+        // V102.702: 📤 ส่งทั้งหมด — the whole Practice / Retake list in one LINE message (kept under the 1000-character limit)
+        function buildSuggestedQuizListTemplate(titles, kind, primaryTag) {
+            const verb = kind === 'retake' ? 'ลองทำซ้ำ' : 'ลองทำ';
+            const head = ['📚 แอดมินแนะนำ quiz'], tail = [primaryTag ? 'Tag: ' + primaryTag : '', '', verb + ' quiz เหล่านี้เพื่อแข็งแกร่งในหัวข้อนี้ขึ้นนะ'].filter(x => x !== null);
+            const lines = []; let len = head.join('\n').length + tail.join('\n').length + 2;
+            for (const t of titles) { const l = '• ' + t; if (len + l.length + 1 > 990) { lines.push('…'); break; } lines.push(l); len += l.length + 1; }
+            return head.concat(lines, tail.filter((x, i) => x || i > 0)).join('\n');
         }
         function buildSuggestedQuizReminderTemplate(quizTitle, kind, primaryTag) {
             const verb = kind === 'retake' ? 'ลองทำซ้ำ' : 'ลองทำ';
@@ -63029,10 +63049,17 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!a) return;
             openLineReminderModal(a.template, a.quizTitle);
         };
-        window.invokeAssignAction = function(idx) {
+        // V102.702: ＋ Quest turns into ✓ Added once the Side Quest is written, and stays so while this admin session lasts (per intern + quiz)
+        window._drillAdded = window._drillAdded || new Set();
+        function drillAdded(quizId) { const c = window._quizInsightCtx; return !!(c && c.userId && window._drillAdded && window._drillAdded.has(c.userId + '|' + quizId)); }
+        window.invokeAssignAction = function(idx, btn) {
             const a = window._drillDownActions && window._drillDownActions.assign && window._drillDownActions.assign[idx];
             if (!a) return;
-            assignSideQuestForQuiz(a.quizId, a.quizTitle, a.kind);
+            return Promise.resolve(assignSideQuestForQuiz(a.quizId, a.quizTitle, a.kind)).then(ok => {
+                if (!ok) return;
+                const c = window._quizInsightCtx; if (c && c.userId) window._drillAdded.add(c.userId + '|' + a.quizId);
+                if (btn) { btn.classList.add('done'); btn.textContent = '✓ Added'; btn.disabled = true; }
+            });
         };
 
         // V102.218: one-click "copy the question WITHOUT the answer" (the question + its numbered choices, nothing marked) and the icon-only LINE button
@@ -63060,6 +63087,9 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         const drillLineBtn = idx => `<button type="button" class="dd-ic dd-line" onclick="event.preventDefault(); event.stopPropagation(); invokeLineReminderAction(${idx})" title="Send LINE reminder" aria-label="Send LINE reminder"><i class="fa-brands fa-line" aria-hidden="true"></i></button>`;
         const drillCopyBtn = idx => `<button type="button" class="dd-ic dd-copy" onclick="event.preventDefault(); event.stopPropagation(); drillCopyQuestion(${idx}, this)" title="Copy the question without the answer" aria-label="Copy question without answer"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>`;
 
+        /* V102.702 (owner pick A, mockup-quiz-drilldown/): lean drill-down — the score once (9/10 ✓), the co-occurring tag named as a chip,
+           ❌ n, each wrong question folded with its answer inline (✗ 1 → ✓ 2), 🧭 Practice / 🔁 Retake n with ONE 📤 LINE for the whole list,
+           rows without the cap icon, m/n only when not every question matches, the first 3 + "＋n more", ＋ Quest → ✓ Added, no Close button. */
         function renderTagDrillDownContent(group, wrong, practice, retake) {
             window._drillDownActions = { line: [], assign: [], copy: [] }; // reset per-render
             const titleEl = document.getElementById('drilldown-title');
@@ -63068,30 +63098,30 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (!titleEl || !statsEl || !bodyEl) return;
 
             const primary = group.tags[0];
-            const extras = group.tags.length > 1
-                ? ` <span style="font-size:0.78em; color:#64748b; font-weight:600;">+${group.tags.length - 1} co-occurring</span>`
-                : '';
-            titleEl.innerHTML = `${escapeHtml(primary)}${extras}`;
-            titleEl.title = group.tags.join(' · ');   // V102.217: the title is one line now — the full tag list is the tooltip
-            const lowN = group.total < 10 ? ' &middot; <span style="color:#92400e;">⚠ low N</span>' : '';
-            statsEl.innerHTML = `${group.correct}/${group.total} correct &middot; ${group.avg.toFixed(1)}% &middot; ${group.attempts} attempt${group.attempts !== 1 ? 's' : ''}${lowN}`;
+            titleEl.textContent = primary;
+            titleEl.title = group.tags.join(' · ');
+            const pct = group.avg, tone = pct >= 80 ? 'dd-ok' : pct >= 60 ? 'dd-mid' : 'dd-low';
+            const more = group.tags.slice(1);
+            statsEl.innerHTML = `<span class="dd-pill ${tone}" title="${group.avg.toFixed(1)}%">${group.correct}/${group.total} ${pct >= 80 ? '✓' : ''}</span>`
+                + (more.length ? `<span class="dd-pill dd-tag" title="${escapeHtml(more.join(' · '))}">🏷 ${escapeHtml(more[0])}${more.length > 1 ? ' +' + (more.length - 1) : ''}</span>` : '')
+                + (group.attempts > 1 ? `<span class="dd-pill" title="attempts">×${group.attempts}</span>` : '')
+                + (group.total < 10 ? '<span class="dd-pill dd-mid" title="Fewer than 10 questions — read with care">⚠ low N</span>' : '');
 
             let html = '';
-
-            // Wrong questions
-            html += `<div style="font-size:0.78em; font-weight:800; color:#991b1b; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-xmark-circle"></i> Wrong questions <span style="background:#fee2e2; color:#991b1b; padding:1px 8px; border-radius:8px; font-size:0.85em;">${wrong.length}</span></div>`;
+            html += `<div class="dd-sec dd-sec-bad">❌ ${wrong.length}</div>`;
             if (wrong.length === 0) {
-                html += `<div style="padding:14px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; color:#065f46; font-size:0.85em; font-weight:700;">No wrong answers in this cluster — strong performance!</div>`;
+                html += `<div style="padding:12px 14px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; color:#065f46; font-size:0.85em; font-weight:700;">✓ No wrong answers here</div>`;
             } else {
                 wrong.forEach(w => {
                     const q = w.question, qText = String(q.q || '');
-                    // V93.80: per-card LINE reminder (template stashed in a registry so onclick passes only an index). V102.218: each card is ONE folded line;
-                    // tap = the full question + its choices; icon-only copy (no answer) + LINE buttons sit in the folded line.
                     const tmplIdx = registerLineReminderAction(buildWrongQuestionReminderTemplate(w.quizTitle, w.qIdx, primary), w.quizTitle);
                     const copyIdx = registerCopyAction(drillQuestionPlainText(q));
                     const asSet = v => new Set((Array.isArray(v) ? v : (v !== undefined && v !== null ? [v] : [])).map(x => parseInt(x)));
                     const picked = asSet(w.userAnswer), right = asSet(q.correct);
-                    const detail = (q.type || 'choice') === 'choice' && Array.isArray(q.options) && q.options.length
+                    const isChoice = (q.type || 'choice') === 'choice' && Array.isArray(q.options) && q.options.length;
+                    const n1 = set => [...set].filter(x => !isNaN(x)).sort((a, b) => a - b).map(x => x + 1).join(',');
+                    const inline = isChoice && right.size ? `<span class="dd-ans">${picked.size ? `<b class="x">✗ ${n1(picked)}</b> → ` : ''}<b class="o">✓ ${n1(right)}</b></span>` : '';
+                    const detail = isChoice
                         ? `<ul class="dd-opts">${q.options.map((o, i) => `<li class="${right.has(i) ? 'ok' : picked.has(i) ? 'bad' : ''}">${i + 1}. ${escapeHtml(String(o))}${right.has(i) ? ' ✓' : picked.has(i) ? ' ✗' : ''}</li>`).join('')}</ul>`
                         : `<div style="display:flex; flex-direction:column; gap:4px; font-size:0.78em;">
                                 <div><span style="color:#94a3b8; font-weight:700;">Your answer:</span> <span style="color:#991b1b; font-weight:700;">${renderAnswerLabel(q, w.userAnswer)}</span></div>
@@ -63099,7 +63129,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                             </div>`;
                     html += `
                         <details class="dd-q">
-                            <summary><span class="dd-qn">Q${w.qIdx + 1}</span><span class="dd-qt" title="${escapeHtml(qText)}">${escapeHtml(qText)}</span>${drillCopyBtn(copyIdx)}${drillLineBtn(tmplIdx)}</summary>
+                            <summary><span class="dd-qn">Q${w.qIdx + 1}</span><span class="dd-qt" title="${escapeHtml(qText)}">${escapeHtml(qText)}</span>${inline}${drillCopyBtn(copyIdx)}${drillLineBtn(tmplIdx)}</summary>
                             <div class="dd-qb">
                                 <div class="dd-qm">${escapeHtml(w.quizTitle)} &middot; ${fmtDrillDownDate(w.timestamp)}</div>
                                 <div class="dd-qfull">${escapeHtml(qText)}</div>
@@ -63110,48 +63140,23 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 });
             }
 
-            // Suggested quizzes — hide section entirely if both empty
-            if (practice.length > 0 || retake.length > 0) {
-                html += `<div style="margin-top:18px; padding-top:14px; border-top:1px solid #f1f5f9;"></div>`;
-                html += `<div style="font-size:0.78em; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;"><i class="fa-solid fa-compass"></i> Suggested quizzes</div>`;
-                if (practice.length > 0) {
-                    html += `<div style="font-size:0.72em; font-weight:800; color:#6366f1; margin-bottom:6px;">📚 PRACTICE <span style="color:#94a3b8; font-weight:600;">(not yet attempted)</span></div>`;
-                    practice.forEach(p => {
-                        // V93.80 — closes pending item #5 (assign + LINE on suggested cards)
-                        const assignIdx = registerAssignAction(p.id, p.title, 'practice');
-                        const lineIdx = registerLineReminderAction(buildSuggestedQuizReminderTemplate(p.title, 'practice', primary), p.title);
-                        html += `
-                            <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:6px;">
-                                <i class="fa-solid fa-graduation-cap" style="color:#6366f1; flex-shrink:0;"></i>
-                                <div style="flex:1; min-width:0;">
-                                    <div style="font-size:0.85em; font-weight:700; color:#1e293b; word-break:break-word;">${escapeHtml(p.title)}</div>
-                                    <div style="font-size:0.7em; color:#94a3b8; font-weight:600;">${p.matchCount} matching question${p.matchCount !== 1 ? 's' : ''}${p.questionCount ? ` of ${p.questionCount}` : ''}</div>
-                                </div>
-                                <button onclick="invokeAssignAction(${assignIdx})" title="Assign as Side Quest (Kanban task)" style="padding:5px 9px; background:#6366f1; color:white; border:none; border-radius:8px; font-size:0.7em; font-weight:800; cursor:pointer; white-space:nowrap;"><i class="fa-solid fa-plus"></i> Quest</button>
-                                ${drillLineBtn(lineIdx)}
-                            </div>
-                        `;
-                    });
-                }
-                if (retake.length > 0) {
-                    html += `<div style="font-size:0.72em; font-weight:800; color:#f59e0b; margin:10px 0 6px;">🔁 RETAKE <span style="color:#94a3b8; font-weight:600;">(previous score &lt; 70%)</span></div>`;
-                    retake.forEach(r => {
-                        const assignIdx = registerAssignAction(r.id, r.title, 'retake');
-                        const lineIdx = registerLineReminderAction(buildSuggestedQuizReminderTemplate(r.title, 'retake', primary), r.title);
-                        html += `
-                            <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; margin-bottom:6px;">
-                                <i class="fa-solid fa-rotate-right" style="color:#f59e0b; flex-shrink:0;"></i>
-                                <div style="flex:1; min-width:0;">
-                                    <div style="font-size:0.85em; font-weight:700; color:#1e293b; word-break:break-word;">${escapeHtml(r.title)}</div>
-                                    <div style="font-size:0.7em; color:#94a3b8; font-weight:600;">${r.matchCount} matching question${r.matchCount !== 1 ? 's' : ''}${r.questionCount ? ` of ${r.questionCount}` : ''}${typeof r.prevScore === 'number' ? ` &middot; previous score ${r.prevScore}%` : ''}</div>
-                                </div>
-                                <button onclick="invokeAssignAction(${assignIdx})" title="Assign as Side Quest (Kanban task)" style="padding:5px 9px; background:#f59e0b; color:white; border:none; border-radius:8px; font-size:0.7em; font-weight:800; cursor:pointer; white-space:nowrap;"><i class="fa-solid fa-plus"></i> Quest</button>
-                                ${drillLineBtn(lineIdx)}
-                            </div>
-                        `;
-                    });
-                }
-            }
+            // 🧭 Practice / 🔁 Retake: one 📤 LINE per list, the first 3 rows + "＋n more"
+            const listHtml = (items, kind) => {
+                if (!items.length) return '';
+                const label = kind === 'retake' ? '🔁 Retake' : '🧭 Practice';
+                const allIdx = registerLineReminderAction(buildSuggestedQuizListTemplate(items.map(x => x.title), kind, primary), items.length + ' quizzes');
+                let h = `<div class="dd-sec">${label} ${items.length}<span style="flex:1"></span><button type="button" class="dd-line-all" onclick="invokeLineReminderAction(${allIdx})" title="Send the whole list on LINE"><i class="fa-brands fa-line" aria-hidden="true"></i> ส่งทั้งหมด</button></div>`;
+                items.forEach((p, i) => {
+                    const assignIdx = registerAssignAction(p.id, p.title, kind);
+                    const done = drillAdded(p.id);
+                    const partial = p.questionCount && p.matchCount < p.questionCount ? `<span class="dd-pill dd-part" title="matching questions">${p.matchCount}/${p.questionCount}</span>` : '';
+                    const prev = kind === 'retake' && typeof p.prevScore === 'number' ? `<span class="dd-pill dd-low" title="previous score">${p.prevScore}%</span>` : '';
+                    h += `<div class="dd-sug${kind === 'retake' ? ' rt' : ''}"${i >= 3 ? ' hidden' : ''}><span class="t" title="${escapeHtml(p.title)}">${escapeHtml(p.title)}</span>${partial}${prev}<button type="button" class="dd-add${done ? ' done' : ''}" onclick="invokeAssignAction(${assignIdx}, this)" title="Assign as Side Quest (Kanban task)"${done ? ' disabled' : ''}>${done ? '✓ Added' : '＋ Quest'}</button></div>`;
+                });
+                if (items.length > 3) h += `<button type="button" class="dd-more" onclick="this.parentElement.querySelectorAll('.dd-sug[hidden]').forEach(r => r.hidden = false); this.remove();">＋${items.length - 3} more ▾</button>`;
+                return '<div>' + h + '</div>';
+            };
+            html += listHtml(practice, 'practice') + listHtml(retake, 'retake');
 
             bodyEl.innerHTML = html;
         }
