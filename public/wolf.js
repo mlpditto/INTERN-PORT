@@ -339,7 +339,7 @@
     window.WW = {
         open: function () { store = load(); g = null; sel = null; ui.peek = false; render(); root().style.display = 'flex'; if (window.WWTour && !WWTour.seen()) WWTour.open(); },
         snd: function () { if (window.WWSound) WWSound.toggle(); render(); },
-        close: function () { if (g) put(); else save(); var m = document.getElementById('wolfModal'); if (m) m.style.display = 'none'; },
+        close: function () { if (window.WWTour && WWTour.isOpen && WWTour.isOpen()) WWTour.close(); if (g) put(); else save(); var m = document.getElementById('wolfModal'); if (m) m.style.display = 'none'; },
         back: function () { if (ui.peek) { ui.peek = false; render(); return; } if (g) { put(); g = null; sel = null; render(); } else WW.close(); },
         peek: function (on) { ui.peek = !!on; render(); },
         tg: function () { ui.tg = !ui.tg; render(); },
