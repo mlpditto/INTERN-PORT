@@ -14,6 +14,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
   const page = await ctx.newPage();
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  const voice = []; page.on('request', (r) => { const m = /wolf-voice\/([\w-]+)\.mp3/.exec(r.url()); if (m) voice.push(m[1]); });
   await page.addInitScript(() => {
     for (const k of ['internGuideSeen', 'journalTourSeen', 'cerealTourSeen']) localStorage.setItem(k, '1');
     window.__acMade = 0; const AC = window.AudioContext; window.AudioContext = function () { window.__acMade++; return new AC(); };
@@ -34,6 +35,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     if (i < 5) await page.click('#wt-next');
   }
   assert.deepEqual(scenes.map((x) => x.dot), [0, 1, 2, 3, 4, 5], 'six scenes, the dot follows');
+  assert.deepEqual([...new Set(voice)].sort(), ['s1', 's2', 's3', 's4', 's5', 's6'], 'each scene reads itself (wolf-voice/sN.mp3): ' + voice);
+  assert.ok(require('fs').existsSync('public/wolf-voice/c-vote.mp3') && require('fs').existsSync('public/wolf-voice/c-night-villager.mp3'), 'all 13 clips are in the repo');
   assert.deepEqual(scenes.map((x) => x.dark), [false, true, false, false, false, false], 'the night scene is dark');
   assert.match(scenes[0].t, /วิธีเล่น/, 'Thai is VISIBLE (innerText — lang-toggle.js hides Thai outside .lang-no-toggle)');
   assert.match(scenes[0].say, /บทลับ/); assert.match(scenes[3].say, /สงสัย/); assert.match(scenes[4].say, /เสมอ = ไม่มีใครออก/);
@@ -88,7 +91,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.equal(await page.textContent('#ww-snd'), '🔊');
   await page.click('#ww-snd');
   assert.equal(await page.textContent('#ww-snd'), '🔇'); assert.equal(await page.evaluate(() => localStorage.getItem('wolfSound')), 'off');
+  const v0 = voice.length;
   await page.evaluate(() => WWTour.open()); assert.equal(await page.textContent('#wt-snd'), '🔇', 'the tour shows the same switch'); await page.evaluate(() => WWTour.close());
+  assert.equal(voice.length, v0, '🔇: the tour reads nothing');
   // finish a game with 🔇: cues log, no new AudioContext
   const made = await page.evaluate(() => window.__acMade);
   for (let step = 0; step < 80 && await page.evaluate(() => WW._game().phase !== 'over'); step++) {

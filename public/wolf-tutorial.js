@@ -3,12 +3,12 @@
        finger tapping a seat, ▶ auto (every 6 s), ข้าม / ถัดไป; opens the first time the 🐺 sheet opens, ❓ in the lobby replays it.
    (B) Coach marks — one purple bubble at a time on the REAL first night (per role), first day and first vote, each shown once;
        "ข้ามคำใบ้" stops them all. wolf.js calls WWTour.coach(key) after every render.
-   Voice: each scene / hint can read itself (public/wolf-voice/s1…s6.mp3, c-<key>.mp3, made once with Paxa — VOICE stays false until
-   the files exist, so nothing is requested before then). 🔊 / 🔇 = the game's own sound switch (WWSound).
+   Voice: each scene / hint reads itself — public/wolf-voice/s1…s6.mp3 and c-<key>.mp3, made once with Paxa TTS (voice foithong, like
+   🥣 Cereal; no call at play time, no personal data). Only with 🔊 on; 🔇 / close / the next card stop it. 🔊 / 🔇 = WWSound.
    Reads and writes nothing but localStorage wolfTourSeen / wolfCoachSeen / wolfTourAuto. window.WWTour. */
 (function () {
     'use strict';
-    var SEEN = 'wolfTourSeen', COACH = 'wolfCoachSeen', AUTO = 'wolfTourAuto', INTERVAL = 6000, VOICE = false;
+    var SEEN = 'wolfTourSeen', COACH = 'wolfCoachSeen', AUTO = 'wolfTourAuto', INTERVAL = 6000, VOICE = true;   // V101.357: public/wolf-voice/ (13 clips, Paxa foithong) exist
     var mem = {};
     function get(k) { try { return localStorage.getItem(k); } catch (_) { return mem[k] || null; } }
     function set(k, v) { mem[k] = v; try { localStorage.setItem(k, v); } catch (_) { /* storage may be blocked (LIFF) */ } }
