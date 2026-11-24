@@ -32,6 +32,14 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
   const entry = await page.$eval('#sch-wolf-btn', (b) => ({ txt: b.textContent, prev: b.previousElementSibling && b.previousElementSibling.id, on: b.getAttribute('onclick') }));
   assert.deepEqual(entry, { txt: '🐺', prev: 'sch-cereal-btn', on: 'wolfOpen()' }, 'the 🐺 button is right after 🥣');
 
+  // phone: 🐺 lives in Schedule, not the top rail; PC (≥ 768 px): 🐺 sits right after 🥣 in the rail, left of 📅, like Cereal
+  const vis = (sel) => page.$eval(sel, (e) => getComputedStyle(e).display !== 'none');
+  assert.equal(await vis('#u-wolf-chip'), false, 'no rail 🐺 on a phone');
+  await page.setViewportSize({ width: 1280, height: 800 });
+  assert.equal(await vis('#u-wolf-chip'), true, 'rail 🐺 on PC');
+  assert.equal(await page.$eval('#u-wolf-chip', (b) => b.previousElementSibling.id), 'u-cereal-chip');
+  assert.equal(await vis('#sch-wolf-btn'), false, 'Schedule 🐺 hidden on PC');
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => wolfOpen());
   const lobby = await page.$eval('#wolfModal', (m) => ({ shown: getComputedStyle(m).display, txt: m.textContent, empty: !!m.querySelector('#ww-empty') }));
   assert.equal(lobby.shown, 'flex'); assert.ok(lobby.empty, 'no games → the empty line');
