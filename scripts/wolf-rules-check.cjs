@@ -148,4 +148,8 @@ g = play([
 ]);
 assert.equal(g.win, 'wolf', '🐺 2 vs 👤 1 left'); assert.deepEqual(W.aliveIds(g.st.alive).sort(), ['p1', 'p2', 'p7']);
 
-console.log('wolf-rules-check: OK (decks 5–10, picks, night order, votes, win, 2 scripted games)');
+// V101.353: the page loads public/wolf-rules.js — it must be the same bytes as the functions copy
+const fsx = require('fs'), px = require('path');
+const lf = (p) => fsx.readFileSync(px.join(__dirname, p), 'utf8').replace(/\r\n/g, '\n');
+assert.equal(lf('../public/wolf-rules.js'), lf('../functions/wolf-rules.js'), 'public/wolf-rules.js = functions/wolf-rules.js');
+console.log('wolf-rules-check: OK (decks 5–10, picks, night order, votes, win, 2 scripted games, public copy)');

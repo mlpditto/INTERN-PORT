@@ -1,8 +1,12 @@
-/* 🐺 Werewolf — rules engine (Phase 0, 2026-11-23). Not used by any function yet.
+/* 🐺 Werewolf — rules engine (Phase 0, 2026-11-23). Phase 1 = the Telegram wolfBot (PR #2437); solo vs 🤖 on LIFF = public/wolf.js (V101.353).
    Pure functions: no Telegram, no Firebase, no state of its own. Phase 1–2 (the wolfBot webhook + wolfTick clock) call
    these inside a transaction, the same way cerealAct calls cereal-rules.js. Plan: docs/WEREWOLF-PLAN.md §3.
    Players are ids (Telegram user ids as strings). Roles: wolf 🐺 · seer 🔮 · guard 🛡️ · witch 🧪 · villager 👤.
    Every random choice takes rng (a () => [0, 1) function) so the check script can replay a game exactly. */
+/* The same file runs in node (functions/, scripts/) and in the page (window.WolfRules); public/wolf-rules.js is a byte-for-byte copy (wolf-rules-check.cjs fails when they differ). */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(); else root.WolfRules = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
 'use strict';
 
 const ROLES = ['wolf', 'seer', 'guard', 'witch', 'villager'];
@@ -165,8 +169,9 @@ function winner(state) {
   return null;
 }
 
-module.exports = {
+return {
   ROLES, EMOJI, MIN_PLAYERS, MAX_PLAYERS, NIGHT_SEC, VOTE_SEC, TALK_SEC, TALK_DEFAULT, DECKS,
   defaultCounts, countsError, deal, newState, nightTurns, pickError, wolfTarget, resolveNight,
   tallyVotes, eliminate, winner, aliveIds, withRole,
 };
+});
