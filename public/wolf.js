@@ -69,6 +69,7 @@
         g.phase = 'night'; g.draft = {}; sel = null; g.tags = {};
         // the wolves' bite is fixed before the witch looks, so a 🧪 player sees the real victim
         if (!(meAlive() && myRole() === 'wolf')) g.draft.bite = W.wolfTarget(AI.wolfVotes(g, rng), rng);
+        else g.draft.mates = AI.wolfVotes(g, rng);   // V101.358 (owner pick A): your bot mates say who they want — you still decide
     }
     function endNight() {
         var d = g.draft, picks = { bite: d.bite || null, guard: null, seer: null, heal: false, poison: null };
@@ -184,7 +185,7 @@
             var cls = 'ww-seat' + (id === g.me ? ' me' : '') + (dead ? ' dead' : '') + (can ? ' pick' : '') + (opts.on === id ? ' on' : '');
             h += '<button type="button" class="' + cls + '" data-id="' + id + '"' + (can ? ' onclick="WW.tap(\'' + id + '\')"' : ' disabled') + '>'
                 + '<span class="n">' + (i + 1) + '</span>' + (opts.votes && opts.votes[id] ? '<span class="vc">' + opts.votes[id] + '</span>' : mark(id))
-                + '<span class="f">' + (dead ? '💀' : g.faces[id]) + '</span>' + esc(nm(id)) + (opts.tags === false && !dead ? '' : tagHtml(id)) + '</button>';
+                + '<span class="f">' + (dead ? '💀' : g.faces[id]) + '</span>' + esc(nm(id)) + (opts.tags === false && !dead ? '' : tagHtml(id)) + (opts.extra && !dead ? opts.extra(id) : '') + '</button>';
         });
         return h + '</div>';
     }
@@ -232,11 +233,20 @@
                 : '<button type="button" class="ww-primary" id="ww-go" onclick="WW.night()">🌙 เข้าสู่คืนแรก</button>') + '</div>';
     }
     function nightHtml() {
-        var r = myRole(), d = g.draft, me = g.me, h = '', ask = '', btn = '', can = null, on = sel;
+        var r = myRole(), d = g.draft, me = g.me, h = '', ask = '', btn = '', can = null, on = sel, extra = null;
         var note = g.lastVote && g.day > 1 ? voteWords() : '';
         if (!meAlive()) { ask = '💀 ดูอยู่'; btn = '☀️ ไปเช้า'; }
         else if (r === 'wolf') {
-            ask = '🐺 กัดใคร?'; can = function (id) { return g.st.roles[id] !== 'wolf'; }; on = d.bite || sel;
+            var mv = d.mates || {}, want = {};
+            Object.keys(mv).forEach(function (m) { if (g.st.alive[m] && mv[m]) (want[mv[m]] = want[mv[m]] || []).push(m); });
+            ask = '🐺 กัดใคร?' + (Object.keys(want).length ? ' · เพื่อนเลือกแล้ว' : ''); can = function (id) { return g.st.roles[id] !== 'wolf'; }; on = d.bite || sel;
+            extra = function (id) {
+                var ws = want[id]; if (!ws) return '';
+                var why = g.level === 3 && AI.wolfWhy ? AI.wolfWhy(g, id) : null;
+                return (g.level === 3 && ws.length > 1 ? '<span class="ww-wc">' + ws.length + '</span>' : '')
+                    + '<span class="ww-want">🐺 ' + ws.map(function (m) { return esc(nm(m)); }).join(' · ') + '</span>'   // the pill already says เพื่อนเลือกแล้ว; the seat is too narrow for more
+                    + (why ? '<span class="ww-why">' + why + '</span>' : '');
+            };
             btn = d.bite ? '🐺 กัด ' + esc(nm(d.bite)) + ' ▸' : '';
         } else if (r === 'seer') {
             var done = g.checks[me] || {};
@@ -254,7 +264,7 @@
             btn = '☀️ ไปเช้า';
         } else { ask = '😴 หลับตา…'; btn = '☀️ ไปเช้า'; }
         h += '<div class="ww">' + top('🌙 คืน ' + g.day, pill(ask, 'ask'));
-        h += seats({ can: can, on: on, tags: false });
+        h += seats({ can: can, on: on, tags: false, extra: extra });
         if (note) h += '<div class="ww-note" id="ww-night-note">' + note + '</div>';
         if (meAlive() && r === 'witch' && (g.st.witch.heal || g.st.witch.poison)) {
             h += '<div class="ww-row">';

@@ -74,6 +74,16 @@ function play(n, level, seed) {
   assert.ok(sus / said < 0.4, 'day 1: fewer than 40 % of the bots accuse (' + sus + '/' + said + ')');
   assert.equal(seerDay1, seerTries, '🥄🥄: the seer bot claims its 👤 result on day 1 every time');
 }
+// V101.358 wolfWhy (🌕 reasons on the wolf night): a 🔮 claim, naming a wolf, suspecting a wolf, a trusted player, else nothing
+{
+  const ids = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7'];
+  const roles = { p1: 'wolf', p2: 'wolf', p3: 'seer', p4: 'guard', p5: 'witch', p6: 'villager', p7: 'villager' };
+  const g = { id: 'why', ids, me: 'p1', level: 3, day: 2, st: W.newState(roles), checks: {}, claims: [{ by: 'p3', day: 1, t: 'p6', wolf: false }, { by: 'p4', day: 1, t: 'p2', wolf: true }], said: [{ day: 1, by: 'p5', k: 'sus', t: 'p1' }], votes: [] };
+  assert.equal(AI.wolfWhy(g, 'p3'), 'อ้างเป็น 🔮');
+  assert.equal(AI.wolfWhy(g, 'p4'), 'ชี้ตัว 🐺', 'naming a wolf beats just claiming');
+  assert.equal(AI.wolfWhy(g, 'p5'), 'สงสัย 🐺');
+  assert.equal(AI.wolfWhy({ ...g, claims: [], said: [] }, 'p7'), null, 'a first-night guess says nothing');
+}
 const tally = {};
 let fakes = 0, trues = 0;
 for (const n of [5, 7, 9]) for (const level of [1, 2, 3]) {
