@@ -2880,6 +2880,20 @@ exports.wolfBot = onRequest({ secrets: ['TELEGRAM_WOLF_TOKEN', 'TELEGRAM_WOLF_HO
     }
     res.status(200).send('ok');
 });
+// 🐺 Werewolf Phase 2 (owner pick Q6: a 1-minute clock, nothing new to enable): ends every night / talk / vote whose deadline
+// has passed. A phase where everyone already pressed moves on at once from wolfBot; this only catches the slow ones.
+exports.wolfTick = onSchedule({
+    schedule: 'every 1 minutes',
+    timeZone: 'Asia/Bangkok',
+    region: 'us-central1',
+    secrets: ['TELEGRAM_WOLF_TOKEN']
+}, async () => {
+    try {
+        await require('./wolf-bot').tick({ db: admin.firestore(), tg: wolfTg, now: Date.now(), rng: Math.random, botName: async () => wolfBotName || (wolfBotName = (await wolfTg('getMe', {})).username) });
+    } catch (e) {
+        console.error('[wolfTick] ' + (e && e.message));
+    }
+});
 
 exports.askNika = onCall({ timeoutSeconds: 60 }, async (request) => {
     const auth = new GoogleAuth({ scopes: 'https://www.googleapis.com/auth/cloud-platform' });

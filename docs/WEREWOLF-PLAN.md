@@ -6,6 +6,7 @@
 > 2026-11-24: เจ้าของสั่ง "สร้างบน LIFF ก่อน แบบ solo เล่นกับบอท" · pick B (ที่นั่ง + ป้ายคำพูด, mockup-werewolf-solo/) → intern V101.353: public/wolf.js + wolf-ai.js + wolf-rules.js (สำเนาเดียวกับ functions/) · ไม่มี Firestore · ไม่มี timer
 **เฟส 0 เริ่ม 2026-11-23:** เจ้าของเลือกข้อ 3 = 5 บท 🐺 🔮 🛡️ 🧪 👤 → `functions/wolf-rules.js` + `scripts/wolf-rules-check.cjs` (ยังไม่มีบอท ยังไม่ deploy) = PR #2436
 **เฟส 1 เริ่ม 2026-11-23:** ข้อ 1 = ใครก็ได้ที่มี Telegram · ข้อ 2 = บอทใหม่แยก · ข้อ 7 = ทุกกลุ่ม → `functions/wolf-bot.js` + `exports.wolfBot` + rules ปิด `wolf_*` + `scripts/wolf-bot-check.cjs` (เกมหยุดที่ 🌙 คืนแรก จนกว่าเฟส 2)
+**เฟส 2 เริ่ม 2026-11-24:** ข้อ 4 = ไม่เปิดบทคนตาย (เปิดตอนจบ) · ข้อ 5 = แค่จำนวน · ข้อ 6 = ทุก 1 นาที · ข้อ 8 = ปล่อยตามมารยาท (mockup-werewolf-p2/) → wolf-bot.js เล่นครบ + `wolfTick` · อยู่ใน PR เดียวกับเฟส 1 (#2437) เพราะเฟส 1 ยัง merge ไม่ได้จนกว่า secret จะครบ
 → ก่อนเริ่มแต่ละเฟส ถามเฉพาะข้อ §8 ที่เฟสนั้นต้องใช้ (เฟส 0: ข้อ 3 · เฟส 1: ข้อ 1, 2, 7 · เฟส 2: ข้อ 4, 5, 6, 8) พร้อม mockup ข้อความแชท
 
 ---
@@ -105,13 +106,13 @@ wolf_tg/{tgId}         ห้องที่อยู่ตอนนี้ + (�
 1. **ใครเล่น:** ✅ ใครก็ได้ที่มี Telegram, ไม่ผูกแอปใน v1 (เลือกแล้ว 2026-11-23) / ~~ต้องผูกกับบัญชี intern ตั้งแต่แรก~~
 2. **บอท:** ✅ สร้างบอทใหม่แยกจากบอทแจ้งเตือน admin (เลือกแล้ว 2026-11-23) / ~~ใช้บอทเดิม~~
 3. **บทใน v1:** ✅ 🐺 🔮 🛡️ 🧪 👤 (เลือกแล้ว 2026-11-23) / ~~แค่ 🐺 🔮 👤~~
-4. **เปิดบทคนตายทันที:** [ไม่] / เปิด
-5. **ผลโหวต:** [แค่จำนวน] / บอกชื่อ
-6. **นาฬิกา:** [ทุก 1 นาที (ไม่ต้องเปิดอะไรเพิ่ม)] / Cloud Tasks ตรงวินาที
+4. ✅ (ไม่) **เปิดบทคนตายทันที:** [ไม่] / เปิด
+5. ✅ (แค่จำนวน) **ผลโหวต:** [แค่จำนวน] / บอกชื่อ
+6. ✅ (ทุก 1 นาที) **นาฬิกา:** [ทุก 1 นาที (ไม่ต้องเปิดอะไรเพิ่ม)] / Cloud Tasks ตรงวินาที
 7. **กลุ่มที่ใช้ได้:** ✅ ทุกกลุ่ม (เลือกแล้ว 2026-11-23) / ~~เฉพาะกลุ่มที่อนุญาต~~
-8. **คนตายพิมพ์ในกลุ่ม:** [ปล่อยตามมารยาท] / บอทลบข้อความ (บอทต้องเป็น admin กลุ่ม)
+8. ✅ (ปล่อยตามมารยาท) **คนตายพิมพ์ในกลุ่ม:** [ปล่อยตามมารยาท] / บอทลบข้อความ (บอทต้องเป็น admin กลุ่ม)
 
-## 9. เปิดบอทจริง (เจ้าของทำ · เฟส 1)
+## 9. เปิดบอทจริง (เจ้าของทำ · เฟส 1–2)
 
 ผมไม่แตะ token เลย ทุกขั้นที่มี token เจ้าของรันเอง
 
@@ -119,9 +120,9 @@ wolf_tg/{tgId}         ห้องที่อยู่ตอนนี้ + (�
 2. ตั้ง secret 2 ตัว (วาง token / พิมพ์รหัสลับยาว ๆ ที่คิดเอง ตอนมันถาม):
    `firebase functions:secrets:set TELEGRAM_WOLF_TOKEN --project intern-port-edfa7`
    `firebase functions:secrets:set TELEGRAM_WOLF_HOOK_SECRET --project intern-port-edfa7`
-3. บอกผม → ผม deploy `wolfBot` + rules
+3. บอกผม → ผม deploy `wolfBot` + `wolfTick` + rules
 4. ผูก webhook (PowerShell, อ่าน secret เองไม่แสดงบนจอ):
    `$t = gcloud secrets versions access latest --secret TELEGRAM_WOLF_TOKEN --project intern-port-edfa7`
    `$h = gcloud secrets versions access latest --secret TELEGRAM_WOLF_HOOK_SECRET --project intern-port-edfa7`
    `Invoke-RestMethod "https://api.telegram.org/bot$t/setWebhook" -Method Post -Body @{ url = 'https://us-central1-intern-port-edfa7.cloudfunctions.net/wolfBot'; secret_token = $h; allowed_updates = '["message","callback_query"]' }`
-5. เพิ่มบอทเข้ากลุ่ม ▸ พิมพ์ `/werewolf` ▸ เพื่อน 5 คนกด ▸ เข้าร่วม ▸ หัวห้องกด ▸ เริ่ม ▸ ทุกคนได้บททาง DM
+5. เพิ่มบอทเข้ากลุ่ม ▸ พิมพ์ `/werewolf` ▸ เพื่อน 5 คนกด ▸ เข้าร่วม ▸ หัวห้องกด ▸ เริ่ม ▸ ทุกคนได้บททาง DM ▸ เล่นคืน → เช้า → โหวต จนจบ
