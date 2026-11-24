@@ -59,7 +59,14 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
   assert.equal(await page.evaluate(() => WW._game ? null : null), null); assert.match(await page.$eval('#ww-levels button.on', (b) => b.textContent), /คืนเดือนเพ็ญ/, 'tap a night = that level');
   await page.click('#ww-levels button:has-text("เที่ยงคืน")');
   assert.equal(await page.textContent('#ww-start'), '▸ เริ่มเกม · สุ่มบท');
+  // V101.359 (pick C): the chosen night says what the bots do, one line under the row, and it follows the pick
+  assert.match(await page.textContent('#ww-lvtip'), /^🌙 เที่ยงคืน บอทจำว่าใครพูดอะไร/);
+  await page.click('#ww-levels button:has-text("หัวค่ำ")'); assert.match(await page.textContent('#ww-lvtip'), /^🌆 หัวค่ำ บอทเดาเกือบสุ่ม/);
+  await page.click('#ww-levels button:has-text("คืนเดือนเพ็ญ")'); assert.match(await page.textContent('#ww-lvtip'), /^🌕 คืนเดือนเพ็ญ บอทหลอกเก่ง/);
+  await page.click('#ww-levels button:has-text("เที่ยงคืน")');
+  assert.match(await page.$eval('#ww-levels button.on', (b) => getComputedStyle(b).boxShadow), /251, 191, 36/, 'the chosen night glows gold');
   await page.click('#wolfModal button.ww-chip:has-text("5")');
+  assert.deepEqual(await page.$$eval('#ww-roles .ww-tile.bump', (t) => t.map((x) => x.dataset.role)), ['wolf'], '7 → 5: only the changed count bumps');
   assert.deepEqual((await tiles()).map((t) => t[1]), ['🐺หมาป่า1', '🔮ผู้หยั่งรู้1', '🛡️การ์ด1', '👤ชาวบ้าน2'], '5 players → 4 tiles, 🐺 1');
 
   const roles = new Set(); const seen = { mates: 0, seerAnswer: 0, witchBite: 0, myTag: 0, voteCounts: 0, deadRole: 0, quietOrTag: 0 };
@@ -144,6 +151,10 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
     await page.evaluate(() => { WW.close(); wolfOpen(); });
     const row = await page.$eval('#wolfModal .ww-game', (r) => r.className);
     assert.match(row, /r-w|r-l/, 'a finished game row has a result bar: ' + row);
+    // V101.359 (pick C): the result once in words (ชนะ green / แพ้ red, no 🏆 / 💀), 👁 = see the result
+    const rr = await page.$eval('#wolfModal .ww-game', (r) => ({ cls: r.className, res: (r.querySelector('.res') || {}).textContent, resCls: (r.querySelector('.res') || {}).className, go: r.querySelector('.go').textContent, txt: r.textContent }));
+    assert.equal(rr.res, rr.cls.includes('r-w') ? 'ชนะ' : 'แพ้'); assert.match(rr.resCls, rr.cls.includes('r-w') ? / w$/ : / l$/);
+    assert.equal(rr.go, '👁'); assert.ok(!/🏆|💀/.test(rr.txt), 'no 🏆 / 💀 in the row: ' + rr.txt);
   }
   assert.equal(roles.size, 5, 'played as every role: ' + [...roles]);
   // a wolf at 9 players sees both mates on the card and a 🐺 corner on their seats at night
@@ -217,7 +228,7 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
   // an unfinished game: framed, ▸, back on reopen
   await page.evaluate(() => { WW.set('n', 7); WW.start(); WW.night(); WW.close(); wolfOpen(); });
   const cur = await page.$eval('#wolfModal .ww-game.cur', (r) => ({ go: r.querySelector('.go').textContent, cls: r.className }));
-  assert.equal(cur.go, '▸'); assert.match(cur.cls, /r-p/);
+  assert.equal(cur.go, '▸ เล่นต่อ', 'V101.359: the unfinished game says ▸ เล่นต่อ'); assert.match(cur.cls, /r-p/);
   const stored = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('wolf_v1_')).map((k) => JSON.parse(localStorage.getItem(k)).games.length));
   assert.ok(stored.length && stored[0] >= 2, 'games are in wolf_v1_<user>');
   await page.click('#wolfModal .ww-game.cur');
