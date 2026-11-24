@@ -130,7 +130,7 @@ const ROLE_WORDS = /คุณคือ|ผู้หยั่งรู้|บอ�
   assert.deepEqual(got, { wolf: 2, seer: 1, guard: 1, villager: 2 });
   const edit = out.find((x) => x.method === 'editMessageText');
   assert.match(edit.body.text, /เกมเริ่ม .* 6 คน/); assert.match(edit.body.text, /🐺 2 · 🔮 1 · 🛡️ 1 · 👤 2/);
-  const cards = out.filter((x) => x.method === 'sendMessage' && x.body.chat_id !== '-1001');
+  const cards = out.filter((x) => x.method === 'sendMessage' && x.body.chat_id !== '-1001' && /🤫 อย่าบอกใคร/.test(x.body.text));   // Phase 2: night menus follow the cards
   assert.equal(cards.length, 6, 'one DM card per player');
   const wolves = Object.keys(st.roles).filter((id) => st.roles[id] === 'wolf');
   for (const c of cards) {
@@ -142,7 +142,7 @@ const ROLE_WORDS = /คุณคือ|ผู้หยั่งรู้|บอ�
       assert.ok(c.body.text.includes('🐺 เพื่อน: ' + mate), 'wolf sees the other wolf');
     } else assert.ok(!/เพื่อน/.test(c.body.text), 'non-wolves see no mates');
   }
-  const warn = out.filter((x) => x.method === 'sendMessage' && x.body.chat_id === '-1001');
+  const warn = out.filter((x) => x.method === 'sendMessage' && x.body.chat_id === '-1001' && /ส่ง DM ไม่ถึง/.test(x.body.text));
   assert.equal(warn.length, 1); assert.match(warn[0].body.text, /ส่ง DM ไม่ถึง: Nam/, 'a failed DM is named in the group');
   failDm.clear();
 
