@@ -257,6 +257,7 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
         out.readMore = { open, typed, closed, shortHidden: btn().style.visibility };
         Articles.edit('b1');
       }
+      const wRead = writes.length;   // V102.701: re-opening b1 auto-saved the typing above (a draft) — the ✨ checks below count from here
       Articles.who(true);
       out.who = [qa('.art-wr').length, qa('.art-wr .pill').map(p => p.textContent), qa('[data-who]').map(b => b.dataset.who + ':' + b.querySelector('b').textContent)];
       Articles.whoF('closed'); out.closedOnly = qa('.art-wr b').map(b => b.textContent);
@@ -287,9 +288,9 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
       await Articles.ai();
       out.thEn = [S.cur.title.en, S.cur.body.en, /into English/.test(thCalls[0][1]) && /หัวข้อไทย\n---\nเนื้อไทย \*\*สำคัญ\*\*$/.test(thCalls[0][1]), busyLbl, q('.art-ai .go').textContent];
       S.cur.title = keep[0]; S.cur.body = keep[1];
-      out.writes = writes.length;
+      out.writes = writes.length - wRead;
       // ---- V102.362: 🌐 Translate all — the header button before ＋ New; every missing TH / KO from EN, saved as title.<L> / body.<L>
-      Articles.close();
+      Articles.close(); const wClose = writes.length;   // V102.701: closing auto-saves the dirty draft above — count only what Translate all sends
       S.list = [
         { id: 'a1', title: { en: 'Acromegaly: Spotting the Subtle Signs 🔍' }, body: { en: 'Body one' }, cover: { emoji: '📰' }, status: 'scheduled', startAt: Date.now(), endAt: Date.now() + 864e5, audience: { divisions: [], groups: [] }, links: [], rerun: 'any' },
         { id: 'a2', title: { en: 'Two', th: 'สอง' }, body: { en: 'Body two', th: 'เนื้อสอง' }, cover: { emoji: '📰' }, status: 'scheduled', startAt: Date.now(), endAt: Date.now() + 864e5, audience: { divisions: [], groups: [] }, links: [], rerun: 'any' },
@@ -300,7 +301,7 @@ const bkk = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi || 0) - BKK;
       out.trHead = [hd.indexOf('art-tr-all') > -1 && hd.indexOf('art-tr-all') < hd.indexOf('art-new'), q('.art-tr-all').textContent.replace(/\s+/g, ' ').trim(), q('.art-tr-all').disabled];
       const trCalls = []; window.callUniversalAI = async (...a) => { trCalls.push(a); const L = /into Korean/.test(a[1]) ? 'ko' : 'th'; return { text: (L === 'ko' ? '제목' : 'หัวข้อ') + '\n---\n' + (L === 'ko' ? '본문' : 'เนื้อหา') }; };
       const toasts = []; window.showToast = m => toasts.push(m);
-      window.confirm = () => false; await Articles.translateAll(); out.trCancel = [trCalls.length, writes.length];
+      window.confirm = () => false; await Articles.translateAll(); out.trCancel = [trCalls.length, writes.length - wClose];
       out.trHead2 = [q('.art-tr-all').textContent.replace(/\s+/g, ' ').trim(), S.list.map(a => a.id + ':' + Object.keys(a.body).sort().join('')).join(' ')];
       window.confirm = msg => { if (!out.trConfirm) out.trConfirm = msg; return true; };   // the stop test below confirms again
       const trInfoWas = window.textAIModelInfo; window.textAIModelInfo = id => ({ 'gemini-3.8-flash': { short: 'Flash 3.8' } })[id] || (trInfoWas ? trInfoWas(id) : null); localStorage.setItem('ai_default_translate_model', 'gemini-3.8-flash');
