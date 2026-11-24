@@ -25,6 +25,8 @@
     var SHORT = { wolf: 'หมาป่า', seer: 'ผู้หยั่งรู้', guard: 'การ์ด', witch: 'แม่มด', villager: 'ชาวบ้าน' };
     var TIP = { wolf: 'กัด 1 คนทุกคืน · ชนะเมื่อเท่ากับคนที่เหลือ', seer: 'ส่อง 1 คนทุกคืน ว่าเป็น 🐺 ไหม', guard: 'คุ้มกัน 1 คนทุกคืน · ห้ามคนเดิม 2 คืนติด',
         witch: '💊 ชุบคนถูกกัด 1 ครั้ง · ☠️ วางยา 1 ครั้ง', villager: 'ไม่มีพลัง · หา 🐺 จากคำพูดแล้วโหวตออก' };
+    // V101.359 (owner pick C, round3): the chosen night says what the bots do, in one line under the row (like the role tip)
+    var LVTIP = { 1: 'บอทเดาเกือบสุ่ม · เหมาะเล่นครั้งแรก', 2: 'บอทจำว่าใครพูดอะไร · 🔮 เปิดตัว · 🐺 แย้งกลับ', 3: 'บอทหลอกเก่ง · 🐺 อาจอ้างเป็น 🔮' };
     var NIGHTS = [[1, '🌆', 'หัวค่ำ', 'ง่าย'], [2, '🌙', 'เที่ยงคืน', 'กลาง'], [3, '🌕', 'คืนเดือนเพ็ญ', 'ยาก']];
     function goal(r) { return r === 'wolf' ? '🏆 ชนะเมื่อ 🐺 เท่ากับคนที่เหลือ' : '🏆 ชนะเมื่อ 🐺 ออกครบ'; }
 
@@ -193,16 +195,18 @@
     function voteWords() { var v = g.lastVote; return !v ? '' : v.out ? '🗳 ' + esc(nm(v.out)) + ' ถูกโหวตออก ' + E[g.st.roles[v.out]] : '🗳 เสมอ · ไม่มีใครออก'; }
 
     function lobbyHtml() {
-        var c = W.defaultCounts(ui.n), h = '<div class="ww">' + top('🐺 มนุษย์หมาป่า', pill('🤖<span class="tx"> เล่นกับบอท</span>', 'acc') + (window.WWTour ? '<button type="button" class="ww-pill ww-help" id="ww-help" onclick="WWTour.open()" title="วิธีเล่น">❓</button>' : ''), true);
+        var c = W.defaultCounts(ui.n), was = ui.prevN ? W.defaultCounts(ui.prevN) : null, h = '<div class="ww ww-lobby">' + top('🐺 มนุษย์หมาป่า', pill('🤖<span class="tx"> เล่นกับบอท</span>', 'acc') + (window.WWTour ? '<button type="button" class="ww-pill ww-help" id="ww-help" onclick="WWTour.open()" title="วิธีเล่น">❓</button>' : ''), true);
         h += '<div class="ww-row"><span class="ww-mini">👥 คน</span>' + [5, 7, 9].map(function (n) { return '<button type="button" class="ww-chip' + (ui.n === n ? ' on' : '') + '" onclick="WW.set(\'n\',' + n + ')">' + n + '</button>'; }).join('') + '</div>';
         var rs = W.ROLES.filter(function (r) { return c[r]; }), tip = rs.indexOf(ui.tip) >= 0 ? ui.tip : null;
         h += '<div class="ww-tiles" id="ww-roles" style="grid-template-columns:repeat(' + rs.length + ',minmax(0,1fr))">' + rs.map(function (r) {
-            return '<button type="button" class="ww-tile' + (tip === r ? ' on' : '') + '" data-role="' + r + '" aria-pressed="' + (tip === r) + '" onclick="WW.set(\'tip\',\'' + (tip === r ? '' : r) + '\')"><span class="e">' + E[r] + '</span>' + SHORT[r] + '<b>' + c[r] + '</b></button>';
+            return '<button type="button" class="ww-tile' + (tip === r ? ' on' : '') + (was && was[r] !== c[r] ? ' bump' : '') + '" data-role="' + r + '" aria-pressed="' + (tip === r) + '" onclick="WW.set(\'tip\',\'' + (tip === r ? '' : r) + '\')"><span class="e">' + E[r] + '</span>' + SHORT[r] + '<b>' + c[r] + '</b></button>';
         }).join('') + '</div>';
         if (tip) h += '<div class="ww-tip" id="ww-tip">' + E[tip] + ' <b>' + SHORT[tip] + '</b> ' + TIP[tip] + '</div>';
         h += '<div class="ww-nights" id="ww-levels" role="group" aria-label="Bot level">' + NIGHTS.map(function (x) {
             return '<button type="button" class="' + (ui.level === x[0] ? 'on' : '') + '" aria-pressed="' + (ui.level === x[0]) + '" onclick="WW.set(\'level\',' + x[0] + ')"><i>' + x[1] + '</i>' + x[2] + '<small>' + x[3] + '</small></button>';
         }).join('') + '</div>';
+        var lv = NIGHTS.filter(function (x) { return x[0] === ui.level; })[0];
+        if (lv) h += '<div class="ww-lvtip" id="ww-lvtip">' + lv[1] + ' <b>' + lv[2] + '</b> ' + LVTIP[lv[0]] + '</div>';
         h += '<button type="button" class="ww-primary" id="ww-start" onclick="WW.start()">▸ เริ่มเกม · สุ่มบท</button>';
         var games = store.games.slice().sort(function (a, b) { return b.upd - a.upd; });
         if (games.length) {
@@ -211,8 +215,8 @@
             games.forEach(function (x) {
                 var r = E[x.st.roles[x.me]], fin = x.status === 'finished', won = fin && ((x.result.winner === 'wolf') === (x.st.roles[x.me] === 'wolf'));
                 var bar = fin ? (won ? ' r-w' : ' r-l') : ' r-p';
-                var words = fin ? r + ' คุณ · ' + (won ? '🏆' : '💀') + ' วัน ' + x.result.day : r + ' คุณ · ' + (x.phase === 'night' ? '🌙 คืน ' : '☀️ วัน ') + x.day + ' · 👥 ' + W.aliveIds(x.st.alive).length + '/' + x.n;
-                h += '<button type="button" class="ww-game' + bar + (x === cur ? ' cur' : '') + '" data-game="' + x.id + '" onclick="WW.resume(\'' + x.id + '\')">' + words + '<span class="go">' + (fin ? '↺' : '▸') + '</span></button>';
+                var words = fin ? r + ' คุณ · วัน ' + x.result.day : r + ' คุณ · ' + (x.phase === 'night' ? '🌙 คืน ' : '☀️ วัน ') + x.day + ' · 👥 ' + W.aliveIds(x.st.alive).length + '/' + x.n;
+                h += '<button type="button" class="ww-game' + bar + (x === cur ? ' cur' : '') + '" data-game="' + x.id + '" onclick="WW.resume(\'' + x.id + '\')">' + words + (fin ? '<span class="res ' + (won ? 'w' : 'l') + '">' + (won ? 'ชนะ' : 'แพ้') + '</span><span class="go" title="ดูผล" aria-label="ดูผล">👁</span>' : '<span class="go cont">▸ เล่นต่อ</span>') + '</button>';
             });
         } else h += '<div class="ww-empty" id="ww-empty">🎮 ยังไม่มีเกม · ▸ เริ่มได้เลย</div>';
         return h + '</div>';
@@ -329,7 +333,7 @@
         close: function () { if (g) put(); else save(); var m = document.getElementById('wolfModal'); if (m) m.style.display = 'none'; },
         back: function () { if (ui.peek) { ui.peek = false; render(); return; } if (g) { put(); g = null; sel = null; render(); } else WW.close(); },
         peek: function (on) { ui.peek = !!on; render(); },
-        set: function (k, v) { ui[k] = v || null; if (k !== 'tip') ui[k] = v; render(); },
+        set: function (k, v) { if (k === 'n' && ui.n !== v) ui.prevN = ui.n; ui[k] = v || null; if (k !== 'tip') ui[k] = v; render(); if (k === 'n') ui.prevN = null; },
         start: function () { g = newGame(ui.n, ui.level); put(); render(); },
         resume: function (id) { g = store.games.filter(function (x) { return x.id === id; })[0] || null; sel = null; ui.peek = false; render(); },
         again: function () { var n = g.n, l = g.level; put(); g = newGame(n, l); put(); render(); },
