@@ -32,12 +32,12 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
   const entry = await page.$eval('#sch-wolf-btn', (b) => ({ txt: b.textContent, prev: b.previousElementSibling && b.previousElementSibling.id, on: b.getAttribute('onclick') }));
   assert.deepEqual(entry, { txt: '🐺', prev: 'sch-cereal-btn', on: 'wolfOpen()' }, 'the 🐺 button is right after 🥣');
 
-  // phone: 🐺 lives in Schedule, not the top rail; PC (≥ 768 px): 🐺 sits right after 🥣 in the rail, left of 📅, like Cereal
+  // phone: 🐺 lives in Schedule, not the top rail; PC (≥ 768 px): 🐺 sits just left of 🥣 in the rail (🥣 stays next to 📅)
   const vis = (sel) => page.$eval(sel, (e) => getComputedStyle(e).display !== 'none');
   assert.equal(await vis('#u-wolf-chip'), false, 'no rail 🐺 on a phone');
   await page.setViewportSize({ width: 1280, height: 800 });
   assert.equal(await vis('#u-wolf-chip'), true, 'rail 🐺 on PC');
-  assert.equal(await page.$eval('#u-wolf-chip', (b) => b.previousElementSibling.id), 'u-cereal-chip');
+  assert.equal(await page.$eval('#u-wolf-chip', (b) => b.nextElementSibling.id), 'u-cereal-chip', '🐺 just left of 🥣 (🥣 stays next to 📅)');
   assert.equal(await vis('#sch-wolf-btn'), false, 'Schedule 🐺 hidden on PC');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => wolfOpen());
