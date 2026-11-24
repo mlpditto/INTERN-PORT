@@ -13,6 +13,16 @@ Files: `public/wolf-rules.js` (a byte copy of `functions/wolf-rules.js`, UMD) ·
 - The 🔮 bot claims at once when it finds a wolf, otherwise from day 2 at 🥄🥄+. Wolves at 🥄🥄+ counter-claim a seer who named a mate; at 🥄🥄🥄 one may fake-claim first. Fake claims are marked and shown 🤥 at the end.
 - Wolves bite the claimed seer / their accusers, vote with the table, never accuse or vote a mate.
 
+## Telegram (Phase 0–2 built, not deployed)
+
+**Built: Phase 0 (rules `functions/wolf-rules.js`), Phase 1 (rooms) and Phase 2 (the whole game) in `functions/wolf-bot.js` behind `exports.wolfBot` + `exports.wolfTick` (every minute).** Live only after the owner makes the bot and sets its secrets + webhook (plan §9). Owner picks: dead roles stay hidden until the end (Q4) · vote result = counts only (Q5) · 1-minute clock (Q6) · the dead are asked to keep quiet, nothing deleted (Q8).
+
+## How to get to it (user POV)
+
+Add the bot to any Telegram group (owner picks: anyone with Telegram, no app account, any group) ▸ `/werewolf` ▸ the bot posts one lobby: `🐺 มนุษย์หมาป่า · ห้อง CODE · 👥 n/10 · names` with ▸ เข้าร่วม (a deep link `t.me/<bot>?start=CODE`: opens the DM, presses Start, seats you, edits the lobby) and ▸ เริ่ม / ✕ ยกเลิก (host only). At 5–10 the host's ▸ เริ่ม deals the default deck, edits the lobby to the role mix and DMs every player their card (wolves see each other). A failed DM is named in the group. One open room per group, one live room per player.
+
+Then (Phase 2): 🌙 the group gets "คืนที่ n · ⏳ 1:30"; each 🐺 / 🔮 / 🛡️ gets a DM menu of names (one press, final; wolves see each other's picks; 🔮 gets the answer in the same message); when the last wolf has chosen, the 🧪 gets a menu that names the bitten (💚 ชุบ · ☠️ names · ⏭ เสร็จ). Everyone pressed → morning at once, else at the deadline. ☀️ "เช้าวันที่ n · เมื่อคืน 💀 X ตาย · ขอเงียบ…" (no role) + the talk timer + 🗳 โหวตเลย (host). 🗳 one group message with a button per living player + ⏭ ข้าม: secret and changeable, the message shows only "โหวตแล้ว k/n"; all voted → the result at once, else at the deadline: "นนท์ 3 · ต้น 2 · ⏭ ข้าม 1 · 👋 นนท์ ออก…" (no voter names; any tie = nobody). The end message is the only group text with roles: every player with their role emoji and 💀. Buttons carry the round, so a stale press is refused. Data: `wolf_games/{CODE}` (+ `secret/state` roles), `wolf_chats/{chatId}`, `wolf_tg/{tgId}`; rules: all closed, only the function touches them.
+
 ## What the engine decides
 
 - `defaultCounts(n)` / `countsError(counts, n)` / `deal(ids, counts, rng)` — the deck per player count and the host's custom deck (one 🔮 🛡️ 🧪 at most, ≥ 1 🐺, wolves < half).
@@ -26,8 +36,13 @@ Files: `public/wolf-rules.js` (a byte copy of `functions/wolf-rules.js`, UMD) ·
 - `wolf-ai-check` (D, node): 1350 all-bot games (5/7/9 × 🥄 levels) — every pick passes pickError, no mate accused or voted, true claims match checks, fakes only from wolves, one claim per bot per day, all games end, 🥄🥄🥄 village beats 🥄 at 7.
 - `wolf-rules-check` (D, node): every default deck 5–10 deals exactly its roles; bad decks refused by code; each refused pick; night order cases; wolf tie by rng; vote ties / skips / dead voters; both win conditions; two scripted 7-player games (village win, wolf win); inputs never mutated; public/wolf-rules.js = functions/wolf-rules.js.
 
+- `wolf-game-check` (D, node): 90 whole games (5–10 players, some phases left to the clock) on fake Telegram + Firestore — winner = the engine's; only the end names roles; vote results are counts only; the dead are asked to keep quiet; the 🔮 answer is true; the 🧪 sees the bite; stale / dead / outsider / self / double presses refused; phases move early without the clock; chat + players freed; wolfTick every minute with the wolf token only.
+- `wolf-bot-check` (D, node): wolfBot export + secret-header 403 + its own secrets; rules keep `wolf_*` closed; lobby + deep link; joins edit the same lobby message; one room per group; host-only ▸ เริ่ม at ≥ 5; 6 players dealt the right deck, each DM card names only its role, wolves see their mate; every text sent to a group is checked for role words; late / full / unknown / other-room joins refused; ✕ frees the chat and players; transactions read before writing.
+
 ## What usually lies
 
 - "Played every role" when the seat was dead: the harness only taps when p1 is alive — a dead p1 just presses ▸.
 - Win rates in wolf-ai-check are bots vs bots, not how hard it feels for a person.
+- The fake Telegram always succeeds unless told to fail: the real API also rate-limits (~20 msgs/min/group) and refuses DMs to people who never pressed Start.
+
 - A check that only calls `resolveNight` with legal picks: the bot must call `pickError` first, the engine trusts its input.
