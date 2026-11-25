@@ -2,7 +2,7 @@
 // with a fake Firestore: what is deleted (blank + 12 h+), what is NOT (config docs "--…", a title / questions / any content, younger than 12 h, no createdAt, already taken), the log goes
 // before the delete (no log → no delete), the sweep runs once, and the snapshot handler calls it.
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
-const html = fs.readFileSync('public/admin.html', 'utf8');
+const html = fs.readFileSync('public/admin.html', 'utf8').replace(/\r\n/g, '\n'); // CRLF on a Windows checkout
 assert.ok(/<title>Nika Admin \(V102\.\d+\)<\/title>/.test(html));
 const a = html.indexOf('const EMPTY_QUIZ_MAX_AGE_MS'), b = html.indexOf('db.collection("quizzes").onSnapshot(s => {\n                quizzesData');
 assert.ok(a > 0 && b > a, 'sweep block found');

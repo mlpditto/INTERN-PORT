@@ -2,8 +2,8 @@
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm'), assert = require('node:assert/strict');
 const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'admin.html'), 'utf8');
 const i = html.indexOf('function setAlabastaCaseCardImageLoadingState('); assert.ok(i > 0);
-const end = html.slice(i).search(/\r?\n {8}\}\r?\n/); assert.ok(end > 0);
-const src = html.slice(i, i + end + 10);
+const m = html.slice(i).match(/\r?\n {8}\}\r?\n/); assert.ok(m); // CRLF on a Windows checkout
+const src = html.slice(i, i + m.index + m[0].length);
 
 let now = 1_000_000, ticks = [];
 const pill = { className: '', innerHTML: '', style: {}, querySelector: () => { const m = pill.innerHTML.match(/cc-gen-time[^>]*>([^<]*)</); return m ? { set textContent(v) { pill.innerHTML = pill.innerHTML.replace(/(cc-gen-time[^>]*>)[^<]*/, '$1' + v); } } : null; } };

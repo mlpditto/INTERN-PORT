@@ -96,7 +96,7 @@ const PUB = path.resolve('public').replace(/\\/g, '/');
         assert.deepEqual(await page.evaluate(() => window.__hub), ['today'], 'a pill opens that person in the User Hub');
         assert.equal(await page.$$eval('#hol-strip .hol-kinds button', b => b.length), 4, '🎌 🩺 🐱 🎂 toggles');
         await page.click('#hol-strip .hol-kinds button[title="Birthdays"]');
-        assert.equal(await page.$$eval('#hol-strip .hol-pill', p => p.length), 0, '🎂 off hides them');
+        assert.equal(await page.$$eval('#hol-strip .hol-pill', p => p.filter(x => x.textContent.trim().startsWith('🎂')).length), 0, '🎂 off hides them (late in a month next month\'s days may still show)');
         await page.click('#hol-strip .hol-kinds button[title="Birthdays"]');
         // month view
         await page.evaluate(() => Holidays.toggleCal());
