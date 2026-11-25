@@ -32,6 +32,7 @@ Walk the areas top to bottom for a broad regression: intern surfaces first, then
 - [werewolf](werewolf.md): The 🐺 Werewolf party game — solo vs 🤖 on LIFF (V101.353); Telegram bot planned.
 - [count-game](count-game.md): 🧊 นับไว — solo Count the Rectangles + Count the Cubes, number pad, answer then the answer shows (V101.362).
 - [shadow](shadow.md): ⚫⚪ ไพ่เงา — hidden-number duel vs 🤖 (0–8, see only the colour), 3 levels, 🧠 memory mode at 🥄🥄🥄 (V101.365).
+- Games row (V101.368): on phones the 4 game doorways (🥣 🐺 🧊 ⚫) are one row of named cards under History, above the version (`#u-games-row`, `scripts/games-row-qa.cjs`); PC keeps the header rail.
 - [content-creator](content-creator.md): The social-content division: intern post form, admin content board, separate CAFE points.
 - [guides](guides.md): Markdown guides served through guide.js with chip rails, feedback boxes and built PDFs.
 - [translations](translations.md): EN / TH / KO toggle, Translate Missing, stale quiz translations, the Korean gap ratchet.

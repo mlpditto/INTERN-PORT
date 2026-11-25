@@ -44,8 +44,8 @@ const disp = (page, sel) => page.evaluate(s => getComputedStyle(document.querySe
         assert.deepEqual(pc.errors, []);
         const ph = await open(browser, 390, true);
         assert.equal(await disp(ph.page, '#u-cereal-chip'), 'none', 'phone: no header 🥣');
-        assert.notEqual(await disp(ph.page, '#sch-cereal-btn'), 'none', 'phone: 🥣 stays beside 💰 in Schedule');
+        assert.notEqual(await disp(ph.page, '#sch-cereal-btn'), 'none', 'phone: 🥣 shown (V101.368: in the games row under History)');
         assert.deepEqual(ph.errors, []);
-        console.log('cereal-header-qa: OK — PC: 🥣 circle left of 📅 opens the game, gone from Schedule; phone: stays beside 💰');
+        console.log('cereal-header-qa: OK — PC: 🥣 circle left of 📅 opens the game, gone from Schedule; phone: in the games row under History');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
