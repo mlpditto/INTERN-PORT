@@ -47,22 +47,22 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   await page.click(`.cg-pad button:text-is("${wrong}")`); await page.click('.cg-pad button:text-is("7")'); await page.click('.cg-pad button[aria-label="Delete"]');
   assert.equal(await page.$eval('#cg-ans', (e) => e.textContent), String(wrong), 'the pad types, ⌫ deletes');
   await page.click('#cg-ok');
-  assert.equal(await page.$eval('#cg-res', (e) => e.textContent), `✗ ตอบ ${wrong} · เฉลย ${n}`);
+  assert.match(await page.$eval('#cg-res', (e) => e.textContent), new RegExp(`^✗ ตอบ ${wrong} · เฉลย ${n} · ⏱ \\d+ วิ$`), 'V101.372: the seconds this question took');
   // V101.371 (pick C): every rectangle as a small numbered picture instead of lighting one by one (count-free-qa covers the details)
   assert.equal(await page.$$eval('#cg-thumbs .cg-th', (t) => t.length), n, 'one small picture per rectangle');
 
   // question 2: right answer scores 100 + 5 × seconds left
   await page.click('#cg-next');
   const r2 = await page.evaluate(() => { const g = CG._g(); String(CG._count(g.p)).split('').forEach((d) => CG.key(+d)); const left = g.left; CG.ok(); return { left, score: g.score, res: document.getElementById('cg-res').textContent }; });
-  assert.equal(r2.score, 100 + r2.left * 5); assert.match(r2.res, /^✓ \d+ ถูก · \+\d+$/);
+  assert.equal(r2.score, 100 + r2.left * 5); assert.match(r2.res, /^✓ \d+ ถูก · \+\d+ · ⏱ \d+ วิ$/); assert.equal(+/(\d+) วิ$/.exec(r2.res)[1], 30 - r2.left, 'took = 30 − seconds left');
 
   // question 3: time runs out → หมดเวลา
   await page.click('#cg-next'); await page.evaluate(() => { CG._g().left = 1; }); await page.waitForSelector('#cg-res', { timeout: 3000 });
-  assert.match(await page.$eval('#cg-res', (e) => e.textContent), /^⏱ หมดเวลา · เฉลย \d+$/);
+  assert.match(await page.$eval('#cg-res', (e) => e.textContent), /^⏱ หมดเวลา · เฉลย \d+$/, 'a time-out never says 30 วิ again');
   for (let i = 0; i < 2; i++) { await page.click('#cg-next'); await page.evaluate(() => { CG.key(0); CG.ok(); }); }
   await page.click('#cg-next');
   const end = await page.evaluate(() => ({ final: document.getElementById('cg-final').textContent, best: localStorage.getItem('countBest_rect'), score: CG._g().score }));
-  assert.equal(end.final, '🏆 ' + end.score); assert.equal(end.best, String(end.score), 'a new best is kept');
+  assert.equal(end.final, '🏆 ' + end.score); assert.equal(await page.$$eval('#cg-qt span', (s) => s.length), 5, 'V101.372: the timed end shows each question\'s seconds too'); assert.equal(end.best, String(end.score), 'a new best is kept');
 
   // 🧊: the answer shows every column's height and the sum
   await page.evaluate(() => CG.start('cube'));

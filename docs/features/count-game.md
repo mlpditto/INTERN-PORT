@@ -40,3 +40,10 @@ Owner asks: "เพิ่มโหมดไม่นับถอยหลัง�
 - 🧊 Cubes: a top-view table of the heights sits beside the stack, with each row's sum and the sum line "… = n ก้อน".
 
 QA: `scripts/count-free-qa.cjs` (new) and `scripts/count-game-qa.cjs` (now checks the small pictures and the sum line).
+
+## V101.372: ⏱ seconds per question in both modes
+
+- Every answer line ends with `· ⏱ n วิ` (`#cg-took`); a time-out does not (it is always 30).
+- The timed end screen also shows `#cg-qt` (ข้อ1 12วิ …, green right / red wrong) under 🏆.
+- The ❓ tour last scene says `🧘 ไม่จับเวลาก็ได้`.
+- QA: count-game-qa, count-free-qa.

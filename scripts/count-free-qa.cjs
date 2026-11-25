@@ -45,7 +45,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     return { n: p.n, res: document.getElementById('cg-res').textContent, figHidden: getComputedStyle(document.getElementById('cg-fig')).display === 'none', nums: th.map((t) => +t.querySelector('b').textContent), lit: th.every((t) => t.querySelectorAll('rect.lit').length === 1),
       rects: th.map((t) => { const r = t.querySelector('rect.lit'); return [+r.dataset.x1, +r.dataset.y1, +r.dataset.x2, +r.dataset.y2].join(); }).sort().join('|') === p.ans.map((r) => r.join()).sort().join('|'),
       heads: [...document.querySelectorAll('#cg-thumbs h5')].map((e) => e.textContent), eq: document.getElementById('cg-eq').textContent }; });
-  assert.equal(rc.res, '✗ ตอบ 0 · เฉลย ' + rc.n);
+  assert.equal(rc.res, '✗ ตอบ 0 · เฉลย ' + rc.n + ' · ⏱ ' + (await page.evaluate(() => CG._g().qt[0])) + ' วิ', 'V101.372: the seconds this question took');
   assert.ok(rc.figHidden, 'the big picture gives way to the small ones');
   assert.deepEqual(rc.nums, Array.from({ length: rc.n }, (_, i) => i + 1), 'numbered 1…n'); assert.ok(rc.lit && rc.rects, 'each small picture lights one rectangle, every rectangle once');
   const groups = rc.heads.map((t) => +(/· (\d+) รูป$/.exec(t) || [])[1]);
