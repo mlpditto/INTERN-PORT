@@ -59,7 +59,7 @@ async function open(browser, authUid) {
         db.collection = (name) => ({
             where: (f, op, uid) => ({ onSnapshot: (cb) => poll(() => window.__mine(uid), (s) => cb({ docs: JSON.parse(s).map(x => ({ id: x.__id, data: () => { const y = Object.assign({}, x); delete y.__id; return y; } })) })) }),
             doc: (id) => ({ onSnapshot: (cb) => poll(() => window.__doc(name + '/' + id), (s) => { const v = JSON.parse(s); cb({ id, exists: !!v, data: () => v }); }), set: wr, update: wr, get: () => Promise.resolve({ exists: false, data: () => ({}) }) }),
-            add: wr
+            add: name === 'game_plays' ? (d) => { (window.__plays = window.__plays || []).push(d); return Promise.resolve(); } : wr   // V101.370 game-log.js: the one allowed write
         });
     });
     return { page, errors };
@@ -133,7 +133,8 @@ const until = (page, fn, arg, msg) => page.waitForFunction(fn, arg, { timeout: 5
         await until(D.page, () => !!document.querySelector('#cerealModal .ck-win'), null, 'detective reveal');
         await until(K.page, () => !!document.querySelector('#cerealModal .ck-win'), null, 'killer reveal');
         assert.ok((await txt(D.page, '#cerealModal .ck-nb')).includes('8 › 3 › 2 › 1'), 'the reveal shows the revealed path');
-        assert.equal(await K.page.evaluate(() => window.__writes) + await D.page.evaluate(() => window.__writes), 0, 'the pages never write Firestore');
+        assert.equal(await K.page.evaluate(() => window.__writes) + await D.page.evaluate(() => window.__writes), 0, 'the pages never write Firestore (but game_plays)');
+        for (const P of [K, D]) assert.deepEqual(await P.page.evaluate(() => (window.__plays || []).map((p) => [p.game, /^online /.test(p.mode), p.rounds.length > 0])), [['cereal', true, true]], 'V101.370: each page logs its finished online game once (game_plays)');
         assert.deepEqual(K.errors, []); assert.deepEqual(D.errors, []);
         console.log('cereal-online-qa: OK — 📱/🌐 tabs, ＋ room code + seats, 🔑 join flips both pages, killer day 1 via cerealAct, ตาคุณ + badge, waiting card, mySecret notebook, path never on the detective page, referee answer, miss turns the day, ⏳ claim → both reveal, zero direct writes');
     } finally { await browser.close(); }

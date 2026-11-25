@@ -203,7 +203,9 @@
             + '<button type="button" class="bw-go alt ic' + (sent ? ' done' : '') + '" id="bw-share" onclick="BW.share()" title="Share in LINE" data-th-title="แชร์ผลใน LINE" aria-label="' + (sent || 'Share in LINE') + '">' + (sent ? '✓' : '📤') + '</button>'
             + '<button type="button" class="bw-go alt ic" id="bw-lvl" onclick="BW.lobby()" title="Change level" data-th-title="เปลี่ยนระดับ" aria-label="เปลี่ยนระดับ">' + '🥄'.repeat(lvl) + '</button></div></div>';
     }
-    function render() { var m = root(); document.getElementById('bw-body').innerHTML = !g ? lobbyHtml() : g.end ? endHtml() : playHtml(); m.style.display = 'flex'; }
+    function render() { var m = root(); document.getElementById('bw-body').innerHTML = !g ? lobbyHtml() : g.end ? endHtml() : playHtml(); m.style.display = 'flex';
+        if (g && window.GameLog) GameLog.see('bw', { id: g.gid || (g.gid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), n: g.hist.length, done: g.end, mode: 'l' + lvl, win: g.sc.me > g.sc.bot ? 'w' : g.sc.me < g.sc.bot ? 'l' : 'd', score: g.sc.me + ':' + g.sc.bot, res: g.hist.map(function (h) { return h.res; }) });   // V101.370 🎮 game time for the admin (game-log.js)
+    }
 
     window.BW = {
         open: function () { g = null; toast = null; render(); },

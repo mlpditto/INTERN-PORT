@@ -108,6 +108,11 @@
         body.innerHTML = html;
         if (sc) sc.scrollTop = keep ? y : 0; if (keep && m) m.scrollTop = my;
         if (window.CKTour) CKTour.coach(coachKey());   // V101.329: first-turn hints follow the step the player is on
+        if (g && g.id && window.GameLog) {   // V101.370 🎮 game time for the admin (game-log.js): a round = a day; online, a day includes waiting for the others
+            var me = g.online ? g.online.me : g.me, fin = g.status === 'finished';
+            GameLog.see('cereal', { id: g.id, n: fin ? g.day : g.day - 1, done: fin, mode: (g.online ? 'online ' + (me || '') : g.bot ? 'bot ' + me : 'friend') + (g.lola ? ' lola' : ''),
+                win: fin && me && g.result ? ((g.result.winner === 'good') === (me !== 'killer') ? 'w' : 'l') : null, score: fin && g.result ? 'D' + g.result.day : '' });
+        }
     }
     /* Which first-turn hint fits the screen just drawn (cereal-tutorial.js shows each once). null = nothing to coach. */
     function coachKey() {
