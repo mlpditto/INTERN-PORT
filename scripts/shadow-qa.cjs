@@ -1,0 +1,103 @@
+// V101.365 ⚫⚪ ไพ่เงา (owner pick C + 🧠 at 🥄🥄🥄, mockup-black-white/) on the REAL index.html, 390×844 touch phone + a 1024 PC.
+// Proves the rules over 300 seeded bot-vs-bot games driven through the real module (each tile once a side, higher wins, a draw scores
+// nobody, the winner leads / a draw keeps the leader, the game stops at 5 or after 9; the bot's guess of my hand always keeps my real
+// tiles possible); the doorways (phone: Schedule row after 🧊, PC: header left of 🧊); a 🤖 number never reaches the page before the
+// end (only its colour); pick → ▸ ลง → result → ▸ ต่อ; the 📓 shows my number + 🤖 colour; 🥄🥄🥄 🧠: used tiles look unused, a tap
+// says so, the 📓 hides my numbers; the end screen opens every 🤖 tile and keeps the record; nothing scrolls sideways at 320 px.
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  await page.addInitScript(() => {
+    for (const k of ['internGuideSeen', 'journalTourSeen', 'cerealTourSeen', 'wolfTourSeen']) localStorage.setItem(k, '1'); localStorage.setItem('wolfCoachSeen', 'all');
+    window.firebase = { auth: () => ({ currentUser: { uid: 'u1' }, onAuthStateChanged: () => () => {}, signInAnonymously: () => Promise.resolve() }), functions: () => ({ httpsCallable: () => () => Promise.resolve({ data: {} }) }), firestore: Object.assign(() => ({}), { FieldValue: { serverTimestamp: () => 0 } }) };
+    const st = window.setTimeout; window.setTimeout = function (fn, ms, ...a) { if (ms === 15000) return 0; return st.call(this, fn, ms, ...a); };
+    let q = 7; Math.random = () => ((q = (q * 16807) % 2147483647) / 2147483647);   // every run the same games
+  });
+  await page.route('**/*', (r) => (r.request().url().startsWith('file:') ? r.continue() : r.abort()));
+  await page.goto(pathToFileURL(path.resolve('public/index.html')).href, { waitUntil: 'load' });
+  await page.evaluate(() => { document.getElementById('main-app').style.setProperty('display', 'block', 'important'); const ov = document.getElementById('loading-overlay'); if (ov) ov.style.setProperty('display', 'none', 'important'); let s = 3; BW._rng(() => ((s = (s * 16807) % 2147483647) / 2147483647)); });
+
+  // ---- rules: 300 games, "me" played by a random hand through BW.pick / BW.play, all three bot levels ----
+  const rules = await page.evaluate(() => {
+    const bad = []; let games = 0, early = 0;
+    for (let i = 0; i < 300; i++) {
+      BW.level(1 + (i % 3)); BW.start(); const g = BW._g(); let lead = g.lead;
+      while (!g.end) {
+        const mine = g.me.slice(), before = g.hist.length, odds = BW._odds();
+        if (g.hist.length && mine.some((n) => odds.cnt[n] === 0)) bad.push('bot ruled out a tile I still hold');
+        const n = mine[Math.floor(Math.random() * mine.length)]; BW.pick(n); BW.play();
+        const h = g.hist[before]; if (!h || h.m !== n) { bad.push('no round'); break; }
+        if (h.res !== (h.m > h.b ? 'win' : h.m < h.b ? 'lose' : 'draw')) bad.push('result');
+        if (h.lead !== lead) bad.push('leader');
+        if (h.res !== 'draw') lead = h.res === 'win' ? 'me' : 'bot';
+        if (!g.end) BW.next();
+      }
+      const ms = g.hist.map((h) => h.m), bs = g.hist.map((h) => h.b);
+      if (new Set(ms).size !== ms.length || new Set(bs).size !== bs.length) bad.push('a tile used twice');
+      const w = g.hist.filter((h) => h.res === 'win').length, l = g.hist.filter((h) => h.res === 'lose').length;
+      if (w !== g.sc.me || l !== g.sc.bot) bad.push('score');
+      if (!(g.hist.length === 9 || Math.max(w, l) === 5) || (g.hist.length < 9 && Math.max(w, l) !== 5)) bad.push('end ' + g.hist.length + ' ' + w + ':' + l);
+      if (g.hist.length < 9) early++; games++;
+    }
+    BW.close(); return { bad: [...new Set(bad)], games, early };
+  });
+  assert.deepEqual(rules.bad, [], 'rules hold over ' + rules.games + ' games'); assert.ok(rules.early > 0, 'some games end early at 5');
+  // the levels are ordered: vs a random hand (seeded, 400 games — the same every run), 🥄🥄🥄 wins clearly more than it loses
+  const st = await page.evaluate(() => { let w = 0, l = 0, z = 11; const R = () => ((z = (z * 48271) % 2147483647) / 2147483647); for (let i = 0; i < 400; i++) { BW.level(3); BW.start(); const g = BW._g(); while (!g.end) { if (g.last) BW.next(); else { BW.pick(g.me[Math.floor(R() * g.me.length)]); BW.play(); } } if (g.sc.bot > g.sc.me) w++; else if (g.sc.bot < g.sc.me) l++; } BW.close(); return { w, l }; });
+  assert.ok(st.w > st.l * 1.3, '🥄🥄🥄 beats a random hand ' + JSON.stringify(st));
+
+  // ---- phone doorway → lobby → a game ----
+  assert.equal(await page.$eval('#u-bw-chip', (e) => getComputedStyle(e).display), 'none', 'phone: no header chip');
+  assert.equal(await page.$eval('#sch-bw-btn', (e) => e.previousElementSibling.id), 'sch-count-btn', 'phone: after 🧊 in the Schedule games row');
+  await page.evaluate(() => { localStorage.removeItem('shadowStats'); document.getElementById('sch-bw-btn').click(); });
+  assert.equal(await page.$eval('#bwModal', (e) => getComputedStyle(e).display + e.classList.contains('lang-no-toggle')), 'flextrue');
+  await page.click('#bw-lv2'); await page.click('#bw-start');
+  // make the 🤖 lead so its tile is on the table
+  await page.evaluate(() => { const g = BW._g(); if (g.lead !== 'bot') { g.lead = 'bot'; g.botTile = BW._botPick(null); } });
+  await page.evaluate(() => { const g = BW._g(); document.getElementById('bw-body') && (BW.pick(g.me[0]), BW.pick(g.me[0])); });
+  const hidden = await page.evaluate(() => { const g = BW._g(), tb = document.getElementById('bw-table'); return { colour: tb.querySelector('.bw-t.back').classList.contains(g.botTile % 2 ? 'w' : 'b'), digits: /\d/.test(tb.textContent), say: document.getElementById('bw-say').textContent }; });
+  assert.equal(hidden.colour, true, 'the 🤖 tile shows its colour'); assert.equal(hidden.digits, false, 'no 🤖 number on the table'); assert.match(hidden.say, /^🤖 ลง [⚫⚪] · ตาคุณ$/);
+  assert.equal(await page.$eval('#bw-play', (b) => b.disabled), false);
+  const n0 = await page.evaluate(() => BW._g().sel);
+  await page.click('#bw-play');
+  const r1 = await page.evaluate(() => { const g = BW._g(), h = g.hist[0]; return { res: document.getElementById('bw-res').textContent, want: { win: '🏆 ชนะ', lose: '😞 แพ้', draw: '🤝 เสมอ' }[h.res], score: document.getElementById('bw-score').textContent, sc: g.sc, botNum: [...document.querySelectorAll('#bwModal .bw-t:not(.back)')].some((e) => +e.textContent === h.b && e.closest('.bw-pair') && e.nextElementSibling && e.nextElementSibling.textContent === '🤖'), nb: document.querySelector('#bwModal .bw-r').textContent }; });
+  assert.equal(r1.res, r1.want); assert.equal(r1.score, 'คุณ ' + r1.sc.me + ' : ' + r1.sc.bot + ' 🤖'); assert.equal(r1.botNum, false, 'after the round the 🤖 number stays hidden');
+  assert.ok(r1.nb.startsWith('1' + n0 + ' vs ?'), '📓: my number vs the 🤖 colour ' + r1.nb);
+  await page.click('#bw-next');
+  assert.equal(await page.$eval(`#bw-hand button[data-n="${n0}"]`, (b) => b.disabled && b.classList.contains('used')), true, '🥄🥄: a used tile is dim and off');
+
+  // ---- 🥄🥄🥄 🧠 memory mode ----
+  await page.evaluate(() => BW.lobby()); await page.click('#bw-lv3');
+  assert.match(await page.textContent('#bwModal .bw-note'), /🧠/);
+  await page.click('#bw-start');
+  await page.evaluate(() => { const g = BW._g(); if (g.lead === 'bot') { BW.pick(g.me[0]); BW.play(); BW.next(); } else { BW.pick(g.me[0]); BW.play(); BW.next(); } });
+  const used = await page.evaluate(() => BW._g().hist[0].m);
+  assert.equal(await page.$eval(`#bw-hand button[data-n="${used}"]`, (b) => b.disabled || b.classList.contains('used')), false, '🧠: a used tile looks unused');
+  await page.click(`#bw-hand button[data-n="${used}"]`);
+  assert.equal(await page.textContent('#bw-toast'), '🧠 ' + used + ' ลงไปแล้ว'); assert.equal(await page.$eval('#bw-play', (b) => b.disabled), true, 'and cannot be played');
+  assert.equal(await page.$$eval('#bwModal .bw-nb .bw-t:not(.back)', (e) => e.length), 0, '🧠: the 📓 hides my numbers');
+
+  // ---- the end: every 🤖 tile opened, the record kept ----
+  await page.evaluate(() => { const g = BW._g(); while (!g.end) { if (g.last) BW.next(); else { BW.pick(g.me[0]); BW.play(); } } });
+  const end = await page.evaluate(() => { const g = BW._g(); return { rows: [...document.querySelectorAll('#bwModal .bw-r')].map((r) => [...r.querySelectorAll('.bw-t')].map((x) => +x.textContent)), hist: g.hist.map((h) => [h.m, h.b]), fin: document.getElementById('bw-final').textContent, sc: g.sc, stats: JSON.parse(localStorage.getItem('shadowStats')) }; });
+  assert.deepEqual(end.rows, end.hist, 'every round opened: mine vs 🤖');
+  assert.ok(end.fin.endsWith(end.sc.me + ' : ' + end.sc.bot)); assert.equal(Object.values(end.stats.l3).reduce((a, b) => a + b, 0), 1, 'the 🥄🥄🥄 record counts the game');
+
+  // ---- 320 px, PC doorway ----
+  await page.setViewportSize({ width: 320, height: 640 }); await page.click('#bw-again');
+  assert.ok(await page.$eval('#bwModal .modal-content', (e) => e.scrollWidth <= e.clientWidth + 1), 'no sideways scroll at 320 px');
+  await page.evaluate(() => BW.close());
+  await page.setViewportSize({ width: 1024, height: 800 });
+  assert.equal(await page.$eval('#u-bw-chip', (e) => [getComputedStyle(e).display, e.nextElementSibling.id].join()), 'flex,u-count-chip', 'PC: ⚫ just left of 🧊');
+  await page.click('#u-bw-chip'); assert.ok(await page.isVisible('#bw-start'));
+
+  assert.deepEqual(errors, []);
+  await browser.close();
+  console.log('shadow-qa: OK — rules over ' + rules.games + ' games (' + rules.early + ' ended at 5), bot keeps my real tiles possible, doorways, 🤖 number hidden till the end, 📓, 🧠 mode, end reveal + record, 320 px, PC chip');
+})().catch((e) => { console.error(e); process.exit(1); });
