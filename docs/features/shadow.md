@@ -1,6 +1,6 @@
 # ⚫⚪ ไพ่เงา (Shadow tiles)
 
-A hidden-number duel vs 🤖 (owner pick C + 🧠 at 🥄🥄🥄, 2026-11-25, mockup-black-white/). Phone: ⚫ after 🧊 in the Schedule games row; PC (≥ 768 px): the ⚫ circle left of 🧊 in the header rail. Both call `bwOpen()` → `#bwModal`.
+A hidden-number duel vs 🤖 (owner pick C + 🧠 at 🥄🥄🥄, 2026-11-25, mockup-black-white/). Phone: ⚫ ไพ่เงา in the games row under History (V101.368, was after 🧊 on Schedule); PC (≥ 768 px): the ⚫ circle left of 🧊 in the header rail. Both call `bwOpen()` → `#bwModal`.
 
 Rules: each side holds 0–8 once (evens ⚫, odds ⚪). The leader puts a tile face down, the other answers; each sees only the other's colour. Higher number takes the round, equal = nobody; the round's winner leads next (a draw keeps the leader); the first leader is random. 9 rounds or first to 5. Numbers stay hidden until the end screen opens every 🤖 tile.
 

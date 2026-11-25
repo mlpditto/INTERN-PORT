@@ -1,6 +1,6 @@
 # 🧊 นับไว (Count Fast)
 
-Two solo eye-and-speed games (owner 2026-11-25, pick C: answer, then the answer shows). Phone: the 🧊 button beside 🐺 on Schedule; PC (≥ 768 px): the 🧊 circle just left of 🐺 in the header rail. Both call `countOpen()` → `#countModal`.
+Two solo eye-and-speed games (owner 2026-11-25, pick C: answer, then the answer shows). Phone: 🧊 นับไว in the games row under History (V101.368, was beside 🐺 on Schedule); PC (≥ 768 px): the 🧊 circle just left of 🐺 in the header rail. Both call `countOpen()` → `#countModal`.
 
 - 🟥 **Count the Rectangles** — a line drawing (outlines of a few rectangles on an 8×6 lattice); count every rectangle whose four sides are drawn lines. After the answer the rectangles light up one by one (🟧 n / n).
 - 🧊 **Count the Cubes** — a staircase stack (back corner tallest, never taller toward you, so every column's top is in sight and hidden cubes sit under seen ones); count = the sum of the heights. After the answer every top shows its column's height and the sum.

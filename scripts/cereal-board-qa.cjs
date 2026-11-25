@@ -15,8 +15,8 @@ const ver = (/<title>Internship Portfolio \((V\d+\.\d+)\)<\/title>/.exec(idx) ||
 assert.ok(ver, 'title version');
 assert.ok(idx.includes('<link rel="stylesheet" href="cereal.css?v='), 'cereal.css is linked');
 assert.ok(/<script src="cereal-maps\.js\?v=V[\d.]+"><\/script>\n<script src="cereal-rules\.js\?v=V[\d.]+"><\/script>\n<script src="cereal-bot\.js\?v=V[\d.]+"><\/script>\n<script src="cereal-sound\.js\?v=V[\d.]+"><\/script>\n<script src="cereal\.js\?v=V[\d.]+" defer><\/script>/.test(idx), 'maps → rules → bot → sound → cereal (defer), adjacent');
-assert.ok(/id="sch-cereal-btn" class="sch-gb-fin" onclick="cerealOpen\(\)"[^>]*data-th-title=/.test(idx), 'the 🥣 button sits in the Schedule goals row beside 💰 with a Thai title');
-assert.ok(idx.indexOf('id="sch-fin-btn"') < idx.indexOf('id="sch-cereal-btn"'), '🥣 comes right after 💰');
+assert.ok(/id="sch-cereal-btn" class="u-game" onclick="cerealOpen\(\)"[^>]*data-th-title=/.test(idx), 'the 🥣 button (V101.368: in the games row under History) with a Thai title');
+assert.ok(idx.indexOf('id="u-games-row"') < idx.indexOf('id="sch-cereal-btn"') && idx.indexOf('id="sch-cereal-btn"') < idx.indexOf('id="intern-footer-line"'), '🥣 is in the games row above the version');
 assert.ok(!/db\.collection|firebase\.|fetch\(|httpsCallable/.test(js), 'cereal.js reads and writes nothing in Firestore');
 assert.ok(js.includes("'cereal_v1_'"), 'state key');
 assert.ok(!/✓|✅/.test(js), 'no check marks (house rule)');
@@ -54,8 +54,8 @@ const stored = page => page.evaluate(() => JSON.parse(localStorage.getItem('cere
     try {
         const { page, errors } = await open(browser);
         // the entry: the 🥣 button beside 💰 on Schedule, same round shape
-        const btn = await page.evaluate(() => { const b = document.getElementById('sch-cereal-btn'), f = document.getElementById('sch-fin-btn'); const cb = getComputedStyle(b), cf = getComputedStyle(f); return { text: b.textContent.trim(), onclick: b.getAttribute('onclick'), w: cb.width, fw: cf.width, radius: cb.borderRadius, fradius: cf.borderRadius }; });
-        assert.equal(btn.text, '🥣'); assert.equal(btn.onclick, 'cerealOpen()'); assert.equal(btn.w, btn.fw); assert.equal(btn.radius, btn.fradius);
+        const btn = await page.evaluate(() => { const b = document.getElementById('sch-cereal-btn'); return { text: b.textContent.trim(), onclick: b.getAttribute('onclick'), row: b.parentElement.id }; });
+        assert.deepEqual(btn, { text: '🥣Cereal', onclick: 'cerealOpen()', row: 'u-games-row' }, 'V101.368: a short card with its name in the games row');
 
         // lobby
         await page.evaluate(() => cerealOpen());
