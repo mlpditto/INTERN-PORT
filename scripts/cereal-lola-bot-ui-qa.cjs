@@ -29,7 +29,7 @@ const cell = id => '#cerealModal .ck-cell[data-id="' + id + '"]';
     await page.click('#ck-vs-bot');
     assert.ok(await page.$('#ck-lola'), '🐕 chip in 🤖 mode too');
     await page.click('#ck-lola');
-    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#cerealModal .ck-seat')].map(b => b.id + ':' + b.innerText.trim())), ['ck-me-killer:🔪 ฉัน', 'ck-me-lola:🐕 ฉัน', 'ck-me-detective:🕵️ ฉัน'], 'three seats');
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#cerealModal .ck-seat')].map(b => b.id + ':' + b.innerText.replace(/\s+/g, ' ').trim())), ['ck-me-killer:🔪 ฆาตกร ฉัน', 'ck-me-lola:🐕 Lola', 'ck-me-detective:🕵️ นักสืบ'], 'three seats (V101.364: icon · role · ฉัน on mine)');
     assert.ok(await page.$('#ck-pair'), 'the pair chip');
     const fit = await page.evaluate(() => { const m = document.querySelector('#cerealModal .modal-content'); return m.scrollWidth <= m.clientWidth + 1; });
     assert.ok(fit, 'lobby fits');

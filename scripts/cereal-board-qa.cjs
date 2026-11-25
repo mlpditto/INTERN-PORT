@@ -157,7 +157,7 @@ const stored = page => page.evaluate(() => JSON.parse(localStorage.getItem('cere
         assert.deepEqual({ status: g.status, winner: g.result.winner, reason: g.result.reason, cell: g.result.cell }, { status: 'finished', winner: 'good', reason: 'arrest', cell: 12 });
         await page.click('#cerealModal .ck-primary');   // 🆕 swap roles
         assert.equal(await page.inputValue('#ck-n1'), 'Mint', 'roles swapped for the rematch');
-        assert.equal(await txt(page, '#cerealModal .ck-game .d'), '🏁', 'finished game listed');
+        assert.match(await txt(page, '#cerealModal .ck-game .ck-res'), /^🕵️ ชนะ · D\d$/, 'finished game listed with who won (V101.364: no 🏁)');
         assert.deepEqual(errors, [], 'no page errors');
 
         // 320 px: everything fits, cells stay tappable

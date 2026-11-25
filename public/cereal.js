@@ -214,10 +214,11 @@
             + (ui.lola ? '' : '<span class="ck-mkmap"><button type="button" id="ck-side-A" class="ck-chip' + (ui.side === 'A' ? ' on' : '') + '" onclick="CK.side(\'A\')"' + t('Map A — favours the killer', 'แผนที่ A · ฆาตกรได้เปรียบ') + '>🗺 A</button>'
             + '<button type="button" id="ck-side-B" class="ck-chip' + (ui.side === 'B' ? ' on' : '') + '" onclick="CK.side(\'B\')"' + t('Map B — favours the detective', 'แผนที่ B · นักสืบได้เปรียบ') + '>B</button></span></div>');
         if (solo) {
-            var seat = function (me, ic, en, th) { return '<button type="button" class="ck-seat ' + me + (ui.me === me ? ' on' : '') + '" id="ck-me-' + me + '" aria-pressed="' + (ui.me === me) + '" onclick="CK.me(\'' + me + '\')"' + t(en, th) + '>' + ic + ' ฉัน</button>'; };
+            // V101.364 (owner pick A, mockup-cereal-lobby-blend/): a big card per seat — icon, the role word, "ฉัน" on the one I play
+            var seat = function (me, ic, en, th) { return '<button type="button" class="ck-seat ' + me + (ui.me === me ? ' on' : '') + '" id="ck-me-' + me + '" aria-pressed="' + (ui.me === me) + '" onclick="CK.me(\'' + me + '\')"' + t(en, th) + '><span class="big">' + ic + '</span><span class="w">' + { killer: 'ฆาตกร', detective: 'นักสืบ', lola: 'Lola' }[me] + '</span>' + (ui.me === me ? '<span class="me">ฉัน</span>' : '') + '</button>'; };
             if (ui.lola && ui.me !== 'killer' && ui.me !== 'detective' && ui.me !== 'lola') ui.me = 'killer';
             if (!ui.lola && ui.me === 'lola') ui.me = 'killer';
-            h += '<div class="ck-seats' + (ui.lola ? ' three' : '') + '">' + seat('killer', '🔪', 'You hide, the bot hunts', 'คุณซ่อน · บอทไล่จับ')
+            h += '<div class="ck-seats cards' + (ui.lola ? ' three' : '') + '">' + seat('killer', '🔪', 'You hide, the bot hunts', 'คุณซ่อน · บอทไล่จับ')
                 + (ui.lola ? seat('lola', '🐕', 'You are Lola, the bots hide and hunt', 'คุณเป็น Lola · บอทเล่นอีก 2 บท') : '')
                 + seat('detective', '🕵️', 'You hunt, the bot hides', 'คุณไล่จับ · บอทซ่อน') + '</div>';
             var lvs = '';
@@ -234,12 +235,14 @@
             h += '<div class="ck-nb"><div class="lbl">🎮 ' + games.length + '</div>';   // V101.344: the tab already says เครื่องนี้
             var cur = games.filter(function (x) { return x.status === 'playing'; })[0];
             games.forEach(function (x) {
-                var fin = x.status === 'finished', res = fin ? (x.result.winner === 'good' ? '🕵️ 🏆 D' : '🔪 🏆 D') + x.result.day : '';
-                h += '<button type="button" class="ck-game ' + rowBar(x) + (x === cur ? ' cur' : '') + '" onclick="CK.resume(\'' + esc(x.id) + '\')"><span class="d">' + (fin ? '🏁' : 'D' + x.day) + '</span><span class="who">🔪 ' + esc(x.names.killer) + ' <small>vs</small> 🕵️ ' + esc(x.names.detective) + (x.lola ? ' · 🐕 ' + esc(x.names.lola) : '') + '</span>'
-                    + '<span class="ck-pill">' + (fin ? res : '🥣 ' + x.kills + '/6 · 🛡️ ' + x.arrestsLeft) + '</span><span class="go">' + (fin ? '↺' : '▸') + '</span></button>';
+                // V101.364 pick A: a finished game says who won — 🏆 ชนะ / 😞 แพ้ vs 🤖 (my side), else the winning side's icon
+                var fin = x.status === 'finished', bar = rowBar(x), res = !fin ? '' : bar === 'r-w' ? '<span class="ck-res w">🏆 ชนะ · D' + x.result.day + '</span>' : bar === 'r-l' ? '<span class="ck-res l">😞 แพ้ · D' + x.result.day + '</span>'
+                    : '<span class="ck-res">' + (x.result.winner === 'good' ? '🕵️' : '🔪') + ' ชนะ · D' + x.result.day + '</span>';
+                h += '<button type="button" class="ck-game ' + rowBar(x) + (x === cur ? ' cur' : '') + '" onclick="CK.resume(\'' + esc(x.id) + '\')">' + (fin ? '' : '<span class="d">D' + x.day + '</span>') + '<span class="who">🔪 ' + esc(x.names.killer) + ' <small>vs</small> 🕵️ ' + esc(x.names.detective) + (x.lola ? ' · 🐕 ' + esc(x.names.lola) : '') + '</span>'
+                    + (fin ? res : '<span class="ck-pill">🥣 ' + x.kills + '/6 · 🛡️ ' + x.arrestsLeft + '</span>') + '<span class="go">' + (fin ? '↺' : '▸') + '</span></button>';
             });
             h += '</div>';
-        } else h += '<div class="ck-empty" id="ck-empty">🎮 ยังไม่มีเกม · เลือกบท แล้ว ▸ เริ่ม</div>';
+        } else h += '<div class="ck-empty bowl" id="ck-empty"><b aria-hidden="true">🥣</b>ยังไม่มีเกม · เลือกบท แล้ว ▸ เริ่ม</div>';   // V101.364 pick A: a big bowl over the line
         h += '</div>';
         return h;
     }

@@ -45,8 +45,8 @@ async function waitBeatDone(page) { await page.waitForSelector('#ck-bot-ok, #cer
             await page.click('#ck-vs-bot');
             assert.ok(!(await page.isVisible('#ck-n1')), 'vs bot: no names row');
             // V101.344 (owner pick B, inline): two one-line seat cards 🔪 ฉัน / 🕵️ ฉัน (meaning in the title), 🥄 levels beside ▸ เริ่ม
-            const cards = await page.evaluate(() => [...document.querySelectorAll('#cerealModal .ck-seat')].map(c => ({ id: c.id, on: c.classList.contains('on'), t: c.innerText.trim(), title: c.dataset.thTitle })));
-            assert.deepEqual(cards.map(c => c.t), ['🔪 ฉัน', '🕵️ ฉัน'], 'seat cards, one line each');
+            const cards = await page.evaluate(() => [...document.querySelectorAll('#cerealModal .ck-seat')].map(c => ({ id: c.id, on: c.classList.contains('on'), t: c.innerText.replace(/\s+/g, ' ').trim(), title: c.dataset.thTitle })));
+            assert.deepEqual(cards.map(c => c.t), ['🔪 ฆาตกร ฉัน', '🕵️ นักสืบ'], 'V101.364 pick A: big seat cards — icon, role, ฉัน on mine');
             assert.deepEqual(cards.map(c => c.title), ['คุณซ่อน · บอทไล่จับ', 'คุณไล่จับ · บอทซ่อน'], 'card meaning in the title');
             assert.equal(await page.evaluate(() => document.querySelectorAll('#cerealModal .ck-gorow .ck-lv').length), 3, 'three 🥄 levels beside start');
             assert.ok(!/Start vs bot|you hide|เล่นกับ|แผนที่/.test(await page.evaluate(() => document.querySelector('#cerealModal .ck').innerText)), 'no English lines, no row labels');

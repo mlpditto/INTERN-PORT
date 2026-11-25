@@ -102,7 +102,7 @@
             // V101.352 (owner pick E): 📋 วาง until 6 letters are in, then ▸ in the same place
             + '<button type="button" class="ck-paste" id="ck-on-paste" onclick="CKOnline.paste()"' + (full ? ' hidden' : '') + '>📋 วาง</button>'
             + '<button type="button" class="ck-go" id="ck-on-join" onclick="CKOnline.join()" aria-label="Join"' + off + (full ? '' : ' hidden') + '>▸</button></label></div>';
-        if (!games.length && st.listed) h += '<div class="ck-empty" id="ck-on-empty">🌐 ยังไม่มีเกม · ＋ สร้างห้อง แล้วส่งรหัสให้เพื่อน</div>';
+        if (!games.length && st.listed) h += '<div class="ck-empty bowl" id="ck-on-empty"><b aria-hidden="true">🥣</b>ยังไม่มีเกม · ＋ สร้างห้อง แล้วส่งรหัสให้เพื่อน</div>';   // V101.364 pick A
         return h;
     }
 
