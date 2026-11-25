@@ -120,8 +120,8 @@
         + '.cg-dots{display:flex;gap:6px;justify-content:center}.cg-dots i{width:14px;height:14px;border-radius:50%;background:#e2e8f0;display:block;box-sizing:border-box}.cg-dots i.ok{background:#16a34a}.cg-dots i.no{background:#dc2626}.cg-dots i.now{background:#fff;border:2px dashed #f97316}'
         + '#countModal .cg-q{border:1px solid #e2e8f0;background:#fff;border-radius:999px;width:26px;height:26px;font-weight:900;color:#475569;padding:0;flex:0 0 auto}'
         + '.cg-tfig{height:190px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:12px;box-sizing:border-box;display:flex;align-items:center;justify-content:center}.cg-tfig svg{width:100%;height:100%}'
-        + '.cg-tcap{text-align:center;font-weight:900;font-size:1.05em;min-height:2.9em}.cg-tcap small{display:block;font-weight:700;color:#64748b;font-size:.8em;margin-top:2px}'
-        + '.cg-tsteps{display:flex;gap:6px;justify-content:center;min-height:24px}.cg-tsteps span{border-radius:999px;padding:3px 10px;font-weight:800;font-size:.85em;background:#f1f5f9;color:#475569}.cg-tsteps span.on{background:#ffedd5;color:#c2410c}'
+        + '.cg-tcap{text-align:center;font-weight:900;font-size:1.05em;height:3em;overflow:hidden}.cg-tcap small{display:block;font-weight:700;color:#64748b;font-size:.8em;margin-top:2px}'
+        + '.cg-tsteps{display:flex;gap:6px;justify-content:center;align-items:center;height:28px;overflow:hidden}.cg-tsteps span{border-radius:999px;padding:3px 10px;font-weight:800;font-size:.85em;background:#f1f5f9;color:#475569}.cg-tsteps span.on{background:#ffedd5;color:#c2410c}'
         + '.cg-tnav{display:flex;align-items:center;gap:8px}.cg-tdots{flex:1;display:flex;gap:5px;justify-content:center}.cg-tdots i{width:8px;height:8px;border-radius:50%;background:#e2e8f0}.cg-tdots i.on{background:#ea580c}'
         + '#countModal .cg-tnav button{border:0;border-radius:12px;padding:10px 14px;font-weight:900}#countModal .cg-tskip{background:none;color:#94a3b8}#countModal .cg-tnext{background:#f97316;color:#fff}'
         + '.cg-trules{font-size:1.4em;line-height:1.8;text-align:center;font-weight:800;color:#0f172a}';
