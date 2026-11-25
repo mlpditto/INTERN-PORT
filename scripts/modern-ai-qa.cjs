@@ -24,6 +24,12 @@ const { registry, runModernAI } = require('../functions/modern-ai');
         await assert.rejects(()=>runModernAI({...args,visionData:{mimeType:'audio/mp3',base64:'abc'}},post,env));
         await assert.rejects(()=>runModernAI(args,post,{}));
     }
+    { // Opus 5.5 rides the server-side fallback; a refusal names its category
+        let req;const post=async(url,body,opts)=>{req={body,opts};return {data:{model:'claude-opus-5-5',stop_reason:'refusal',stop_details:{type:'refusal',category:'bio',explanation:'x'},content:[],usage:{input_tokens:1,output_tokens:0}}};};
+        const r=await runModernAI({model:'claude-opus-5-5',prompt:'t'},post,{ANTHROPIC_API_KEY:'t'});
+        assert.equal(req.body.fallbacks,'default');assert.equal(req.opts.headers['anthropic-beta'],'server-side-fallback-2026-07-01');
+        assert(r.error.includes('stopped with refusal (bio: x)'),r.error);
+    }
     const backend=fs.readFileSync('functions/index.js','utf8');const start=backend.indexOf('exports.callAIProxy =');
     let role=true,auth=true,called=0;
     const c={exports:{},onRequest:(_,fn)=>fn,aiModelRegistry:registry,runModernAI:async()=>{called++;return {text:'OK',model:'claude-sonnet-5',tokens:1};},process:{env:{}},postWithRetry(){},recordAiUsage(){},verifyIdTokenFromHeader:async(_,res)=>auth?{}:(res.status(401).json({error:'unauthorized'}),null),isAdminToken:()=>role,console,sanitizeProxyErrorMessage:()=>'',getSafeProviderError:()=>({})};
