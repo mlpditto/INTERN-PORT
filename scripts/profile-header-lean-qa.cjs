@@ -41,7 +41,7 @@ const SAMPLE = `
             assert.ok(name.l > img.r && score.l > img.r, 'name + score beside the avatar');
             if (touch) assert.ok(rail.t >= img.b - 2, 'phone: rail is its own row under the name'); else assert.ok(Math.abs(rail.c - img.c) <= 8 && rail.l > score.r, 'desktop: rail on the same line, right');
             const buttons = await page.$$eval('#profile-quick-actions > button:not([hidden])', els => els.filter(e => e.getClientRects().length).map(e => Math.round(e.getBoundingClientRect().top)));
-            assert.equal(buttons.length, touch ? 5 : 7, tag + ': rail buttons');   // V101.147: ⋯ beside Flood · V101.334: + 🥣 left of 📅 on a PC-wide window only · V101.353: + 🐺 left of 🥣
+            assert.equal(buttons.length, touch ? 5 : 8, tag + ': rail buttons');   // V101.147: ⋯ beside Flood · V101.334: + 🥣 left of 📅 on a PC-wide window only · V101.353: + 🐺 left of 🥣 · V101.362: + 🧊 left of 🐺
              assert.ok(Math.max(...buttons) - Math.min(...buttons) <= 2, 'rail buttons on one row');
             assert.equal(await page.$eval('#u-division-badge', e => getComputedStyle(e).display), 'none', 'badge row hidden even when JS shows it');
             assert.equal(await page.$eval('#u-img', e => e.style.borderColor), 'rgb(224, 33, 138)', 'ring = division colour (V101.158: CU is pinned to Chulalongkorn pink #e0218a; the hash gave it the same purple as BUU)');
