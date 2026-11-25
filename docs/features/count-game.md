@@ -15,6 +15,7 @@ File: `public/count.js` (game + its own CSS).
 
 - `scripts/count-game-qa.cjs` — counter right on known drawings, every stack fair, doorways (phone + PC), pad, wrong → เฉลย + light-up, right = 100 + 5 × s, time out, best kept, 🧊 heights add up, 320 px, PC keys.
 - `scripts/count-tour-qa.cjs` — V101.367: the first open plays the ❓ tour inside the popup (① ② ③ step by step, at once with reduced motion; ถัดไป fixed), never again; ? replays it and the clock waits; the fuller question; ✓ beside the answer, grey → orange; 44 px keys; 5 round dots; 320 px.
+- `scripts/count-voice-qa.cjs` — V101.373: each ❓ scene reads itself in Thai (`public/count-voice/t1…t3.mp3`, Paxa foithong, made once, 40 kbps mono); 🔊/🔇 beside ✕ in the tour, kept as `countVoice`; ถัดไป / ข้าม / ✕ stop the clip; with the voice on scene 1 steps every 2.6 s. Audio is stubbed — real sound needs a phone
 
 ## What usually lies
 
