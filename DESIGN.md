@@ -112,3 +112,14 @@ How screens in this project are designed. Read it before any UI work. `CLAUDE.md
 | 8.6 | An AI model choice uses the one picker | 3.2 · §6 |
 | 8.7 | Every id / handler still there; all QA scripts pass | 3.8 · 7.3 |
 | 8.8 | Before / after shown to the owner before the code | 7.1 |
+| 8.9 | New CSS / markup keeps the code floor | §9 |
+
+## 9. Code floor
+*Why: four checks from the Hallmark design skill (2026-11-25) that fit this app. **New work** follows them; old code is fixed **one part at a time, when that part is touched** — no mass rewrite (today: `transition: all` ≈ 112 places).*
+
+| # | Rule | ✓ Do | ✗ Don't |
+|---|---|---|---|
+| 9.1 | **Name what moves** | `transition: opacity .15s, transform .15s`; move with `transform` / `opacity` | `transition: all`; animating `width`, `height`, `top`, `left` |
+| 9.2 | **Every control shows focus** | `:focus-visible` on each new button / chip / link / field, at once (no delay) | `outline: none` with nothing in its place |
+| 9.3 | **Motion has a still version** | Each new animation / transition gets a `@media (prefers-reduced-motion: reduce)` fallback; the content is there without it | Information that only shows through an animation |
+| 9.4 | **Never invent a fact** | Numbers, quotes, names and logos come from data or the owner; a placeholder says it is one | A made-up count, score, testimonial or "used by" logo |
