@@ -17,6 +17,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     for (const k of ['internGuideSeen', 'journalTourSeen', 'cerealTourSeen', 'wolfTourSeen']) localStorage.setItem(k, '1'); localStorage.setItem('wolfCoachSeen', 'all');
     window.firebase = { auth: () => ({ currentUser: { uid: 'u1' }, onAuthStateChanged: () => () => {}, signInAnonymously: () => Promise.resolve() }), functions: () => ({ httpsCallable: () => () => Promise.resolve({ data: {} }) }), firestore: Object.assign(() => ({}), { FieldValue: { serverTimestamp: () => 0 } }) };
     const st = window.setTimeout; window.setTimeout = function (fn, ms, ...a) { if (ms === 15000) return 0; return st.call(this, fn, ms, ...a); };
+    let q = 7; Math.random = () => ((q = (q * 16807) % 2147483647) / 2147483647);   // every run the same games
   });
   await page.route('**/*', (r) => (r.request().url().startsWith('file:') ? r.continue() : r.abort()));
   await page.goto(pathToFileURL(path.resolve('public/index.html')).href, { waitUntil: 'load' });
@@ -47,8 +48,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     BW.close(); return { bad: [...new Set(bad)], games, early };
   });
   assert.deepEqual(rules.bad, [], 'rules hold over ' + rules.games + ' games'); assert.ok(rules.early > 0, 'some games end early at 5');
-  // the levels are ordered: vs a random hand, 🥄🥄🥄 wins clearly more than it loses
-  const st = await page.evaluate(() => { let w = 0, l = 0; for (let i = 0; i < 200; i++) { BW.level(3); BW.start(); const g = BW._g(); while (!g.end) { if (g.last) BW.next(); else { BW.pick(g.me[Math.floor(Math.random() * g.me.length)]); BW.play(); } } if (g.sc.bot > g.sc.me) w++; else if (g.sc.bot < g.sc.me) l++; } BW.close(); return { w, l }; });
+  // the levels are ordered: vs a random hand (seeded, 400 games — the same every run), 🥄🥄🥄 wins clearly more than it loses
+  const st = await page.evaluate(() => { let w = 0, l = 0, z = 11; const R = () => ((z = (z * 48271) % 2147483647) / 2147483647); for (let i = 0; i < 400; i++) { BW.level(3); BW.start(); const g = BW._g(); while (!g.end) { if (g.last) BW.next(); else { BW.pick(g.me[Math.floor(R() * g.me.length)]); BW.play(); } } if (g.sc.bot > g.sc.me) w++; else if (g.sc.bot < g.sc.me) l++; } BW.close(); return { w, l }; });
   assert.ok(st.w > st.l * 1.3, '🥄🥄🥄 beats a random hand ' + JSON.stringify(st));
 
   // ---- phone doorway → lobby → a game ----
