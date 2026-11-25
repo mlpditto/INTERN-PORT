@@ -66,6 +66,10 @@ const ONLINE = [
   assert.equal(rows.length, 6);
   assert.deepEqual(rows.map((r) => r.cls.match(/r-[a-z]/)[0]), ['r-p', 'r-p', 'r-w', 'r-l', 'r-d', 'r-k'], 'bar per row: unfinished, unfinished, I won vs 🤖, I lost vs 🤖, 🕵️ won, 🔪 won');
   assert.deepEqual(rows.map((r) => /\bcur\b/.test(r.cls)), [true, false, false, false, false, false], 'only the newest unfinished game is .cur');
+  // V101.364 pick A: a finished row says who won — 🏆 ชนะ / 😞 แพ้ vs 🤖 (my side), the winning side's icon otherwise; no 🏁
+  const res = await page.$$eval('#cerealModal .ck-game', (els) => els.map((e) => { const r = e.querySelector('.ck-res'); return r ? r.textContent : (e.querySelector('.d') || {}).textContent; }));
+  assert.deepEqual(res.slice(0, 4), ['D3', res[1], '🏆 ชนะ · D6', '😞 แพ้ · D2'], 'vs 🤖: won / lost from my side ' + JSON.stringify(res));
+  assert.match(res[4], /^🕵️ ชนะ · D\d$/); assert.match(res[5], /^🔪 ชนะ · D\d$/);
   const want = { 'r-p': 'rgb(203, 213, 225)', 'r-w': 'rgb(22, 163, 74)', 'r-l': 'rgb(220, 38, 38)', 'r-d': 'rgb(67, 56, 202)', 'r-k': 'rgb(190, 18, 60)' };
   for (const [i, k] of ['r-p', 'r-p', 'r-w', 'r-l', 'r-d', 'r-k'].entries()) {
     const b = await bar('#cerealModal .ck-game:nth-of-type(' + (i + 1) + ')');
@@ -78,7 +82,7 @@ const ONLINE = [
   assert.equal(await page.getAttribute('#cerealModal .ck-game.cur', 'onclick'), "CK.resume('g4')", 'the .cur row resumes the newest unfinished game');
 
   await open('local', [], []);
-  assert.equal((await page.textContent('#ck-empty')).trim(), '🎮 ยังไม่มีเกม · เลือกบท แล้ว ▸ เริ่ม');
+  assert.equal((await page.textContent('#ck-empty')).trim(), '🥣ยังไม่มีเกม · เลือกบท แล้ว ▸ เริ่ม', 'V101.364 pick A: a big 🥣 over the line');
   assert.ok(await page.isVisible('#ck-empty'));
 
   // ---- 🌐 code box + empty line ----
