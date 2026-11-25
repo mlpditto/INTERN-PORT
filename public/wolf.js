@@ -154,6 +154,8 @@
         m.classList.toggle('dark', !!g && g.phase === 'night' && !ui.peek);
         document.getElementById('ww-body').innerHTML = html;
         if (window.WWTour) WWTour.coach(coachKey());   // V101.357 (pick B): one hint at a time on the first real turn
+        if (g && window.GameLog) { var fin = g.status === 'finished';   // V101.370 🎮 game time for the admin (game-log.js): a round = a night + a day
+            GameLog.see('wolf', { id: g.id, n: fin ? g.day : g.day - 1, done: fin, mode: g.n + ' ' + g.level, win: fin && g.result ? ((g.result.winner === 'wolf') === (myRole() === 'wolf') ? 'w' : 'l') : null, score: fin && g.result ? 'D' + g.result.day : '' }); }
     }
     function coachKey() {
         if (!g || ui.peek || g.status !== 'playing' || !meAlive()) return null;

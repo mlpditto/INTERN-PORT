@@ -8,7 +8,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const admin = fs.readFileSync('public/admin.html', 'utf8'), js = fs.readFileSync('public/cereal-admin.js', 'utf8');
 
 // static pins
-assert.ok(/<div id="ck-admin-strip" class="lang-no-toggle" hidden><\/div>\s*<div id="quiz-dash">/.test(admin), 'the strip sits right above #quiz-dash');
+assert.ok(/<div id="ck-admin-strip" class="lang-no-toggle" hidden><\/div>\s*(<!--[^>]*-->\s*)?<div id="gt-admin"[^>]*><\/div>\s*<div id="quiz-dash">/.test(admin), 'the strip sits above #quiz-dash (V102.704: the 🎮 game time card right under it)');
 assert.ok(/<script src="cereal-admin\.js\?v=V102\.\d+"><\/script>/.test(admin), 'script loaded');
 assert.ok(/window\.upNext\.refresh\(\);[^\n]*\n\s*if \(window\.cerealAdmin\) window\.cerealAdmin\.refresh\(\);/.test(admin), 'refreshed with the quiz list, after 🚀 Up next');
 

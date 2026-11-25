@@ -126,6 +126,19 @@ service cloud.firestore {
       }
     }
     // 🥣 Phase 4: online wins + 🏅 achievements, written by cerealAct only
+    // 🎮 game time (2026-11-25, game-log.js on the intern page, game-admin.js reads): one doc per finished solo / local / online game.
+    // An intern adds only their own (userId linked to this login, authUid = this login); nobody edits; only admins read.
+    match /game_plays/{playId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn()
+        && request.resource.data.authUid == request.auth.uid
+        && isSelfOrLinked(request.resource.data.userId)
+        && request.resource.data.game in ['bw', 'count', 'cereal', 'wolf']
+        && request.resource.data.rounds is list && request.resource.data.rounds.size() <= 40
+        && request.resource.data.keys().hasOnly(['userId', 'authUid', 'game', 'mode', 'rounds', 'from', 'sec', 'win', 'score', 'res', 'startedAt', 'endedAt', 'v', 'at']);
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
     match /cereal_stats/{userId} {
       allow read: if isAdmin() || isSelfOrLinked(userId);
       allow write: if false;
