@@ -33,7 +33,9 @@
     function save() { if (g) g.upd = Date.now(); try { localStorage.setItem(key(), JSON.stringify(store)); } catch (_) { /* storage may be blocked (LIFF) */ } }
 
     var store = { games: [] }, g = null;                 // g = the open game; null = lobby
-    var ui = { tab: 'local', side: 'A', names: { killer: '', detective: '', lola: '' }, arrest: null, revealDay: null, rules: false, vs: 'friend', me: 'killer', level: { killer: 2, detective: 2, lola: 2 }, beat: null,
+    var walkT = null;
+    function stopWalk() { clearInterval(walkT); walkT = null; ui.walk = null; }
+    var ui = { logDay: null, walk: null, tab: 'local', side: 'A', names: { killer: '', detective: '', lola: '' }, arrest: null, revealDay: null, rules: false, vs: 'friend', me: 'killer', level: { killer: 2, detective: 2, lola: 2 }, beat: null,
         lola: false, pair: 1, lolaPick: null };   // V101.346 Phase 3: 🐕 3 คน on this phone; pair = index into CEREAL_MAPS.difficulty (city + suburb)
     var BOT_MS = 700;                                     // the bot's "thinking" beat (≥ 0.6 s so its move is seen to happen); CK.botDelay() sets it for QA
 
@@ -97,13 +99,14 @@
         if (window.CKTour) CKTour.hideCoach();
         var m = document.getElementById('cerealModal'); if (m) m.style.display = 'none';
     }
-    function render() {
+    function render(keep) {   // keep = stay where the reader is (V101.363: a log row opening, ▶ walking)
         root();
         var body = document.getElementById('ck-body');
         var on = g && g.online && window.CKOnline ? CKOnline.screen() : null;   // V101.335: room / waiting screens
         var html = !g ? lobbyHtml() : on ? on : g.status === 'finished' ? revealHtml() : ui.beat ? beatHtml() : g.hand ? handHtml() : g.phase === 'killer' ? killerHtml() : g.phase === 'lola' ? lolaHtml() : detectiveHtml();
+        var sc = document.querySelector('#cerealModal .modal-content'), m = document.getElementById('cerealModal'), y = sc ? sc.scrollTop : 0, my = m ? m.scrollTop : 0;
         body.innerHTML = html;
-        var sc = document.querySelector('#cerealModal .modal-content'); if (sc) sc.scrollTop = 0;
+        if (sc) sc.scrollTop = keep ? y : 0; if (keep && m) m.scrollTop = my;
         if (window.CKTour) CKTour.coach(coachKey());   // V101.329: first-turn hints follow the step the player is on
     }
     /* Which first-turn hint fits the screen just drawn (cereal-tutorial.js shows each once). null = nothing to coach. */
@@ -168,13 +171,23 @@
         if (game.lola && game.lola.pos != null && !(game.phase === 'lola' && !game.hand)) add(game.lola.pos, 'tk', '🐕');
         return ex;
     }
+    // V101.363 (owner pick, mockup-cereal-review/): a day row taps open into one line per event, with a word for what happened
+    var LOGW = { kill: 'สังหาร', ask: 'ถามพยาน', arrest: 'จับ', lola: 'Lola', 'lola-move': 'Lola เดิน' };
     function logHtml(game, label) {
         var byDay = {}; game.log.forEach(function (e) { (byDay[e.day] = byDay[e.day] || []).push(e); });
         var h = '<div class="ck-nb"><div class="lbl">' + (label || 'บันทึกคดี · ทุกคนเห็น') + '</div>';
         Object.keys(byDay).map(Number).sort(function (a, b) { return a - b; }).forEach(function (d) {
-            h += '<div class="r' + (d === game.day ? ' now' : '') + '"><span class="d">D' + d + '</span>' + byDay[d].map(function (e) { return esc(e.text); }).join(' · ') + '</div>';
+            var open = ui.logDay === d;
+            h += '<div class="r ck-lr' + (d === game.day ? ' now' : '') + (open ? ' open' : '') + '" role="button" tabindex="0" aria-expanded="' + open + '" data-day="' + d + '" onclick="CK.logDay(' + d + ')"><span class="d">D' + d + '</span>'
+                + (open ? '' : '<span class="sm">' + byDay[d].map(function (e) { return esc(e.text); }).join(' · ') + '</span>') + '<span class="ar">' + (open ? '▴' : '▾') + '</span></div>';
+            if (open) h += '<div class="ck-logx">' + byDay[d].map(function (e) { var w = LOGW[e.type] && !/^⏭/.test(e.text) ? LOGW[e.type] : ''; return '<div>' + (w ? '<b>' + w + '</b> · ' : '') + esc(e.text) + '</div>'; }).join('') + '</div>';
         });
         return h + '</div>';
+    }
+    function keyHtml(me) {   // V101.363: one line under the board — what the marks mean
+        var k = me === 'killer' ? ['🔪 คุณ', '🕵️ นักสืบ'] : me === 'lola' ? ['🐕 คุณ', '🕵️ นักสืบ'] : ['🕵️ คุณ'];
+        k.push('👁️ พยาน', '🥣 เหยื่อ'); if (g.lola && me !== 'lola') k.push('🐕 Lola');
+        return '<div class="ck-key" aria-label="Key">' + k.map(function (x) { return '<span>' + x + '</span>'; }).join('') + '<span><i></i>เดินได้</span></div>';
     }
     function qcard(q) { for (var i = 0; i < QCARDS.length; i++) if (QCARDS[i].q === q) return QCARDS[i]; return QCARDS[0]; }
     function dirWord(a) { return { N: 'N · เหนือ', S: 'S · ใต้', E: 'E · ตะวันออก', W: 'W · ตะวันตก' }[a] || a; }
@@ -277,8 +290,8 @@
         if (typeof ui.lolaBite === 'number') add(ui.lolaBite, 'cls', ' ring');
         L0.notes.forEach(function (u) { if (u.cell != null && u.day === g.day) add(u.cell, 'tk', u.ans === 'center' ? '🎯' : '👃'); });
         var enabled = function (id) { return picking ? near.indexOf(id) >= 0 : targets.indexOf(id) >= 0; };
-        var h = '<div class="ck lola">' + topHtml('🐕 วันที่ ' + g.day, '<span class="ck-pill acc"' + t('steps left' + (v.bonus ? ' (🦴 +1)' : ''), 'ก้าวที่เหลือ') + '>👣 ' + left + '</span>' + pills(g)) + boardHtml(g, { extra: ex, tap: true, enabled: enabled });
-        if (path.length > 1) h += '<div class="ck-path"><span class="ck-mini">เส้นทาง</span><b>' + path.join(' › ') + '</b>' + (L0.dd.used ? '' : '<button type="button" class="ck-undo" onclick="CK.undo()"' + t('Undo one step', 'ถอยหนึ่งก้าว') + '>↺</button>') + '</div>';
+        var h = '<div class="ck lola">' + topHtml('🐕 วันที่ ' + g.day, '<span class="ck-pill acc"' + t('steps left' + (v.bonus ? ' (🦴 +1)' : ''), 'ก้าวที่เหลือ') + '>👣 ' + left + '</span>' + pills(g)) + boardHtml(g, { extra: ex, tap: true, enabled: enabled }) + keyHtml(g.phase === 'lola' ? 'lola' : 'detective');
+        if (path.length > 1) h += '<div class="ck-path"><span class="ck-mini">เส้นทาง</span><b>' + path.join(' › ') + '</b>' + (L0.dd.used ? '' : '<button type="button" class="ck-undo" onclick="CK.undo()"' + t('Undo one step', 'ถอยหนึ่งก้าว') + '>↺ ถอย</button>') + '</div>';
         h += '<div class="ck-row rail" id="ck-lola-ab"><span class="ck-mini">🐕 ท่า</span>';
         ABIL.forEach(function (x) {
             var rest = L0.last === x.a, used = !!L0.dd.used, on = ui.lolaPick === x.a || (used && L0.dd.used.a === x.a);
@@ -364,11 +377,11 @@
         }
         var enabled = pos == null ? function (id) { return m.cells[id].t === R.T.HOUSE; } : function (id) { return targets.indexOf(id) >= 0; };
         var h = '<div class="ck killer">' + topHtml('🔪 วันที่ ' + g.day, pills(g) + '<span class="ck-pill"' + t(g.skipUsed ? 'the quiet day is used' : 'one day without a victim is allowed', g.skipUsed ? 'ใช้วันไม่สังหารไปแล้ว' : 'ไม่สังหารได้ 1 วัน') + '>⏭ ' + (g.skipUsed ? 0 : 1) + '</span>') + calHtml(g);
-        h += boardHtml(g, { extra: ex, tap: true, enabled: enabled });
+        h += boardHtml(g, { extra: ex, tap: true, enabled: enabled }) + keyHtml('killer');
         if (pos == null) h += '<div class="ck-row"><span class="ck-mini">🏠 บ้าน</span><span class="ck-note">แตะบ้าน 1 หลัง · จุดเริ่มลับของคุณ</span></div>';
         else {
             h += '<div class="ck-path"><span class="ck-mini">เส้นทาง</span><b id="ck-path">' + path.join(' › ') + (full ? '' : ' › _'.repeat(R.STEPS.killer + 1 - path.length)) + '</b>'
-                + (path.length > 1 || g.day === 1 ? '<button type="button" class="ck-undo" onclick="CK.undo()"' + t('Undo one step', 'ถอยหนึ่งก้าว') + '>↺</button>' : '') + '</div>';
+                + (path.length > 1 || g.day === 1 ? '<button type="button" class="ck-undo" onclick="CK.undo()"' + t('Undo one step', 'ถอยหนึ่งก้าว') + '>↺ ถอย</button>' : '') + '</div>';
             if (full) {
                 var opts = R.killOptions(m, path, g.cereals), kill = g.draft.kill;
                 h += '<div class="ck-row rail" id="ck-kill"><span class="ck-mini">🥣 สังหาร</span>';
@@ -453,8 +466,8 @@
         arrestCells.forEach(function (id) { add(id, 'cls', ' pick'); });
         if (typeof ui.arrest === 'number') add(ui.arrest, 'cls', ' ring');
         var enabled = function (id) { return ui.arrest === 'pick' ? arrestCells.indexOf(id) >= 0 : targets.indexOf(id) >= 0; };
-        h += topHtml('🕵️ วันที่ ' + g.day, '<span class="ck-pill acc"' + t('steps left' + (v.bonus ? ' (☕ +1)' : ''), 'ก้าวที่เหลือ') + '>👣 ' + left + '</span>' + pills(g)) + boardHtml(g, { extra: ex, tap: true, enabled: enabled });
-        if (path.length > 1) h += '<div class="ck-path"><span class="ck-mini">เส้นทาง</span><b>' + path.join(' › ') + '</b><button type="button" class="ck-undo" onclick="CK.undo()"' + t('Undo one step', 'ถอยหนึ่งก้าว') + '>↺</button></div>';
+        h += topHtml('🕵️ วันที่ ' + g.day, '<span class="ck-pill acc"' + t('steps left' + (v.bonus ? ' (☕ +1)' : ''), 'ก้าวที่เหลือ') + '>👣 ' + left + '</span>' + pills(g)) + boardHtml(g, { extra: ex, tap: true, enabled: enabled }) + keyHtml(g.phase === 'lola' ? 'lola' : 'detective');
+        if (path.length > 1) h += '<div class="ck-path"><span class="ck-mini">เส้นทาง</span><b>' + path.join(' › ') + '</b><button type="button" class="ck-undo" onclick="CK.undo()"' + t('Undo one step', 'ถอยหนึ่งก้าว') + '>↺ ถอย</button></div>';
         // question cards
         var canAsk = g.witness != null && R.canQuestion(m, last, g.witness) && !g.dd.asked;
         h += '<div class="ck-row rail" id="ck-ask"><span class="ck-mini">❓ ถาม' + (g.witness != null ? ' 👁️' + g.witness : '') + '</span>';
@@ -603,7 +616,8 @@
         else { title = L('🔪 ' + esc(g.names.killer) + ' รอดครบ 7 วัน', esc(g.names.killer) + ' survived 7 days'); sub = 'เหยื่อ ' + g.kills + ' · 🛡️ เหลือ ' + g.arrestsLeft; }
         var ex = publicExtra(g), add = function (id, k, v) { ex[id] = ex[id] || {}; ex[id][k] = (ex[id][k] || '') + v; };
         if (g.secret.home != null) add(g.secret.home, 'cls', ' home');
-        var p = sel ? (g.secret.path[sel] || []) : [];
+        var p = sel ? (g.secret.path[sel] || []) : [], wk = ui.walk && ui.walk.d === sel ? ui.walk.k : null;
+        if (wk != null) p = p.slice(0, wk + 1);   // V101.363 ▶: the day walks one step at a time
         p.slice(1).forEach(function (id, i) { add(id, 'cls', ' on'); ex[id].st = String(i + 1); });
         if (p.length) add(p[p.length - 1], 'me', '🔪');
         if (!sel && r.kpos != null) add(r.kpos, 'me', '🔪');
@@ -616,12 +630,13 @@
             + (g.online && window.CKOnline && CKOnline.achLine ? CKOnline.achLine(g) : '')   // Phase 4: 🏅 what this game earned
             + '<div class="ck-days" aria-label="Replay by day"><button type="button" class="all' + (sel ? '' : ' on') + '" onclick="CK.revealDay(0)">ทั้งหมด</button>';
         for (var d = 1; d <= R.DAYS; d++) h += '<button type="button" class="' + (d === sel ? 'on' : '') + '"' + (days.indexOf(d) >= 0 ? ' onclick="CK.revealDay(' + d + ')" style="--dc:' + DAYC[d - 1] + '"' : ' disabled') + '>D' + d + '</button>';
+        h += '<button type="button" class="play' + (wk != null ? ' on' : '') + '" id="ck-walk" onclick="CK.walk()"' + t('Walk the day step by step', 'เดินทีละก้าว') + '>▶</button>';
         // V101.333 pick 2D: the killer's route drawn on the board, one colour per day (all days, or the one picked)
         var rows = Math.max.apply(null, m.ids.map(function (id) { return m.cells[id].y; }));
         var shown = days.filter(function (d) { return !sel || d === sel; });
         var lines = shown.map(function (d, i) {
             var off = shown.length > 1 ? (i - (shown.length - 1) / 2) * 0.09 : 0;   // a day that walks back over another stays visible beside it
-            return '<polyline class="ck-route" data-day="' + d + '" stroke="' + DAYC[d - 1] + '" points="' + g.secret.path[d].map(function (id) { return (m.cells[id].x - 0.5 + off) + ',' + (m.cells[id].y - 0.5 + off); }).join(' ') + '"/>';
+            return '<polyline class="ck-route" data-day="' + d + '" stroke="' + DAYC[d - 1] + '" points="' + (d === sel && wk != null ? p : g.secret.path[d]).map(function (id) { return (m.cells[id].x - 0.5 + off) + ',' + (m.cells[id].y - 0.5 + off); }).join(' ') + '"/>';
         }).join('');
         h += '</div><div class="ck-boardwrap">' + boardHtml(g, { extra: ex, tap: false }) + '<svg class="ck-routes" viewBox="0 0 5 ' + rows + '" preserveAspectRatio="none" aria-hidden="true">' + lines + '</svg></div>';
         h += '<div class="ck-nb"><div class="lbl">📓 สมุดลับของฆาตกร · 🏠 บ้าน ' + g.secret.home + '</div>';
@@ -673,7 +688,15 @@
         rematch: function () { if (g && g.online) { if (window.CKOnline) CKOnline.leave(); ui.tab = 'online'; g = null; render(); return; } if (g && g.bot) { ui.vs = 'bot'; ui.me = g.bot.seat; ui.lola = !!g.lola; if (g.lola) ui.pair = g.pair; } else if (g) { ui.vs = 'friend'; ui.names = { killer: g.names.detective, detective: g.names.killer, lola: g.lola ? g.names.lola : '' }; ui.lola = !!g.lola; if (g.lola) ui.pair = g.pair; } g = null; ui.beat = null; render(); },
         lobby: function () { if (g && g.online) { if (window.CKOnline) CKOnline.leave(); ui.tab = 'online'; } g = null; render(); },
         tab: function (tb) { readNames(); ui.tab = tb; render(); },
-        revealDay: function (d) { ui.revealDay = d; render(); },
+        revealDay: function (d) { stopWalk(); ui.revealDay = d; render(); },
+        logDay: function (d) { ui.logDay = ui.logDay === d ? null : d; render(true); },
+        walk: function () {   // V101.363: ▶ — the picked day (or the last one) walks from home, one step every 0.65 s
+            if (!g || g.status !== 'finished') return;
+            var days = Object.keys(g.secret.path).map(Number).sort(function (a, b) { return a - b; }); if (!days.length) return;
+            var d = ui.revealDay && days.indexOf(ui.revealDay) >= 0 ? ui.revealDay : days[days.length - 1], n = g.secret.path[d].length - 1;
+            stopWalk(); ui.revealDay = d; ui.walk = { d: d, k: 0 }; render(true);
+            walkT = setInterval(function () { if (!g || g.status !== 'finished' || !ui.walk) return stopWalk(); ui.walk.k++; if (ui.walk.k >= n) { stopWalk(); } render(true); }, 650);
+        },
         close: close,
         game: function () { return g; },   // read by the QA harness
         // V101.335: what cereal-online.js needs from this file (the same screens draw an online game)

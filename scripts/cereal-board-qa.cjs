@@ -146,7 +146,7 @@ const stored = page => page.evaluate(() => JSON.parse(localStorage.getItem('cere
 
         // reveal
         assert.ok((await txt(page, '#cerealModal .ck-win .t')).includes('Mint caught Pond at 12'), 'correct arrest ends the game');
-        assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#cerealModal .ck-days button')].map(b => (b.disabled ? '-' : '') + b.textContent)), ['ทั้งหมด', 'D1', 'D2', '-D3', '-D4', '-D5', '-D6', '-D7'], 'V101.333: the rail opens on ทั้งหมด (every day\'s route)');
+        assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#cerealModal .ck-days button')].map(b => (b.disabled ? '-' : '') + b.textContent)), ['ทั้งหมด', 'D1', 'D2', '-D3', '-D4', '-D5', '-D6', '-D7', '▶'], 'V101.333: the rail opens on ทั้งหมด (every day\'s route) · V101.363: ▶ walks a day');
         assert.ok((await cls(page, 12)).includes('caught') && (await cls(page, 8)).includes('home'), 'caught cell + home ring');
         assert.ok((await txt(page, cell(13))).includes('🕵️'), 'the detective is drawn where the arrest was made from (13), not where the turn began');
         const nb = await txt(page, '#cerealModal .ck-nb');
