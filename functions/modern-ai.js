@@ -59,7 +59,8 @@ async function runModernAI({ model, prompt, isJson, visionData, generationOption
         // refusal, which the finish-reason check below reports. No `thinking` field: omitted =
         // adaptive thinking, which at effort low skips thinking on most simple requests.
         // V102.627: Claude Fable 5.2 (replaces Fable 5.1) gets the same server-side fallback — a declined request re-runs inside the same call
-        const fallback = model === 'claude-sonnet-5-5' || model === 'claude-fable-5-2';
+        // Opus 5.5 declined an Articles draft (2026-11-25): same fallback, so a declined request re-runs inside the call
+        const fallback = model === 'claude-sonnet-5-5' || model === 'claude-fable-5-2' || model === 'claude-opus-5-5';
         ({ data } = await post('https://api.anthropic.com/v1/messages', {
             model, max_tokens: max, output_config: { effort: 'low' }, messages: [{ role: 'user', content }],
             ...(fallback ? { fallbacks: 'default' } : {})
@@ -80,7 +81,9 @@ async function runModernAI({ model, prompt, isJson, visionData, generationOption
         // V101.09: say WHY, with the numbers the caller needs to act (which model,
         // how it stopped, how much it wrote against the cap) and log it — this
         // branch used to be silent and skipped ai_usage, so it was invisible.
-        const detail = config.adapter === 'responses' && data.incomplete_details && data.incomplete_details.reason ? ` (${data.incomplete_details.reason})` : '';
+        const sd = config.adapter !== 'responses' && data.stop_details;   // refusal: which category declined it
+        const detail = config.adapter === 'responses' && data.incomplete_details && data.incomplete_details.reason ? ` (${data.incomplete_details.reason})`
+            : sd && sd.category ? ` (${sd.category}${sd.explanation ? ': ' + String(sd.explanation).slice(0, 160) : ''})` : '';
         const why = finishReason !== expectedFinish ? `stopped with ${finishReason || 'no finish reason'}${detail}`
             : !text.trim() ? 'empty text' : 'text is not valid JSON';
         const head = String(text || '').replace(/\s+/g, ' ').slice(0, 200);
