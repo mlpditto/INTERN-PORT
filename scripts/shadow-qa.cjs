@@ -4,6 +4,9 @@
 // tiles possible); the doorways (phone: Schedule row after 🧊, PC: header left of 🧊); a 🤖 number never reaches the page before the
 // end (only its colour); pick → ▸ ลง → result → ▸ ต่อ; the 📓 shows my number + 🤖 colour; 🥄🥄🥄 🧠: used tiles look unused, a tap
 // says so, the 📓 hides my numbers; the end screen opens every 🤖 tile and keeps the record; nothing scrolls sideways at 320 px.
+// V101.366 (pick B + end screen): a dark popup, the 🤖 tile glows in its colour; the 📓 is one bar (none before round 1) that pulls a sheet
+// up and folds it again; with motion allowed the end screen opens the 🤖 tiles one by one (a tap opens the rest); 📤 LINE falls back to
+// the clipboard outside LINE; ?bw=1 (the card's button) opens the game.
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -62,13 +65,20 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   await page.evaluate(() => { const g = BW._g(); if (g.lead !== 'bot') { g.lead = 'bot'; g.botTile = BW._botPick(null); } });
   await page.evaluate(() => { const g = BW._g(); document.getElementById('bw-body') && (BW.pick(g.me[0]), BW.pick(g.me[0])); });
   const hidden = await page.evaluate(() => { const g = BW._g(), tb = document.getElementById('bw-table'); return { colour: tb.querySelector('.bw-t.back').classList.contains(g.botTile % 2 ? 'w' : 'b'), digits: /\d/.test(tb.textContent), say: document.getElementById('bw-say').textContent }; });
-  assert.equal(hidden.colour, true, 'the 🤖 tile shows its colour'); assert.equal(hidden.digits, false, 'no 🤖 number on the table'); assert.match(hidden.say, /^🤖 ลง [⚫⚪] · ตาคุณ$/);
+  assert.equal(hidden.colour, true, 'the 🤖 tile shows its colour');
+  const look = await page.evaluate(() => { const g = BW._g(), t = document.querySelector('#bw-table .bw-t.huge'); return { bg: getComputedStyle(document.querySelector('#bwModal .modal-content')).backgroundColor, glow: getComputedStyle(t).boxShadow.includes(g.botTile % 2 ? 'rgba(226, 232, 240' : 'rgba(139, 92, 246'), bar: !!document.getElementById('bw-nb') }; });
+  assert.deepEqual(look, { bg: 'rgb(20, 18, 43)', glow: true, bar: false }, 'dark popup, the 🤖 tile glows in its colour, no 📓 bar before round 1'); assert.equal(hidden.digits, false, 'no 🤖 number on the table'); assert.match(hidden.say, /^🤖 ลง [⚫⚪] · ตาคุณ$/);
   assert.equal(await page.$eval('#bw-play', (b) => b.disabled), false);
   const n0 = await page.evaluate(() => BW._g().sel);
   await page.click('#bw-play');
-  const r1 = await page.evaluate(() => { const g = BW._g(), h = g.hist[0]; return { res: document.getElementById('bw-res').textContent, want: { win: '🏆 ชนะ', lose: '😞 แพ้', draw: '🤝 เสมอ' }[h.res], score: document.getElementById('bw-score').textContent, sc: g.sc, botNum: [...document.querySelectorAll('#bwModal .bw-t:not(.back)')].some((e) => +e.textContent === h.b && e.closest('.bw-pair') && e.nextElementSibling && e.nextElementSibling.textContent === '🤖'), nb: document.querySelector('#bwModal .bw-r').textContent }; });
+  const r1 = await page.evaluate(() => { const g = BW._g(), h = g.hist[0]; return { res: document.getElementById('bw-res').textContent, want: { win: '🏆 ชนะ', lose: '😞 แพ้', draw: '🤝 เสมอ' }[h.res], score: document.getElementById('bw-score').textContent, sc: g.sc, botNum: [...document.querySelectorAll('#bwModal .bw-t:not(.back)')].some((e) => +e.textContent === h.b && e.closest('.bw-pair') && e.nextElementSibling && e.nextElementSibling.textContent === '🤖'), bar: document.getElementById('bw-nb').textContent, rows: document.querySelectorAll('#bwModal .bw-r').length }; });
   assert.equal(r1.res, r1.want); assert.equal(r1.score, 'คุณ ' + r1.sc.me + ' : ' + r1.sc.bot + ' 🤖'); assert.equal(r1.botNum, false, 'after the round the 🤖 number stays hidden');
-  assert.ok(r1.nb.startsWith('1' + n0 + ' vs ?'), '📓: my number vs the 🤖 colour ' + r1.nb);
+  assert.match(r1.bar, /^📓 1 ตา🤖 เหลือ ⚫ \d · ⚪ \d ▴$/, '📓 folded to one bar'); assert.equal(r1.rows, 0, 'rows hidden while folded');
+  await page.click('#bw-nb');
+  const sheet = await page.evaluate(() => { const sh = document.getElementById('bw-sheet'), r = sh && sh.getBoundingClientRect(); return { pos: sh && getComputedStyle(sh).position, bottom: r && Math.round(r.bottom), h: innerHeight, row: sh && sh.querySelector('.bw-r').textContent, exp: document.getElementById('bw-nb').getAttribute('aria-expanded') }; });
+  assert.equal(sheet.pos, 'fixed'); assert.equal(sheet.bottom, sheet.h, 'the sheet sits on the bottom edge'); assert.equal(sheet.exp, 'true');
+  assert.ok(sheet.row.startsWith('1' + n0 + ' vs ?'), '📓: my number vs the 🤖 colour ' + sheet.row);
+  await page.click('#bw-nb'); assert.equal(await page.$('#bw-sheet'), null, 'a second tap folds it');
   await page.click('#bw-next');
   assert.equal(await page.$eval(`#bw-hand button[data-n="${n0}"]`, (b) => b.disabled && b.classList.contains('used')), true, '🥄🥄: a used tile is dim and off');
 
@@ -81,7 +91,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.equal(await page.$eval(`#bw-hand button[data-n="${used}"]`, (b) => b.disabled || b.classList.contains('used')), false, '🧠: a used tile looks unused');
   await page.click(`#bw-hand button[data-n="${used}"]`);
   assert.equal(await page.textContent('#bw-toast'), '🧠 ' + used + ' ลงไปแล้ว'); assert.equal(await page.$eval('#bw-play', (b) => b.disabled), true, 'and cannot be played');
-  assert.equal(await page.$$eval('#bwModal .bw-nb .bw-t:not(.back)', (e) => e.length), 0, '🧠: the 📓 hides my numbers');
+  await page.click('#bw-nb');
+  assert.equal(await page.$$eval('#bw-sheet .bw-t:not(.back)', (e) => e.length), 0, '🧠: the 📓 hides my numbers');
+  assert.ok((await page.$$eval('#bw-sheet .bw-r', (e) => e.length)) >= 1);
+  await page.click('#bw-nb');
 
   // ---- the end: every 🤖 tile opened, the record kept ----
   await page.evaluate(() => { const g = BW._g(); while (!g.end) { if (g.last) BW.next(); else { BW.pick(g.me[0]); BW.play(); } } });
@@ -95,7 +108,29 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   await page.evaluate(() => BW.close());
   await page.setViewportSize({ width: 1024, height: 800 });
   assert.equal(await page.$eval('#u-bw-chip', (e) => [getComputedStyle(e).display, e.nextElementSibling.id].join()), 'flex,u-count-chip', 'PC: ⚫ just left of 🧊');
+  // ?bw=1 (the 📤 card's button) opens the game
+  await page.evaluate(() => BW.close()); await page.evaluate(() => applyTabDeepLink(new URLSearchParams('bw=1'))); await page.waitForSelector('#bw-start', { timeout: 2000 });
+  await page.evaluate(() => BW.close());
   await page.click('#u-bw-chip'); assert.ok(await page.isVisible('#bw-start'));
+
+  const p2 = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'no-preference' });
+  p2.on('pageerror', (e) => errors.push(e.message));
+  await p2.addInitScript(() => { window.firebase = { auth: () => ({ currentUser: { uid: 'u1' }, onAuthStateChanged: () => () => {}, signInAnonymously: () => Promise.resolve() }), functions: () => ({ httpsCallable: () => () => Promise.resolve({ data: {} }) }), firestore: Object.assign(() => ({}), { FieldValue: { serverTimestamp: () => 0 } }) };
+    const st = window.setTimeout; window.setTimeout = function (fn, ms, ...a) { if (ms === 15000) return 0; return st.call(this, fn, ms, ...a); };
+    window.__clip = null; Object.defineProperty(navigator, 'share', { value: undefined, configurable: true }); Object.defineProperty(navigator, 'clipboard', { value: { writeText: (t) => { window.__clip = t; return Promise.resolve(); } }, configurable: true }); });
+  await p2.route('**/*', (r) => (r.request().url().startsWith('file:') ? r.continue() : r.abort()));
+  await p2.goto(pathToFileURL(path.resolve('public/index.html')).href, { waitUntil: 'load' });
+  await p2.evaluate(() => { bwOpen(); BW.start(); const g = BW._g(); while (!g.end) { if (g.last) BW.next(); else { BW.pick(g.me[0]); BW.play(); } } });
+  const open0 = await p2.$$eval('#bw-reveal .bw-r', (rs) => rs.filter((r) => !r.querySelectorAll('.bw-t')[1].classList.contains('back')).length);
+  assert.equal(open0, 0, 'motion allowed: the 🤖 tiles start face down');
+  await p2.waitForFunction(() => [...document.querySelectorAll('#bw-reveal .bw-r')].filter((r) => !r.querySelectorAll('.bw-t')[1].classList.contains('back')).length === 2, null, { timeout: 3000 });
+  assert.equal(await p2.$$eval('#bw-reveal .bw-r.now', (e) => e.length), 1, 'the row just opened is lit');
+  await p2.click('#bw-reveal');
+  assert.equal(await p2.$$eval('#bw-reveal .bw-t.back', (e) => e.length), 0, 'a tap opens the rest');
+  await p2.click('#bw-share'); await p2.waitForSelector('#bw-sent');
+  const clip = await p2.evaluate(() => ({ clip: window.__clip, sent: document.getElementById('bw-sent').textContent, sc: BW._g().sc }));
+  assert.equal(clip.sent, '📋 คัดลอกแล้ว'); assert.match(clip.clip, /^⚫⚪ ไพ่เงา · (🏆 ชนะ|😞 แพ้|🤝 เสมอ) \d : \d vs 🤖 🥄🥄\nhttps:\/\/liff\.line\.me\/.*\?bw=1$/, '📤 outside LINE: the text + ?bw=1 link to the clipboard');
+  await p2.close();
 
   assert.deepEqual(errors, []);
   await browser.close();
