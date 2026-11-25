@@ -30,7 +30,7 @@ Walk the areas top to bottom for a broad regression: intern surfaces first, then
 - [flood-watch](flood-watch.md): Open-Meteo / canal-gauge flood alerts: the intern popup, the profile river strip, the 10 km summary, district tables and tiers in functions.
 - [cereal-killer](cereal-killer.md): The 🥣 Cereal Killer deduction game: board + engine, the pass-and-play game from Schedule ▸ 🥣 (lobby, killer / hand-off / detective turns, reveal).
 - [werewolf](werewolf.md): The 🐺 Werewolf party game — solo vs 🤖 on LIFF (V101.353); Telegram bot planned.
-- [count-game](count-game.md): 🧊 นับไว — solo Count the Rectangles + Count the Cubes, number pad, answer then the answer shows (V101.362).
+- [count-game](count-game.md): 🧊 นับไว — solo Count the Rectangles + Count the Cubes, number pad, answer then the answer shows (V101.362); 🧘 no-timer mode + small numbered pictures / top-view table answers (V101.371).
 - [shadow](shadow.md): ⚫⚪ ไพ่เงา — hidden-number duel vs 🤖 (0–8, see only the colour), 3 levels, 🧠 memory mode at 🥄🥄🥄 (V101.365).
 - [game-time](game-time.md): 🎮 seconds per round for all 4 games → admin Dashboard table per person (intern V101.370 / admin V102.704).
 - Games row (V101.368): on phones the 4 game doorways (🥣 🐺 🧊 ⚫) are one row of named cards under History, above the version (`#u-games-row`, `scripts/games-row-qa.cjs`); PC keeps the header rail.
