@@ -163,7 +163,8 @@ const ROLE_WORDS = /คุณคือ|ผู้หยั่งรู้|บอ�
   await press(1, 'cancel:' + code);
   out = take();
   assert.equal(store.get('wolf_games/' + code).status, 'cancelled');
-  assert.match(out.find((x) => x.method === 'editMessageText').body.text, /ปิดห้อง/);
+  assert.match(out.find((x) => x.method === 'editMessageText').body.text, /ยกเลิกแล้ว/);   // Phase 3: ✕ mid-game edits the start
+  assert.match(out.find((x) => x.method === 'sendMessage' && x.body.chat_id === '-1001').body.text, /✕ ยกเลิกเกม/);   // + a new line
   assert.equal(store.get('wolf_tg/503').game, null);
   await dm(3, '/start ' + code2); assert.match(take()[0].body.text, /เข้าห้อง .* ที่นั่ง 1/);
   await press(1, 'cancel:' + code); assert.match(take()[0].body.text, /ปิดแล้ว/);

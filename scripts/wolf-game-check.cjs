@@ -144,7 +144,7 @@ async function game(n, lazy) {
       continue;
     }
     if (g.status === 'vote') {
-      const vm = out.find((x) => x.method === 'sendMessage' && /^🗳 โหวตวันที่/.test(x.body.text || ''));
+      const vm = out.find((x) => x.method === 'sendMessage' && /^🗳 โหวตลับ วันที่/.test(x.body.text || ''));
       assert.equal(G().voteMsgId, vm.id, 'the vote message id is kept');
       const live = Object.keys(st.alive).filter((id) => st.alive[id]), dead = Object.keys(st.alive).filter((id) => !st.alive[id]);
       if (dead.length) { await press(dead[0], kb(vm)[0].callback_data); assert.match(toasts(take())[0], /คนตายโหวตไม่ได้/); stats.refused++; }
@@ -155,7 +155,7 @@ async function game(n, lazy) {
         const opts = kb(vm).filter((b) => !b.callback_data.endsWith(':' + v));
         await press(v, pick(opts).callback_data);
         const o = take(); out.push(...o);
-        const e = o.find((x) => x.method === 'editMessageText' && x.body.message_id === vm.id && /โหวตแล้ว/.test(x.body.text));
+        const e = o.find((x) => x.method === 'editMessageText' && x.body.message_id === vm.id && /✅ \d/.test(x.body.text));
         if (e) assert.ok(!NAMES.some((nme) => e.body.text.split('\n')[1].includes(nme)), 'the running count names nobody');
         if (G().status !== 'vote' || G().round !== r) break;
       }
