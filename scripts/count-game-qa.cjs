@@ -2,7 +2,7 @@
 // Proves: the rectangle counter is right on known drawings (a 2×1 split = 3, a 2×2 grid = 9, a box with a T line); every 🧊 stack is a
 // staircase (each top in sight) and its count = the sum of the heights; the doorways (phone: Schedule row, PC: header beside 🐺) open the
 // lobby with 🟥 / 🧊; the number pad types, ⌫ deletes, ✓ waits for a number; a right answer scores 100 + 5 × seconds left, a wrong one
-// shows "เฉลย n"; 🟥 then lights the rectangles one by one up to n / n; 🧊 shows each column's height and the sum; time running out
+// shows "เฉลย n"; 🟥 then shows every rectangle as a small numbered picture (V101.371); 🧊 shows each column's height and the sum; time running out
 // ends the question; 5 questions → the score, a new best kept in localStorage; the keyboard works on PC; nothing scrolls sideways at 320 px.
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -48,8 +48,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.equal(await page.$eval('#cg-ans', (e) => e.textContent), String(wrong), 'the pad types, ⌫ deletes');
   await page.click('#cg-ok');
   assert.equal(await page.$eval('#cg-res', (e) => e.textContent), `✗ ตอบ ${wrong} · เฉลย ${n}`);
-  await page.waitForFunction((n) => document.getElementById('cg-run').textContent === n + ' / ' + n, n, { timeout: 8000 });
-  assert.equal(await page.$$eval('#cg-fig rect[stroke]', (r) => r.length), 1, 'the newest rectangle has the orange frame');
+  // V101.371 (pick C): every rectangle as a small numbered picture instead of lighting one by one (count-free-qa covers the details)
+  assert.equal(await page.$$eval('#cg-thumbs .cg-th', (t) => t.length), n, 'one small picture per rectangle');
 
   // question 2: right answer scores 100 + 5 × seconds left
   await page.click('#cg-next');
@@ -67,8 +67,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   // 🧊: the answer shows every column's height and the sum
   await page.evaluate(() => CG.start('cube'));
   await page.evaluate(() => { CG.key(0); CG.ok(); });
-  const cube = await page.evaluate(() => { const p = CG._g().p; return { nums: [...document.querySelectorAll('#cg-fig text')].map((t) => +t.textContent).reduce((a, b) => a + b, 0), n: CG._count(p), sum: document.querySelector('.cg-sum').textContent }; });
-  assert.equal(cube.nums, cube.n, 'the heights on the tops add up to the answer'); assert.ok(cube.sum.endsWith('= ' + cube.n));
+  const cube = await page.evaluate(() => { const p = CG._g().p; return { nums: [...document.querySelectorAll('#cg-fig text')].map((t) => +t.textContent).reduce((a, b) => a + b, 0), n: CG._count(p), sum: document.getElementById('cg-eq').textContent }; });
+  assert.equal(cube.nums, cube.n, 'the heights on the tops add up to the answer'); assert.ok(cube.sum.endsWith('= ' + cube.n + ' ก้อน'), 'V101.371: the sum line');
 
   // no sideways scroll at 320 px
   await page.setViewportSize({ width: 320, height: 640 }); await page.evaluate(() => CG.start('rect'));

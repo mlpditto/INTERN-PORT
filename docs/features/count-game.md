@@ -19,3 +19,24 @@ File: `public/count.js` (game + its own CSS).
 ## What usually lies
 
 - A harness pass does not prove the drawings are fun to count on a small phone; try it in LINE.
+
+## V101.371: 🧘 no-timer mode and an answer that shows how to count
+
+Owner asks: "เพิ่มโหมดไม่นับถอยหลังเวลา แต่เก็บ stat ให้ ADMIN และ user ทราบ" and "เฉลยควรบอกวิธีนับ พร้อมตัวเลขกำกับ". Picks: 🟥 C ภาพย่อย · 🧊 B ตารางมองจากบน (mockup-count-free/).
+
+**Lobby**
+- A chip rail: ⏱ แข่งเวลา 30 วิ / 🧘 ไม่จับเวลา.
+- The pick is kept on the phone (localStorage `countFree`).
+
+**🧘 no-timer mode**
+- The clock counts up in grey and never ends a question. No points are given.
+- The header shows ✓ n.
+- The end screen shows ✓ n/5, the total time, the average per question, and the seconds for each question.
+- A best total time is kept only for a 5/5 run (`countFreeBest_rect` / `countFreeBest_cube`).
+- The admin 🎮 table logs the mode as `rect free` / `cube free`.
+
+**Answer screen (both modes)**
+- 🟥 Rectangles: every rectangle is shown as a small numbered picture (1…n). They are grouped by how many pieces each covers, with the sum line "1 ช่อง a + 2 ช่อง b … = n รูป". This replaces the old one-by-one lighting.
+- 🧊 Cubes: a top-view table of the heights sits beside the stack, with each row's sum and the sum line "… = n ก้อน".
+
+QA: `scripts/count-free-qa.cjs` (new) and `scripts/count-game-qa.cjs` (now checks the small pictures and the sum line).
