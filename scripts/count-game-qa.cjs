@@ -77,7 +77,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
   // PC: the header chip beside 🐺, keyboard plays
   await page.setViewportSize({ width: 1024, height: 800 });
-  assert.equal(await page.$eval('#u-count-chip', (e) => [getComputedStyle(e).display, e.previousElementSibling.id].join()), 'flex,u-wolf-chip', 'PC: 🧊 right after 🐺');
+  assert.equal(await page.$eval('#u-count-chip', (e) => [getComputedStyle(e).display, e.nextElementSibling.id].join()), 'flex,u-wolf-chip', 'PC: 🧊 just left of 🐺 (🐺 🥣 📅 stay together)');
   await page.click('#u-count-chip'); await page.click('#cg-cube');
   await page.keyboard.press('1'); await page.keyboard.press('Enter');
   assert.ok(await page.$('#cg-res'), 'PC: digits + Enter answer');
