@@ -8,7 +8,7 @@ const { pathToFileURL } = require('node:url');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
 const css = fs.readFileSync('public/cereal.css', 'utf8');
-assert.ok(/#cerealModal \.ck \.ck-x \{ width: 30px;/.test(css) && /#cerealModal \.ck \.ck-undo \{ width: 30px;/.test(css), '✕ / ↺ rules out-rank `.ck button`');
+assert.ok(/#cerealModal \.ck \.ck-x \{ width: 30px;/.test(css) && /#cerealModal \.ck \.ck-undo \{ min-width: 44px; height: 44px;/.test(css), '✕ / ↺ rules out-rank `.ck button`');
 
 async function open(browser, width) {
     const ctx = await browser.newContext({ viewport: { width, height: 780 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, timezoneId: 'Asia/Bangkok' });
@@ -55,7 +55,7 @@ const txt = (page, sel) => page.evaluate(s => { const e = document.querySelector
             await page.click('#ck-hand-go');
             await page.click(cell(8)); for (const id of [3, 2, 1]) await page.click(cell(id));
             x = await box(page, '#cerealModal .ck-undo');
-            assert.ok(x.w === 30 && x.h === 30, width + ' ↺ is a 30 px square: ' + JSON.stringify(x));
+            assert.ok(x.w >= 44 && x.h === 44, width + ' ↺ ถอย is a 44 px target (V101.363; was a 30 px square): ' + JSON.stringify(x));
             assert.ok(await oneLine(page, '#ck-kill'), width + ' kill row (3 houses + ⏭ เว้น) is one line');
             await page.click('#ck-kill .ck-chip:has-text("🏠 3")');
             assert.ok(await oneLine(page, '#ck-wit'), width + ' witness row is one line');
@@ -92,6 +92,6 @@ const txt = (page, sel) => page.evaluate(s => { const e = document.querySelector
             if (process.env.QA_SHOTS) await page.screenshot({ path: process.env.QA_SHOTS + '/reveal-' + width + '.png' });
             assert.deepEqual(errors, [], 'no page errors');
         }
-        console.log('cereal-polish-qa: OK — ✕ / ↺ / cancel are 30 px squares, Game over header fits, kill / witness / ask are one-line rails, ask chips labelled, Thai first with small English, lean hand-off (390 + 320)');
+        console.log('cereal-polish-qa: OK — ✕ / cancel are 30 px squares, ↺ ถอย 44 px, Game over header fits, kill / witness / ask are one-line rails, ask chips labelled, Thai first with small English, lean hand-off (390 + 320)');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
