@@ -69,6 +69,8 @@ const state = page => page.evaluate(() => {
             const want = [['1 / 4 · Journal', '📝 บันทึกวันนี้'], ['2 / 4 · Note', '🎓 จด 1 เรื่องที่อยากจำ'], ['3 / 4 · Review', '👩‍⚕️ แอดมินอ่านและให้คะแนน'], ['4 / 4 · My Notes', '📚 โน้ตเก็บไว้ใน My Notes']];
             for (let i = 0; i < 4; i++) {
                 await page.waitForTimeout(450);
+                // V101.368: wait for the ring to settle on the Note row (a smooth scroll can outlast a fixed 450 ms on a slow runner) — still fails if it never gets there
+                if (i > 0) await page.waitForFunction(() => { const t = document.getElementById('journalTour'), n = document.getElementById('dc-note'); if (!t || !n) return false; const r = t.querySelector('.jt-ring').getBoundingClientRect(), b = n.getBoundingClientRect(); return r.left <= b.left + 1 && r.right >= b.right - 1 && r.top <= b.top + 1 && r.bottom >= b.bottom - 1; }, null, { timeout: 2500 }).catch(() => {});
                 const s = await state(page);
                 assert.deepEqual([s.step, s.title], want[i], 'scene ' + (i + 1) + tag);
                 assert.equal(s.wrapped, 0, 'no Thai hidden by the EN/TH toggle, scene ' + (i + 1) + tag);
