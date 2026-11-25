@@ -17,7 +17,7 @@ assert.ok(/\$\{r\.rating \?/.test(adm) && /ER_TAGS\.find/.test(adm), 'admin queu
     try {
         const page = await browser.newPage({ viewport: { width: 412, height: 900 } });
         const errors = []; page.on('pageerror', e => errors.push(e.message));
-        await page.addInitScript(() => { window.__written = null; window.__lastDoc = ''; window.firebase = new Proxy(function () {}, { get: (t, p) => (p === 'doc' ? id => { window.__lastDoc = id; return window.firebase; } : p === 'set' ? async data => { window.__written = { id: window.__lastDoc, data }; } : window.firebase), apply: () => window.firebase }); });   // records db.collection(..).doc(id).set(data)
+        await page.addInitScript(() => { window.plain = x => JSON.parse(JSON.stringify(x, (k, v) => (typeof v === 'function' ? '[fn]' : v))); /* newer Playwright refuses functions (the serverTimestamp stub) */ window.__written = null; window.__lastDoc = ''; window.firebase = new Proxy(function () {}, { get: (t, p) => (p === 'doc' ? id => { window.__lastDoc = id; return window.firebase; } : p === 'set' ? async data => { window.__written = { id: window.__lastDoc, data }; } : window.firebase), apply: () => window.firebase }); });   // records db.collection(..).doc(id).set(data)
         await page.route('**/*', r => (r.request().url().startsWith('file:') ? r.continue() : r.abort()));
         await page.goto(pathToFileURL(path.resolve('public/index.html')).href, { waitUntil: 'load' });
         await page.waitForTimeout(400);
@@ -71,7 +71,7 @@ assert.ok(/\$\{r\.rating \?/.test(adm) && /ER_TAGS\.find/.test(adm), 'admin queu
         await page.fill('#er-text', 'หมูย่างอร่อย'); await page.fill('#er-spend', '250');
         assert.equal(await page.evaluate(() => [document.getElementById('er-count').hidden, document.getElementById('er-count').textContent].join('|')), 'false|12/300', 'counter appears with the first character');
         await page.evaluate(() => submitExploreReview());
-        const w = await page.evaluate(() => window.__written);
+        const w = await page.evaluate(() => plain(window.__written));
         assert.equal(w.id, 'L1_' + (await page.evaluate(() => userId)), 'doc id = linkId_userId');
         assert.equal(w.data.rating, 4); assert.deepEqual(w.data.tags, ['tasty', 'worth']); assert.equal(w.data.text, 'หมูย่างอร่อย'); assert.equal(w.data.spendAmount, 250); assert.equal(w.data.status, 'pending');
 
@@ -80,7 +80,7 @@ assert.ok(/\$\{r\.rating \?/.test(adm) && /ER_TAGS\.find/.test(adm), 'admin queu
         assert.equal(await page.locator('.er-star.on').count(), 0, 'reopen = reset');
         await page.locator('.er-star').nth(4).click({ force: true });
         await page.evaluate(() => submitExploreReview());
-        const w2 = await page.evaluate(() => window.__written);
+        const w2 = await page.evaluate(() => plain(window.__written));
         assert.ok(w2 && w2.data.rating === 5 && w2.data.text === '' && w2.data.tags.length === 0 && w2.data.spendAmount === null, 'stars only: ' + JSON.stringify(w2));
 
         // peer list shows ★ + tag icons, and copes with no text

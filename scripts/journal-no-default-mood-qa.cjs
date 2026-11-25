@@ -1,6 +1,6 @@
 // V101.210: the Journal opens with NO mood chosen (a pre-selected 😊 biased what interns reported) — one tap is needed before a log can be sent.
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm'), assert = require('node:assert/strict');
-const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8').replace(/\r\n/g, '\n'); // CRLF on a Windows checkout
 
 // markup: nothing selected, nothing stored
 assert.ok(/<input type="hidden" id="rl-mood" value="">/.test(html), 'the primary mood starts empty');

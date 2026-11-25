@@ -16,7 +16,7 @@ assert.ok(/\.\.\.\(typeof preData\.division === 'string' \? \{ division: preData
         await page.addInitScript(() => { window.firebase = new Proxy(function () {}, { get: () => window.firebase, apply: () => window.firebase }); });
         await page.goto(require('url').pathToFileURL(process.cwd() + '/public/admin.html').href);
         await page.evaluate(() => {
-            window.__adds = []; window.__upd = []; window.__cfg = [];
+            window.__adds = []; window.__upd = []; window.__cfg = []; window.plain = x => JSON.parse(JSON.stringify(x, (k, v) => (typeof v === 'function' ? '[fn]' : v))); // newer Playwright refuses functions (the serverTimestamp stub)
             divisionConfig = { MLP: ['Pharmacists'], CAFE: ['Content Creator'] };
             usersData = []; preRegData = [];
             getGlobalGroups = () => ['Junior', 'INTERN', 'EXTERN', 'Public', 'Pharmacists', 'Content Creator', 'Audit'];
@@ -50,7 +50,7 @@ assert.ok(/\.\.\.\(typeof preData\.division === 'string' \? \{ division: preData
         // generate
         await page.fill('#prereg-name-th', 'ธนพล'); await page.fill('#prereg-nick', 'Joey');
         await page.evaluate(() => addPreRegUser());
-        const add = await page.evaluate(() => window.__adds[0][1]);
+        const add = await page.evaluate(() => plain(window.__adds[0][1]));
         assert.equal(add.group, 'Audit'); assert.equal(add.division, 'CAFE');
         assert.deepEqual(add.memberships, [{ division: 'MLP', group: 'Pharmacists' }]);
         assert.equal(add.startDate, '2026-10-05');
@@ -59,7 +59,7 @@ assert.ok(/\.\.\.\(typeof preData\.division === 'string' \? \{ division: preData
         assert.deepEqual(await on(), ['CAFE', 'Audit']); assert.equal((await chips('#prereg-pick .pr-line:nth-child(3) .pr-chip')).length, 1);
         // not choosing a Division → Only I, stored explicitly
         await page.click('#prereg-pick [data-v=""]'); await page.fill('#prereg-name-th', 'Mint'); await page.evaluate(() => addPreRegUser());
-        const add2 = await page.evaluate(() => window.__adds[1][1]);
+        const add2 = await page.evaluate(() => plain(window.__adds[1][1]));
         assert.equal(add2.division, '', 'Only I = empty division, explicit'); assert.equal(add2.group, 'Audit', 'switching division keeps the group when the new list has it');
         // a waiting row: tags + tap → picker → saved at once
         await page.evaluate(() => { preRegData = [{ id: 'p1', fullName: 'Mint', code: 'ABC123', group: 'Junior', division: '', memberships: [{ division: 'CAFE', group: 'Audit' }], claimed: false }]; renderPreRegList(); });
