@@ -51,7 +51,7 @@ const SHOT = process.env.SHOT; let pass = 0; const ok = (c, m) => { assert.ok(c,
         await shot('qe-head-closed');
 
         console.log('under ⚙');
-        await page.click('#qe-head-on'); v = await view();
+        await page.click('#qe-head-on'); await page.waitForFunction(() => document.getElementById('quiz-editor-settings').open, null, { timeout: 3000 }).catch(() => {}); v = await view();
         ok(v.open && v.modesShown && v.gearExp === 'true', 'a tap on the icons opens ⚙');
         ok(v.namesShown && v.names.every(n => n.length > 0) && v.rows === 1 && /Modes/.test(v.label), 'every mode has its name, on one row, labelled Modes: ' + v.names.join(' · '));
         const col = await page.evaluate(() => { const c = ic => getComputedStyle(document.querySelector('#qe-modes .logic-chip[data-ic="' + ic + '"]')); return [c('🔀').borderTopColor, c('📊').borderTopColor, c('📊').color]; });

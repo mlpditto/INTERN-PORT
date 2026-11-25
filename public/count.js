@@ -186,7 +186,7 @@
                 + '<button type="button" onclick="CG.key(\'del\')" aria-label="Delete">⌫</button><button type="button" onclick="CG.key(0)">0</button></div>';
         } else {
             var n = count(p);
-            h += '<div class="cg-res ' + (d.right ? 'ok' : 'no') + '" id="cg-res">' + (d.right ? '✓ ' + n + ' ถูก' + (g.free ? '' : ' · +' + d.pts) : (d.typed === '' ? '⏱ หมดเวลา' : '✗ ตอบ ' + d.typed) + ' · เฉลย ' + n) + (d.typed === '' && !g.free ? '' : '<span class="cg-took" id="cg-took"> · ⏱ ' + g.qt[g.i] + ' วิ</span>') + '</div>'
+            h += '<div class="cg-res ' + (d.right ? 'ok' : 'no') + '" id="cg-res">' + (d.right ? '✓ ' + n + ' ถูก' + (g.free ? '' : ' · +' + d.pts) : (d.typed === '' ? '⏱ หมดเวลา' : '✗ ตอบ ' + d.typed))   /* V101.372: the answer n shows once, in the #cg-eq sum line */ + (d.typed === '' && !g.free ? '' : '<span class="cg-took" id="cg-took"> · ⏱ ' + g.qt[g.i] + ' วิ</span>') + '</div>'
                 + (p.mode === 'rect' ? rectAnswer(p) : cubeEq(p))
                 + '<button type="button" class="cg-go" id="cg-next" onclick="CG.next()">' + (g.i + 1 < Q ? '▸ ข้อถัดไป' : '🏁 ดูคะแนน') + '</button>';
         }
