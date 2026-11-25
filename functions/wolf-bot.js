@@ -7,6 +7,10 @@
 // Owner picks (docs/WEREWOLF-PLAN.md §8): anyone with Telegram, no app account (Q1) · a new bot (Q2) · 5 roles (Q3) · the dead
 // are NOT revealed until the end (Q4) · the vote result is counts only, no names (Q5) · a 1-minute clock (Q6) · any group (Q7)
 // · the dead are asked to keep quiet, nothing is deleted (Q8).
+// Phase 3 (2026-11-25, mockups/werewolf-p3.html): /rules = one plain message (R1) · ⏳ "เหลือ ~1 นาที" once per phase: a group line
+// in the talk, a DM to each night actor who has not pressed, nothing in the 1-minute vote (W1) · a living player who misses 2
+// of their phases in a row (a night with buttons, or a vote) gets one reminder DM, the group is told nothing, no kick (D1) ·
+// ✕ mid-game posts a new group line, closes the vote buttons and frees the chat + players.
 // handle(update, deps) / tick(deps): deps = { db, tg(method, body), botName(), now, rng }. Roles live only in
 // wolf_games/{code}/secret/state and in each player's own DM — never in a group text before the game is over.
 // Messages are plain text (no parse_mode), so a player's name can never inject markup.
@@ -23,18 +27,32 @@ const ROLE_CARD = {
 };
 const LIVE = ['night', 'day', 'vote'];
 const QUIET = ' · ขอเงียบในกลุ่มจนจบเกมนะ 🤐';   // owner pick Q8: ask once, delete nothing
+const WARN_SEC = 60;   // ⏳ the warning goes out at the first tick with ≤ 60 s left (W1)
+const mmss = (sec) => Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+const RULES = [   // owner pick R1: a line per role + the flow + the win rule, plain text (~450 chars)
+  '🐺 มนุษย์หมาป่า · กติกา',
+  W.MIN_PLAYERS + '–' + W.MAX_PLAYERS + ' คน · บทลับส่งทาง DM',
+  '🐺 หมาป่า กัด 1 คน/คืน · เห็นเพื่อนหมาป่า',
+  '🔮 ผู้หยั่งรู้ ส่อง 1 คน ว่าเป็น 🐺 ไหม',
+  '🛡️ บอดี้การ์ด คุ้มกัน 1 คน · ห้ามคนเดิม 2 คืนติด',
+  '🧪 แม่มด 💚 ชุบ 1 + ☠️ พิษ 1 ทั้งเกม · 7 คนขึ้นไป',
+  '👤 ชาวบ้าน ช่วยกันหา 🐺',
+  '🌙 คืน ' + mmss(W.NIGHT_SEC) + ' → ☀️ เช้า บอกใครตาย (ไม่บอกบท) → 💬 คุย ' + mmss(W.TALK_DEFAULT) + ' → 🗳 โหวตลับ ' + mmss(W.VOTE_SEC) + ' · เสมอ = ไม่มีใครออก',
+  '🏆 🐺 หมด = ชาวบ้านชนะ · 🐺 ≥ คนที่เหลือ = 🐺 ชนะ',
+  '💀 ตายแล้วขอเงียบในกลุ่ม · เริ่ม /werewolf',
+].join('\n');
+const REMIND = (code) => '💤 ไม่ได้กด 2 รอบติดแล้ว · ยังเล่นอยู่ไหม?\nกดในข้อความถัดไปได้เลย · ห้อง ' + code;   // owner pick D1
 
 const nameOf = (u) => (((u.first_name || '') + ' ' + (u.last_name || '')).trim() || u.username || 'ผู้เล่น').slice(0, 24);
 const seated = (g) => Object.entries(g.players || {}).sort((a, b) => a[1].seat - b[1].seat);
 const isGroup = (chat) => chat && (chat.type === 'group' || chat.type === 'supergroup');
-const mmss = (sec) => Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
 const rows2 = (btns) => { const r = []; for (let i = 0; i < btns.length; i += 2) r.push(btns.slice(i, i + 2)); return r; };
 
 function lobbyView(g, bot) {
   const list = seated(g).map(([, p]) => p.name);
   const n = list.length;
   const text = '🐺 มนุษย์หมาป่า · ห้อง ' + g.code + '\n👥 ' + n + '/' + W.MAX_PLAYERS + (n ? ' · ' + list.join(', ') : '') +
-    '\n' + (n >= W.MIN_PLAYERS ? '✅ ครบแล้ว หัวห้องกด ▸ เริ่ม' : 'ต้องมีอีก ' + (W.MIN_PLAYERS - n) + ' คน');
+    '\n' + (n >= W.MIN_PLAYERS ? '✅ ครบแล้ว หัวห้องกด ▸ เริ่ม' : '⏳ อีก ' + (W.MIN_PLAYERS - n) + ' คน · กติกา /rules');
   const rows = [];
   if (n < W.MAX_PLAYERS) rows.push([{ text: '▸ เข้าร่วม', url: 'https://t.me/' + bot + '?start=' + g.code }]);
   rows.push([{ text: '▸ เริ่ม', callback_data: 'start:' + g.code }, { text: '✕ ยกเลิก', callback_data: 'cancel:' + g.code }]);
@@ -45,7 +63,7 @@ function startedView(g, counts) {
   const mix = W.ROLES.filter((r) => counts[r]).map((r) => W.EMOJI[r] + ' ' + counts[r]).join(' · ');
   return {
     text: '🐺 เกมเริ่ม · ห้อง ' + g.code + ' · ' + seated(g).length + ' คน\n🃏 ส่งบทให้ทุกคนทาง DM แล้ว · ' + mix,
-    reply_markup: { inline_keyboard: [[{ text: '✕ จบเกม', callback_data: 'cancel:' + g.code }]] },
+    reply_markup: { inline_keyboard: [[{ text: '✕ ยกเลิกเกม', callback_data: 'cancel:' + g.code }]] },
   };
 }
 
@@ -169,13 +187,16 @@ function nightDone(st) {
 function afterWolves(g, st, out, rng) {
   st.picks.bite = W.wolfTarget(st.picks.wolf, rng);
   const witch = W.withRole(st.roles, st.alive, 'witch')[0];
-  if (witch && (st.witch.heal || st.witch.poison)) out.push({ method: 'sendMessage', body: Object.assign({ chat_id: witch }, witchView(g, st)), dm: nm(g, witch) });
+  if (witch && (st.witch.heal || st.witch.poison)) {
+    st.picks.witchAsked = true;
+    out.push({ method: 'sendMessage', body: Object.assign({ chat_id: witch }, witchView(g, st)), dm: nm(g, witch) });
+  }
   else st.picks.witchDone = true;
 }
 function beginNight(g, st, now, out, rng) {
   g.status = 'night'; g.deadline = now + W.NIGHT_SEC * 1000;
   st.picks = { wolf: {}, bite: null, seer: null, guard: null, heal: false, poison: null, witchDone: false };
-  out.push({ method: 'sendMessage', body: { chat_id: g.chatId, text: '🌙 คืนที่ ' + g.round + ' · ทุกคนหลับตา\nคนที่มีบท ดูข้อความจากบอททาง DM · ⏳ ' + mmss(W.NIGHT_SEC) } });
+  out.push({ method: 'sendMessage', body: { chat_id: g.chatId, text: '🌙 คืนที่ ' + g.round + ' · ⏳ ' + mmss(W.NIGHT_SEC) + '\n💤 หลับตา · คนมีบทดู DM' } });
   const turns = W.nightTurns(st);
   for (const id of Object.keys(turns)) {
     const k = turns[id];
@@ -185,8 +206,28 @@ function beginNight(g, st, now, out, rng) {
     out.push({ method: 'sendMessage', body: { chat_id: id, text: ASK[k], reply_markup: { inline_keyboard: rows2(btns) } }, dm: nm(g, id) });
   }
 }
+/* Who had a menu out tonight and whether they pressed: { id: bool }. A 🔮 / 🛡️ with nobody to pick ('none') and a 🧪 who
+   never got her menu were not asked. */
+function nightActed(st) {
+  const t = W.nightTurns(st), p = st.picks, out = {};
+  for (const id of Object.keys(t)) {
+    const k = t[id];
+    if (k === 'wolf') out[id] = id in p.wolf;
+    else if (k === 'seer' || k === 'guard') { if (p[k] !== 'none') out[id] = !!p[k]; }
+    else if (k === 'witch' && p.witchAsked) out[id] = !!(p.witchDone || p.heal || p.poison);
+  }
+  return out;
+}
+/* D1: count each asked player's misses in a row (a press resets it); the ids that just reached 2. Kept in secret/state
+   because a night miss shows who has a night role. */
+function countMiss(st, acted) {
+  st.miss = st.miss || {};
+  return Object.keys(acted).filter((id) => { st.miss[id] = acted[id] ? 0 : (st.miss[id] || 0) + 1; return st.miss[id] === 2; });
+}
+const remind = (g, st, ids, out) => ids.filter((id) => st.alive[id]).forEach((id) => out.push({ method: 'sendMessage', body: { chat_id: id, text: REMIND(g.code) } }));
 function finishNight(g, st, now, out, rng) {
   const p = st.picks;
+  const missed = countMiss(st, nightActed(st));
   if (!p.bite && !wolvesDone(st) && Object.keys(p.wolf).length) p.bite = W.wolfTarget(p.wolf, rng);   // time ran out mid-vote
   const witch = W.withRole(st.roles, st.alive, 'witch')[0];
   const picks = {
@@ -201,23 +242,27 @@ function finishNight(g, st, now, out, rng) {
   r.dead.forEach((id) => { g.players[id].alive = false; });
   const deadTxt = r.dead.length ? 'เมื่อคืน 💀 ' + r.dead.map((id) => nm(g, id)).join(', ') + ' ตาย' + QUIET : 'คืนสงบ ไม่มีใครตาย';
   r.dead.forEach((id) => out.push({ method: 'sendMessage', body: { chat_id: id, text: '💀 คุณตายเมื่อคืน · ดูเกมต่อได้ แต่ขอเงียบในกลุ่มจนจบนะ 🤐' } }));
-  if (endIf(g, st, out, '☀️ เช้าวันที่ ' + g.round + '\n' + deadTxt)) return;
+  if (endIf(g, st, out, '☀️ เช้าวันที่ ' + g.round + ' · ' + deadTxt)) return;
   g.status = 'day'; g.deadline = now + (g.talkSec || W.TALK_DEFAULT) * 1000;
-  out.push({ method: 'sendMessage', body: { chat_id: g.chatId, text: '☀️ เช้าวันที่ ' + g.round + '\n' + deadTxt + '\n👥 เหลือ ' + liveIds(st).length + ' · คุยกัน ' + mmss(g.talkSec || W.TALK_DEFAULT),
+  out.push({ method: 'sendMessage', body: { chat_id: g.chatId, text: '☀️ เช้าวันที่ ' + g.round + ' · ' + deadTxt + '\n👥 ' + liveIds(st).length + ' · 💬 คุย ' + mmss(g.talkSec || W.TALK_DEFAULT),
     reply_markup: { inline_keyboard: [[{ text: '🗳 โหวตเลย (หัวห้อง)', callback_data: 'talk:' + g.code + ':' + g.round }]] } } });
+  remind(g, st, missed, out);
 }
 function voteView(g, st) {
   const live = seated(g).map(([id]) => id).filter((id) => st.alive[id]);
   const btns = live.map((id) => ({ text: nm(g, id), callback_data: 'v:' + g.code + ':' + g.round + ':' + id }));
   btns.push({ text: '⏭ ข้าม', callback_data: 'v:' + g.code + ':' + g.round + ':skip' });
   const n = Object.keys(st.ballot || {}).length;
-  return { text: '🗳 โหวตวันที่ ' + g.round + ' · โหวตลับ เปลี่ยนได้จนหมดเวลา\n✅ โหวตแล้ว ' + n + '/' + live.length + ' · ⏳ ' + mmss(W.VOTE_SEC), reply_markup: { inline_keyboard: rows2(btns) } };
+  return { text: '🗳 โหวตลับ วันที่ ' + g.round + ' · ⏳ ' + mmss(W.VOTE_SEC) + ' · เปลี่ยนได้\n✅ ' + n + '/' + live.length, reply_markup: { inline_keyboard: rows2(btns) } };
 }
 function beginVote(g, st, now, out) {
   g.status = 'vote'; g.deadline = now + W.VOTE_SEC * 1000; st.ballot = {};
   out.push({ method: 'sendMessage', body: Object.assign({ chat_id: g.chatId }, voteView(g, st)), save: 'voteMsgId' });
 }
 function finishVote(g, st, now, out, rng) {
+  const acted = {};
+  liveIds(st).forEach((id) => { acted[id] = id in (st.ballot || {}); });
+  const missed = countMiss(st, acted);
   const t = W.tallyVotes(st, st.ballot || {});
   const parts = Object.keys(t.counts).filter((k) => k !== 'skip').sort((a, b) => t.counts[b] - t.counts[a]).map((id) => nm(g, id) + ' ' + t.counts[id]);
   if (t.counts.skip) parts.push('⏭ ข้าม ' + t.counts.skip);
@@ -232,6 +277,7 @@ function finishVote(g, st, now, out, rng) {
   out.push({ method: 'sendMessage', body: { chat_id: g.chatId, text: txt } });
   g.round += 1; g.voteMsgId = null;
   beginNight(g, st, now, out, rng);
+  remind(g, st, missed, out);
 }
 /* The end: the winner and every role (the only group text that ever names roles). */
 function endIf(g, st, out, lead) {
@@ -277,7 +323,7 @@ async function onButton(q, deps) {
       tx.update(gRef, { status: 'cancelled', deadline: null, updatedAt: deps.now });
       tx.set(db.collection('wolf_chats').doc(d.chatId), { game: null, updatedAt: deps.now });
       for (const id of Object.keys(d.players)) tx.set(db.collection('wolf_tg').doc(id), { game: null, updatedAt: deps.now });
-      return { g: d, cancelled: true };
+      return { g: d, cancelled: true, live: LIVE.includes(d.status) };
     }
     if (d.status !== 'lobby') return { say: 'เกมเริ่มไปแล้ว' };
     const ids = seated(d).map(([id]) => id);
@@ -296,8 +342,14 @@ async function onButton(q, deps) {
   if (res.say) return answer(res.say);
   await answer();
   const g = res.g;
-  if (res.cancelled) {
+  if (res.cancelled && !res.live) {
     if (g.msgId) await safe(deps, 'editMessageText', { chat_id: g.chatId, message_id: g.msgId, text: '✕ ปิดห้อง ' + g.code + ' แล้ว · พิมพ์ /werewolf เพื่อเปิดใหม่' });
+    return;
+  }
+  if (res.cancelled) {   // mid-game: the start message is far up the chat, so say it anew; no roles (Q4)
+    if (g.voteMsgId && g.status === 'vote') await safe(deps, 'editMessageText', { chat_id: g.chatId, message_id: g.voteMsgId, text: '🗳 ปิดโหวต · ✕ ยกเลิกเกม' });
+    if (g.msgId) await safe(deps, 'editMessageText', { chat_id: g.chatId, message_id: g.msgId, text: '🐺 ห้อง ' + g.code + ' · ✕ ยกเลิกแล้ว' });
+    await safe(deps, 'sendMessage', { chat_id: g.chatId, text: '✕ ยกเลิกเกม ห้อง ' + g.code + ' · ไม่เฉลยบท\nเล่นใหม่ /werewolf' });
     return;
   }
   await run(deps, g, res.out);
@@ -315,6 +367,7 @@ async function onNight(q, parts, deps) {
     const ss = await tx.get(gRef.collection('secret').doc('state'));
     if (!gs.exists || !ss.exists) return { say: 'ไม่พบห้องนี้' };
     const g = gs.data(), st = ss.data();
+    if (g.status === 'cancelled') return { say: 'เกมนี้ถูกยกเลิกแล้ว' };
     if (g.status !== 'night' || String(g.round) !== round || !st.picks) return { say: 'หมดเวลาคืนนั้นแล้ว' };
     if (!st.alive[me]) return { say: 'คุณตายแล้ว' };
     const p = st.picks, out = [], role = st.roles[me];
@@ -372,6 +425,7 @@ async function onVote(q, parts, deps) {
     const ss = await tx.get(gRef.collection('secret').doc('state'));
     if (!gs.exists || !ss.exists) return { say: 'ไม่พบห้องนี้' };
     const g = gs.data(), st = ss.data();
+    if (g.status === 'cancelled') return { say: 'เกมนี้ถูกยกเลิกแล้ว' };
     if (g.status !== 'vote' || String(g.round) !== round || !st.ballot) return { say: 'ปิดโหวตแล้ว' };
     if (!(me in st.alive)) return { say: 'คุณไม่ได้อยู่ในเกมนี้' };
     if (!st.alive[me]) return { say: 'คนตายโหวตไม่ได้ 🤐' };
@@ -409,11 +463,23 @@ async function onTalkEnd(q, parts, deps) {
   if (res.out) await run(deps, res.g, res.out);
 }
 
-/* wolfTick (every minute, owner pick Q6): move every live room whose deadline has passed. One query on a single field
-   (deadline) so no composite index is needed; lobby / over / cancelled rooms keep deadline null. */
+/* wolfTick (every minute, owner pick Q6): move every live room whose deadline has passed, and post the ⏳ warning (W1) in
+   rooms with ≤ 60 s left — once per phase (g.warned = '<status>:<round>'). One query on a single field (deadline) so no
+   composite index is needed; lobby / over / cancelled rooms keep deadline null. Returns how many rooms moved. */
+function warn(g, st, out) {
+  const key = g.status + ':' + g.round;
+  if (g.warned === key || g.status === 'vote') return false;   // the vote is only 1:00 long: no warning
+  g.warned = key;
+  if (g.status === 'day') out.push({ method: 'sendMessage', body: { chat_id: g.chatId, text: '⏳ เหลือ ~1 นาที · แล้วโหวต 🗳' } });
+  else {
+    const acted = nightActed(st);
+    Object.keys(acted).filter((id) => !acted[id]).forEach((id) => out.push({ method: 'sendMessage', body: { chat_id: id, text: '⏳ เหลือ ~1 นาที · ยังไม่ได้เลือกคืนนี้ ☝️' } }));
+  }
+  return true;
+}
 async function tick(deps) {
   const { db } = deps;
-  const due = await db.collection('wolf_games').where('deadline', '<=', deps.now).get();
+  const due = await db.collection('wolf_games').where('deadline', '<=', deps.now + WARN_SEC * 1000).get();
   let moved = 0;
   for (const doc of due.docs) {
     const gRef = db.collection('wolf_games').doc(doc.id);
@@ -422,15 +488,20 @@ async function tick(deps) {
       const ss = await tx.get(gRef.collection('secret').doc('state'));
       if (!gs.exists || !ss.exists) return null;
       const g = gs.data(), st = ss.data();
-      if (!LIVE.includes(g.status) || !g.deadline || g.deadline > deps.now) return null;
+      if (!LIVE.includes(g.status) || !g.deadline) return null;
       const out = [];
+      if (g.deadline > deps.now) {
+        if (!warn(g, st, out)) return null;
+        commit(tx, db, gRef, g, st, deps.now);
+        return { g, out, warned: true };
+      }
       if (g.status === 'night') finishNight(g, st, deps.now, out, deps.rng);
       else if (g.status === 'day') beginVote(g, st, deps.now, out);
       else finishVote(g, st, deps.now, out, deps.rng);
       commit(tx, db, gRef, g, st, deps.now);
       return { g, out };
     });
-    if (res) { moved++; await run(deps, res.g, res.out); }
+    if (res) { if (!res.warned) moved++; await run(deps, res.g, res.out); }
   }
   return moved;
 }
@@ -443,15 +514,16 @@ async function handle(update, deps) {
   const [cmdRaw, arg] = msg.text.trim().split(/\s+/);
   const bot = await deps.botName();
   const cmd = cmdRaw.toLowerCase().replace('@' + String(bot).toLowerCase(), '');
+  if (cmd === '/rules') return safe(deps, 'sendMessage', { chat_id: msg.chat.id, text: RULES });
   if (cmd === '/werewolf') {
     if (isGroup(msg.chat)) return openRoom(msg, deps);
-    return safe(deps, 'sendMessage', { chat_id: msg.chat.id, text: '🐺 เพิ่มบอทเข้ากลุ่ม แล้วพิมพ์ /werewolf ในกลุ่มนั้น' });
+    return safe(deps, 'sendMessage', { chat_id: msg.chat.id, text: '🐺 เพิ่มบอทเข้ากลุ่ม แล้วพิมพ์ /werewolf ในกลุ่มนั้น · กติกา /rules' });
   }
   if (cmd === '/start' && msg.chat.type === 'private') {
     const code = String(arg || '').toUpperCase();
     if (/^[A-Z0-9]{6}$/.test(code)) return join(msg, code, deps);
-    return safe(deps, 'sendMessage', { chat_id: msg.chat.id, text: '🐺 สวัสดี · ในกลุ่มพิมพ์ /werewolf แล้วกด ▸ เข้าร่วม' });
+    return safe(deps, 'sendMessage', { chat_id: msg.chat.id, text: '🐺 สวัสดี · ในกลุ่มพิมพ์ /werewolf แล้วกด ▸ เข้าร่วม · กติกา /rules' });
   }
 }
 
-module.exports = { handle, tick, lobbyView, startedView, roleCard, ROLE_CARD };
+module.exports = { handle, tick, lobbyView, startedView, roleCard, ROLE_CARD, RULES };
