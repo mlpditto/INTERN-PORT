@@ -2,10 +2,14 @@
    🟥 Count the Rectangles — a line drawing; how many rectangles are in it (every rectangle whose four sides are drawn lines).
    🧊 Count the Cubes — a stack seen from the corner; how many cubes (the stack has no holes and no overhangs, so hidden ones count too).
    5 questions a run, 30 s each, a number pad; after each answer the picture explains it (rectangles light up one by one / every column shows its height).
-   Reads and writes nothing but localStorage countBest_rect / countBest_cube. window.CG, window.countOpen. A room with friends = later. */
+   Reads and writes nothing but localStorage countBest_rect / countBest_cube / countTourSeen. window.CG, window.countOpen. A room with friends = later.
+   V101.367 (owner "Build A + the ❓ tour", mockup-count-tour/): a 44 px pad, the answer and ✓ on one row (✓ grey until a number), 5 round
+   dots, a fuller question saying what counts, ? in the header; a 3-scene tour plays INSIDE the popup (fixed height, so ถัดไป ▸ never
+   moves) — on the first open, and from ?; the clock waits while it is open. */
 (function () {
     'use strict';
-    var Q = 5, SEC = 30, MODES = { rect: { e: '🟥', n: 'สี่เหลี่ยม', ask: 'กี่รูป?' }, cube: { e: '🧊', n: 'ลูกบาศก์', ask: 'กี่ก้อน?' } };
+    var Q = 5, SEC = 30, MODES = { rect: { e: '🟥', n: 'สี่เหลี่ยม', ask: 'มีสี่เหลี่ยมกี่รูป?', sub: 'รวมรูปซ้อน · รวมกรอบนอก' }, cube: { e: '🧊', n: 'ลูกบาศก์', ask: 'มีลูกบาศก์กี่ก้อน?', sub: 'รวมก้อนที่ถูกบัง' } };
+    var tour = null, tourT = null;   // V101.367: { i: scene, step: 1–3 on scene 1 }
     var rng = Math.random, g = null, tick = null, show = null;
     function ri(a, b) { return a + Math.floor(rng() * (b - a + 1)); }
     function get(k) { try { return +localStorage.getItem(k) || 0; } catch (e) { return 0; } }
@@ -83,10 +87,10 @@
     // ---- game -------------------------------------------------------------------------------------------------------------
     function count(p) { return p.mode === 'rect' ? p.n : p.n2; }
     function newQ() { g.p = g.mode === 'rect' ? rectPuzzle(g.i) : cubePuzzle(g.i); g.typed = ''; g.left = SEC; g.done = null; g.upto = 0; startTick(); }
-    function startTick() { clearInterval(tick); tick = setInterval(function () { if (!g || g.done) return clearInterval(tick); g.left--; if (g.left <= 0) { g.left = 0; answer(); } else paintClock(); }, 1000); }
+    function startTick() { clearInterval(tick); tick = setInterval(function () { if (!g || g.done) return clearInterval(tick); if (tour) return; g.left--; if (g.left <= 0) { g.left = 0; answer(); } else paintClock(); }, 1000); }
     function answer() {
         clearInterval(tick); var right = g.typed !== '' && +g.typed === count(g.p), pts = right ? 100 + g.left * 5 : 0;
-        g.score += pts; if (right) g.right++; g.done = { right: right, pts: pts, typed: g.typed }; g.upto = 0; render();
+        g.score += pts; if (right) g.right++; g.res.push(right); g.done = { right: right, pts: pts, typed: g.typed }; g.upto = 0; render();
         if (g.mode === 'rect') {   // pick C: the rectangles light up one by one, then the whole count stands
             var n = g.p.n, step = Math.max(120, Math.min(450, 4500 / n)); clearInterval(show);
             show = setInterval(function () { if (!g || !g.done) return clearInterval(show); g.upto++; var f = document.getElementById('cg-fig'); if (f) f.innerHTML = rectSvg(g.p, g.upto); var t = document.getElementById('cg-run'); if (t) t.textContent = g.upto + ' / ' + n; if (g.upto >= n) clearInterval(show); }, step);
@@ -106,7 +110,21 @@
         + '#countModal .cg-go,#countModal .cg-pad .cg-go{background:#f97316;color:#fff;border:0;border-radius:14px;padding:12px;font-size:1.1em;font-weight:900}#countModal .cg-pad .cg-go{padding:8px 0;border-radius:12px;font-size:1.35em}#countModal .cg-go:disabled{opacity:.45}'
         + '.cg-res{text-align:center;font-weight:900;font-size:1.05em;border-radius:12px;padding:8px}.cg-res.ok{background:#dcfce7;color:#166534}.cg-res.no{background:#fee2e2;color:#991b1b}.cg-sum{text-align:center;color:#475569;font-size:.9em;word-break:break-word}'
         + '.cg-modes{display:grid;grid-template-columns:1fr 1fr;gap:10px}#countModal .cg-modes button{background:#fff7ed;border:1px solid #fed7aa;border-radius:16px;padding:16px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;font-weight:800;color:#0f172a}'
-        + '.cg-modes i{font-style:normal;font-size:2em}.cg-modes small{color:#64748b;font-weight:700}.cg-note{color:#64748b;font-size:.85em;text-align:center}';
+        + '.cg-modes i{font-style:normal;font-size:2em}.cg-modes small{color:#64748b;font-weight:700}.cg-note{color:#64748b;font-size:.85em;text-align:center}'
+        // V101.367: lean pad · answer + ✓ one row · dots · ? · the tour (DESIGN §9: focus shows, nothing moves with reduced motion)
+        + '#countModal button:focus-visible{outline:3px solid #f97316;outline-offset:2px}'
+        + '#countModal .cg-pad{gap:6px}#countModal .cg-pad button{font-size:1.15em;padding:0;height:44px}'
+        + '.cg-ask small{display:block;font-size:.72em;font-weight:700;color:#64748b;margin-top:2px}'
+        + '.cg-row{display:flex;gap:8px;align-items:stretch}.cg-row .cg-ans{flex:1;font-size:1.6em;padding:2px;min-height:1.3em}#countModal .cg-row .cg-go{width:84px;font-size:1.3em;padding:0;border-radius:14px}'
+        + '#countModal .cg-go{transition:none}#countModal .cg-go:disabled{background:#e2e8f0;color:#94a3b8;opacity:1}'   // §9.1: the app-wide button transition: all made ✓ fade
+        + '.cg-dots{display:flex;gap:6px;justify-content:center}.cg-dots i{width:14px;height:14px;border-radius:50%;background:#e2e8f0;display:block;box-sizing:border-box}.cg-dots i.ok{background:#16a34a}.cg-dots i.no{background:#dc2626}.cg-dots i.now{background:#fff;border:2px dashed #f97316}'
+        + '#countModal .cg-q{border:1px solid #e2e8f0;background:#fff;border-radius:999px;width:26px;height:26px;font-weight:900;color:#475569;padding:0;flex:0 0 auto}'
+        + '.cg-tfig{height:190px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:12px;box-sizing:border-box;display:flex;align-items:center;justify-content:center}.cg-tfig svg{width:100%;height:100%}'
+        + '.cg-tcap{text-align:center;font-weight:900;font-size:1.05em;min-height:2.9em}.cg-tcap small{display:block;font-weight:700;color:#64748b;font-size:.8em;margin-top:2px}'
+        + '.cg-tsteps{display:flex;gap:6px;justify-content:center;min-height:24px}.cg-tsteps span{border-radius:999px;padding:3px 10px;font-weight:800;font-size:.85em;background:#f1f5f9;color:#475569}.cg-tsteps span.on{background:#ffedd5;color:#c2410c}'
+        + '.cg-tnav{display:flex;align-items:center;gap:8px}.cg-tdots{flex:1;display:flex;gap:5px;justify-content:center}.cg-tdots i{width:8px;height:8px;border-radius:50%;background:#e2e8f0}.cg-tdots i.on{background:#ea580c}'
+        + '#countModal .cg-tnav button{border:0;border-radius:12px;padding:10px 14px;font-weight:900}#countModal .cg-tskip{background:none;color:#94a3b8}#countModal .cg-tnext{background:#f97316;color:#fff}'
+        + '.cg-trules{font-size:1.4em;line-height:1.8;text-align:center;font-weight:800;color:#0f172a}';
     function root() {
         var m = document.getElementById('countModal');
         if (!m) {
@@ -119,20 +137,22 @@
         return m;
     }
     function x() { return '<button type="button" class="cg-x" onclick="CG.close()" aria-label="Close">✕</button>'; }
+    function q() { return '<button type="button" class="cg-q" id="cg-help" onclick="CG.tour()" aria-label="How to count" title="How to count" data-th-title="วิธีนับ">?</button>'; }
+    function dots() { var h = '<div class="cg-dots" aria-label="Questions">'; for (var i = 0; i < Q; i++) h += '<i class="' + (i < g.res.length ? (g.res[i] ? 'ok' : 'no') : i === g.i && !g.done ? 'now' : '') + '"></i>'; return h + '</div>'; }
     function lobbyHtml() {
-        return '<div class="cg"><div class="cg-top"><h3>🧊 นับไว</h3>' + x() + '</div>'
+        return '<div class="cg"><div class="cg-top"><h3>🧊 นับไว</h3>' + q() + x() + '</div>'
             + '<div class="cg-modes">' + ['rect', 'cube'].map(function (k) { var b = get('countBest_' + k); return '<button type="button" id="cg-' + k + '" onclick="CG.start(\'' + k + '\')"><i>' + MODES[k].e + '</i>' + MODES[k].n + '<small>' + (b ? '🏆 ' + b : Q + ' ข้อ · ' + SEC + ' วิ') + '</small></button>'; }).join('') + '</div>'
             + '<div class="cg-note">ตอบแล้วดูเฉลยทุกข้อ</div></div>';
     }
     function playHtml() {
         var p = g.p, d = g.done, m = MODES[g.mode];
-        var h = '<div class="cg"><div class="cg-top"><h3>' + m.e + ' ' + (g.i + 1) + '/' + Q + '</h3><span class="cg-pill t" id="cg-clock">⏱ 0:' + (g.left < 10 ? '0' : '') + g.left + '</span><span class="cg-pill">🏆 ' + g.score + '</span>' + x() + '</div>'
+        var h = '<div class="cg"><div class="cg-top"><h3>' + m.e + ' ' + (g.i + 1) + '/' + Q + '</h3><span class="cg-pill t" id="cg-clock">⏱ 0:' + (g.left < 10 ? '0' : '') + g.left + '</span><span class="cg-pill">🏆 ' + g.score + '</span>' + q() + x() + '</div>' + dots()
             + '<div class="cg-fig" id="cg-fig">' + (p.mode === 'rect' ? rectSvg(p, g.upto) : cubeSvg(p, !!d)) + '</div>';
         if (!d) {
-            h += '<div class="cg-ask">' + m.ask + '</div><div class="cg-ans" id="cg-ans">' + g.typed + '</div><div class="cg-pad">'
+            h += '<div class="cg-ask" id="cg-ask">' + m.ask + '<small>' + m.sub + '</small></div>'
+                + '<div class="cg-row"><div class="cg-ans" id="cg-ans">' + g.typed + '</div><button type="button" class="cg-go" id="cg-ok" onclick="CG.ok()" aria-label="Answer"' + (g.typed === '' ? ' disabled' : '') + '>✓</button></div><div class="cg-pad">'
                 + [1, 2, 3, 4, 5, 6, 7, 8, 9].map(function (k) { return '<button type="button" onclick="CG.key(' + k + ')">' + k + '</button>'; }).join('')
-                + '<button type="button" onclick="CG.key(\'del\')" aria-label="Delete">⌫</button><button type="button" onclick="CG.key(0)">0</button>'
-                + '<button type="button" class="cg-go" id="cg-ok" onclick="CG.ok()"' + (g.typed === '' ? ' disabled' : '') + '>✓</button></div>';
+                + '<button type="button" onclick="CG.key(\'del\')" aria-label="Delete">⌫</button><button type="button" onclick="CG.key(0)">0</button></div>';
         } else {
             var n = count(p);
             h += '<div class="cg-res ' + (d.right ? 'ok' : 'no') + '" id="cg-res">' + (d.right ? '✓ ' + n + ' ถูก · +' + d.pts : (d.typed === '' ? '⏱ หมดเวลา' : '✗ ตอบ ' + d.typed) + ' · เฉลย ' + n) + '</div>'
@@ -148,18 +168,51 @@
             + '<div class="cg-ans" id="cg-final">🏆 ' + g.score + '</div><div class="cg-note">✓ ' + g.right + '/' + Q + (nb ? ' · 🎉 สถิติใหม่' : best ? ' · สถิติ ' + best : '') + '</div>'
             + '<button type="button" class="cg-go" onclick="CG.start(\'' + g.mode + '\')">↻ เล่นอีก</button><button type="button" class="cg-x" style="align-self:center" onclick="CG.lobby()">⬅ เลือกเกม</button></div>';
     }
-    function render() { var m = root(); document.getElementById('cg-body').innerHTML = !g ? lobbyHtml() : g.end ? endHtml() : playHtml(); m.style.display = 'flex'; }
+    // ---- ❓ the tour (V101.367): 3 scenes inside the popup ------------------------------------------------------------------------
+    function tourRect(k) {   // a box split in two: ① left ② right ③ the whole box
+        var U = 70, P = 8, on = function (a, b) { return '<rect x="' + (P + a * U) + '" y="' + P + '" width="' + (b - a) * U + '" height="' + U + '" fill="rgba(249,115,22,.25)" stroke="#ea580c" stroke-width="6"/>'; };
+        return '<svg viewBox="0 0 ' + (2 * U + 2 * P) + ' ' + (U + 2 * P) + '" width="300">' + (k === 1 ? on(0, 1) : k === 2 ? on(1, 2) : on(0, 2))
+            + '<g stroke="#0f172a" stroke-width="3" fill="none"><rect x="' + P + '" y="' + P + '" width="' + 2 * U + '" height="' + U + '"/><line x1="' + (P + U) + '" y1="' + P + '" x2="' + (P + U) + '" y2="' + (P + U) + '"/></g></svg>';
+    }
+    function tourCubes() {   // 5 cubes: a back column of 2 and three in front; the hidden one is dashed
+        var p = { n: 2, h: [[2, 1], [1, 1]] }, s = cubeSvg(p, false);
+        var a = 22, b = 12.7, z = 25, cx = 2 * a + 6, top = 4 * z + 4, pt = function (X, Y, K) { return (cx + (X - Y) * a).toFixed(1) + ',' + (top + (X + Y) * b - K * z).toFixed(1); };
+        var d = ' fill="rgba(249,115,22,.12)" stroke="#ea580c" stroke-width="1.6" stroke-dasharray="4 3"';
+        var hid = '<polygon' + d + ' points="' + [pt(0, 0, 1), pt(1, 0, 1), pt(1, 1, 1), pt(0, 1, 1)].join(' ') + '"/><polygon' + d + ' points="' + [pt(0, 1, 1), pt(1, 1, 1), pt(1, 1, 0), pt(0, 1, 0)].join(' ') + '"/><polygon' + d + ' points="' + [pt(1, 0, 1), pt(1, 1, 1), pt(1, 1, 0), pt(1, 0, 0)].join(' ') + '"/>';
+        return s.replace(/viewBox="[^"]+"/, 'viewBox="2 48 96 110"').replace('</svg>', hid + '</svg>');   // crop to the stack
+    }
+    function tourHtml() {
+        var i = tour.i, k = tour.step, fig, cap, steps = '';
+        if (i === 0) { fig = tourRect(k); cap = (k === 1 ? '① ช่องซ้าย' : k === 2 ? '② ช่องขวา' : '③ รวมทั้งกรอบ = <b>3 รูป</b>') + '<small>นับทุกสี่เหลี่ยม · รวมกรอบนอก</small>';
+            steps = ['① ซ้าย', '② ขวา', '③ ทั้งกรอบ'].map(function (t, n) { return '<span class="' + (n < k ? 'on' : '') + '">' + t + '</span>'; }).join(''); }
+        else if (i === 1) { fig = tourCubes(); cap = 'ก้อนที่ถูกบัง (เส้นประ) ก็นับ = <b>5 ก้อน</b><small>กองไม่มีรู · ไม่มีก้อนลอย</small>'; }
+        else { fig = '<div class="cg-trules">⏱ ' + SEC + ' วิ · ' + Q + ' ข้อ<br>⌨️ ตอบ → 💡 ดูเฉลย</div>'; cap = 'ตอบถูกเร็ว = 🏆 มาก'; }
+        return '<div class="cg" id="cg-tour"><div class="cg-top"><h3>❓ วิธีนับ</h3><button type="button" class="cg-x" onclick="CG.tourEnd()" aria-label="Close the tour">✕</button></div>'
+            + '<div class="cg-tfig" id="cg-tfig">' + fig + '</div><div class="cg-tcap" id="cg-tcap">' + cap + '</div><div class="cg-tsteps">' + steps + '</div>'
+            + '<div class="cg-tnav"><button type="button" class="cg-tskip" onclick="CG.tourEnd()">ข้าม</button><div class="cg-tdots">' + [0, 1, 2].map(function (n) { return '<i class="' + (n === i ? 'on' : '') + '"></i>'; }).join('') + '</div>'
+            + '<button type="button" class="cg-tnext" id="cg-tnext" onclick="CG.tourNext()">' + (i === 2 ? '▸ เริ่ม' : 'ถัดไป ▸') + '</button></div></div>';
+    }
+    function tourScene(i) {
+        clearInterval(tourT); var still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+        tour = { i: i, step: i === 0 && !still ? 1 : 3 }; render();
+        if (i === 0 && !still) tourT = setInterval(function () { if (!tour || tour.i !== 0) return clearInterval(tourT); tour.step++; if (tour.step >= 3) clearInterval(tourT); render(); }, 900);
+    }
+    function render() { var m = root(); document.getElementById('cg-body').innerHTML = tour ? tourHtml() : !g ? lobbyHtml() : g.end ? endHtml() : playHtml(); m.style.display = 'flex'; }
     function onKey(e) {
         var m = document.getElementById('countModal'); if (!m || m.style.display !== 'flex') return;
+        if (tour) { if (e.key === 'Escape') CG.tourEnd(); else if (e.key === 'Enter') { e.preventDefault(); CG.tourNext(); } return; }
         if (e.key === 'Escape') return CG.close(); if (!g || g.end) return;
         if (g.done) { if (e.key === 'Enter') { e.preventDefault(); CG.next(); } return; }
         if (/^[0-9]$/.test(e.key)) CG.key(+e.key); else if (e.key === 'Backspace') CG.key('del'); else if (e.key === 'Enter') { e.preventDefault(); CG.ok(); }
     }
 
     window.CG = {
-        open: function () { g = null; render(); },
+        open: function () { g = null; if (!get('countTourSeen')) tourScene(0); else render(); },   // V101.367: the tour on the first open
+        tour: function () { tourScene(0); },
+        tourNext: function () { if (!tour) return; if (tour.i < 2) tourScene(tour.i + 1); else CG.tourEnd(); },
+        tourEnd: function () { clearInterval(tourT); tour = null; set('countTourSeen', 1); render(); },   // back to the lobby / the same question
         lobby: function () { clearInterval(tick); clearInterval(show); g = null; render(); },
-        start: function (mode) { g = { mode: mode, i: 0, score: 0, right: 0 }; newQ(); render(); },
+        start: function (mode) { g = { mode: mode, i: 0, score: 0, right: 0, res: [] }; newQ(); render(); },
         key: function (k) {
             if (!g || g.done) return;
             g.typed = k === 'del' ? g.typed.slice(0, -1) : (g.typed + k).replace(/^0+(?=\d)/, '').slice(0, 2);
@@ -167,7 +220,7 @@
         },
         ok: function () { if (g && !g.done && g.typed !== '') { answer(); } },
         next: function () { if (!g || !g.done) return; clearInterval(show); if (g.i + 1 >= Q) { g.end = true; render(); return; } g.i++; newQ(); render(); },
-        close: function () { clearInterval(tick); clearInterval(show); g = null; var m = document.getElementById('countModal'); if (m) m.style.display = 'none'; },
+        close: function () { clearInterval(tick); clearInterval(show); clearInterval(tourT); tour = null; g = null; var m = document.getElementById('countModal'); if (m) m.style.display = 'none'; },
         // for scripts/count-game-qa.cjs
         _g: function () { return g; }, _rng: function (f) { rng = f; }, _rects: rectsIn, _count: count
     };
