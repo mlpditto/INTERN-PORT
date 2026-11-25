@@ -12,6 +12,9 @@
     'use strict';
     var ALL = [0, 1, 2, 3, 4, 5, 6, 7, 8], WIN_AT = 5, rng = Math.random, g = null, lvl = 2, toast = null, nb = false, shown = 9, revT = null, sent = '';
     var col = function (n) { return n % 2 ? 'w' : 'b'; };
+    function S(k, d) { if (window.BWSound) BWSound.play(k, d); }   // V101.369 sounds (shadow-sound.js, pick C) — only from a tap
+    function endKey() { return g.sc.me > g.sc.bot ? 'endW' : g.sc.me < g.sc.bot ? 'endL' : 'endD'; }
+    function botSays() { if (g && !g.end && g.lead === 'bot' && g.botTile != null) { S('think'); S(col(g.botTile), 0.45); } }   // the colour only
     var CE = { b: '⚫', w: '⚪' };
     function get() { try { return JSON.parse(localStorage.getItem('shadowStats') || '{}') || {}; } catch (e) { return {}; } }
     function put(s) { try { localStorage.setItem('shadowStats', JSON.stringify(s)); } catch (e) { } }
@@ -90,15 +93,16 @@
         s[k] = s[k] || { w: 0, l: 0, d: 0 }; s[k][r]++; put(s);
         nb = false; sent = ''; clearInterval(revT); var still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
         shown = still ? g.hist.length : 0;   // §9.3: no motion → every tile at once
-        if (!still) revT = setInterval(function () { if (!g || !g.end) return clearInterval(revT); shown++; if (shown >= g.hist.length) clearInterval(revT); render(); }, 450);
+        // V101.369: each 🤖 tile sounds its number as it opens (the only time a number has a sound), then the end tune
+        if (!still) revT = setInterval(function () { if (!g || !g.end) return clearInterval(revT); shown++; S('n' + g.hist[shown - 1].b); if (shown >= g.hist.length) { clearInterval(revT); S(endKey(), 0.3); } render(); }, 450);
     }
 
     // ---- drawing ---------------------------------------------------------------------------------------------------------------
-    var CSS = '#bwModal{z-index:10000}#bwModal .modal-content{text-align:left;padding:14px 14px calc(16px + env(safe-area-inset-bottom));max-width:400px;max-height:92vh;overflow:auto}'
-        + '#bwModal .bw{display:flex;flex-direction:column;gap:10px;color:#0f172a;font-variant-numeric:tabular-nums}#bwModal .bw button{font-family:inherit;width:auto;min-height:0;margin:0;box-shadow:none;cursor:pointer}'
+    var CSS = '#bwModal{z-index:10000}#bwModal .modal-content{text-align:left;padding:18px 18px calc(20px + env(safe-area-inset-bottom));width:calc(100% - 20px);max-width:440px;max-height:92vh;box-sizing:border-box;overflow:auto}'
+        + '#bwModal .bw{display:flex;flex-direction:column;gap:12px;color:#0f172a;font-variant-numeric:tabular-nums}#bwModal .bw button{font-family:inherit;width:auto;min-height:0;margin:0;box-shadow:none;cursor:pointer}'
         + '#bwModal .bw button:focus-visible{outline:3px solid #f97316;outline-offset:2px}'
         + '.bw-top{display:flex;align-items:center;gap:6px}.bw-top h3{margin:0;flex:1;font-size:1.05em;font-weight:900;white-space:nowrap}.bw-pill{border-radius:999px;padding:3px 9px;font-weight:800;font-size:.82em;background:#f1f5f9;white-space:nowrap}.bw-pill.sc{background:#fef3c7}'
-        + '#bwModal .bw-x{background:none;border:0;color:#94a3b8;font-size:1.1em;padding:2px 4px}'
+        + '#bwModal .bw-x{background:none;border:0;color:#94a3b8;font-size:1.1em;padding:2px 4px}#bwModal .bw-snd{background:none;border:0;font-size:1em;padding:2px 4px;min-width:30px}'
         + '.bw-t{display:inline-flex;align-items:center;justify-content:center;width:30px;height:40px;border-radius:7px;font-weight:900;font-size:17px;box-sizing:border-box;flex:0 0 auto;vertical-align:middle}'
         + '.bw-t.b{background:#0f172a;color:#fff}.bw-t.w{background:#fff;color:#0f172a;border:2px solid #0f172a}'
         + '.bw-t.back{color:transparent;background-image:repeating-linear-gradient(45deg,transparent 0 5px,rgba(148,163,184,.35) 5px 7px)}.bw-t.back.b{background-color:#0f172a}.bw-t.back.w{background-color:#fff}'
@@ -123,13 +127,15 @@
         + '#bwModal .bw-dots i{background:#25224a}#bwModal .bw-dots i.win{background:#22c55e}#bwModal .bw-dots i.lose{background:#ef4444}#bwModal .bw-dots i.draw{background:#64748b}#bwModal .bw-dots i.now{background:transparent}#bwModal .bw-dots i.b{box-shadow:inset 0 0 0 4px #7c3aed}#bwModal .bw-dots i.w{box-shadow:inset 0 0 0 4px #e2e8f0}'
         + '#bwModal .bw-res.win{background:#1c3a2a;color:#86efac}#bwModal .bw-res.lose{background:#3a1c1c;color:#fca5a5}#bwModal .bw-res.draw{background:#25224a;color:#e2e8f0}'
         + '#bwModal .bw-nb{border-color:#2e2a5a}#bwModal .bw-lbl,#bwModal .bw-lbl span{color:#a5b4fc}#bwModal .bw-r{color:#94a3b8}#bwModal .bw-r.now{background:rgba(139,92,246,.18);border-radius:8px}'
-        + '#bwModal .bw-win{background:#1c3a2a;color:#86efac}#bwModal .bw-win.lose{background:#3a1c1c;color:#fca5a5}#bwModal .bw-win.draw{background:#25224a;color:#e2e8f0}'
         + '#bwModal .bw .bw-lvs button{background:#1d1a3d;border-color:#2e2a5a;color:#e9d5ff}#bwModal .bw .bw-lvs button.on{background:#6d28d9;border-color:#6d28d9;color:#fff}'
         + '#bwModal .bw-bar{display:flex;align-items:center;gap:6px;border:1px solid #2e2a5a;border-radius:12px;padding:8px 10px;background:none;color:#a5b4fc;font-weight:900;font-size:12px;width:100%}#bwModal .bw-bar span{margin-left:auto}'
         + '#bwModal .bw-sheet{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:400px;max-height:70vh;overflow:auto;background:#1d1a3d;border-radius:18px 18px 0 0;padding:12px 14px calc(18px + env(safe-area-inset-bottom));z-index:10001;box-shadow:0 -10px 30px rgba(0,0,0,.5);box-sizing:border-box}'
-        + '#bwModal .bw-row2{display:grid;grid-template-columns:2fr 1fr;gap:8px}#bwModal .bw-sent{text-align:center;font-size:.8em;font-weight:800;color:#86efac}'
+        + '#bwModal .bw-top .bw-fin{border-radius:999px;padding:3px 10px;white-space:nowrap}.bw-t.mid{width:26px;height:34px;font-size:16px;border-radius:6px}@media (min-width:360px){.bw-t.mid{width:30px;height:40px;font-size:18px}}'
+        + '#bwModal .bw-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;cursor:pointer}#bwModal .bw-card{position:relative;display:flex;align-items:center;justify-content:center;gap:4px;border-radius:12px;padding:16px 2px 10px;background:#1d1a3d;box-shadow:inset 4px 0 0 #3f3a74;font-size:11px;color:#94a3b8}'
+        + '#bwModal .bw-card .d{position:absolute;top:3px;left:9px;font-size:10px;font-weight:900;color:#6b7280}#bwModal .bw-card.win{background:#17302a;box-shadow:inset 4px 0 0 #22c55e}#bwModal .bw-card.lose{background:#2e1a24;box-shadow:inset 4px 0 0 #ef4444}#bwModal .bw-card.draw{box-shadow:inset 4px 0 0 #94a3b8}#bwModal .bw-card.now{outline:2px solid #a78bfa}'
+        + '#bwModal .bw-act{display:flex;gap:8px}#bwModal .bw-act #bw-again{flex:1}#bwModal .bw-act .ic{flex:0 0 58px;padding:0}#bwModal .bw-act .done{color:#86efac}'
         + '.bw-lvs{display:flex;gap:6px;justify-content:center}#bwModal .bw-lvs button{border:1px solid #e2e8f0;background:#fff;border-radius:999px;padding:8px 12px;font-weight:800}#bwModal .bw-lvs button.on{border-color:#0f172a;background:#0f172a;color:#fff}'
-        + '.bw-rule{font-size:.85em;color:#475569;text-align:center;line-height:1.6}.bw-toast{text-align:center;font-size:.85em;font-weight:800;color:#b45309}.bw-win{text-align:center;font-size:1.2em;font-weight:900;border-radius:14px;padding:10px;background:#dcfce7;color:#166534}.bw-win.lose{background:#fee2e2;color:#991b1b}.bw-win.draw{background:#f1f5f9;color:#334155}';
+        + '.bw-rule{font-size:.85em;color:#475569;text-align:center;line-height:1.6}.bw-toast{text-align:center;font-size:.85em;font-weight:800;color:#b45309}';
     function root() {
         var m = document.getElementById('bwModal');
         if (!m) {
@@ -143,11 +149,12 @@
     }
     function t(n, cls) { return '<span class="bw-t ' + col(n) + (cls ? ' ' + cls : '') + '">' + n + '</span>'; }
     function back(c, cls) { return '<span class="bw-t back ' + c + (cls ? ' ' + cls : '') + '" aria-label="' + (c === 'b' ? 'black' : 'white') + ' tile">?</span>'; }
+    function snd() { var o = !window.BWSound || BWSound.on(); return '<button type="button" class="bw-snd" id="bw-snd" onclick="BW.sound()" aria-label="Sound" aria-pressed="' + o + '">' + (o ? '🔊' : '🔇') + '</button>'; }
     var X = '<button type="button" class="bw-x" onclick="BW.close()" aria-label="Close">✕</button>';
     var RW = { win: '🏆 ชนะ', lose: '😞 แพ้', draw: '🤝 เสมอ' };
     function lobbyHtml() {
         var s = get();
-        return '<div class="bw"><div class="bw-top"><h3>⚫⚪ ไพ่เงา</h3>' + X + '</div>'
+        return '<div class="bw"><div class="bw-top"><h3>⚫⚪ ไพ่เงา</h3>' + snd() + X + '</div>'
             + '<div class="bw-rule">ไพ่ 0–8 คนละชุด · คู่ ⚫ คี่ ⚪<br>เห็นแค่สีของอีกฝั่ง · เลขสูงกว่าชนะตานั้น<br>9 ตา · ถึง 5 ก่อนชนะ</div>'
             + '<div class="bw-lvs">' + [1, 2, 3].map(function (n) { var r = s['l' + n]; return '<button type="button" class="' + (lvl === n ? 'on' : '') + '" id="bw-lv' + n + '" onclick="BW.level(' + n + ')" title="' + ['', 'ง่าย', 'กลาง', 'ยาก · 🧠 จำเอง'][n] + '">' + '🥄'.repeat(n) + (n === 3 ? ' 🧠' : '') + (r ? ' · ' + r.w + '/' + (r.w + r.l + r.d) : '') + '</button>'; }).join('') + '</div>'
             + (lvl === 3 ? '<div class="bw-note">🧠 ไพ่ที่ลงแล้วไม่จาง · สมุดไม่บอกเลขคุณ</div>' : '')
@@ -160,7 +167,7 @@
     }
     function botLeft() { var b = g.bot.filter(function (n) { return col(n) === 'b'; }).length - (g.botTile != null && col(g.botTile) === 'b' ? 1 : 0), w = g.bot.length - (g.botTile != null ? 1 : 0) - b; return '🤖 เหลือ ⚫ ' + b + ' · ⚪ ' + w; }
     function playHtml() {
-        var L = g.last, h = '<div class="bw"><div class="bw-top"><h3>⚫⚪ ไพ่เงา</h3><span class="bw-pill">' + Math.min(9, g.hist.length + (L ? 0 : 1)) + '/9</span><span class="bw-pill sc" id="bw-score">คุณ ' + g.sc.me + ' : ' + g.sc.bot + ' 🤖</span>' + X + '</div>' + dots();
+        var L = g.last, h = '<div class="bw"><div class="bw-top"><h3>⚫⚪ ไพ่เงา</h3><span class="bw-pill">' + Math.min(9, g.hist.length + (L ? 0 : 1)) + '/9</span><span class="bw-pill sc" id="bw-score">คุณ ' + g.sc.me + ' : ' + g.sc.bot + ' 🤖</span>' + snd() + X + '</div>' + dots();
         h += '<div class="bw-table" id="bw-table">';
         if (L) h += '<div class="bw-pair"><div>' + t(L.m, 'huge') + '<small>คุณ</small></div><div>' + back(L.bc, 'huge') + '<small>🤖</small></div></div><div class="bw-res ' + L.res + '" id="bw-res">' + RW[L.res] + '</div>';
         else if (g.lead === 'bot') h += back(col(g.botTile), 'huge') + '<div class="bw-note" id="bw-say">🤖 ลง ' + CE[col(g.botTile)] + ' · ตาคุณ</div>';
@@ -183,17 +190,18 @@
         }
         return h + '</div>';
     }
+    // V101.369 (owner: "lean + inline", pick B · การ์ด 3×3, mockup-bw-end-lean/): the result sits in the header line, no dots row, a card a
+    // round (my tile vs the 🤖 tile, the left bar = its result, still opening one by one), one action row ↺ อีกตา · 📤 (✓ once sent) · 🥄
     function endHtml() {
         var r = g.sc.me > g.sc.bot ? 'win' : g.sc.me < g.sc.bot ? 'lose' : 'draw';
-        return '<div class="bw"><div class="bw-top"><h3>⚫⚪ จบเกม</h3>' + X + '</div>'
-            + '<div class="bw-win ' + r + '" id="bw-final">' + (r === 'win' ? '🏆 คุณชนะ ' : r === 'lose' ? '😞 🤖 ชนะ ' : '🤝 เสมอ ') + g.sc.me + ' : ' + g.sc.bot + '</div>' + dots()
-            + '<div class="bw-nb" id="bw-reveal" onclick="BW.showAll()"><div class="bw-lbl">ทุกตา · เปิดไพ่ 🤖</div>' + g.hist.map(function (x, i) {
-                var open = i < shown;   // V101.366: one by one; a tap on the list opens the rest
-                return '<div class="bw-r' + (i === shown - 1 && shown < g.hist.length ? ' now' : '') + '"><span class="d">' + (i + 1) + '</span>' + t(x.m, 'mini') + ' vs ' + (open ? t(x.b, 'mini') : back(x.bc, 'mini')) + '<span class="rs ' + x.res + '"' + (open ? '' : ' style="visibility:hidden"') + '>' + RW[x.res] + '</span></div>';
+        return '<div class="bw"><div class="bw-top"><h3>⚫⚪ จบเกม</h3><span class="bw-res bw-fin ' + r + '" id="bw-final">' + { win: '🏆', lose: '😞', draw: '🤝' }[r] + ' ' + g.sc.me + ' : ' + g.sc.bot + '</span>' + snd() + X + '</div>'
+            + '<div class="bw-cards" id="bw-reveal" onclick="BW.showAll()" aria-label="Rounds">' + g.hist.map(function (x, i) {
+                var open = i < shown;   // V101.366: one by one; a tap opens the rest
+                return '<div class="bw-card' + (open ? ' ' + x.res : '') + (i === shown - 1 && shown < g.hist.length ? ' now' : '') + '"><span class="d">' + (i + 1) + '</span>' + t(x.m, 'mid') + '<small>vs</small>' + (open ? t(x.b, 'mid') : back(x.bc, 'mid')) + '</div>';
             }).join('') + '</div>'
-            + '<div class="bw-row2"><button type="button" class="bw-go" id="bw-again" onclick="BW.start()">↺ อีกตา</button><button type="button" class="bw-go alt" id="bw-share" onclick="BW.share()" title="Share in LINE" data-th-title="แชร์ผลใน LINE">📤 LINE</button></div>'
-            + (sent ? '<div class="bw-sent" id="bw-sent">' + sent + '</div>' : '')
-            + '<button type="button" class="bw-go alt" onclick="BW.lobby()">' + '🥄'.repeat(lvl) + ' เปลี่ยนระดับ</button></div>';
+            + '<div class="bw-act"><button type="button" class="bw-go" id="bw-again" onclick="BW.start()">↺ อีกตา</button>'
+            + '<button type="button" class="bw-go alt ic' + (sent ? ' done' : '') + '" id="bw-share" onclick="BW.share()" title="Share in LINE" data-th-title="แชร์ผลใน LINE" aria-label="' + (sent || 'Share in LINE') + '">' + (sent ? '✓' : '📤') + '</button>'
+            + '<button type="button" class="bw-go alt ic" id="bw-lvl" onclick="BW.lobby()" title="Change level" data-th-title="เปลี่ยนระดับ" aria-label="เปลี่ยนระดับ">' + '🥄'.repeat(lvl) + '</button></div></div>';
     }
     function render() { var m = root(); document.getElementById('bw-body').innerHTML = !g ? lobbyHtml() : g.end ? endHtml() : playHtml(); m.style.display = 'flex'; }
 
@@ -201,7 +209,8 @@
         open: function () { g = null; toast = null; render(); },
         lobby: function () { clearInterval(revT); g = null; nb = false; render(); },
         nb: function () { nb = !nb; render(); },
-        showAll: function () { if (g && g.end && shown < g.hist.length) { clearInterval(revT); shown = g.hist.length; render(); } },
+        showAll: function () { if (g && g.end && shown < g.hist.length) { clearInterval(revT); shown = g.hist.length; S(endKey()); render(); } },
+        sound: function () { if (window.BWSound && BWSound.toggle()) S('pick'); render(); },
         share: function () {   // V101.366: a Flex card via shareTargetPicker → the OS share sheet → the clipboard (as Cereal)
             if (!g || !g.end) return;
             var r = g.sc.me > g.sc.bot ? 'win' : g.sc.me < g.sc.bot ? 'lose' : 'draw', head = (r === 'win' ? '🏆 ชนะ ' : r === 'lose' ? '😞 แพ้ ' : '🤝 เสมอ ') + g.sc.me + ' : ' + g.sc.bot;
@@ -221,10 +230,17 @@
             });
         },
         level: function (n) { lvl = n; render(); },
-        start: function () { clearInterval(revT); toast = null; nb = false; newGame(lvl); render(); },
-        pick: function (n) { if (!g || g.end || g.last) return; toast = null; if (g.me.indexOf(n) < 0) { toast = '🧠 ' + n + ' ลงไปแล้ว'; g.sel = null; } else g.sel = n; render(); },
-        play: function () { if (g && g.sel != null) { play(g.sel); render(); } },
-        next: function () { next(); },
+        start: function () { clearInterval(revT); toast = null; nb = false; newGame(lvl); botSays(); render(); },
+        pick: function (n) { if (!g || g.end || g.last) return; toast = null; if (g.me.indexOf(n) < 0) { toast = '🧠 ' + n + ' ลงไปแล้ว'; g.sel = null; S('oops'); } else { g.sel = n; S('pick'); } render(); },
+        play: function () {
+            if (!g || g.sel == null) return;
+            var led = g.lead; play(g.sel); var L = g.hist[g.hist.length - 1], at = 0.25; S('place');
+            if (!g.end && led === 'me') { S('think', at); S(L.bc, at += 0.45); }   // I led: 🤖 answers with a colour
+            S(L.res, g.end ? 0.2 : at + 0.35);
+            if (g.end && shown >= g.hist.length) S(endKey(), 0.6);   // reduced motion: every tile opens at once → the tune now
+            render();
+        },
+        next: function () { var was = g && g.last; next(); if (was) botSays(); },
         close: function () { clearInterval(revT); g = null; nb = false; var m = document.getElementById('bwModal'); if (m) m.style.display = 'none'; },
         // for scripts/shadow-qa.cjs
         _g: function () { return g; }, _rng: function (f) { rng = f; }, _odds: function () { return myOdds(); }, _botPick: function (c) { return botPick(c); }

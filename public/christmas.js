@@ -34,7 +34,9 @@
         return audio;
     }
     // V101.286 (owner): quiet while a quiz is open — #quizModal shown = the music pauses; it comes back when the quiz closes
-    function inQuiz() { var q = document.getElementById('quizModal'); return !!(q && getComputedStyle(q).display !== 'none'); }
+    // V101.369 (owner: "เสียง theme Christmas ไม่ควรแทรกมาเมื่อกดเกม"): the 4 game popups too — they have their own sounds
+    var QUIET = ['quizModal', 'cerealModal', 'wolfModal', 'countModal', 'bwModal'];
+    function inQuiz() { return QUIET.some(function (id) { var q = document.getElementById(id); return !!(q && getComputedStyle(q).display !== 'none'); }); }
     var quizQuiet = false;
     function quizSync() {
         if (!audio) return;
@@ -42,11 +44,15 @@
         else if (quizQuiet) { quizQuiet = false; if (started && wanted() && on() && !bdMe()) audio.play().catch(function () { /* needs a new gesture */ }); }
     }
     function watchQuiz() {
-        var q = document.getElementById('quizModal');
-        if (!q || q.dataset.xmWatch) return;
-        q.dataset.xmWatch = '1';
-        new MutationObserver(quizSync).observe(q, { attributes: true, attributeFilter: ['style', 'class'] });
+        QUIET.forEach(function (id) {
+            var q = document.getElementById(id);
+            if (!q || q.dataset.xmWatch) return;
+            q.dataset.xmWatch = '1';
+            new MutationObserver(quizSync).observe(q, { attributes: true, attributeFilter: ['style', 'class'] });
+        });
     }
+    // the game popups are added to <body> on their first open: watch them as they arrive (and sync, they open shown)
+    new MutationObserver(function () { watchQuiz(); quizSync(); }).observe(document.body || document.documentElement, { childList: true });
     function play() {
         if (!on() || inQuiz() || bdMe()) return;
         var p = player().play(); started = true;

@@ -82,6 +82,15 @@ async function open(browser, opts = {}) {
         assert.equal(await page.evaluate(() => window.xmMusic.isOn()), false, 'coming back to the app mid-quiz stays quiet');
         await qm('none'); await page.waitForTimeout(50);
         assert.equal(await page.evaluate(() => window.xmMusic.isOn()), true, 'quiz closed = music back');
+        // V101.369 (owner: "เสียง theme Christmas ไม่ควรแทรกมาเมื่อกดเกม"): the same for each game popup (they are made on first open)
+        for (const [open, id] of [['cerealOpen', 'cerealModal'], ['wolfOpen', 'wolfModal'], ['countOpen', 'countModal'], ['bwOpen', 'bwModal']]) {
+            await page.evaluate((f) => window[f](), open); await page.waitForTimeout(50);
+            assert.equal(await page.evaluate(() => window.xmMusic.isOn()), false, open + ': game open = music paused');
+            await page.mouse.click(5, 5);
+            assert.equal(await page.evaluate(() => window.xmMusic.isOn()), false, open + ': taps in the game do not restart it');
+            await page.evaluate((m) => { document.getElementById(m).style.display = 'none'; }, id); await page.waitForTimeout(50);
+            assert.equal(await page.evaluate(() => window.xmMusic.isOn()), true, open + ': game closed = music back');
+        }
         // music turned off by the user → a quiz open / close never turns it on
         await page.mouse.move(cx, cy); await page.mouse.down(); await page.waitForTimeout(750); await page.mouse.up();
         assert.equal(await page.evaluate(() => window.xmMusic.isOn()), false);
