@@ -186,25 +186,26 @@
                 + '<button type="button" onclick="CG.key(\'del\')" aria-label="Delete">⌫</button><button type="button" onclick="CG.key(0)">0</button></div>';
         } else {
             var n = count(p);
-            h += '<div class="cg-res ' + (d.right ? 'ok' : 'no') + '" id="cg-res">' + (d.right ? '✓ ' + n + ' ถูก' + (g.free ? '' : ' · +' + d.pts) : (d.typed === '' ? '⏱ หมดเวลา' : '✗ ตอบ ' + d.typed) + ' · เฉลย ' + n) + '</div>'
+            h += '<div class="cg-res ' + (d.right ? 'ok' : 'no') + '" id="cg-res">' + (d.right ? '✓ ' + n + ' ถูก' + (g.free ? '' : ' · +' + d.pts) : (d.typed === '' ? '⏱ หมดเวลา' : '✗ ตอบ ' + d.typed))   /* V101.372: the answer n shows once, in the #cg-eq sum line */ + (d.typed === '' && !g.free ? '' : '<span class="cg-took" id="cg-took"> · ⏱ ' + g.qt[g.i] + ' วิ</span>') + '</div>'
                 + (p.mode === 'rect' ? rectAnswer(p) : cubeEq(p))
                 + '<button type="button" class="cg-go" id="cg-next" onclick="CG.next()">' + (g.i + 1 < Q ? '▸ ข้อถัดไป' : '🏁 ดูคะแนน') + '</button>';
         }
         return h + '</div>';
     }
+    function qtRow() { return '<div class="cg-qt" id="cg-qt">' + g.qt.map(function (s, i) { return '<span class="' + (g.res[i] ? 'ok' : 'no') + '">ข้อ' + (i + 1) + ' ' + s + 'วิ</span>'; }).join('') + '</div>'; }   // V101.372: both modes
     function endHtml() {
         if (g.free) {   // V101.371 🧘: right · total · average, each question's seconds; a best total only for 5/5
             var tot = g.qt.reduce(function (a, b) { return a + b; }, 0), fk = 'countFreeBest_' + g.mode, fb = get(fk), fnb = g.right === Q && (!fb || tot < fb);
             if (fnb) set(fk, tot);
             return '<div class="cg"><div class="cg-top"><h3>' + MODES[g.mode].e + ' จบรอบ · 🧘</h3>' + x() + '</div>'
                 + '<div class="cg-stats" id="cg-stats"><div>✓ ' + g.right + '/' + Q + '<small>ถูก</small></div><div>' + mmss(tot) + '<small>เวลารวม</small></div><div>' + Math.round(tot / Q) + ' วิ<small>เฉลี่ย/ข้อ</small></div></div>'
-                + '<div class="cg-qt" id="cg-qt">' + g.qt.map(function (s, i) { return '<span class="' + (g.res[i] ? 'ok' : 'no') + '">ข้อ' + (i + 1) + ' ' + s + 'วิ</span>'; }).join('') + '</div>'
+                + qtRow()
                 + '<div class="cg-note" id="cg-best">' + (fnb ? '🎉 สถิติใหม่ · ดีสุด ' + mmss(tot) : fb ? 'ดีสุด ' + mmss(fb) + ' (✓ 5/5)' : 'ถูกครบ 5 ข้อ = เก็บสถิติเวลา') + '</div>'
                 + '<button type="button" class="cg-go" onclick="CG.start(\'' + g.mode + '\')">↻ เล่นอีก</button><button type="button" class="cg-x" style="align-self:center" onclick="CG.lobby()">⬅ เลือกเกม</button></div>';
         }
         var best = get('countBest_' + g.mode), nb = g.score > best; if (nb) set('countBest_' + g.mode, g.score);
         return '<div class="cg"><div class="cg-top"><h3>' + MODES[g.mode].e + ' จบรอบ</h3>' + x() + '</div>'
-            + '<div class="cg-ans" id="cg-final">🏆 ' + g.score + '</div><div class="cg-note">✓ ' + g.right + '/' + Q + (nb ? ' · 🎉 สถิติใหม่' : best ? ' · สถิติ ' + best : '') + '</div>'
+            + '<div class="cg-ans" id="cg-final">🏆 ' + g.score + '</div><div class="cg-note">✓ ' + g.right + '/' + Q + (nb ? ' · 🎉 สถิติใหม่' : best ? ' · สถิติ ' + best : '') + '</div>' + qtRow()
             + '<button type="button" class="cg-go" onclick="CG.start(\'' + g.mode + '\')">↻ เล่นอีก</button><button type="button" class="cg-x" style="align-self:center" onclick="CG.lobby()">⬅ เลือกเกม</button></div>';
     }
     // ---- ❓ the tour (V101.367): 3 scenes inside the popup ------------------------------------------------------------------------
@@ -225,7 +226,7 @@
         if (i === 0) { fig = tourRect(k); cap = (k === 1 ? '① ช่องซ้าย' : k === 2 ? '② ช่องขวา' : '③ รวมทั้งกรอบ = <b>3 รูป</b>') + '<small>นับทุกสี่เหลี่ยม · รวมกรอบนอก</small>';
             steps = ['① ซ้าย', '② ขวา', '③ ทั้งกรอบ'].map(function (t, n) { return '<span class="' + (n < k ? 'on' : '') + '">' + t + '</span>'; }).join(''); }
         else if (i === 1) { fig = tourCubes(); cap = 'ก้อนที่ถูกบัง (เส้นประ) ก็นับ = <b>5 ก้อน</b><small>กองไม่มีรู · ไม่มีก้อนลอย</small>'; }
-        else { fig = '<div class="cg-trules">⏱ ' + SEC + ' วิ · ' + Q + ' ข้อ<br>⌨️ ตอบ → 💡 ดูเฉลย</div>'; cap = 'ตอบถูกเร็ว = 🏆 มาก'; }
+        else { fig = '<div class="cg-trules">⏱ ' + SEC + ' วิ · ' + Q + ' ข้อ<br>⌨️ ตอบ → 💡 ดูเฉลย</div>'; cap = 'ตอบถูกเร็ว = 🏆 มาก · 🧘 ไม่จับเวลาก็ได้'; }
         return '<div class="cg" id="cg-tour"><div class="cg-top"><h3>❓ วิธีนับ</h3><button type="button" class="cg-x" onclick="CG.tourEnd()" aria-label="Close the tour">✕</button></div>'
             + '<div class="cg-tfig" id="cg-tfig">' + fig + '</div><div class="cg-tcap" id="cg-tcap">' + cap + '</div><div class="cg-tsteps">' + steps + '</div>'
             + '<div class="cg-tnav"><button type="button" class="cg-tskip" onclick="CG.tourEnd()">ข้าม</button><div class="cg-tdots">' + [0, 1, 2].map(function (n) { return '<i class="' + (n === i ? 'on' : '') + '"></i>'; }).join('') + '</div>'
