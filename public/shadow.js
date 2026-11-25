@@ -4,10 +4,13 @@
    or first to 5. Numbers are never shown until the game ends (then every 🤖 tile is opened so the player can look back).
    Pick C: a 3×3 hand + 📓 notebook (my tile · 🤖 colour · result) and how many ⚫ / ⚪ the 🤖 still holds. 🥄🥄🥄 = 🧠 memory mode, as
    the original: used tiles look unused (a tap says so) and the notebook hides my numbers. The bot infers my possible tiles from
-   every colour and result so far (all consistent histories). Reads and writes nothing but localStorage shadowStats. window.BW, bwOpen. */
+   every colour and result so far (all consistent histories). Reads and writes nothing but localStorage shadowStats. window.BW, bwOpen.
+   V101.366 (owner pick B + end screen, mockup-black-white/looks/): a dark popup, the 🤖 tile glows in its colour; the 📓 is one bar
+   (📓 n ตา · 🤖 เหลือ ⚫ · ⚪ ▴) that pulls up a sheet; the end screen opens the 🤖 tiles one by one (at once with reduced motion), and
+   📤 LINE shares the result (shareTargetPicker → OS share → clipboard, like Cereal); the card's button opens ?bw=1. */
 (function () {
     'use strict';
-    var ALL = [0, 1, 2, 3, 4, 5, 6, 7, 8], WIN_AT = 5, rng = Math.random, g = null, lvl = 2, toast = null;
+    var ALL = [0, 1, 2, 3, 4, 5, 6, 7, 8], WIN_AT = 5, rng = Math.random, g = null, lvl = 2, toast = null, nb = false, shown = 9, revT = null, sent = '';
     var col = function (n) { return n % 2 ? 'w' : 'b'; };
     var CE = { b: '⚫', w: '⚪' };
     function get() { try { return JSON.parse(localStorage.getItem('shadowStats') || '{}') || {}; } catch (e) { return {}; } }
@@ -85,6 +88,9 @@
     function finish() {
         g.end = true; var s = get(), k = 'l' + lvl, r = g.sc.me > g.sc.bot ? 'w' : g.sc.me < g.sc.bot ? 'l' : 'd';
         s[k] = s[k] || { w: 0, l: 0, d: 0 }; s[k][r]++; put(s);
+        nb = false; sent = ''; clearInterval(revT); var still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+        shown = still ? g.hist.length : 0;   // §9.3: no motion → every tile at once
+        if (!still) revT = setInterval(function () { if (!g || !g.end) return clearInterval(revT); shown++; if (shown >= g.hist.length) clearInterval(revT); render(); }, 450);
     }
 
     // ---- drawing ---------------------------------------------------------------------------------------------------------------
@@ -106,6 +112,22 @@
         + '#bwModal .bw-go{border:0;border-radius:14px;background:#0f172a;color:#fff;font-weight:900;font-size:1.05em;padding:11px;display:flex;align-items:center;justify-content:center;gap:8px}#bwModal .bw-go:disabled{opacity:.4}#bwModal .bw-go.alt{background:#f1f5f9;color:#0f172a}'
         + '.bw-nb{border-top:1px solid #e2e8f0;padding-top:8px;display:flex;flex-direction:column;gap:4px}.bw-lbl{font-size:12px;font-weight:900;color:#64748b;display:flex;gap:6px;align-items:center}.bw-lbl span{margin-left:auto;color:#0f172a}'
         + '.bw-r{display:flex;align-items:center;gap:6px;font-size:13px;color:#64748b}.bw-r .d{font-weight:900;width:14px}.bw-r .rs{margin-left:auto;font-weight:900;font-size:12px}.bw-r .rs.win{color:#166534}.bw-r .rs.lose{color:#991b1b}'
+        // V101.366 pick B: dark — the 🤖 tile glows violet (⚫) / white (⚪); the 📓 is a bar that pulls up a sheet
+        + '#bwModal .modal-content{background:#14122b;color:#e2e8f0;box-shadow:inset 0 0 0 1px #2e2a5a}#bwModal .bw{color:#e2e8f0}#bwModal .bw-top h3{color:#e9d5ff;min-width:0;overflow:hidden;text-overflow:ellipsis}'
+        + '#bwModal .bw-pill{background:#25224a;color:#c4b5fd}#bwModal .bw-pill.sc{background:#3b2f12;color:#fcd34d}#bwModal .bw-x{color:#6b7280}'
+        + '#bwModal .bw-table{background:radial-gradient(circle at 50% 40%,#2a2457 0,#14122b 70%)}#bwModal .bw-note,#bwModal .bw-rule{color:#a5b4fc}'
+        + '#bwModal .bw-table .bw-t.huge.back.b{background-color:#0b0a1a;box-shadow:0 0 0 1px #6d28d9,0 0 22px 4px rgba(139,92,246,.55)}#bwModal .bw-table .bw-t.huge.back.w{box-shadow:0 0 0 1px #e2e8f0,0 0 22px 4px rgba(226,232,240,.45)}'
+        + '#bwModal .bw-t.b{background:#0b0a1a;box-shadow:inset 0 0 0 1px #3f3a74}#bwModal .bw-t.w{background:#ece9ff;border-color:#ece9ff}'
+        + '#bwModal .bw-hand button.b{background:#0b0a1a;border:1px solid #3f3a74;color:#e9d5ff}#bwModal .bw-hand button.w{background:#ece9ff;border:2px solid #ece9ff;color:#14122b}'
+        + '#bwModal .bw-hand button.sel{outline:3px solid #f59e0b;box-shadow:0 0 14px rgba(245,158,11,.6)}#bwModal .bw-go{background:#6d28d9}#bwModal .bw-go:disabled{opacity:.35}#bwModal .bw-go.alt{background:#25224a;color:#e9d5ff}'
+        + '#bwModal .bw-dots i{background:#25224a}#bwModal .bw-dots i.win{background:#22c55e}#bwModal .bw-dots i.lose{background:#ef4444}#bwModal .bw-dots i.draw{background:#64748b}#bwModal .bw-dots i.now{background:transparent}#bwModal .bw-dots i.b{box-shadow:inset 0 0 0 4px #7c3aed}#bwModal .bw-dots i.w{box-shadow:inset 0 0 0 4px #e2e8f0}'
+        + '#bwModal .bw-res.win{background:#1c3a2a;color:#86efac}#bwModal .bw-res.lose{background:#3a1c1c;color:#fca5a5}#bwModal .bw-res.draw{background:#25224a;color:#e2e8f0}'
+        + '#bwModal .bw-nb{border-color:#2e2a5a}#bwModal .bw-lbl,#bwModal .bw-lbl span{color:#a5b4fc}#bwModal .bw-r{color:#94a3b8}#bwModal .bw-r.now{background:rgba(139,92,246,.18);border-radius:8px}'
+        + '#bwModal .bw-win{background:#1c3a2a;color:#86efac}#bwModal .bw-win.lose{background:#3a1c1c;color:#fca5a5}#bwModal .bw-win.draw{background:#25224a;color:#e2e8f0}'
+        + '#bwModal .bw .bw-lvs button{background:#1d1a3d;border-color:#2e2a5a;color:#e9d5ff}#bwModal .bw .bw-lvs button.on{background:#6d28d9;border-color:#6d28d9;color:#fff}'
+        + '#bwModal .bw-bar{display:flex;align-items:center;gap:6px;border:1px solid #2e2a5a;border-radius:12px;padding:8px 10px;background:none;color:#a5b4fc;font-weight:900;font-size:12px;width:100%}#bwModal .bw-bar span{margin-left:auto}'
+        + '#bwModal .bw-sheet{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:400px;max-height:70vh;overflow:auto;background:#1d1a3d;border-radius:18px 18px 0 0;padding:12px 14px calc(18px + env(safe-area-inset-bottom));z-index:10001;box-shadow:0 -10px 30px rgba(0,0,0,.5);box-sizing:border-box}'
+        + '#bwModal .bw-row2{display:grid;grid-template-columns:2fr 1fr;gap:8px}#bwModal .bw-sent{text-align:center;font-size:.8em;font-weight:800;color:#86efac}'
         + '.bw-lvs{display:flex;gap:6px;justify-content:center}#bwModal .bw-lvs button{border:1px solid #e2e8f0;background:#fff;border-radius:999px;padding:8px 12px;font-weight:800}#bwModal .bw-lvs button.on{border-color:#0f172a;background:#0f172a;color:#fff}'
         + '.bw-rule{font-size:.85em;color:#475569;text-align:center;line-height:1.6}.bw-toast{text-align:center;font-size:.85em;font-weight:800;color:#b45309}.bw-win{text-align:center;font-size:1.2em;font-weight:900;border-radius:14px;padding:10px;background:#dcfce7;color:#166534}.bw-win.lose{background:#fee2e2;color:#991b1b}.bw-win.draw{background:#f1f5f9;color:#334155}';
     function root() {
@@ -152,29 +174,58 @@
             }).join('') + '</div>' + (toast ? '<div class="bw-toast" id="bw-toast">' + toast + '</div>' : '')
                 + '<button type="button" class="bw-go" id="bw-play" onclick="BW.play()"' + (g.sel == null ? ' disabled' : '') + '>▸ ลง' + (g.sel != null ? ' ' + t(g.sel, 'mini') : '') + '</button>';
         }
-        h += '<div class="bw-nb"><div class="bw-lbl">📓 สมุดจด<span id="bw-left">' + botLeft() + '</span></div>' + g.hist.map(function (r, i) {
-            return '<div class="bw-r"><span class="d">' + (i + 1) + '</span>' + (g.mem ? back(r.mc, 'mini') : t(r.m, 'mini')) + ' vs ' + back(r.bc, 'mini') + '<span class="rs ' + r.res + '">' + RW[r.res] + '</span></div>';
-        }).join('') + '</div>';
+        // V101.366 pick B: one bar; a tap pulls the 📓 up from the bottom (hidden until the first round is played — §2.2)
+        if (g.hist.length) {
+            var bar = '<button type="button" class="bw-bar" id="bw-nb" aria-expanded="' + nb + '" onclick="BW.nb()">📓 ' + g.hist.length + ' ตา<span id="bw-left">' + botLeft() + ' ' + (nb ? '▾' : '▴') + '</span></button>';
+            h += nb ? '<div class="bw-sheet" id="bw-sheet">' + bar + '<div class="bw-nb">' + g.hist.map(function (r, i) {
+                return '<div class="bw-r"><span class="d">' + (i + 1) + '</span>' + (g.mem ? back(r.mc, 'mini') : t(r.m, 'mini')) + ' vs ' + back(r.bc, 'mini') + '<span class="rs ' + r.res + '">' + RW[r.res] + '</span></div>';
+            }).join('') + '</div></div>' : bar;
+        }
         return h + '</div>';
     }
     function endHtml() {
         var r = g.sc.me > g.sc.bot ? 'win' : g.sc.me < g.sc.bot ? 'lose' : 'draw';
         return '<div class="bw"><div class="bw-top"><h3>⚫⚪ จบเกม</h3>' + X + '</div>'
             + '<div class="bw-win ' + r + '" id="bw-final">' + (r === 'win' ? '🏆 คุณชนะ ' : r === 'lose' ? '😞 🤖 ชนะ ' : '🤝 เสมอ ') + g.sc.me + ' : ' + g.sc.bot + '</div>' + dots()
-            + '<div class="bw-nb"><div class="bw-lbl">ทุกตา · เปิดไพ่ 🤖</div>' + g.hist.map(function (x, i) { return '<div class="bw-r"><span class="d">' + (i + 1) + '</span>' + t(x.m, 'mini') + ' vs ' + t(x.b, 'mini') + '<span class="rs ' + x.res + '">' + RW[x.res] + '</span></div>'; }).join('') + '</div>'
-            + '<button type="button" class="bw-go" id="bw-again" onclick="BW.start()">↺ อีกตา</button><button type="button" class="bw-go alt" onclick="BW.lobby()">' + '🥄'.repeat(lvl) + ' เปลี่ยนระดับ</button></div>';
+            + '<div class="bw-nb" id="bw-reveal" onclick="BW.showAll()"><div class="bw-lbl">ทุกตา · เปิดไพ่ 🤖</div>' + g.hist.map(function (x, i) {
+                var open = i < shown;   // V101.366: one by one; a tap on the list opens the rest
+                return '<div class="bw-r' + (i === shown - 1 && shown < g.hist.length ? ' now' : '') + '"><span class="d">' + (i + 1) + '</span>' + t(x.m, 'mini') + ' vs ' + (open ? t(x.b, 'mini') : back(x.bc, 'mini')) + '<span class="rs ' + x.res + '"' + (open ? '' : ' style="visibility:hidden"') + '>' + RW[x.res] + '</span></div>';
+            }).join('') + '</div>'
+            + '<div class="bw-row2"><button type="button" class="bw-go" id="bw-again" onclick="BW.start()">↺ อีกตา</button><button type="button" class="bw-go alt" id="bw-share" onclick="BW.share()" title="Share in LINE" data-th-title="แชร์ผลใน LINE">📤 LINE</button></div>'
+            + (sent ? '<div class="bw-sent" id="bw-sent">' + sent + '</div>' : '')
+            + '<button type="button" class="bw-go alt" onclick="BW.lobby()">' + '🥄'.repeat(lvl) + ' เปลี่ยนระดับ</button></div>';
     }
     function render() { var m = root(); document.getElementById('bw-body').innerHTML = !g ? lobbyHtml() : g.end ? endHtml() : playHtml(); m.style.display = 'flex'; }
 
     window.BW = {
         open: function () { g = null; toast = null; render(); },
-        lobby: function () { g = null; render(); },
+        lobby: function () { clearInterval(revT); g = null; nb = false; render(); },
+        nb: function () { nb = !nb; render(); },
+        showAll: function () { if (g && g.end && shown < g.hist.length) { clearInterval(revT); shown = g.hist.length; render(); } },
+        share: function () {   // V101.366: a Flex card via shareTargetPicker → the OS share sheet → the clipboard (as Cereal)
+            if (!g || !g.end) return;
+            var r = g.sc.me > g.sc.bot ? 'win' : g.sc.me < g.sc.bot ? 'lose' : 'draw', head = (r === 'win' ? '🏆 ชนะ ' : r === 'lose' ? '😞 แพ้ ' : '🤝 เสมอ ') + g.sc.me + ' : ' + g.sc.bot;
+            var uri = 'https://liff.line.me/' + (typeof USER_LIFF_ID !== 'undefined' ? USER_LIFF_ID : '') + '?bw=1', alt = '⚫⚪ ไพ่เงา · ' + head + ' vs 🤖 ' + '🥄'.repeat(lvl);
+            var dots = g.hist.map(function (h) { return h.res === 'win' ? '🟢' : h.res === 'lose' ? '🔴' : '⚪'; }).join('');
+            var card = { type: 'flex', altText: alt, contents: { type: 'bubble', size: 'kilo',
+                header: { type: 'box', layout: 'vertical', backgroundColor: '#14122b', paddingAll: '16px', contents: [
+                    { type: 'text', text: '⚫⚪ ไพ่เงา', color: '#c4b5fd', size: 'xs', weight: 'bold' }, { type: 'text', text: head, color: '#ffffff', size: 'xl', weight: 'bold' }] },
+                body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: [{ type: 'text', text: 'vs 🤖 ' + '🥄'.repeat(lvl), size: 'sm', color: '#3c3c3c' }, { type: 'text', text: dots, size: 'sm', wrap: true }] },
+                footer: { type: 'box', layout: 'vertical', contents: [{ type: 'button', style: 'primary', color: '#6d28d9', height: 'sm', action: { type: 'uri', label: '⚫ เล่นบ้าง', uri: uri } }] } } };
+            var text = alt + '\n' + uri, done = function (ok) { if (ok) { sent = '📤 ส่งแล้ว'; render(); } };
+            var viaLine = window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker') ? Promise.resolve(liff.shareTargetPicker([card])).then(function (x) { return x ? 'sent' : 'closed'; }, function () { return null; }) : Promise.resolve(null);
+            return viaLine.then(function (x) {
+                if (x === 'sent') return done(true); if (x === 'closed') return;
+                if (navigator.share) return navigator.share({ text: text }).then(function () { done(true); }, function () { });
+                try { navigator.clipboard.writeText(text).then(function () { sent = '📋 คัดลอกแล้ว'; render(); }, function () { }); } catch (e) { }
+            });
+        },
         level: function (n) { lvl = n; render(); },
-        start: function () { toast = null; newGame(lvl); render(); },
+        start: function () { clearInterval(revT); toast = null; nb = false; newGame(lvl); render(); },
         pick: function (n) { if (!g || g.end || g.last) return; toast = null; if (g.me.indexOf(n) < 0) { toast = '🧠 ' + n + ' ลงไปแล้ว'; g.sel = null; } else g.sel = n; render(); },
         play: function () { if (g && g.sel != null) { play(g.sel); render(); } },
         next: function () { next(); },
-        close: function () { g = null; var m = document.getElementById('bwModal'); if (m) m.style.display = 'none'; },
+        close: function () { clearInterval(revT); g = null; nb = false; var m = document.getElementById('bwModal'); if (m) m.style.display = 'none'; },
         // for scripts/shadow-qa.cjs
         _g: function () { return g; }, _rng: function (f) { rng = f; }, _odds: function () { return myOdds(); }, _botPick: function (c) { return botPick(c); }
     };
