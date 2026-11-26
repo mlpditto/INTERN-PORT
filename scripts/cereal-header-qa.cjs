@@ -34,7 +34,7 @@ const disp = (page, sel) => page.evaluate(s => getComputedStyle(document.querySe
     const browser = await chromium.launch({ headless: true });
     try {
         const pc = await open(browser, 1280, false);
-        // V101.377 (owner pick A, mockup-pc-games-chip/): the games are one 🎮 circle left of 📅; 🥣 is the first row of its menu
+        // V101.378 (owner pick A, mockup-pc-games-chip/): the games are one 🎮 circle left of 📅; 🥣 is the first row of its menu
         assert.equal(await disp(pc.page, '#u-games-chip'), 'flex', 'PC: the header 🎮 shows');
         assert.equal(await pc.page.isVisible('#u-cereal-chip'), false, 'the menu starts closed');
         const r = await pc.page.evaluate(() => { const a = document.getElementById('u-games-chip').getBoundingClientRect(), b = document.getElementById('u-schedule-chip').getBoundingClientRect(); return { aw: a.width, ah: a.height, ar: a.right, bl: b.left, ay: Math.round(a.top + a.height / 2), by: Math.round(b.top + b.height / 2), sbw: b.width }; });

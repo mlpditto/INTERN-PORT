@@ -78,7 +78,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
   // PC: the header chip beside 🐺, keyboard plays
   await page.setViewportSize({ width: 1024, height: 800 });
-  await page.click('#u-games-chip');   // V101.377: on PC the games sit in the 🎮 menu (owner pick A)
+  await page.click('#u-games-chip');   // V101.378: on PC the games sit in the 🎮 menu (owner pick A)
   assert.equal(await page.$eval('#u-count-chip', (e) => [e.previousElementSibling.id, e.nextElementSibling.id].join()), 'u-wolf-chip,u-bw-chip', 'PC: 🧊 in the 🎮 menu between 🐺 and ⚫');
   await page.click('#u-count-chip'); await page.click('#cg-cube');
   await page.keyboard.press('1'); await page.keyboard.press('Enter');

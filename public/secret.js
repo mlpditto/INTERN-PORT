@@ -1,4 +1,4 @@
-/* V101.377 🔢 เลขลับ · โหมดฝึก 🤖 (owner 2026-11-26: game 1 of docs/MIND-GAMES-PLAN.md, inspired by a game-show mechanic, our own name and
+/* V101.378 🔢 เลขลับ · โหมดฝึก 🤖 (owner 2026-11-26: game 1 of docs/MIND-GAMES-PLAN.md, inspired by a game-show mechanic, our own name and
    look; picks: the 5th tile in the games row · help levels 🟩 the app crosses out (C1) → ✏️ you cross out (C2) → 📏 the range bar only
    (B) → 🧠 no help, the log only (A) · a ❓ tour read aloud in Thai, mockup-secret-number/). 🤖 thinks of 1–100; each question from the
    menu costs 🎫 1 and is answered truthfully; a wrong guess costs 🎫 1 more. Score = 🎫 used, fewer is better; a best per help level

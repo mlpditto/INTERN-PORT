@@ -116,7 +116,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.ok(await page.$eval('#bwModal .modal-content', (e) => e.scrollWidth <= e.clientWidth + 1), 'no sideways scroll at 320 px');
   await page.evaluate(() => BW.close());
   await page.setViewportSize({ width: 1024, height: 800 });
-  await page.click('#u-games-chip');   // V101.377: on PC the games sit in the 🎮 menu (owner pick A)
+  await page.click('#u-games-chip');   // V101.378: on PC the games sit in the 🎮 menu (owner pick A)
   assert.equal(await page.$eval('#u-bw-chip', (e) => [e.previousElementSibling.id, e.nextElementSibling.id].join()), 'u-count-chip,u-sn-chip', 'PC: ⚫ in the 🎮 menu between 🧊 and 🔢');
   // ?bw=1 (the 📤 card's button) opens the game
   await page.evaluate(() => BW.close()); await page.evaluate(() => applyTabDeepLink(new URLSearchParams('bw=1'))); await page.waitForSelector('#bw-start', { timeout: 2000 });

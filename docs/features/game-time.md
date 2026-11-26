@@ -20,7 +20,7 @@ The card covers the last 7 days in one query, at most every 5 minutes, and is hi
 ## 🏆 Top 3 per game (V101.375 / V102.705)
 
 Owner 2026-11-26: "แต่ละเกม ให้เก็บคะแนนผู้ชนะไว้ด้วย ประกาศ Top 3 แต่ละเกม ให้แต่ละ user ทราบ ส่วน ADMIN จะทราบทั้งหมด". Picks: count wins · this week + all time · line B (mockup-game-top3/).
-- **Ranking** (`game-top-rank.js`, the same file in `functions/` and `public/`): 🥣 🐺 ⚫⚪ = games won; 🧊 นับไว = best total seconds of a 5/5 game at 🥄🥄🥄 ยาก only (owner pick; the board says so). 🔢 เลขลับ (V101.377) = the fewest 🎫 of a 🧠 (no help) game. A tie goes to who got there first. The week starts Monday 00:00 Bangkok. Users with `isIgnored` never rank.
+- **Ranking** (`game-top-rank.js`, the same file in `functions/` and `public/`): 🥣 🐺 ⚫⚪ = games won; 🧊 นับไว = best total seconds of a 5/5 game at 🥄🥄🥄 ยาก only (owner pick; the board says so). 🔢 เลขลับ (V101.378) = the fewest 🎫 of a 🧠 (no help) game. A tie goes to who got there first. The week starts Monday 00:00 Bangkok. Users with `isIgnored` never rank.
 - **Intern** (`public/game-top.js`): one 🏆 line under each game's title — three faces with 🥇🥈🥉 and the value, plus "คุณ #n". A tap opens the board (สัปดาห์นี้ │ ตลอดกาล); a second tap folds it. Data comes from the `gameTop` callable (nickname + LINE photo of the top 3, and your own place). It asks at most every 2 min, and again after a finished game. Nothing shows when the call fails.
 - **Admin** (`game-admin.js`): ⏱ เวลา │ 🏆 อันดับ on the 🎮 card. It lists every player of the chosen game, best first, including players with 0 wins. ตลอดกาล reads all of `game_plays` once (5 min).
 - **Deploy**: `firebase deploy --only functions:gameTop` (no rules change).

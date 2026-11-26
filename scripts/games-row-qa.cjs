@@ -48,5 +48,5 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.deepEqual(await page.evaluate(() => ['u-cereal-chip', 'u-wolf-chip', 'u-count-chip', 'u-bw-chip', 'u-sn-chip'].map((id) => !!document.getElementById(id).offsetParent)), [true, true, true, true, true], 'PC: all 5 in the 🎮 menu');
   assert.deepEqual(errors, []);
   await browser.close();
-  console.log('games-row-qa: OK — phone: 🥣 Cereal · 🐺 หมาป่า · 🧊 นับไว · ⚫ ไพ่เงา · 🔢 เลขลับ (V101.377) under History, one line, 44 px, each opens its game, Schedule keeps 💰 only; 320 px; PC: row hidden, header rail kept');
+  console.log('games-row-qa: OK — phone: 🥣 Cereal · 🐺 หมาป่า · 🧊 นับไว · ⚫ ไพ่เงา · 🔢 เลขลับ (V101.378) under History, one line, 44 px, each opens its game, Schedule keeps 💰 only; 320 px; PC: row hidden, header rail kept');
 })().catch((e) => { console.error(e); process.exit(1); });

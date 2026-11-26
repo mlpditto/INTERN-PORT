@@ -1,4 +1,4 @@
-// V101.377 🔢 เลขลับ · โหมดฝึก 🤖 (owner 2026-11-26, docs/MIND-GAMES-PLAN.md §3, mockup-secret-number/) on the REAL index.html, 390×844.
+// V101.378 🔢 เลขลับ · โหมดฝึก 🤖 (owner 2026-11-26, docs/MIND-GAMES-PLAN.md §3, mockup-secret-number/) on the REAL index.html, 390×844.
 // Proves: the 5th tile in the games row opens it; the first open plays a 4-scene tour read aloud (t1…t4), ❓ replays, 🔊/🔇 kept;
 // every menu question answers truthfully over 2000 random (number, question) pairs; the live set never drops the secret; 🟩 crosses
 // out what the answers rule out and a tap on a live number guesses; ✏️ crosses only what you tap (✏️ ขีด) and 🎯 guesses; 📏 shows the

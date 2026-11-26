@@ -37,7 +37,7 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
   const vis = (sel) => page.$eval(sel, (e) => getComputedStyle(e).display !== 'none');
   assert.equal(await page.isVisible('#u-wolf-chip'), false, 'no rail 🐺 on a phone');
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.click('#u-games-chip');   // V101.377: on PC the games sit in the 🎮 menu (owner pick A)
+  await page.click('#u-games-chip');   // V101.378: on PC the games sit in the 🎮 menu (owner pick A)
   assert.equal(await page.isVisible('#u-wolf-chip'), true, '🐺 in the 🎮 menu on PC');
   assert.equal(await page.$eval('#u-wolf-chip', (b) => b.previousElementSibling.id), 'u-cereal-chip', '🐺 right under 🥣');
   await page.keyboard.press('Escape');
