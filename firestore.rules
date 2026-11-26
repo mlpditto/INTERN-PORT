@@ -125,6 +125,19 @@ service cloud.firestore {
         allow read, write: if false;
       }
     }
+    // 🌐 rooms for 2-player games (2026-11-26, ไพ่เงา B/C): the roomAct callable is the only writer. Players read their own
+    // room; the hands and the face-down tile sit in secret/hands, which no client may read.
+    match /rooms/{roomId} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid in resource.data.authUids);
+      allow write: if false;
+      match /secret/{doc} {
+        allow read, write: if false;
+      }
+      match /hand/{uid} {   // each player reads only their own tiles
+        allow read: if isSignedIn() && request.auth.uid == uid;
+        allow write: if false;
+      }
+    }
     // 🥣 Phase 4: online wins + 🏅 achievements, written by cerealAct only
     // 🎮 game time (2026-11-25, game-log.js on the intern page, game-admin.js reads): one doc per finished solo / local / online game.
     // An intern adds only their own (userId linked to this login, authUid = this login); nobody edits; only admins read.

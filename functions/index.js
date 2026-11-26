@@ -2881,6 +2881,11 @@ exports.cerealAct = onCall({ timeoutSeconds: 30 }, async (request) => {
     return require('./cereal-act').handle(request, { db: admin.firestore(), FieldValue: admin.firestore.FieldValue, HttpsError, isAdmin: isAdminToken, now: Date.now(), rand: Math.random });
 });
 
+// 🌐 Rooms for 2-player games (owner 2026-11-26, ไพ่เงา B 🌐 with a friend + C 🔢 live room): the referee, see functions/room-act.js.
+exports.roomAct = onCall({ timeoutSeconds: 30 }, async (request) => {
+    return require('./room-act').handle(request, { db: admin.firestore(), HttpsError, now: Date.now(), rand: Math.random });
+});
+
 // 🐺 Werewolf Phase 1 (owner 2026-11-23, docs/WEREWOLF-PLAN.md): the Telegram game bot's webhook — a NEW bot, not the admin
 // alerts bot. Telegram sends each update with the secret_token set in setWebhook; anything without it gets 403. Always 200
 // after that, so Telegram does not retry a bad update forever. Errors never log the token (it is in the request URL).
