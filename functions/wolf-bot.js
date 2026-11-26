@@ -21,8 +21,14 @@
 // the deadline (deps.tasks); each calls phase(), which edits the phase message's ⏳ (night → the 🌙 line, day → the ☀️ line
 // with its 🗳 button, vote → the ballot) or ends the phase on the second. Task names are deterministic, so a repeat is a
 // harmless 409. Without deps.tasks, or when the enqueue fails, wolfTick (every minute) still runs the game as before.
+// Bot players (2026-11-26, owner picks 1A 2B 3 5, mockup werewolf-bot-players): the host adds 🤖 seats in the lobby (+1 / −1,
+// level 🌆 🌙 🌕 = wolf-ai.js, the solo game's brain); bots have no Telegram chat, so they decide inside the function when a
+// phase starts: night picks at 🌙 (a human 🐺 sees a bot mate's wish in the DM), one line of table talk in the ☀️ message
+// (🤨 / 👍 / 🔮 claims, fakes shown 🤥 at the end), ballots at 🗳. Bot ids are bot1…bot9, names carry 🤖; a game needs ≥ 1
+// human. Bot knowledge lives in secret/state.ai (checks, claims, said, votes). Nothing is ever sent to a bot id.
 'use strict';
 const W = require('./wolf-rules');
+const AI = require('./wolf-ai');
 
 const CODE_ABC = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const ROLE_CARD = {
@@ -36,6 +42,9 @@ const LIVE = ['night', 'day', 'vote'];
 const QUIET = ' · ขอเงียบในกลุ่มจนจบเกมนะ 🤐';   // owner pick Q8: ask once, delete nothing
 const WARN_SEC = 60;   // ⏳ the warning goes out at the first tick with ≤ 60 s left (W1)
 const STEP_SEC = 30;   // C1: the ⏳ in the phase message is edited this often
+const BOT_NAMES = ['ต้น', 'ใบ', 'ฟ้า', 'นนท์', 'มุก', 'ภู', 'แพร', 'ก้อง', 'เจ'];   // the solo game's names, in order
+const LEVELS = { 1: '🌆 หัวค่ำ', 2: '🌙 เที่ยงคืน', 3: '🌕 คืนเดือนเพ็ญ' };   // the solo lobby's night levels
+const isBotId = (id) => /^bot\d$/.test(String(id));
 const leftSec = (g, now) => Math.max(0, Math.round((g.deadline - now) / 5000) * 5);   // what the ⏳ shows: to 5 s, task jitter hidden
 const mmss = (sec) => Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
 const RULES = [   // owner pick R1: a line per role + the flow + the win rule, plain text (~450 chars)
@@ -56,16 +65,20 @@ const nameOf = (u) => (((u.first_name || '') + ' ' + (u.last_name || '')).trim()
 const cleanName = (s) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, 24);
 const hostNm = (g) => ((g.players || {})[g.host] || {}).name || g.hostName;   // the host may have renamed since opening the room
 const seated = (g) => Object.entries(g.players || {}).sort((a, b) => a[1].seat - b[1].seat);
+const bots = (g) => seated(g).filter(([id]) => isBotId(id));
+const humans = (g) => seated(g).filter(([id]) => !isBotId(id));
 const isGroup = (chat) => chat && (chat.type === 'group' || chat.type === 'supergroup');
 const rows2 = (btns) => { const r = []; for (let i = 0; i < btns.length; i += 2) r.push(btns.slice(i, i + 2)); return r; };
 
 function lobbyView(g, bot) {
-  const list = seated(g).map(([, p]) => p.name);
-  const n = list.length;
+  const list = humans(g).map(([, p]) => p.name), bl = bots(g).map(([, p]) => p.name);
+  const n = list.length, total = n + bl.length;
   const text = '🐺 มนุษย์หมาป่า · ห้อง ' + g.code + '\n👥 ' + n + '/' + W.MAX_PLAYERS + (n ? ' · ' + list.join(', ') : '') +
-    '\n' + (n >= W.MIN_PLAYERS ? '✅ ครบแล้ว หัวห้องกด ▸ เริ่ม' : '⏳ อีก ' + (W.MIN_PLAYERS - n) + ' คน · กติกา /rules');
+    (bl.length ? '\n🤖 ' + bl.length + ' · ' + bl.join(' ') + ' · ' + LEVELS[g.level || 2] : '') +
+    '\n' + (total >= W.MIN_PLAYERS ? '✅ ครบแล้ว หัวห้องกด ▸ เริ่ม' : '⏳ อีก ' + (W.MIN_PLAYERS - total) + ' คน · กติกา /rules' + (bl.length ? '' : ' · หรือเติม 🤖'));
   const rows = [];
-  if (n < W.MAX_PLAYERS) rows.push([{ text: '▸ เข้าร่วม', url: 'https://t.me/' + bot + '?start=' + g.code }]);
+  if (total < W.MAX_PLAYERS) rows.push([{ text: '▸ เข้าร่วม', url: 'https://t.me/' + bot + '?start=' + g.code }]);
+  rows.push([{ text: '🤖 +1', callback_data: 'bot:+:' + g.code }, { text: '🤖 −1', callback_data: 'bot:-:' + g.code }, { text: LEVELS[g.level || 2], callback_data: 'lvl:' + g.code }]);
   rows.push([{ text: '▸ เริ่ม', callback_data: 'start:' + g.code }, { text: '✕ ยกเลิก', callback_data: 'cancel:' + g.code }]);
   return { text, reply_markup: { inline_keyboard: rows } };
 }
@@ -96,6 +109,7 @@ async function safe(deps, method, body) {
 async function run(deps, g, out) {
   const missed = [];
   for (const o of out) {
+    if (o.body && isBotId(o.body.chat_id)) continue;   // a bot seat has no chat
     const r = await safe(deps, o.method, o.body);
     if (!r && o.dm) missed.push(o.dm);
     if (r && r.message_id && o.save) await deps.db.collection('wolf_games').doc(g.code).update({ [o.save]: r.message_id });
@@ -211,7 +225,52 @@ async function rename(msg, deps) {
 }
 
 // ---- the game loop (pure over g = the game doc, st = secret/state; each returns the messages to send) -----------------------
-const nm = (g, id) => (g.players[id] ? g.players[id].name : '?');
+const nm = (g, id) => (g.players[id] ? g.players[id].name + (isBotId(id) ? ' 🤖' : '') : '?');
+/* What wolf-ai.js reads: the seats, which are bots, the level, the day and the bots' memory in st.ai. */
+function aiView(g, st) {
+  const ids = seated(g).map(([id]) => id);
+  st.ai = st.ai || { checks: {}, claims: [], said: [], votes: [] };
+  return { id: g.code, me: '-', bots: ids.filter(isBotId), level: g.level || 2, day: g.round, ids, st, checks: st.ai.checks, claims: st.ai.claims, said: st.ai.said, votes: st.ai.votes };
+}
+/* The bots' night: every bot with a night role picks now (the 🧪 waits for the bite, see afterWolves). */
+function botNight(g, st, out, rng) {
+  if (!bots(g).length) return;
+  const v = aiView(g, st), p = st.picks, wv = AI.wolfVotes(v, rng);
+  Object.keys(wv).forEach((b) => { if (!W.pickError(st, b, 'wolf', wv[b])) p.wolf[b] = wv[b]; });
+  const t = W.nightTurns(st);
+  for (const id of Object.keys(t)) {
+    if (!isBotId(id)) continue;
+    if (t[id] === 'seer' && !p.seer) {
+      const x = AI.seerPick(v, id, rng);
+      if (x && !W.pickError(st, id, 'seer', x)) { p.seer = x; st.ai.checks[id] = Object.assign(st.ai.checks[id] || {}, { [x]: st.roles[x] === 'wolf' }); } else p.seer = 'none';
+    }
+    if (t[id] === 'guard' && !p.guard) { const x = AI.guardPick(v, id, rng); p.guard = x && !W.pickError(st, id, 'guard', x) ? x : 'none'; }
+  }
+  if (wolvesDone(st)) afterWolves(g, st, out, rng);   // every wolf is a bot: the bite is fixed now, a human 🧪 gets her menu
+}
+/* One line of table talk for the ☀️ message (owner pick 2B): the solo tags, bots that stay quiet are not named. */
+function botTalk(g, st) {
+  if (!bots(g).length) return '';
+  const v = aiView(g, st), t = AI.talk(v), parts = [];
+  t.claims.forEach((c) => { if (isBotId(c.by)) st.ai.claims.push(c); });
+  for (const [id, p] of bots(g)) {
+    const tag = st.alive[id] ? t.tags[id] : null;
+    if (!tag || tag.k === 'quiet') continue;
+    if (tag.k === 'claim') parts.push(p.name + ' 🔮 ' + nm(g, tag.t) + (tag.wolf ? ' = 🐺' : ' ไม่ใช่ 🐺'));
+    else { parts.push(p.name + (tag.k === 'sus' ? ' 🤨 ' : ' 👍 ') + nm(g, tag.t)); st.ai.said.push({ day: g.round, by: id, k: tag.k, t: tag.t, soft: !!tag.soft }); }
+  }
+  return parts.length ? '🤖 ' + parts.join(' · ') : '';
+}
+/* The bots' ballots, cast the moment the vote opens (owner pick 3). */
+function botVote(g, st) {
+  if (!bots(g).length) return;
+  const vt = AI.votes(aiView(g, st));
+  bots(g).forEach(([id]) => {
+    if (!st.alive[id] || !vt[id]) return;
+    const t = vt[id] !== 'skip' && st.alive[vt[id]] && vt[id] !== id ? vt[id] : 'skip';
+    st.ballot[id] = t; st.ai.votes.push({ day: g.round, by: id, t });
+  });
+}
 const liveIds = (st) => W.aliveIds(st.alive);
 /* Who may be picked by actor for kind tonight, as menu buttons. */
 function menu(g, st, actor, kind) {
@@ -245,6 +304,11 @@ function nightDone(st) {
 function afterWolves(g, st, out, rng) {
   st.picks.bite = W.wolfTarget(st.picks.wolf, rng);
   const witch = W.withRole(st.roles, st.alive, 'witch')[0];
+  if (witch && isBotId(witch)) {
+    const wp = AI.witchPick(aiView(g, st), witch, st.picks.bite, rng);
+    st.picks.heal = !!(wp.heal && st.picks.bite); st.picks.poison = wp.poison && !W.pickError(st, witch, 'poison', wp.poison) ? wp.poison : null; st.picks.witchDone = true;
+    return;
+  }
   if (witch && (st.witch.heal || st.witch.poison)) {
     st.picks.witchAsked = true;
     out.push({ method: 'sendMessage', body: Object.assign({ chat_id: witch }, witchView(g, st)), dm: nm(g, witch) });
@@ -253,19 +317,25 @@ function afterWolves(g, st, out, rng) {
 }
 const nightView = (g, left) => ({ text: '🌙 คืนที่ ' + g.round + ' · ⏳ ' + mmss(left) + '\n💤 หลับตา · คนมีบทดู DM' });
 /* The ☀️ line (g.dayLead = who died, set by finishNight) with the talk time left and the host's 🗳 button. */
-const dayView = (g, st, left) => ({ text: '☀️ เช้าวันที่ ' + g.round + ' · ' + (g.dayLead || '') + '\n👥 ' + liveIds(st).length + ' · 💬 คุย ' + mmss(left),
+const dayView = (g, st, left) => ({ text: '☀️ เช้าวันที่ ' + g.round + ' · ' + (g.dayLead || '') + (g.botSay ? '\n' + g.botSay : '') + '\n👥 ' + liveIds(st).length + ' · 💬 คุย ' + mmss(left),
   reply_markup: { inline_keyboard: [[{ text: '🗳 โหวตเลย (หัวห้อง)', callback_data: 'talk:' + g.code + ':' + g.round }]] } });
 function beginNight(g, st, now, out, rng) {
   g.status = 'night'; g.deadline = now + W.NIGHT_SEC * 1000;
   st.picks = { wolf: {}, bite: null, seer: null, guard: null, heal: false, poison: null, witchDone: false };
   out.push({ method: 'sendMessage', body: Object.assign({ chat_id: g.chatId }, nightView(g, W.NIGHT_SEC)), save: 'phaseMsgId' });
+  botNight(g, st, out, rng);
   const turns = W.nightTurns(st);
   for (const id of Object.keys(turns)) {
     const k = turns[id];
-    if (k === 'witch') continue;   // after the wolves
+    if (k === 'witch' || isBotId(id)) continue;   // the witch after the wolves; bots picked above
     const btns = menu(g, st, id, k);
     if (!btns.length) { if (k === 'guard') st.picks.guard = 'none'; if (k === 'seer') st.picks.seer = 'none'; continue; }
-    out.push({ method: 'sendMessage', body: { chat_id: id, text: ASK[k], reply_markup: { inline_keyboard: rows2(btns) } }, dm: nm(g, id) });
+    let ask = ASK[k];
+    if (k === 'wolf') Object.keys(st.picks.wolf).filter(isBotId).forEach((b) => {   // a bot mate's wish, as in the solo game (pick A + D)
+      const why = (g.level || 2) === 3 ? AI.wolfWhy(aiView(g, st), st.picks.wolf[b]) : null;
+      ask += '\n' + nm(g, b) + ' อยากกัด ' + nm(g, st.picks.wolf[b]) + (why ? ' · ' + why : '');
+    });
+    out.push({ method: 'sendMessage', body: { chat_id: id, text: ask, reply_markup: { inline_keyboard: rows2(btns) } }, dm: nm(g, id) });
   }
 }
 /* Who had a menu out tonight and whether they pressed: { id: bool }. A 🔮 / 🛡️ with nobody to pick ('none') and a 🧪 who
@@ -305,7 +375,7 @@ function finishNight(g, st, now, out, rng) {
   const deadTxt = r.dead.length ? 'เมื่อคืน 💀 ' + r.dead.map((id) => nm(g, id)).join(', ') + ' ตาย' + QUIET : 'คืนสงบ ไม่มีใครตาย';
   r.dead.forEach((id) => out.push({ method: 'sendMessage', body: { chat_id: id, text: '💀 คุณตายเมื่อคืน · ดูเกมต่อได้ แต่ขอเงียบในกลุ่มจนจบนะ 🤐' } }));
   if (endIf(g, st, out, '☀️ เช้าวันที่ ' + g.round + ' · ' + deadTxt)) return;
-  g.status = 'day'; g.deadline = now + (g.talkSec || W.TALK_DEFAULT) * 1000; g.dayLead = deadTxt;
+  g.status = 'day'; g.deadline = now + (g.talkSec || W.TALK_DEFAULT) * 1000; g.dayLead = deadTxt; g.botSay = botTalk(g, st);
   out.push({ method: 'sendMessage', body: Object.assign({ chat_id: g.chatId }, dayView(g, st, g.talkSec || W.TALK_DEFAULT)), save: 'phaseMsgId' });
   remind(g, st, missed, out);
 }
@@ -313,11 +383,12 @@ function voteView(g, st, left) {
   const live = seated(g).map(([id]) => id).filter((id) => st.alive[id]);
   const btns = live.map((id) => ({ text: nm(g, id), callback_data: 'v:' + g.code + ':' + g.round + ':' + id }));
   btns.push({ text: '⏭ ข้าม', callback_data: 'v:' + g.code + ':' + g.round + ':skip' });
-  const n = Object.keys(st.ballot || {}).length;
-  return { text: '🗳 โหวตลับ วันที่ ' + g.round + ' · ⏳ ' + mmss(left) + ' · เปลี่ยนได้\n✅ ' + n + '/' + live.length, reply_markup: { inline_keyboard: rows2(btns) } };
+  const n = Object.keys(st.ballot || {}).length, nb = live.filter(isBotId).length;
+  return { text: '🗳 โหวตลับ วันที่ ' + g.round + ' · ⏳ ' + mmss(left) + ' · เปลี่ยนได้\n✅ ' + n + '/' + live.length + (nb ? ' · 🤖 ลงแล้ว' : ''), reply_markup: { inline_keyboard: rows2(btns) } };
 }
 function beginVote(g, st, now, out) {
   g.status = 'vote'; g.deadline = now + W.VOTE_SEC * 1000; st.ballot = {};
+  botVote(g, st);
   out.push({ method: 'sendMessage', body: Object.assign({ chat_id: g.chatId }, voteView(g, st, W.VOTE_SEC)), save: 'voteMsgId' });
 }
 function finishVote(g, st, now, out, rng) {
@@ -345,7 +416,8 @@ function endIf(g, st, out, lead) {
   const w = W.winner(st);
   if (!w) return false;
   g.status = 'over'; g.deadline = null; g.winner = w;
-  const list = seated(g).map(([id, p]) => W.EMOJI[st.roles[id]] + ' ' + p.name + (st.alive[id] ? '' : ' 💀')).join('\n');
+  const faked = (id) => !!(st.ai && st.ai.claims.some((c) => c.fake && c.by === id));
+  const list = seated(g).map(([id]) => W.EMOJI[st.roles[id]] + ' ' + nm(g, id) + (faked(id) ? ' 🤥' : '') + (st.alive[id] ? '' : ' 💀')).join('\n');
   out.push({ method: 'sendMessage', body: { chat_id: g.chatId, text: lead + '\n\n' + (w === 'wolf' ? '🐺 หมาป่าชนะ!' : '🏆 ฝั่งชาวบ้านชนะ!') + '\n' + list + '\n\nเล่นอีก พิมพ์ /werewolf' } });
   g.freed = true;
   return true;
@@ -358,7 +430,7 @@ function commit(tx, db, gRef, g, st, now) {
   tx.set(gRef.collection('secret').doc('state'), st);
   if (free) {
     tx.set(db.collection('wolf_chats').doc(g.chatId), { game: null, updatedAt: now });
-    for (const id of Object.keys(g.players)) tx.set(db.collection('wolf_tg').doc(id), { game: null, updatedAt: now }, { merge: true });
+    for (const id of Object.keys(g.players)) if (!isBotId(id)) tx.set(db.collection('wolf_tg').doc(id), { game: null, updatedAt: now }, { merge: true });
   }
 }
 
@@ -368,6 +440,7 @@ async function onButton(q, deps) {
   if (parts[0] === 'n') return onNight(q, parts, deps);
   if (parts[0] === 'v') return onVote(q, parts, deps);
   if (parts[0] === 'talk') return onTalkEnd(q, parts, deps);
+  if (parts[0] === 'bot' || parts[0] === 'lvl') return onLobbyBots(q, parts, deps);
   const { db } = deps;
   const [kind, code] = parts;
   const me = String(q.from.id);
@@ -383,12 +456,13 @@ async function onButton(q, deps) {
       if (['over', 'cancelled'].includes(d.status)) return { say: 'ห้องนี้ปิดแล้ว' };
       tx.update(gRef, { status: 'cancelled', deadline: null, updatedAt: deps.now });
       tx.set(db.collection('wolf_chats').doc(d.chatId), { game: null, updatedAt: deps.now });
-      for (const id of Object.keys(d.players)) tx.set(db.collection('wolf_tg').doc(id), { game: null, updatedAt: deps.now }, { merge: true });
+      for (const id of Object.keys(d.players)) if (!isBotId(id)) tx.set(db.collection('wolf_tg').doc(id), { game: null, updatedAt: deps.now }, { merge: true });
       return { g: d, cancelled: true, live: LIVE.includes(d.status) };
     }
     if (d.status !== 'lobby') return { say: 'เกมเริ่มไปแล้ว' };
     const ids = seated(d).map(([id]) => id);
     if (ids.length < W.MIN_PLAYERS) return { say: 'ต้องมีอย่างน้อย ' + W.MIN_PLAYERS + ' คน (ตอนนี้ ' + ids.length + ')' };
+    if (!humans(d).length) return { say: 'ต้องมีคนจริงอย่างน้อย 1 คน' };
     const counts = W.defaultCounts(ids.length);
     const roles = W.deal(ids, counts, deps.rng);
     const st = W.newState(roles);
@@ -417,6 +491,37 @@ async function onButton(q, deps) {
 }
 
 /* n:<code>:<round>:<kind>:<target> — a night pick from a player's DM menu. */
+/* 🤖 +1 / −1 and the level chip in the lobby (owner pick 1A): host only, humans + bots ≤ 10, names from BOT_NAMES in order. */
+async function onLobbyBots(q, parts, deps) {
+  const { db } = deps;
+  const code = parts[0] === 'bot' ? parts[2] : parts[1], me = String(q.from.id);
+  const bot = await deps.botName();
+  const gRef = db.collection('wolf_games').doc(code || '-');
+  const res = await db.runTransaction(async (tx) => {
+    const gs = await tx.get(gRef);
+    if (!gs.exists) return { say: 'ไม่พบห้องนี้' };
+    const g = gs.data();
+    if (g.host !== me) return { say: 'เฉพาะหัวห้อง (' + hostNm(g) + ') กดได้' };
+    if (g.status !== 'lobby') return { say: 'เกมเริ่มไปแล้ว' };
+    if (parts[0] === 'lvl') g.level = ((g.level || 2) % 3) + 1;
+    else if (parts[1] === '+') {
+      if (seated(g).length >= W.MAX_PLAYERS) return { say: 'เต็มแล้ว (' + W.MAX_PLAYERS + ' ที่)' };
+      const used = seated(g).map(([, p]) => p.name);
+      let k = 1; while (g.players['bot' + k]) k++;
+      const name = BOT_NAMES.find((x) => !used.includes(x)) || ('บอท' + k);
+      g.players['bot' + k] = { name, seat: Math.max(0, ...Object.values(g.players).map((p) => p.seat)) + 1, alive: true, bot: true };
+    } else {
+      const last = bots(g).pop();
+      if (!last) return { say: 'ยังไม่มีบอทในห้อง' };
+      delete g.players[last[0]];
+    }
+    tx.update(gRef, { players: g.players, level: g.level || 2, updatedAt: deps.now });
+    return { g };
+  });
+  await safe(deps, 'answerCallbackQuery', { callback_query_id: q.id, text: res.say, show_alert: !!res.say });
+  if (res.g && res.g.msgId) await safe(deps, 'editMessageText', Object.assign({ chat_id: res.g.chatId, message_id: res.g.msgId }, lobbyView(res.g, bot)));
+}
+
 async function onNight(q, parts, deps) {
   const { db } = deps;
   const [, code, round, kind, arg] = parts;
@@ -622,4 +727,4 @@ async function handle(update, deps) {
   if (msg.chat.type === 'private' && !cmdRaw.startsWith('/')) return rename(msg, deps);
 }
 
-module.exports = { handle, tick, phase, lobbyView, startedView, roleCard, ROLE_CARD, RULES, STEP_SEC };
+module.exports = { handle, tick, phase, lobbyView, startedView, roleCard, ROLE_CARD, RULES, STEP_SEC, BOT_NAMES, LEVELS };
