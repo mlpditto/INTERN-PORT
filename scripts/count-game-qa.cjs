@@ -34,7 +34,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.ok(stacks.every(Boolean), 'every 🧊 stack: never taller toward you, count = sum of heights');
 
   // phone doorway → lobby
-  assert.equal(await page.$eval('#u-count-chip', (e) => getComputedStyle(e).display), 'none', 'phone: no header chip');
+  assert.equal(await page.isVisible('#u-count-chip'), false, 'phone: no header chip');
   await page.evaluate(() => document.getElementById('sch-count-btn').click());
   const lobby = await page.evaluate(() => ({ shown: getComputedStyle(document.getElementById('countModal')).display, modes: [...document.querySelectorAll('.cg-modes button')].map((b) => b.querySelector('i').textContent), noToggle: document.getElementById('countModal').classList.contains('lang-no-toggle') }));
   assert.deepEqual(lobby, { shown: 'flex', modes: ['🟥', '🧊'], noToggle: true }, 'the lobby offers 🟥 and 🧊');
@@ -78,7 +78,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
   // PC: the header chip beside 🐺, keyboard plays
   await page.setViewportSize({ width: 1024, height: 800 });
-  assert.equal(await page.$eval('#u-count-chip', (e) => [getComputedStyle(e).display, e.nextElementSibling.id].join()), 'flex,u-wolf-chip', 'PC: 🧊 just left of 🐺 (🐺 🥣 📅 stay together)');
+  await page.click('#u-games-chip');   // V101.377: on PC the games sit in the 🎮 menu (owner pick A)
+  assert.equal(await page.$eval('#u-count-chip', (e) => [e.previousElementSibling.id, e.nextElementSibling.id].join()), 'u-wolf-chip,u-bw-chip', 'PC: 🧊 in the 🎮 menu between 🐺 and ⚫');
   await page.click('#u-count-chip'); await page.click('#cg-cube');
   await page.keyboard.press('1'); await page.keyboard.press('Enter');
   assert.ok(await page.$('#cg-res'), 'PC: digits + Enter answer');

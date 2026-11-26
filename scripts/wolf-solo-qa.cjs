@@ -35,10 +35,12 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
 
   // phone: 🐺 lives in Schedule, not the top rail; PC (≥ 768 px): 🐺 sits just left of 🥣 in the rail (🥣 stays next to 📅)
   const vis = (sel) => page.$eval(sel, (e) => getComputedStyle(e).display !== 'none');
-  assert.equal(await vis('#u-wolf-chip'), false, 'no rail 🐺 on a phone');
+  assert.equal(await page.isVisible('#u-wolf-chip'), false, 'no rail 🐺 on a phone');
   await page.setViewportSize({ width: 1280, height: 800 });
-  assert.equal(await vis('#u-wolf-chip'), true, 'rail 🐺 on PC');
-  assert.equal(await page.$eval('#u-wolf-chip', (b) => b.nextElementSibling.id), 'u-cereal-chip', '🐺 just left of 🥣 (🥣 stays next to 📅)');
+  await page.click('#u-games-chip');   // V101.377: on PC the games sit in the 🎮 menu (owner pick A)
+  assert.equal(await page.isVisible('#u-wolf-chip'), true, '🐺 in the 🎮 menu on PC');
+  assert.equal(await page.$eval('#u-wolf-chip', (b) => b.previousElementSibling.id), 'u-cereal-chip', '🐺 right under 🥣');
+  await page.keyboard.press('Escape');
   assert.equal(await vis('#sch-wolf-btn'), false, 'Schedule 🐺 hidden on PC');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => wolfOpen());
