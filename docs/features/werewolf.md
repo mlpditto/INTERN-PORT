@@ -1,8 +1,8 @@
-# 🐺 Werewolf (solo on LIFF · Telegram later)
+# 🐺 Werewolf (solo on LIFF · live on Telegram)
 
 A secret-role party game for 5–10 players, played in a Telegram group with a bot (not LINE: no monthly push quota, the bot can DM roles). Plan, phases and the owner's decisions: [`docs/WEREWOLF-PLAN.md`](../WEREWOLF-PLAN.md) (Thai).
 
-**Solo vs 🤖 on the intern app (V101.353).** The 🐺 button (phones: the games row under History since V101.368, was beside 🥣 on Schedule; PC: the header rail) (`wolfOpen()`) opens `#wolfModal`: pick 5 / 7 / 9 players and 🥄–🥄🥄🥄 bots, get a random role, play night → day → vote until a side wins. Owner pick B (mockup-werewolf-solo/): every player is a seat; what a bot said today is a tag under its name (🤨 / 👍 / 🔮 X 🐺|👤); you tap a seat, then a chip. A player's role shows when they die. No timer. State = localStorage `wolf_v1_<userId>` (10 games); nothing in Firestore. The Telegram bot (Phase 1, PR #2437) is separate and not merged. Roles (owner pick, §8 Q3): 🐺 wolf · 🔮 seer · 🛡️ guard · 🧪 witch (7+ players) · 👤 villager.
+**Solo vs 🤖 on the intern app (V101.353).** The 🐺 button (phones: the games row under History since V101.368, was beside 🥣 on Schedule; PC: the header rail) (`wolfOpen()`) opens `#wolfModal`: pick 5 / 7 / 9 players and 🥄–🥄🥄🥄 bots, get a random role, play night → day → vote until a side wins. Owner pick B (mockup-werewolf-solo/): every player is a seat; what a bot said today is a tag under its name (🤨 / 👍 / 🔮 X 🐺|👤); you tap a seat, then a chip. A player's role shows when they die. No timer. State = localStorage `wolf_v1_<userId>` (10 games); nothing in Firestore. The Telegram bot (below) is separate: a different game, nothing shared but the rules file. Roles (owner pick, §8 Q3): 🐺 wolf · 🔮 seer · 🛡️ guard · 🧪 witch (7+ players) · 👤 villager.
 
 Files: `public/wolf-rules.js` (a byte copy of `functions/wolf-rules.js`, UMD) · `public/wolf-ai.js` (the bots) · `public/wolf.js` (screens + storage) · `public/wolf.css`.
 
@@ -13,9 +13,9 @@ Files: `public/wolf-rules.js` (a byte copy of `functions/wolf-rules.js`, UMD) ·
 - The 🔮 bot claims at once when it finds a wolf, otherwise from day 2 at 🥄🥄+. Wolves at 🥄🥄+ counter-claim a seer who named a mate; at 🥄🥄🥄 one may fake-claim first. Fake claims are marked and shown 🤥 at the end.
 - Wolves bite the claimed seer / their accusers, vote with the table, never accuse or vote a mate.
 
-## Telegram (Phase 0–3 built, not deployed)
+## Telegram (Phase 0–3 live · bot @NikaWerewolf_bot)
 
-**Built: Phase 0 (rules `functions/wolf-rules.js`), Phase 1 (rooms) and Phase 2 (the whole game) in `functions/wolf-bot.js` behind `exports.wolfBot` + `exports.wolfTick` (every minute).** Live only after the owner makes the bot and sets its secrets + webhook (plan §9). Owner picks: dead roles stay hidden until the end (Q4) · vote result = counts only (Q5) · 1-minute clock (Q6) · the dead are asked to keep quiet, nothing deleted (Q8).
+**Built: Phase 0 (rules `functions/wolf-rules.js`), Phase 1 (rooms) and Phase 2 (the whole game) in `functions/wolf-bot.js` behind `exports.wolfBot` + `exports.wolfTick` (every minute).** Deployed with the bot's secrets + webhook set (plan §9); first real 5-player game played to the end in the owner's group on 2026-11-26 (🐺 win, roles shown only at the end). Owner picks: dead roles stay hidden until the end (Q4) · vote result = counts only (Q5) · 1-minute clock (Q6) · the dead are asked to keep quiet, nothing deleted (Q8).
 
 ## How to get to it (user POV)
 
