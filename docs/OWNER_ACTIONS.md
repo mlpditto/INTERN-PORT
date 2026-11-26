@@ -16,7 +16,7 @@
 | **DEADLINE-ALERTS** | Quiz deadline LINE alerts (admin V102.480): deploy `firestore:rules` and `functions:notifyQuizDeadlines` after merge; then watch the first day of `line_usage` | ⬜ open — after merge | 2 |
 | **LINE-WATCH** | Deploy `watchLineQuota` (daily LINE quota check + mail when the tier rises) | ⬜ open — code merged, not deployed | 2 |
 | **CLOUD** | Finish the Claude Code on the web setup at claude.ai/code | ⬜ optional | 3 |
-| **WOLF-CLOCK** | 🐺 Werewolf ⏳ per phase (Cloud Tasks): enable the API, create queue `wolf-phase`, deploy `wolfBot`, `wolfTick`, `wolfPhase` | ⬜ open — after the PR is merged | 2 |
+| WOLF-CLOCK | 🐺 Werewolf ⏳ per phase (Cloud Tasks): API enabled, queue `wolf-phase` created, `wolfBot` / `wolfTick` / `wolfPhase` deployed | ✅ 2026-11-26 (with names by DM and 🤖 bot players) — first live game with the countdown not played yet | — |
 | FN | Every exported Cloud Function is deployed and ACTIVE | ✅ *script* (25/25 on 2026-09-30) | — |
 | RULES | `firestore.rules` / `storage.rules` identical to live | ✅ *script* | — |
 | SITE | Live intern/admin versions match `origin/production` | ✅ *script* | — |
@@ -25,13 +25,6 @@
 | TTL | Firestore TTL on `learning_path_entries.deleteAt` | ✅ *script* — active (the comment above `notifyPurgeDigest` still says "until then"; it is on) | — |
 
 ## 2. Actions in priority order
-
-### WOLF-CLOCK — 🐺 Werewolf live ⏳ per phase (after the PR is merged)
-**What it does:** at each night / talk / vote start the bot queues one Cloud Task per 30 s and one at the deadline; `wolfPhase` edits the phase message's ⏳ and ends the phase on the second. Without the queue nothing breaks: `wolfTick` keeps ending phases within a minute, you only lose the countdown.
-1. `gcloud services enable cloudtasks.googleapis.com --project intern-port-edfa7`
-2. `gcloud tasks queues create wolf-phase --location=us-central1 --project intern-port-edfa7`
-3. `firebase deploy --only functions:wolfBot,functions:wolfTick,functions:wolfPhase --project intern-port-edfa7`
-4. Play one round in the Telegram group: the 🌙 line should count 1:30 → 1:00 → 0:30 and the morning should land at 0:00. If the functions log says `[wolfClock] tasks 403`, the runtime service account lacks `roles/cloudtasks.enqueuer` — grant it to the default compute account and redeploy nothing.
 
 ### PAXA — third voice for 🎬 Watch first (after the PR is merged; admin V102.674)
 
@@ -121,6 +114,7 @@ At claude.ai/code:
 First test: a cloud task that runs `bash scripts/run-qa.sh`.
 
 ## 3. Standing rules (no action unless the script says so)
+- **🐺 Werewolf clock (2026-11-26).** Cloud Tasks queue `wolf-phase` (us-central1) drives the per-phase ⏳ and ends phases on the second; the runtime account's `roles/editor` covers the enqueue. `wolfTick` (every minute) is only the fallback. If a phase message stops counting, look for `[wolfClock]` in the `wolfBot` / `wolfTick` logs (a 403 = the queue or the role is gone) — the game still runs. Redeploy `wolfBot`, `wolfTick`, `wolfPhase` together: they share the Telegram bot deps.
 - **Deploys after a merge.** GitHub Pages deploys only `public/`. After merging a PR that touches `functions/` or `*.rules`, deploy what the PR names:
   - Functions: `FUNCTIONS_DISCOVERY_TIMEOUT=60 firebase deploy --only functions:<name>` from a clean `production` checkout, after `npm --prefix functions ci`.
   - Rules: `firebase deploy --only firestore:rules`.
