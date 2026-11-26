@@ -27,6 +27,7 @@
         }
         snow.innerHTML = html;
         document.body.appendChild(snow);
+        snowSync();   // the theme may switch on while a game is open
     }
 
     function player() {
@@ -38,7 +39,12 @@
     var QUIET = ['quizModal', 'cerealModal', 'wolfModal', 'countModal', 'bwModal'];
     function inQuiz() { return QUIET.some(function (id) { var q = document.getElementById(id); return !!(q && getComputedStyle(q).display !== 'none'); }); }
     var quizQuiet = false;
+    // V101.377 (owner "หิมะควรหยุดตก ตอนเปิดเกม"): the flakes hide while one of the 4 game popups is open (a quiz keeps its snow)
+    var GAMES = ['cerealModal', 'wolfModal', 'countModal', 'bwModal'];
+    function inGame() { return GAMES.some(function (id) { var q = document.getElementById(id); return !!(q && getComputedStyle(q).display !== 'none'); }); }
+    function snowSync() { if (snow) snow.style.display = inGame() ? 'none' : ''; }
     function quizSync() {
+        snowSync();
         if (!audio) return;
         if (inQuiz()) { if (!audio.paused) { quizQuiet = true; audio.pause(); } }
         else if (quizQuiet) { quizQuiet = false; if (started && wanted() && on() && !bdMe()) audio.play().catch(function () { /* needs a new gesture */ }); }

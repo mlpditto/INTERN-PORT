@@ -105,6 +105,29 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.match(lb.mode, /^l\d$/); assert.ok(['w', 'l', 'd'].includes(lb.win), 'the bot game still logs its win');
   assert.ok(await page.isVisible('#bw-share'), 'the bot game keeps 📤');
 
+  // V101.377 names: typed in the lobby, kept, shown instead of 1️⃣ / 2️⃣ (escaped), ↺ keeps them, empty = the numbers
+  await page.evaluate(() => { BW.lobby(); BW.who('two'); });
+  await page.fill('#bw-n1', '  แนน  '); await page.fill('#bw-n2', '<b>บิว</b>');
+  await page.click('#bw-start');
+  assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('bwNames'))), { me: 'แนน', bot: '<b>บิว</b>' });
+  assert.match(await page.textContent('#bw-score'), /แนน 0 : 0 <b>บิว<\/b>/, 'names in the score pill, escaped'); assert.equal(await page.$('#bw-score b'), null, 'no injected markup');
+  assert.match(await page.textContent('#bw-cvt'), /ส่งเครื่องให้ (แนน|<b>บิว<\/b>)$/);
+  await page.evaluate(() => { const g = BW._g(); while (!g.end) { if (g.cover) BW.ready(); else if (g.last) BW.next(); else { const s2 = g.lt == null ? g.lead : (g.lead === 'me' ? 'bot' : 'me'); BW.pick(g[s2][0]); BW.play(); } } });
+  assert.match(await page.textContent('#bw-final'), /แนน \d : \d <b>บิว<\/b>/, 'names at the end');
+  await page.click('#bw-again'); assert.match(await page.textContent('#bw-score'), /^แนน 0 : 0 /, '↺ keeps the names');
+  await page.evaluate(() => { BW.lobby(); BW.who('two'); });
+  assert.equal(await page.inputValue('#bw-n1'), 'แนน', 'the lobby remembers'); assert.equal(await page.inputValue('#bw-n2'), '<b>บิว</b>');
+  await page.fill('#bw-n1', ''); await page.fill('#bw-n2', ''); await page.click('#bw-start');
+  assert.match(await page.textContent('#bw-score'), /^1️⃣ 0 : 0 2️⃣$/, 'empty = the numbers');
+  // V101.377 snow (christmas.js): hidden while a game popup is open, back when it closes (inline style — reduced motion hides it by CSS here)
+  await page.evaluate(() => document.documentElement.classList.add('xm'));
+  await page.waitForFunction(() => { const sn = document.querySelector('.xm-snow'); return !!sn && sn.style.display === 'none'; }, null, { timeout: 3000 });
+  await page.evaluate(() => BW.close());
+  await page.waitForFunction(() => document.querySelector('.xm-snow').style.display === '', null, { timeout: 3000 });
+  await page.evaluate(() => bwOpen());
+  await page.waitForFunction(() => document.querySelector('.xm-snow').style.display === 'none', null, { timeout: 3000 });
+  await page.evaluate(() => { BW.close(); document.documentElement.classList.remove('xm'); });
+
   // 320 px: lobby + cover + a hand
   await page.setViewportSize({ width: 320, height: 640 });
   await page.evaluate(() => { BW.lobby(); BW.who('two'); });
@@ -113,5 +136,5 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   await page.click('#bw-ready'); assert.ok(await fits(), 'hand 320');
   assert.deepEqual(errors, []);
   await browser.close();
-  console.log('shadow-two-qa: OK — 🤖 │ 📱 2 คน rail, a cover before every hand change (no hand, no number on it), the follower sees a colour, rounds show colours only, 200 games keep the rules, the end names 1️⃣/2️⃣ and opens all, no 📤, log mode two / no win, bot game untouched, 320 px');
+  console.log('shadow-two-qa: OK — 🤖 │ 📱 2 คน rail, a cover before every hand change (no hand, no number on it), the follower sees a colour, rounds show colours only, 200 games keep the rules, the end names 1️⃣/2️⃣ and opens all, no 📤, log mode two / no win, bot game untouched, names typed/kept/escaped/↺, snow hidden while a game is open, 320 px');
 })().catch((e) => { console.error(e); process.exit(1); });
