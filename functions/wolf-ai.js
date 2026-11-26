@@ -187,6 +187,12 @@
     if (!c.length) return null;
     return g.level === 1 ? c[Math.floor(hash(g.id + b + 'shot') * c.length)] : argmax(sus(g, b), c);
   }
+  /** 💘 (2026-11-26, Telegram 🎲 extra role): the cupid bot b pairs two living players at random (itself allowed). */
+  function cupidPick(g, b, rng) {
+    var c = alive(g).slice(); if (c.length < 2) return null;
+    var i = Math.floor(rng() * c.length), a = c.splice(i, 1)[0];
+    return [a, c[Math.floor(rng() * c.length)]];
+  }
   /** V101.358 (owner pick D on 🌕): why the wolves want t, in a few words — what the day showed (a 🔮 claim, a finger at a wolf,
    *  the table trusting t). null = nothing to say (a first-night guess). */
   function wolfWhy(g, t) {
@@ -196,5 +202,5 @@
     var con = consensus(g); if ((con[t] || 0) <= -1.5) return 'คนไว้ใจเยอะ';
     return null;
   }
-  return { sus: sus, consensus: consensus, wolfScore: wolfScore, wolfVotes: wolfVotes, wolfWhy: wolfWhy, seerPick: seerPick, guardPick: guardPick, witchPick: witchPick, hunterPick: hunterPick, talk: talk, votes: votes, hash: hash };
+  return { sus: sus, consensus: consensus, wolfScore: wolfScore, wolfVotes: wolfVotes, wolfWhy: wolfWhy, seerPick: seerPick, guardPick: guardPick, witchPick: witchPick, hunterPick: hunterPick, cupidPick: cupidPick, talk: talk, votes: votes, hash: hash };
 });

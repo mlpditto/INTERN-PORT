@@ -91,7 +91,8 @@ async function openRoom(host, chatId, n) {
   assert.match(lob.text, /🎲 🏹 นักล่า แทน 👤 1 คน · ต้อง 6 คนขึ้นไป/);
   assert.equal(lob.reply_markup.inline_keyboard[2][0].text, '🎲 บทพิเศษ: 🏹 นักล่า');
   assert.equal(lob.reply_markup.inline_keyboard[2][0].callback_data, 'extra:' + a);
-  assert.equal(G(a).extra, true);
+  assert.equal(G(a).extra, 'hunter');
+  await press(1, 'extra:' + a); assert.equal(G(a).extra, 'cupid'); await press(1, 'extra:' + a); assert.equal(G(a).extra, 'random');   // the chip cycles (💘 check covers the labels)
   await press(1, 'extra:' + a); assert.match(take().find((x) => x.method === 'editMessageText').body.text, /\n⏳ อีก|✅ ครบแล้ว/); assert.equal(G(a).extra, false);
   await press(1, 'extra:' + a); take();
   // at 5 seats the deck is the default one
@@ -106,7 +107,7 @@ async function openRoom(host, chatId, n) {
   out = take(); assert.match(out.find((x) => x.method === 'editMessageText').body.text, /🎲 🏹 นักล่า แทน 👤 1 คน\n✅ ครบแล้ว/, 'the 6-seat note has no warning');
   await press(1, 'start:' + b); out = take(); takeQ();
   assert.match(out.find((x) => x.method === 'editMessageText').body.text, /🐺 2 · 🔮 1 · 🛡️ 1 · 🏹 1 · 👤 1$/, '6 seats: 🏹 in the deck line (pick 4A)');
-  assert.deepEqual(G(b).counts, { wolf: 2, seer: 1, guard: 1, witch: 0, hunter: 1, villager: 1 });
+  assert.deepEqual(G(b).counts, { wolf: 2, seer: 1, guard: 1, witch: 0, hunter: 1, cupid: 0, villager: 1 });
   const dealt = store.get(SP(b)).roles, hunterDealt = Object.keys(dealt).find((id) => dealt[id] === 'hunter');
   assert.ok(out.some((x) => x.body.chat_id === hunterDealt && x.body.text.startsWith(B.ROLE_CARD.hunter)), 'the hunter gets the 🏹 card');
   // now a known table: 501 🐺 502 🐺 503 🏹 504 🔮 505 🛡️ 506 👤
