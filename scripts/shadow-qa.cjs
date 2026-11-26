@@ -56,7 +56,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.ok(st.w > st.l * 1.3, '🥄🥄🥄 beats a random hand ' + JSON.stringify(st));
 
   // ---- phone doorway → lobby → a game ----
-  assert.equal(await page.$eval('#u-bw-chip', (e) => getComputedStyle(e).display), 'none', 'phone: no header chip');
+  assert.equal(await page.isVisible('#u-bw-chip'), false, 'phone: no header chip');
   assert.equal(await page.$eval('#sch-bw-btn', (e) => e.previousElementSibling.id), 'sch-count-btn', 'phone: after 🧊 in the Schedule games row');
   await page.evaluate(() => { localStorage.removeItem('shadowStats'); document.getElementById('sch-bw-btn').click(); });
   assert.equal(await page.$eval('#bwModal', (e) => getComputedStyle(e).display + e.classList.contains('lang-no-toggle')), 'flextrue');
@@ -116,7 +116,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.ok(await page.$eval('#bwModal .modal-content', (e) => e.scrollWidth <= e.clientWidth + 1), 'no sideways scroll at 320 px');
   await page.evaluate(() => BW.close());
   await page.setViewportSize({ width: 1024, height: 800 });
-  assert.equal(await page.$eval('#u-bw-chip', (e) => [getComputedStyle(e).display, e.nextElementSibling.id].join()), 'flex,u-count-chip', 'PC: ⚫ just left of 🧊');
+  await page.click('#u-games-chip');   // V101.378: on PC the games sit in the 🎮 menu (owner pick A)
+  assert.equal(await page.$eval('#u-bw-chip', (e) => [e.previousElementSibling.id, e.nextElementSibling.id].join()), 'u-count-chip,u-sn-chip', 'PC: ⚫ in the 🎮 menu between 🧊 and 🔢');
   // ?bw=1 (the 📤 card's button) opens the game
   await page.evaluate(() => BW.close()); await page.evaluate(() => applyTabDeepLink(new URLSearchParams('bw=1'))); await page.waitForSelector('#bw-start', { timeout: 2000 });
   await page.evaluate(() => BW.close());

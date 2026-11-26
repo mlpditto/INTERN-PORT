@@ -34,18 +34,27 @@ const disp = (page, sel) => page.evaluate(s => getComputedStyle(document.querySe
     const browser = await chromium.launch({ headless: true });
     try {
         const pc = await open(browser, 1280, false);
-        assert.equal(await disp(pc.page, '#u-cereal-chip'), 'flex', 'PC: the header 🥣 shows');
-        const r = await pc.page.evaluate(() => { const a = document.getElementById('u-cereal-chip').getBoundingClientRect(), b = document.getElementById('u-schedule-chip').getBoundingClientRect(); return { aw: a.width, ah: a.height, ar: a.right, bl: b.left, ay: Math.round(a.top + a.height / 2), by: Math.round(b.top + b.height / 2), sbw: b.width }; });
+        // V101.378 (owner pick A, mockup-pc-games-chip/): the games are one 🎮 circle left of 📅; 🥣 is the first row of its menu
+        assert.equal(await disp(pc.page, '#u-games-chip'), 'flex', 'PC: the header 🎮 shows');
+        assert.equal(await pc.page.isVisible('#u-cereal-chip'), false, 'the menu starts closed');
+        const r = await pc.page.evaluate(() => { const a = document.getElementById('u-games-chip').getBoundingClientRect(), b = document.getElementById('u-schedule-chip').getBoundingClientRect(); return { aw: a.width, ah: a.height, ar: a.right, bl: b.left, ay: Math.round(a.top + a.height / 2), by: Math.round(b.top + b.height / 2), sbw: b.width }; });
         assert.ok(r.aw === r.sbw && r.ah === r.aw, 'same circle as 📅: ' + JSON.stringify(r));
         assert.ok(r.ar <= r.bl && r.bl - r.ar < 16 && Math.abs(r.ay - r.by) <= 1, 'directly left of 📅 on the same row: ' + JSON.stringify(r));
         assert.equal(await disp(pc.page, '#sch-cereal-btn'), 'none', 'PC: gone from the Schedule goals row (moved, not copied)');
+        await pc.page.click('#u-games-chip');
+        assert.deepEqual(await pc.page.$$eval('#u-games-menu .btn-sm', (b) => b.map((x) => x.textContent.replace(/\s+/g, ''))), ['🥣Cerealนักสืบ2คน', '🐺หมาป่ากับบอท', '🧊นับไวนับรูป', '⚫ไพ่เงาดวลเลข', '🔢เลขลับทายเลข'], 'the menu: 🥣 🐺 🧊 ⚫ 🔢 with names');
+        assert.equal(await pc.page.getAttribute('#u-games-chip', 'aria-expanded'), 'true');
+        await pc.page.keyboard.press('Escape'); assert.equal(await pc.page.isVisible('#u-games-menu'), false, 'Esc closes it');
+        await pc.page.click('#u-games-chip'); await pc.page.mouse.click(5, 700); assert.equal(await pc.page.isVisible('#u-games-menu'), false, 'a tap outside closes it');
+        await pc.page.click('#u-games-chip');
         await pc.page.click('#u-cereal-chip');
+        assert.equal(await pc.page.isVisible('#u-games-menu'), false, 'picking a game closes the menu');
         assert.equal(await disp(pc.page, '#cerealModal'), 'flex', 'opens the game');
         assert.deepEqual(pc.errors, []);
         const ph = await open(browser, 390, true);
-        assert.equal(await disp(ph.page, '#u-cereal-chip'), 'none', 'phone: no header 🥣');
+        assert.equal(await disp(ph.page, '#u-games-wrap'), 'none', 'phone: no header 🎮 (and no 🥣)');
         assert.notEqual(await disp(ph.page, '#sch-cereal-btn'), 'none', 'phone: 🥣 shown (V101.368: in the games row under History)');
         assert.deepEqual(ph.errors, []);
-        console.log('cereal-header-qa: OK — PC: 🥣 circle left of 📅 opens the game, gone from Schedule; phone: in the games row under History');
+        console.log('cereal-header-qa: OK — PC: 🎮 circle left of 📅, its menu 🥣 🐺 🧊 ⚫ 🔢 (Esc / outside / a pick close it), 🥣 opens the game, gone from Schedule; phone: in the games row under History');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

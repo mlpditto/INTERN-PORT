@@ -30,11 +30,11 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
       noToggle: r.classList.contains('lang-no-toggle'), schGames: document.querySelectorAll('#sch-goals-box .sch-gb-fin').length, schKeeps: !!document.querySelector('#sch-goals-box #sch-fin-btn') };
   });
   const a = await row();
-  assert.deepEqual({ shown: a.shown, ids: a.ids, text: a.text, on: a.on }, { shown: 'grid', ids: ['sch-cereal-btn', 'sch-wolf-btn', 'sch-count-btn', 'sch-bw-btn'], text: ['🥣Cereal', '🐺หมาป่า', '🧊นับไว', '⚫ไพ่เงา'], on: ['cerealOpen()', 'wolfOpen()', 'countOpen()', 'bwOpen()'] }, 'phone: the games row, named, same ids + handlers');
+  assert.deepEqual({ shown: a.shown, ids: a.ids, text: a.text, on: a.on }, { shown: 'grid', ids: ['sch-cereal-btn', 'sch-wolf-btn', 'sch-count-btn', 'sch-bw-btn', 'sch-sn-btn'], text: ['🥣Cereal', '🐺หมาป่า', '🧊นับไว', '⚫ไพ่เงา', '🔢เลขลับ'], on: ['cerealOpen()', 'wolfOpen()', 'countOpen()', 'bwOpen()', 'secretOpen()'] }, 'phone: the games row, named, same ids + handlers');
   assert.ok(a.afterHistory && a.beforeFooter, 'under History, right above the version');
   assert.ok(a.oneLine && a.minH >= 44 && a.fits && a.noToggle, 'one line, ≥ 44 px, fits, Thai names shown ' + JSON.stringify(a));
   assert.equal(a.schGames, 1, 'the Schedule goals row keeps only 💰 (no game)'); assert.ok(a.schKeeps);
-  for (const [id, modal] of [['sch-cereal-btn', 'cerealModal'], ['sch-wolf-btn', 'wolfModal'], ['sch-count-btn', 'countModal'], ['sch-bw-btn', 'bwModal']]) {
+  for (const [id, modal] of [['sch-cereal-btn', 'cerealModal'], ['sch-wolf-btn', 'wolfModal'], ['sch-count-btn', 'countModal'], ['sch-bw-btn', 'bwModal'], ['sch-sn-btn', 'snModal']]) {
     await page.click('#' + id);
     assert.equal(await page.$eval('#' + modal, (m) => getComputedStyle(m).display), 'flex', id + ' opens ' + modal);
     await page.evaluate((m) => { document.getElementById(m).style.display = 'none'; }, modal);
@@ -43,8 +43,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   const n = await row(); assert.ok(n.oneLine && n.fits, '320 px: one line, nothing sideways ' + JSON.stringify(n));
   await page.setViewportSize({ width: 1024, height: 800 });
   assert.equal((await row()).shown, 'none', 'PC: the row hides');
-  assert.deepEqual(await page.evaluate(() => ['u-bw-chip', 'u-count-chip', 'u-wolf-chip', 'u-cereal-chip'].map((id) => getComputedStyle(document.getElementById(id)).display)), ['flex', 'flex', 'flex', 'flex'], 'PC: the header rail keeps the games');
+  assert.equal(await page.$eval('#u-games-chip', (e) => getComputedStyle(e).display), 'flex', 'PC: the header 🎮 keeps the games');
+  await page.click('#u-games-chip');
+  assert.deepEqual(await page.evaluate(() => ['u-cereal-chip', 'u-wolf-chip', 'u-count-chip', 'u-bw-chip', 'u-sn-chip'].map((id) => !!document.getElementById(id).offsetParent)), [true, true, true, true, true], 'PC: all 5 in the 🎮 menu');
   assert.deepEqual(errors, []);
   await browser.close();
-  console.log('games-row-qa: OK — phone: 🥣 Cereal · 🐺 หมาป่า · 🧊 นับไว · ⚫ ไพ่เงา under History, one line, 44 px, each opens its game, Schedule keeps 💰 only; 320 px; PC: row hidden, header rail kept');
+  console.log('games-row-qa: OK — phone: 🥣 Cereal · 🐺 หมาป่า · 🧊 นับไว · ⚫ ไพ่เงา · 🔢 เลขลับ (V101.378) under History, one line, 44 px, each opens its game, Schedule keeps 💰 only; 320 px; PC: row hidden, header rail kept');
 })().catch((e) => { console.error(e); process.exit(1); });

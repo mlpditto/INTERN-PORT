@@ -32,6 +32,10 @@ assert.deepEqual(r.boards.bw.all.map((x) => x.userId + x.v), ['a2', 'b1'], 'all 
 assert.deepEqual(r.boards.count.week.map((x) => x.userId + x.v), ['b60', 'a80'], '🧊 fastest 5/5 at 🥄🥄🥄 first; 4/5, 🥄🥄 and old plays without a level never count');
 assert.deepEqual(r.boards.count.all.map((x) => x.userId + x.v), ['a50', 'b60']);
 assert.deepEqual(R.board(P, 'bw', skip, true).map((x) => x.userId + x.v), ['a2', 'b1', 'cnull'], 'the admin list keeps who never won, last');
+// V101.378 🔢 เลขลับ: fewest 🎫, 🧠 (h4) games only
+const SP = [{ userId: 'a', game: 'secret', mode: 'h4', win: 'w', score: '9', endedAt: MON + 1 }, { userId: 'b', game: 'secret', mode: 'h4', win: 'w', score: '6', endedAt: MON + 2 },
+  { userId: 'c', game: 'secret', mode: 'h1', win: 'w', score: '2', endedAt: MON + 1 }, { userId: 'a', game: 'secret', mode: 'h4', win: 'w', score: '7', endedAt: MON + 3 }];
+assert.deepEqual(R.rank(SP, MON + 1000).boards.secret.week.map((x) => x.userId + x.v), ['b6', 'a7'], '🔢 fewest 🎫 at 🧠 first; 🟩 never counts');
 const mine = R.forIntern(r, 'c', (id) => ({ name: 'N' + id, pic: '' }));
 assert.deepEqual(mine.bw.week, { top: [{ v: 1, name: 'Nb', pic: '' }, { v: 1, name: 'Na', pic: '' }], me: null });
 assert.deepEqual(R.forIntern(r, 'a', (id) => ({ name: id })).count.all.me, { r: 1, v: 50 });
