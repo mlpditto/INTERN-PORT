@@ -91,7 +91,7 @@
     function lobbyHtml() {
         return '<div class="sn"><div class="sn-top"><h3>🔢 เลขลับ · 🤖</h3>' + HQ + X + '</div>'
             + (window.GameTop ? GameTop.line('secret') : '')
-            + '<div class="sn-note">🤖 คิดเลข 1–100 · ถามได้ทีละข้อ 🎫 1 ใบ · ใช้ 🎫 น้อยสุดชนะ</div>'
+            + '<div class="sn-note">🤖 คิดเลข 1–100 · ถามข้อละ 🎫 1 · ใช้น้อยสุดชนะ</div>'
             + '<div class="sn-lvs" role="group" aria-label="Help">' + [1, 2, 3, 4].map(function (k) { var b = get('snBest_h' + k); return '<button type="button" id="sn-h' + k + '" class="' + (help === k ? 'on' : '') + '" aria-pressed="' + (help === k) + '" onclick="SN.help(' + k + ')">' + HELP[k][0] + ' ' + HELP[k][1] + (b ? ' · ' + b + '🎫' : '') + '</button>'; }).join('') + '</div>'
             + '<button type="button" class="sn-go" id="sn-start" onclick="SN.start()">▸ เริ่ม</button></div>';
     }
