@@ -27,7 +27,7 @@
             + '#bwModal .bwo-row{display:flex;align-items:center;gap:8px;border:1px solid #3f3a74;border-radius:14px;padding:9px 11px;background:#1d1a3d;color:#e9d5ff;font-weight:800;text-align:left;width:100%}'
             + '#bwModal .bwo-row small{display:block;opacity:.7;font-weight:600;font-size:.78em}#bwModal .bwo-row .go{margin-left:auto;color:#fbbf24;white-space:nowrap}#bwModal .bwo-row .wait{margin-left:auto;opacity:.75;white-space:nowrap}'
             + '#bwModal .bwo-code{display:flex;gap:8px;justify-content:center}#bwModal .bwo-code span{width:48px;height:58px;border-radius:12px;background:#1d1a3d;border:1px solid #3f3a74;color:#fff;font-size:30px;font-weight:900;display:flex;align-items:center;justify-content:center}'
-            + '#bwModal .bwo-join{display:flex;gap:6px}#bwModal .bwo-join input{flex:1;min-width:0;border-radius:12px;border:1px solid #3f3a74;background:#0f0d24;color:#fff;padding:10px;font-size:16px;letter-spacing:4px;text-align:center}'
+            + '#bwModal .bwo-join{display:flex;gap:6px}#bwModal .bwo-join input{flex:1;min-width:0;border-radius:12px;border:1px solid #3f3a74;background:#0f0d24;color:#fff;padding:10px;font-size:16px;letter-spacing:4px;text-align:center}#bwModal .bwo-join input::placeholder{letter-spacing:normal}'
             + '#bwModal .bwo-err{color:#fca5a5;font-weight:800;text-align:center;font-size:.85em}#bwModal .bwo-vs{display:flex;align-items:center;gap:4px;font-size:.85em}';
         document.head.appendChild(s);
     }
@@ -68,7 +68,7 @@
                     + (myTurn(x) ? '<b class="go">▶ ตาคุณ</b>' : '<span class="wait">⏳ รอเขา</span>') + '</button>';
             });
             if (open) h += '<div class="bwo-row" id="bwo-open">🔑 ' + open.code + '<span class="wait">รอเพื่อน…</span><button type="button" class="bw-snd" onclick="BWOnline.invite(\'' + open.id + '\')" aria-label="Invite again in LINE">📤</button><button type="button" class="bw-snd" onclick="BWOnline.cancel(\'' + open.id + '\')" aria-label="Close the room">✕</button></div>';
-            h += '<div class="bw-note">ตาละครั้ง ไม่ต้องออนไลน์พร้อมกัน · ถึงตาเพื่อน กด 📤 สะกิด</div>' + joinRow()
+            h += '<div class="bw-note">ตาละครั้ง · ถึงตาเพื่อน กด 📤 สะกิด</div>' + joinRow()
                 + '<button type="button" class="bw-go" id="bwo-new" onclick="BWOnline.create(false)"' + (st.busy ? ' disabled' : '') + '>📤 ชวนเพื่อนใน LINE</button>';
             return h;
         }
