@@ -5,7 +5,7 @@
    (snBest_h<n>); game_plays: game 'secret', mode 'h<n>', win 'w', score = 🎫 (🏆 Top 3 counts 🧠 only). window.SN, window.secretOpen. */
 (function () {
     'use strict';
-    var MAX = 100, rng = Math.random, g = null, help = 1, toast = null, pend = null, cross = false;
+    var MAX = 100, rng = Math.random, g = null, help = 1, toast = null, pend = null, cross = false, multi = false;
     var HELP = { 1: ['🟩', 'ขีดให้'], 2: ['✏️', 'ขีดเอง'], 3: ['📏', 'แถบช่วง'], 4: ['🧠', 'ไม่มีตัวช่วย'] };
     // the question menu: [id, chip, needs numbers, test(n, a, b), the asked line]
     var QS = [
@@ -42,16 +42,18 @@
         ['🤖 คิดเลขลับไว้ 1 ตัว<br>ตั้งแต่ 1 ถึง 100', 'The bot keeps a number from 1 to 100.', function () { return '<div class="sn-big">🤖 💭 <b>?</b></div>'; }],
         ['แตะคำถาม เช่น “มากกว่า 50 ?”<br>🤖 ตอบจริงเสมอ · ใช้ 🎫 1 ใบ', 'Ask from the menu — always a true answer, 1 🎫.', function () { return '<div class="sn-log"><div><span>มากกว่า 50 ?</span><b class="no">✗ ไม่</b></div><div><span>เลขคู่ ?</span><b class="yes">✓ ใช่</b></div></div>'; }],
         ['ตารางขีดเลขที่ตัดทิ้งได้ให้<br>แตะเลขที่เหลือ = ทาย · ผิดเสีย 🎫 1', 'The board crosses out; tap a number to guess.', function () { var h = ''; for (var n = 1; n <= 30; n++) h += '<span class="' + (n % 2 || n < 20 ? 'out' : '') + '">' + n + '</span>'; return '<div class="sn-grid sm">' + h + '</div>'; }],
-        ['ใช้ 🎫 น้อยสุด = เก่งสุด<br>อยากยากขึ้น: ✏️ ขีดเอง · 📏 · 🧠', 'Fewest 🎫 wins · harder: cross out yourself, or no help.', function () { return '<div class="sn-lvs">' + [1, 2, 3, 4].map(function (k) { return '<span class="' + (k === 1 ? 'on' : '') + '">' + HELP[k][0] + ' ' + HELP[k][1] + '</span>'; }).join('') + '</div>'; }]
+        ['ใช้ 🎫 น้อยสุด = เก่งสุด<br>อยากยากขึ้น: ✏️ ขีดเอง · 📏 · 🧠', 'Fewest 🎫 wins · harder: cross out yourself, or no help.', function () { return '<div class="sn-lvs">' + [1, 2, 3, 4].map(function (k) { return '<span class="' + (k === 1 ? 'on' : '') + '">' + HELP[k][0] + ' ' + HELP[k][1] + '</span>'; }).join('') + '</div>'; }],
+        // V101.380 🌐 หลายคน (secret-online.js)
+        ['🌐 เล่นกับเพื่อน: ทุกคนมีเลขลับ<br>ตาคุณถาม 1 คน 1 ข้อ · คำตอบเห็นคนเดียว<br>ทายถูก ⭐ +3 · เพื่อนออก', 'With friends: ask one, only you see the answer; a right guess ⭐ +3.', function () { return '<div class="sn-lvs"><span>🧑‍⚕️ 🎫 6</span><span class="on">👩‍⚕️ ?</span><span>🧑 🎫 5 · ⭐ 3</span></div>'; }]
     ];
     function tourHtml() {
         var s = TOUR[tour];
-        return '<div class="sn sn-tour" id="sn-tour"><div class="sn-top"><h3>❓ วิธีเล่น</h3><span class="sn-pill">' + (tour + 1) + '/4</span>'
+        return '<div class="sn sn-tour" id="sn-tour"><div class="sn-top"><h3>❓ วิธีเล่น</h3><span class="sn-pill">' + (tour + 1) + '/' + TOUR.length + '</span>'
             + '<button type="button" class="sn-x" id="sn-voice" onclick="SN.voice()" aria-label="Sound" aria-pressed="' + vOn() + '">' + (vOn() ? '🔊' : '🔇') + '</button>'
             + '<button type="button" class="sn-x" onclick="SN.tourEnd()" aria-label="Close the tour">✕</button></div>'
             + '<div class="sn-say" id="sn-tcap">' + s[0] + '<small>' + s[1] + '</small></div>' + s[2]()
-            + '<div class="sn-tnav"><button type="button" class="sn-skip" onclick="SN.tourEnd()">ข้าม</button><div class="sn-dots">' + [0, 1, 2, 3].map(function (n) { return '<i class="' + (n === tour ? 'on' : '') + '"></i>'; }).join('') + '</div>'
-            + '<button type="button" class="sn-go" id="sn-tnext" onclick="SN.tourNext()">' + (tour === 3 ? '▸ เริ่ม' : 'ถัดไป ▸') + '</button></div></div>';
+            + '<div class="sn-tnav"><button type="button" class="sn-skip" onclick="SN.tourEnd()">ข้าม</button><div class="sn-dots">' + TOUR.map(function (x, n) { return n; }).map(function (n) { return '<i class="' + (n === tour ? 'on' : '') + '"></i>'; }).join('') + '</div>'
+            + '<button type="button" class="sn-go" id="sn-tnext" onclick="SN.tourNext()">' + (tour === TOUR.length - 1 ? '▸ เริ่ม' : 'ถัดไป ▸') + '</button></div></div>';
     }
 
     // ---- drawing -----------------------------------------------------------------------------------------------------------------
@@ -89,11 +91,13 @@
     var X = '<button type="button" class="sn-x" onclick="SN.close()" aria-label="Close">✕</button>';
     var HQ = '<button type="button" class="sn-x" id="sn-help" onclick="SN.tour()" aria-label="How to play" title="วิธีเล่น">❓</button>';
     function lobbyHtml() {
-        return '<div class="sn"><div class="sn-top"><h3>🔢 เลขลับ · 🤖</h3>' + HQ + X + '</div>'
+        var M = multi && window.SNOnline;   // V101.380
+        return '<div class="sn"><div class="sn-top"><h3>🔢 เลขลับ</h3>' + HQ + X + '</div>'
             + (window.GameTop ? GameTop.line('secret') : '')
-            + '<div class="sn-note">🤖 คิดเลข 1–100 · ถามข้อละ 🎫 1 · ใช้น้อยสุดชนะ</div>'
+            + (window.SNOnline ? '<div class="sn-lvs" role="group" aria-label="Mode">' + [[0, '🤖 ฝึกกับบอท'], [1, '🌐 หลายคน']].map(function (k) { var on = !!k[0] === !!multi; return '<button type="button" id="sn-mode-' + k[0] + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" onclick="SN.multi(' + k[0] + ')">' + k[1] + '</button>'; }).join('') + '</div>' : '')
+            + (M ? SNOnline.lobbyHtml() + '</div>' : '<div class="sn-note">🤖 คิดเลข 1–100 · ถามข้อละ 🎫 1 · ใช้น้อยสุดชนะ</div>'
             + '<div class="sn-lvs" role="group" aria-label="Help">' + [1, 2, 3, 4].map(function (k) { var b = get('snBest_h' + k); return '<button type="button" id="sn-h' + k + '" class="' + (help === k ? 'on' : '') + '" aria-pressed="' + (help === k) + '" onclick="SN.help(' + k + ')">' + HELP[k][0] + ' ' + HELP[k][1] + (b ? ' · ' + b + '🎫' : '') + '</button>'; }).join('') + '</div>'
-            + '<button type="button" class="sn-go" id="sn-start" onclick="SN.start()">▸ เริ่ม</button></div>';
+            + '<button type="button" class="sn-go" id="sn-start" onclick="SN.start()">▸ เริ่ม</button></div>');
     }
     function askHtml() {
         var Q = pend ? q(pend) : null, h = '<div class="sn-chips" role="group" aria-label="Questions">' + QS.map(function (x) { return '<button type="button" data-q="' + x[0] + '" class="' + (pend === x[0] ? 'on' : '') + '" onclick="SN.pick(\'' + x[0] + '\')">' + x[1] + '</button>'; }).join('') + '</div>';
@@ -134,7 +138,7 @@
     }
     function used() { return g.log.length + g.wrong.length; }
     function render() {
-        var m = root(); document.getElementById('sn-body').innerHTML = tour >= 0 ? tourHtml() : !g ? lobbyHtml() : g.end ? endHtml() : playHtml(); m.style.display = 'flex';
+        var m = root(); document.getElementById('sn-body').innerHTML = tour >= 0 ? tourHtml() : window.SNOnline && SNOnline.active() ? SNOnline.html() : !g ? lobbyHtml() : g.end ? endHtml() : playHtml(); m.style.display = 'flex';
         if (g && tour < 0 && window.GameLog) GameLog.see('secret', { id: g.id, n: used(), done: g.end, mode: 'h' + help, win: g.end ? 'w' : null, score: String(used()), res: [] });
     }
     function guess(n) {
@@ -149,10 +153,12 @@
     window.SN = {
         open: function () { g = null; toast = null; if (!seen()) return SN.tour(); render(); },
         tour: function () { tour = 0; render(); say(0); },
-        tourNext: function () { if (tour < 0) return; if (tour < 3) { tour++; render(); say(tour); } else SN.tourEnd(); },
+        tourNext: function () { if (tour < 0) return; if (tour < TOUR.length - 1) { tour++; render(); say(tour); } else SN.tourEnd(); },
         tourEnd: function () { hush(); tour = -1; try { localStorage.setItem('snTourSeen', '1'); } catch (e) { } render(); },
         voice: function () { try { localStorage.setItem('snVoice', vOn() ? 'off' : 'on'); } catch (e) { } if (vOn() && tour >= 0) say(tour); else hush(); render(); },
         help: function (k) { help = HELP[k] ? k : 1; render(); },
+        multi: function (v) { multi = !!v; g = null; render(); },   // V101.380 🤖 │ 🌐
+        _render: function () { var m = document.getElementById('snModal'); if (m && m.style.display === 'flex') render(); },
         lobby: function () { g = null; toast = null; render(); },
         start: function () { g = { id: Date.now().toString(36) + Math.floor(rng() * 1e6).toString(36), n: 1 + Math.floor(rng() * MAX), log: [], wrong: [], mine: [], end: false, at: Date.now() }; pend = null; cross = false; toast = null; render(); },
         pick: function (id) { if (!g || g.end || !q(id)) return; pend = id; toast = null; render(); var f = document.getElementById('sn-a'); if (f) f.focus(); if (!q(id)[2]) SN.ask(); },
@@ -166,7 +172,7 @@
         cell: function (n) { if (!g || g.end) return; if (help === 2 && cross) { var i = g.mine.indexOf(n); if (i < 0) g.mine.push(n); else g.mine.splice(i, 1); return render(); } guess(n); },
         mode: function (c) { cross = !!c; render(); },
         guessBox: function () { var v = +(document.getElementById('sn-g') || {}).value; if (!Number.isInteger(v) || v < 1 || v > MAX) { toast = 'ใส่เลข 1–100'; return render(); } guess(v); },
-        close: function () { hush(); tour = -1; g = null; var m = document.getElementById('snModal'); if (m) m.style.display = 'none'; },
+        close: function () { if (window.SNOnline) SNOnline.close(); hush(); tour = -1; g = null; var m = document.getElementById('snModal'); if (m) m.style.display = 'none'; },
         // for scripts/secret-qa.cjs
         _g: function () { return g; }, _rng: function (f) { rng = f; }, _live: function () { return live(); }, _qs: QS
     };

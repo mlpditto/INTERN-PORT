@@ -45,7 +45,7 @@ async function handle(request, deps) {
     const authUid = request.auth.uid, d = request.data || {}, now = deps.now;
     const fail = (c, msg) => { throw new HttpsError('failed-precondition', msg, { code: c }); };
     const bad = (msg) => { throw new HttpsError('invalid-argument', msg); };
-    if (d.game !== 'bw') bad('game');
+    if (d.game !== 'bw' && d.game !== 'secret') bad('game');
 
     async function me() {   // the LINE identity behind the anonymous Firebase user (as cerealAct / askNika)
         const link = await db.collection('user_auth_links').doc(authUid).get();
@@ -56,12 +56,13 @@ async function handle(request, deps) {
         const x = u.data() || {};
         return { uid, authUid, name: String(x.nickName || x.firstName || x.displayName || 'Intern').slice(0, 20), pic: /^https:\/\//.test(x.pictureUrl || '') ? String(x.pictureUrl).slice(0, 500) : '' };
     }
+    if (d.game === 'secret') return require('./room-secret.js').handle(request, deps, me);   // V101.380 🔢 เลขลับ หลายคน
     const rooms = db.collection('rooms');
 
     if (d.action === 'create') {
         const p = await me(), live = d.live === true;
-        const open = await rooms.where('creatorAuth', '==', authUid).where('status', '==', 'lobby').limit(1).get();
-        if (!open.empty) {   // one open room per creator: switch its kind instead of piling rooms up
+        const open = { docs: (await rooms.where('creatorAuth', '==', authUid).where('status', '==', 'lobby').limit(4).get()).docs.filter((x) => (x.data().game || 'bw') === 'bw') };
+        if (open.docs.length) {   // one open room per creator: switch its kind instead of piling rooms up
             const r = open.docs[0];
             if (!!r.data().live !== live) await r.ref.update({ live, updatedAt: now });
             return { roomId: r.id, code: r.data().code, name: p.name, existing: true };
@@ -82,9 +83,9 @@ async function handle(request, deps) {
         const c = String(d.code || '').replace(/\D/g, '');
         if (c.length !== 4) bad('code');
         const p = await me();
-        const q = await rooms.where('code', '==', c).where('status', '==', 'lobby').limit(1).get();
-        if (q.empty) fail('no-room', 'No open room with that code');
-        const ref = q.docs[0].ref;
+        const q = (await rooms.where('code', '==', c).where('status', '==', 'lobby').limit(4).get()).docs.filter((x) => (x.data().game || 'bw') === 'bw');
+        if (!q.length) fail('no-room', 'No open room with that code');
+        const ref = q[0].ref;
         return db.runTransaction(async (tx) => {
             const g = (await tx.get(ref)).data();
             if (g.status !== 'lobby') fail('started', 'Already started');

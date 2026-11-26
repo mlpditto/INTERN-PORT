@@ -34,3 +34,17 @@ File: `public/secret.js` (game, CSS and tour; `window.SN`, `window.secretOpen`).
 
 - Audio is stubbed in QA, so real sound needs a phone.
 - The 🏆 line shows only after `gameTop` answers (signed in).
+
+## 🌐 หลายคน (V101.380)
+
+Owner 2026-11-27: "Yes, start it". Picks: A, player cards + a grid of what I know about that player; the host picks ⏱ 1 ชม. or ⚡ 60 วิ a turn (mockup-secret-multi/).
+- **Referee:** `functions/room-secret.js`, reached through `roomAct` with `game: 'secret'`. 2–6 players, each with a different 1–100 and 🎫 6.
+  - On your turn, ask one person one question (🎫 −1). Only the asker gets the answer, in `rooms/{id}/hand/{login}`. Everyone sees who asked whom what.
+  - Or guess: right is ⭐ +3 and that player is out (their number is then shown); wrong is ⭐ −1 and 🎫 −1.
+  - The game ends when one player is left in, or nobody still in has a 🎫. Most ⭐ wins and every number is revealed. A late turn is skipped (`claim`).
+- **Phone:** `public/secret-online.js`. The lobby has a 🤖 ฝึกกับบอท │ 🌐 หลายคน rail, and a room joins by code or the 📤 link `?sn=<code>`.
+  - The turn screen shows player cards (🎫 · ⭐) above the target's grid. Tap a number to guess it.
+  - `game_plays` mode is `online` / `live`. These games stay out of 🏆, which counts 🧠 practice only.
+- **Tutorial:** a 5th scene about playing with friends, with voice `secret-voice/t5.mp3`.
+- QA: `scripts/room-secret-check.cjs` (the referee: 200 random games, answers only to the asker, refusals), `scripts/secret-online-qa.cjs` (three phones through the real referee).
+- **Deploy:** `firebase deploy --only functions:roomAct`. The rules are unchanged; `rooms` already exists.
