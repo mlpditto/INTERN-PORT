@@ -4,7 +4,9 @@
 // player and edits that same lobby message; a second /werewolf in the same chat is refused; host-only ▸ เริ่ม needs 5;
 // 6 players get the right deck, each DM card names only their own role (wolves see each other); NO group text ever holds a
 // role word; full / started / unknown / other-room joins are refused; ✕ closes the room and frees the chat and players;
-// /werewolf@<bot> works; transactions read before they write (real Firestore requires it).
+// /werewolf@<bot> works; transactions read before they write (real Firestore requires it). Names (owner pick B): a plain DM
+// renames you in a lobby (lobby line + host tag follow, duplicates refused, blanks ignored), is kept for the next room, and
+// mid-game only changes the next room; freeing a player keeps the name (set merge).
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -27,7 +29,7 @@ function docRef(p) {
   return {
     id: p.split('/').pop(), path: p,
     get: async () => ({ id: p.split('/').pop(), exists: store.has(p), data: () => clone(store.get(p)) }),
-    set: async (v) => { store.set(p, clone(v)); },
+    set: async (v, o) => { store.set(p, o && o.merge && store.has(p) ? Object.assign(clone(store.get(p)), clone(v)) : clone(v)); },
     update: async (v) => { assert.ok(store.has(p), 'update of a missing doc ' + p); store.set(p, Object.assign(clone(store.get(p)), clone(v))); },
     collection: (n) => colRef(p + '/' + n),
   };
@@ -39,7 +41,7 @@ const db = {
     const writes = [];
     const tx = {
       get: (ref) => { assert.equal(writes.length, 0, 'transaction read after a write (' + ref.path + ')'); return ref.get(); },
-      set: (ref, v) => writes.push(() => ref.set(v)),
+      set: (ref, v, o) => writes.push(() => ref.set(v, o)),
       update: (ref, v) => writes.push(() => ref.update(v)),
     };
     const out = await fn(tx);
@@ -102,6 +104,20 @@ const ROLE_WORDS = /คุณคือ|ผู้หยั่งรู้|บอ�
     assert.match(out[1].body.text, new RegExp('👥 ' + n + '/10'));
   }
   assert.match(out[1].body.text, /Pond, Mint, Beam, Fah/);
+  assert.match(out[0].body.text, /🏷 ชื่อในเกม: Fah\nเปลี่ยน\? พิมพ์ชื่อใหม่/, 'the join DM shows the name and how to change it');
+
+  // a plain DM renames you (owner pick B): the lobby line follows, duplicates are refused, blanks ignored, kept for next time
+  await dm(1, '  แนน   ไง ');
+  out = take();
+  assert.equal(out[0].body.text, '🏷 ชื่อในเกม: แนน ไง · จำไว้ให้เกมหน้าด้วย');
+  assert.equal(out[1].method, 'editMessageText'); assert.match(out[1].body.text, /👥 4\/10 · แนน ไง, Mint, Beam, Fah/);
+  assert.equal(store.get('wolf_tg/501').name, 'แนน ไง'); assert.equal(store.get('wolf_tg/501').game, code, 'merge keeps the room');
+  await dm(2, 'แนน ไง'); out = take();
+  assert.equal(out.length, 1); assert.match(out[0].body.text, /มีคนชื่อ แนน ไง ในห้องแล้ว/);
+  assert.equal(store.get('wolf_games/' + code).players['502'].name, 'Mint');
+  await dm(1, '   '); assert.equal(take().length, 0, 'blank text is ignored');
+  await dm(8, 'โบว์'); assert.equal(take()[0].body.text, '🏷 ชื่อในเกม: โบว์ · ใช้ตอนเข้าห้องครั้งหน้า');
+  await dm(1, '/whatever'); assert.equal(take().length, 0, 'an unknown command is not a name');
   await dm(2, '/start ' + code);
   assert.match(take()[0].body.text, /อยู่ในห้อง .* แล้ว/, 'joining twice is harmless');
   assert.equal(Object.keys(store.get('wolf_games/' + code).players).length, 4);
@@ -116,7 +132,7 @@ const ROLE_WORDS = /คุณคือ|ผู้หยั่งรู้|บอ�
 
   // only the host starts
   await press(2, 'start:' + code);
-  assert.match(take()[0].body.text, /เฉพาะหัวห้อง \(Pond\)/);
+  assert.match(take()[0].body.text, /เฉพาะหัวห้อง \(แนน ไง\)/, 'the host tag follows the rename');
   assert.equal(store.get('wolf_games/' + code).status, 'lobby');
 
   failDm.add('506');
@@ -146,6 +162,10 @@ const ROLE_WORDS = /คุณคือ|ผู้หยั่งรู้|บอ�
   assert.equal(warn.length, 1); assert.match(warn[0].body.text, /ส่ง DM ไม่ถึง: Nam/, 'a failed DM is named in the group');
   failDm.clear();
 
+  // mid-game a new name waits for the next room
+  await dm(2, 'มิ้นท์'); assert.equal(take()[0].body.text, '🏷 ชื่อในเกม: มิ้นท์ · เกมนี้เริ่มแล้ว ใช้เกมหน้า');
+  assert.equal(store.get('wolf_games/' + code).players['502'].name, 'Mint'); assert.equal(store.get('wolf_tg/502').name, 'มิ้นท์');
+
   // late join, a second /werewolf while playing, start twice
   await dm(7, '/start ' + code);
   assert.match(take()[0].body.text, /เริ่มเกมไปแล้ว/);
@@ -166,14 +186,20 @@ const ROLE_WORDS = /คุณคือ|ผู้หยั่งรู้|บอ�
   assert.match(out.find((x) => x.method === 'editMessageText').body.text, /ยกเลิกแล้ว/);   // Phase 3: ✕ mid-game edits the start
   assert.match(out.find((x) => x.method === 'sendMessage' && x.body.chat_id === '-1001').body.text, /✕ ยกเลิกเกม/);   // + a new line
   assert.equal(store.get('wolf_tg/503').game, null);
+  assert.equal(store.get('wolf_tg/502').name, 'มิ้นท์', 'freeing a player keeps the name');
   await dm(3, '/start ' + code2); assert.match(take()[0].body.text, /เข้าห้อง .* ที่นั่ง 1/);
   await press(1, 'cancel:' + code); assert.match(take()[0].body.text, /ปิดแล้ว/);
-  await say(user(1), GROUP, '/werewolf'); assert.match(take()[0].body.text, /ห้อง [A-Z0-9]{6}\n👥 0\/10/, 'a new room after ✕');
+  await say(user(1), GROUP, '/werewolf'); out = take(); assert.match(out[0].body.text, /ห้อง [A-Z0-9]{6}\n👥 0\/10/, 'a new room after ✕');
+  const code3 = /ห้อง ([A-Z0-9]{6})/.exec(out[0].body.text)[1];
+  await press(2, 'start:' + code3); assert.match(take()[0].body.text, /เฉพาะหัวห้อง \(แนน ไง\)/, 'a new room takes the stored host name');
 
   // full room: 10 seats, the 11th is refused and the join button goes away
   for (let n = 1; n <= 10; n++) await dm(n === 3 ? 11 : n, '/start ' + code2);
   out = take();
   assert.match(out.pop().body.text, /เต็มแล้ว/);
+  assert.equal(store.get('wolf_games/' + code2).players['502'].name, 'มิ้นท์', 'the stored name is used at the next join');
+  assert.equal(store.get('wolf_games/' + code2).players['508'].name, 'โบว์');
+  assert.match(out.find((x) => x.method === 'sendMessage' && x.body.chat_id === '502').body.text, /ชื่อในเกม: มิ้นท์/);
   const last = out.filter((x) => x.method === 'editMessageText').pop().body;
   assert.match(last.text, /👥 10\/10/);
   assert.ok(!last.reply_markup.inline_keyboard[0].some((b) => b.url), 'no ▸ เข้าร่วม at 10/10');
@@ -187,5 +213,5 @@ const ROLE_WORDS = /คุณคือ|ผู้หยั่งรู้|บอ�
   await B.handle({ callback_query: { id: 'x', from: user(1), data: 'nope' } }, deps());
   assert.ok(take().every((x) => x.method === 'answerCallbackQuery'));
 
-  console.log('wolf-bot-check: OK (webhook guard, rules, lobby, deep-link join, host start, 6 role DMs, no group leak, refusals, ✕, 10/10)');
+  console.log('wolf-bot-check: OK (webhook guard, rules, lobby, deep-link join, names by DM, host start, 6 role DMs, no group leak, refusals, ✕, 10/10)');
 })().catch((e) => { console.error(e); process.exit(1); });

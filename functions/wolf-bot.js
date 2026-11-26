@@ -14,6 +14,9 @@
 // handle(update, deps) / tick(deps): deps = { db, tg(method, body), botName(), now, rng }. Roles live only in
 // wolf_games/{code}/secret/state and in each player's own DM — never in a group text before the game is over.
 // Messages are plain text (no parse_mode), so a player's name can never inject markup.
+// Names (2026-11-26, owner pick B): a player joins under their Telegram name, and any plain text they DM the bot becomes
+// their in-game name — in a lobby it renames them at once (the lobby line and the host tag follow), otherwise it is kept
+// in wolf_tg/{tgId}.name for the next room. 24 chars, one line, no duplicate in the same room; never changeable mid-game.
 'use strict';
 const W = require('./wolf-rules');
 
@@ -44,6 +47,8 @@ const RULES = [   // owner pick R1: a line per role + the flow + the win rule, p
 const REMIND = (code) => '💤 ไม่ได้กด 2 รอบติดแล้ว · ยังเล่นอยู่ไหม?\nกดในข้อความถัดไปได้เลย · ห้อง ' + code;   // owner pick D1
 
 const nameOf = (u) => (((u.first_name || '') + ' ' + (u.last_name || '')).trim() || u.username || 'ผู้เล่น').slice(0, 24);
+const cleanName = (s) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, 24);
+const hostNm = (g) => ((g.players || {})[g.host] || {}).name || g.hostName;   // the host may have renamed since opening the room
 const seated = (g) => Object.entries(g.players || {}).sort((a, b) => a[1].seat - b[1].seat);
 const isGroup = (chat) => chat && (chat.type === 'group' || chat.type === 'supergroup');
 const rows2 = (btns) => { const r = []; for (let i = 0; i < btns.length; i += 2) r.push(btns.slice(i, i + 2)); return r; };
@@ -104,13 +109,14 @@ async function openRoom(msg, deps) {
       const g = await tx.get(db.collection('wolf_games').doc(c.data().game));
       if (g.exists && !['over', 'cancelled'].includes(g.data().status)) return { busy: g.data() };
     }
+    const ht = await tx.get(db.collection('wolf_tg').doc(host));
     let code = null;
     for (let i = 0; i < 8 && !code; i++) {
       let k = ''; for (let j = 0; j < 6; j++) k += CODE_ABC[Math.floor(deps.rng() * CODE_ABC.length)];
       if (!(await tx.get(db.collection('wolf_games').doc(k))).exists) code = k;
     }
     if (!code) throw new Error('no free code');
-    const g = { code, chatId, host, hostName: nameOf(msg.from), status: 'lobby', players: {}, talkSec: W.TALK_DEFAULT, round: 0, msgId: null, deadline: null, createdAt: deps.now, updatedAt: deps.now };
+    const g = { code, chatId, host, hostName: (ht.exists && ht.data().name) || nameOf(msg.from), status: 'lobby', players: {}, talkSec: W.TALK_DEFAULT, round: 0, msgId: null, deadline: null, createdAt: deps.now, updatedAt: deps.now };
     tx.set(db.collection('wolf_games').doc(code), g);
     tx.set(chatRef, { game: code, updatedAt: deps.now });
     return { g };
@@ -143,10 +149,39 @@ async function join(msg, code, deps) {
       if (other.exists && !['over', 'cancelled'].includes(other.data().status)) return { say: '⛔ คุณอยู่ห้อง ' + t.data().game + ' อยู่ · จบห้องนั้นก่อน' };
     }
     const seat = Math.max(0, ...Object.values(d.players).map((p) => p.seat)) + 1;
-    d.players[me] = { name: nameOf(msg.from), seat, alive: true };
+    const name = (t.exists && t.data().name) || nameOf(msg.from);
+    d.players[me] = { name, seat, alive: true };
     tx.update(gRef, { players: d.players, updatedAt: deps.now });
-    tx.set(tgRef, { game: code, updatedAt: deps.now });
-    return { say: '✅ เข้าห้อง ' + code + ' แล้ว · ที่นั่ง ' + seat + '\nรอหัวห้องกด ▸ เริ่ม แล้วบทจะมาทางนี้', g: d };
+    tx.set(tgRef, { game: code, updatedAt: deps.now }, { merge: true });   // keep .name
+    return { say: '✅ เข้าห้อง ' + code + ' แล้ว · ที่นั่ง ' + seat + ' · รอหัวห้องกด ▸ เริ่ม\n🏷 ชื่อในเกม: ' + name + '\nเปลี่ยน? พิมพ์ชื่อใหม่มาเลย (ก่อนเกมเริ่ม) · จำไว้ให้เกมหน้า', g: d };
+  });
+  await safe(deps, 'sendMessage', { chat_id: me, text: res.say });
+  if (res.g && res.g.msgId) await safe(deps, 'editMessageText', Object.assign({ chat_id: res.g.chatId, message_id: res.g.msgId }, lobbyView(res.g, bot)));
+}
+
+// ---- a plain DM = the player's in-game name (owner pick B, 2026-11-26) ---------------------------------------------------
+async function rename(msg, deps) {
+  const { db } = deps;
+  const me = String(msg.from.id), name = cleanName(msg.text);
+  if (!name) return;
+  const bot = await deps.botName();
+  const tgRef = db.collection('wolf_tg').doc(me);
+  const res = await db.runTransaction(async (tx) => {
+    const t = await tx.get(tgRef);
+    const code = t.exists ? t.data().game : null;
+    const gRef = code ? db.collection('wolf_games').doc(code) : null;
+    const g = gRef ? await tx.get(gRef) : null;
+    const d = g && g.exists ? g.data() : null;
+    const mine = !!(d && d.players[me]);
+    if (mine && d.status === 'lobby') {
+      if (seated(d).some(([id, p]) => id !== me && p.name === name)) return { say: '⚠️ มีคนชื่อ ' + name + ' ในห้องแล้ว · เลือกชื่ออื่น' };
+      d.players[me].name = name;
+      tx.update(gRef, { players: d.players, updatedAt: deps.now });
+      tx.set(tgRef, { name, updatedAt: deps.now }, { merge: true });
+      return { say: '🏷 ชื่อในเกม: ' + name + ' · จำไว้ให้เกมหน้าด้วย', g: d };
+    }
+    tx.set(tgRef, { name, updatedAt: deps.now }, { merge: true });
+    return { say: '🏷 ชื่อในเกม: ' + name + (mine && LIVE.includes(d.status) ? ' · เกมนี้เริ่มแล้ว ใช้เกมหน้า' : ' · ใช้ตอนเข้าห้องครั้งหน้า') };
   });
   await safe(deps, 'sendMessage', { chat_id: me, text: res.say });
   if (res.g && res.g.msgId) await safe(deps, 'editMessageText', Object.assign({ chat_id: res.g.chatId, message_id: res.g.msgId }, lobbyView(res.g, bot)));
@@ -297,7 +332,7 @@ function commit(tx, db, gRef, g, st, now) {
   tx.set(gRef.collection('secret').doc('state'), st);
   if (free) {
     tx.set(db.collection('wolf_chats').doc(g.chatId), { game: null, updatedAt: now });
-    for (const id of Object.keys(g.players)) tx.set(db.collection('wolf_tg').doc(id), { game: null, updatedAt: now });
+    for (const id of Object.keys(g.players)) tx.set(db.collection('wolf_tg').doc(id), { game: null, updatedAt: now }, { merge: true });
   }
 }
 
@@ -317,12 +352,12 @@ async function onButton(q, deps) {
     const g = await tx.get(gRef);
     if (!g.exists) return { say: 'ไม่พบห้องนี้' };
     const d = g.data();
-    if (d.host !== me) return { say: 'เฉพาะหัวห้อง (' + d.hostName + ') กดได้' };
+    if (d.host !== me) return { say: 'เฉพาะหัวห้อง (' + hostNm(d) + ') กดได้' };
     if (kind === 'cancel') {
       if (['over', 'cancelled'].includes(d.status)) return { say: 'ห้องนี้ปิดแล้ว' };
       tx.update(gRef, { status: 'cancelled', deadline: null, updatedAt: deps.now });
       tx.set(db.collection('wolf_chats').doc(d.chatId), { game: null, updatedAt: deps.now });
-      for (const id of Object.keys(d.players)) tx.set(db.collection('wolf_tg').doc(id), { game: null, updatedAt: deps.now });
+      for (const id of Object.keys(d.players)) tx.set(db.collection('wolf_tg').doc(id), { game: null, updatedAt: deps.now }, { merge: true });
       return { g: d, cancelled: true, live: LIVE.includes(d.status) };
     }
     if (d.status !== 'lobby') return { say: 'เกมเริ่มไปแล้ว' };
@@ -452,7 +487,7 @@ async function onTalkEnd(q, parts, deps) {
     const ss = await tx.get(gRef.collection('secret').doc('state'));
     if (!gs.exists || !ss.exists) return { say: 'ไม่พบห้องนี้' };
     const g = gs.data(), st = ss.data();
-    if (g.host !== String(q.from.id)) return { say: 'เฉพาะหัวห้อง (' + g.hostName + ') กดได้' };
+    if (g.host !== String(q.from.id)) return { say: 'เฉพาะหัวห้อง (' + hostNm(g) + ') กดได้' };
     if (g.status !== 'day' || String(g.round) !== round) return { say: 'เลยช่วงคุยแล้ว' };
     const out = [];
     beginVote(g, st, deps.now, out);
@@ -524,6 +559,7 @@ async function handle(update, deps) {
     if (/^[A-Z0-9]{6}$/.test(code)) return join(msg, code, deps);
     return safe(deps, 'sendMessage', { chat_id: msg.chat.id, text: '🐺 สวัสดี · ในกลุ่มพิมพ์ /werewolf แล้วกด ▸ เข้าร่วม · กติกา /rules' });
   }
+  if (msg.chat.type === 'private' && !cmdRaw.startsWith('/')) return rename(msg, deps);
 }
 
 module.exports = { handle, tick, lobbyView, startedView, roleCard, ROLE_CARD, RULES };
