@@ -17,8 +17,17 @@ The card covers the last 7 days in one query, at most every 5 minutes, and is hi
 
 **Rules** (`firestore.rules`, `game_plays`): an intern creates only their own (authUid = login, userId linked), for the 4 games, ≤ 40 rounds, known fields only. Nobody edits it; only admins read or delete. Needs `firebase deploy --only firestore:rules` (owner).
 
+## 🏆 Top 3 per game (V101.375 / V102.705)
+
+Owner 2026-11-26: "แต่ละเกม ให้เก็บคะแนนผู้ชนะไว้ด้วย ประกาศ Top 3 แต่ละเกม ให้แต่ละ user ทราบ ส่วน ADMIN จะทราบทั้งหมด". Picks: count wins · this week + all time · line B (mockup-game-top3/).
+- **Ranking** (`game-top-rank.js`, the same file in `functions/` and `public/`): 🥣 🐺 ⚫⚪ = games won; 🧊 นับไว = best total seconds of a 5/5 game. A tie goes to who got there first. The week starts Monday 00:00 Bangkok. Users with `isIgnored` never rank.
+- **Intern** (`public/game-top.js`): one 🏆 line under each game's title — three faces with 🥇🥈🥉 and the value, plus "คุณ #n". A tap opens the board (สัปดาห์นี้ │ ตลอดกาล); a second tap folds it. Data comes from the `gameTop` callable (nickname + LINE photo of the top 3, and your own place). It asks at most every 2 min, and again after a finished game. Nothing shows when the call fails.
+- **Admin** (`game-admin.js`): ⏱ เวลา │ 🏆 อันดับ on the 🎮 card. It lists every player of the chosen game, best first, including players with 0 wins. ตลอดกาล reads all of `game_plays` once (5 min).
+- **Deploy**: `firebase deploy --only functions:gameTop` (no rules change).
+
 ## QA
 
 - `scripts/game-log-qa.cjs`: real index.html with a fake clock and a fake Firestore. Covers seconds per round for all 4 games, the 3-min cap, one doc per game, closed half-way = none, not signed in = none.
 - `scripts/game-admin-qa.cjs`: the admin.html wiring and the rules, checked as text, plus the real game-admin.js on a fake db. Covers the query, chips, rows, 🐢/⚡, bars, wins / ✓, the chip switch, the throttle, and the empty / failed states.
+- `scripts/game-top-qa.cjs`: the ranking in node (both copies the same), the 🏆 line in the 4 real lobbies with a fake `gameTop`, the board, an empty week, a failing call, asking again after a game, 320 px; admin 🏆 อันดับ on a fake db.
 - `scripts/rules-game-plays.emu.cjs`: emulator only, not in CI.

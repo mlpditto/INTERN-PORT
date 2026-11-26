@@ -199,7 +199,7 @@
 
     // ---- lobby ------------------------------------------------------------------------------------------
     function lobbyHtml() {
-        var h = '<div class="ck lobby">' + topHtml('🥣 Cereal Killer', '<button type="button" class="ck-pill' + (ui.rules ? ' acc' : '') + '" onclick="CK.rules()"' + t('How to play', 'กติกา · วิธีเล่น') + '>?</button>');
+        var h = '<div class="ck lobby">' + topHtml('🥣 Cereal Killer', '<button type="button" class="ck-pill' + (ui.rules ? ' acc' : '') + '" onclick="CK.rules()"' + t('How to play', 'กติกา · วิธีเล่น') + '>?</button>') + (window.GameTop ? GameTop.line('cereal') : '');   // V101.375 🏆 Top 3
         if (window.CKOnline) {   // V101.335 owner pick B: 📱 เครื่องนี้ | 🌐 ออนไลน์ (the badge = online games waiting for my move)
             var n = CKOnline.myTurnCount();
             h += '<div class="ck-tabs" role="tablist"><button type="button" role="tab" id="ck-tab-local" aria-selected="' + (ui.tab !== 'online') + '" class="' + (ui.tab !== 'online' ? 'on' : '') + '" onclick="CK.tab(\'local\')">📱 เครื่องนี้</button>'

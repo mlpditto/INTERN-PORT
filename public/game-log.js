@@ -19,6 +19,7 @@
             var u = window.firebase && firebase.auth && firebase.auth().currentUser;
             if (typeof db === 'undefined' || !u || typeof userId !== 'string' || !userId) return null;
             doc.userId = userId; doc.authUid = u.uid; doc.v = VER; doc.at = firebase.firestore.FieldValue.serverTimestamp();
+            if (window.GameTop) GameTop.played();   // V101.375 🏆 the Top 3 asks again
             return db.collection('game_plays').add(doc).catch(function () { /* offline / rules: the game goes on */ });
         } catch (e) { return null; }
     }

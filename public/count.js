@@ -178,6 +178,7 @@
     function lobbyHtml() {
         var free = get('countFree') === 1;
         return '<div class="cg"><div class="cg-top"><h3>🧊 นับไว</h3>' + q() + x() + '</div>'
+            + (window.GameTop ? GameTop.line('count') : '')   // V101.375 🏆 Top 3 (game-top.js)
             + '<div class="cg-rail" role="group" aria-label="Timer"><button type="button" id="cg-timed" class="' + (free ? '' : 'on') + '" aria-pressed="' + !free + '" onclick="CG.free(0)">⏱ แข่งเวลา ' + SEC + ' วิ</button><button type="button" id="cg-free" class="' + (free ? 'on' : '') + '" aria-pressed="' + free + '" onclick="CG.free(1)">🧘 ไม่จับเวลา</button></div>'
             + '<div class="cg-modes">' + ['rect', 'cube'].map(function (k) { var b = get(free ? 'countFreeBest_' + k : 'countBest_' + k); return '<button type="button" id="cg-' + k + '" onclick="CG.start(\'' + k + '\')"><i>' + MODES[k].e + '</i>' + MODES[k].n + '<small>' + (free ? (b ? '⏱ ดีสุด ' + mmss(b) : Q + ' ข้อ · ไม่จับเวลา') : b ? '🏆 ' + b : Q + ' ข้อ · ' + SEC + ' วิ') + '</small></button>'; }).join('') + '</div>'
             + '<div class="cg-note">' + (free ? 'ไม่มีนับถอยหลัง · จับเวลาไว้ดูทีหลัง' : 'ตอบแล้วดูเฉลยทุกข้อ') + '</div></div>';

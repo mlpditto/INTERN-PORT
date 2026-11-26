@@ -362,6 +362,32 @@ exports.getBirthdays = onCall(async (request) => {
     return { today, items: bd.birthdaysAround(snap.docs.map((d) => Object.assign({ id: d.id }, d.data())), today, isActiveMember) };
 });
 
+// V101.375 (owner 2026-11-26): 🏆 Top 3 per game for every signed-in intern — nickname + LINE photo of the top 3, this week and all
+// time, and the caller's own place (by the userId they send: a place is no secret, the Top 3 is shown to all). Ranked from game_plays
+// by functions/game-top-rank.js (the same file the admin page uses); the ranking is kept 2 minutes per instance.
+let gameTopCache = null;
+exports.gameTop = onCall({ timeoutSeconds: 30 }, async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
+    const gt = require('./game-top-rank');
+    const now = Date.now();
+    if (!gameTopCache || now - gameTopCache.at > 120000) {
+        const db = admin.firestore();
+        const [ps, us] = await Promise.all([
+            db.collection('game_plays').select('userId', 'game', 'win', 'score', 'sec', 'endedAt').get(),
+            db.collection('users').select('nickName', 'firstName', 'displayName', 'pictureUrl', 'isIgnored').get(),
+        ]);
+        const users = new Map(us.docs.map((d) => [d.id, d.data()]));
+        const ranked = gt.rank(ps.docs.map((d) => d.data()), now, (id) => { const u = users.get(id); return !u || u.isIgnored === true; });
+        gameTopCache = { at: now, ranked, users };
+    }
+    const { ranked, users } = gameTopCache;
+    const who = (id) => {
+        const u = users.get(id) || {};
+        return { name: String(u.nickName || u.firstName || u.displayName || '…').trim().slice(0, 40), pic: /^https:\/\//.test(u.pictureUrl || '') ? String(u.pictureUrl).slice(0, 500) : '' };
+    };
+    return { week: ranked.week, games: gt.forIntern(ranked, String((request.data && request.data.userId) || ''), who) };
+});
+
 // V101.297 (owner pick C + 1, 2026-11-09): the intern's 🎓✓ → ⬇️ PDF. The PDF stays admin-only in Storage; this hands back a
 // download URL for the caller's OWN issued certificate only. Identity = the LINE ID token (verified with LINE), because the
 // anonymous Firebase uid can be linked to any userId by the client. See functions/cert-download.js.

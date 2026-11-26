@@ -40,7 +40,7 @@ assert.ok(/allow read: if isAdmin\(\);/.test(r) && /request\.resource\.data\.aut
   await page.waitForFunction(() => !document.getElementById('gt-admin').hidden);
   assert.deepEqual(await page.evaluate(() => window.__q), [['game_plays', 'endedAt', '>=', NOW - 7 * D]], 'one query, last 7 days');
   const read = () => page.evaluate(() => ({
-    chips: [...document.querySelectorAll('#gt-admin .gt-chip')].map((b) => b.textContent + (b.classList.contains('on') ? '*' : '')),
+    chips: [...document.querySelectorAll('#gt-admin [aria-label="Game"] .gt-chip')].map((b) => b.textContent + (b.classList.contains('on') ? '*' : '')),
     head: [...document.querySelectorAll('#gt-admin th')].map((t) => t.textContent),
     rows: [...document.querySelectorAll('#gt-admin tbody tr')].map((tr) => [...tr.cells].map((c, i) => (i === 3 ? [...c.querySelectorAll('i')].map((x) => (x.classList.contains('hi') ? 'H' : '.')).join('') : c.textContent.trim()))),
   }));
@@ -48,7 +48,7 @@ assert.ok(/allow read: if isAdmin\(\);/.test(r) && /request\.resource\.data\.aut
   assert.deepEqual(v.chips, ['⚫ ไพ่เงา*', '🧊 นับไว'], 'chips only for games with plays; the first on');
   assert.deepEqual(v.head, ['คน', '🎮', '⌛ วิ/ตา', 'เกมล่าสุด', '🏆']);
   assert.deepEqual(v.rows, [['มายด์', '2', '27 🐢', '..H.', '1/2'], ['ปอนด์', '1', '15', 'H.', '0/1'], ['ต้นข้าว', '1', '13', '.H.', '1/1'], ['เฟิร์น', '1', '4 ⚡', 'H..', '0/1']], 'per person, slowest first, flags, last game bars, wins');
-  await page.click('#gt-admin .gt-chip:nth-child(2)');
+  await page.click('#gt-admin [aria-label="Game"] .gt-chip:nth-child(2)');
   v = await read();
   assert.deepEqual(v.chips, ['⚫ ไพ่เงา', '🧊 นับไว*']); assert.equal(v.head[2], '⌛ วิ/ข้อ'); assert.equal(v.head[4], '✓');
   assert.deepEqual(v.rows, [['ต้นข้าว', '2', '9', 'H....', '2.5/5'], ['มายด์', '1', '4', '..H..', '4.0/5']], 'นับไว: ✓ average, no flags under 3 people');

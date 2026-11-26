@@ -2,10 +2,12 @@
    game (⚫ ไพ่เงา · 🧊 นับไว · 🥣 Cereal · 🐺 หมาป่า) and a table per person over the last 7 days: 🎮 games, ⌛ seconds per round
    (🐢 much slower / ⚡ much faster than the others in that game), the last game's rounds as small bars (🟧 = its longest round) and
    🏆 wins / games (นับไว: ✓ on average). One query (game_plays endedAt ≥ now − 7 d, written by game-log.js on the intern page), at most
-   every 5 minutes; hidden when nobody played or the read fails. window.gameAdmin. */
+   every 5 minutes; hidden when nobody played or the read fails. window.gameAdmin.
+   V102.705 (owner 2026-11-26 "ADMIN จะทราบทั้งหมด"): ⏱ เวลา │ 🏆 อันดับ — every player of the game ranked like the interns' Top 3
+   (game-top-rank.js: wins, 🧊 best 5/5 time), สัปดาห์นี้ (from Monday) │ ตลอดกาล (all game_plays, read once when asked, 5 min). */
 (function () {
     'use strict';
-    var WEEK = 7 * 864e5, last = 0, plays = [], pick = null;
+    var WEEK = 7 * 864e5, last = 0, plays = [], pick = null, view = 'time', per = 'week', all = null, allAt = 0;
     var GAMES = [['bw', '⚫', 'ไพ่เงา'], ['count', '🧊', 'นับไว'], ['cereal', '🥣', 'Cereal'], ['wolf', '🐺', 'หมาป่า']];
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function avg(a) { return a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : 0; }
@@ -35,14 +37,30 @@
         var mx = Math.max.apply(null, r.concat([1])), hi = r.indexOf(mx);
         return '<span class="sp" title="' + r.map(fmt).join(' · ') + ' วิ">' + r.map(function (s, i) { return '<i' + (i === hi ? ' class="hi"' : '') + ' style="height:' + Math.max(15, Math.round(s / mx * 100)) + '%"></i>'; }).join('') + '</span>';
     }
+    function chip(on, js, label) { return '<button type="button" class="gt-chip' + (on ? ' on' : '') + '" aria-pressed="' + on + '" onclick="' + js + '">' + label + '</button>'; }
+    function rankHtml(src) {   // V102.705 🏆 everyone, best first
+        var R = window.GameTopRank; if (!R) return '';
+        if (per === 'week') { var ws = R.weekStart(Date.now()); src = src.filter(function (p) { return (+p.endedAt || 0) >= ws; }); }
+        var skip = function (id) { var u = (typeof usersData !== 'undefined' ? usersData : []).find(function (x) { return x.id === id; }); return !!(u && u.isIgnored); };
+        var rs = R.board(src, pick, skip, true), cnt = pick === 'count';
+        if (!rs.length) return '<div class="gt-k">ยังไม่มีใครเล่น' + (per === 'week' ? 'สัปดาห์นี้' : '') + '</div>';
+        return '<table class="gt-t" id="gt-rank"><thead><tr><th class="n">#</th><th>คน</th><th class="n">' + (cnt ? '⏱ ดีสุด 5/5' : '🏆 ชนะ') + '</th><th class="n">🎮</th></tr></thead><tbody>'
+            + rs.map(function (r, i) { return '<tr><td class="n">' + (r.v == null ? '' : i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1) + '</td><td>' + who(r.userId) + '</td><td class="n">' + (r.v == null ? (cnt ? '—' : '0') : cnt ? fmt(r.v) : r.v) + '</td><td class="n">' + r.n + '</td></tr>'; }).join('')
+            + '</tbody></table>';
+    }
     function html() {
-        var have = GAMES.filter(function (g) { return plays.some(function (p) { return p.game === g[0]; }); });
+        var src = view === 'rank' && per === 'all' ? (all || []) : plays;
+        var have = GAMES.filter(function (g) { return src.some(function (p) { return p.game === g[0]; }); });
         if (!have.length) return '';
         if (!pick || !have.some(function (g) { return g[0] === pick; })) pick = have[0][0];
         var rs = rows(plays, pick), unit = pick === 'count' ? 'ข้อ' : pick === 'bw' ? 'ตา' : 'วัน';
-        return '<div class="gt-chips" role="group" aria-label="Game">' + have.map(function (g) {
+        var top = '<div class="gt-chips" role="group" aria-label="View">' + chip(view === 'time', "gameAdmin.view('time')", '⏱ เวลา') + chip(view === 'rank', "gameAdmin.view('rank')", '🏆 อันดับ')
+            + (view === 'rank' ? '<span style="width:8px"></span>' + chip(per === 'week', "gameAdmin.per('week')", 'สัปดาห์นี้') + chip(per === 'all', "gameAdmin.per('all')", 'ตลอดกาล') : '') + '</div>';
+        var games = '<div class="gt-chips" role="group" aria-label="Game">' + have.map(function (g) {
             return '<button type="button" class="gt-chip' + (g[0] === pick ? ' on' : '') + '" aria-pressed="' + (g[0] === pick) + '" onclick="gameAdmin.pick(\'' + g[0] + '\')">' + g[1] + ' ' + g[2] + '</button>';
-        }).join('') + '</div>'
+        }).join('') + '</div>';
+        if (view === 'rank') return top + games + rankHtml(src);
+        return top + games
             + '<table class="gt-t"><thead><tr><th>คน</th><th class="n">🎮</th><th class="n">⌛ วิ/' + unit + '</th><th>เกมล่าสุด</th><th class="n">' + (pick === 'count' ? '✓' : '🏆') + '</th></tr></thead><tbody>'
             + rs.map(function (r) {
                 return '<tr><td>' + who(r.userId) + '</td><td class="n">' + r.games + '</td><td class="n">' + fmt(r.perRound) + (r.flag === 'slow' ? ' 🐢' : r.flag === 'fast' ? ' ⚡' : '') + '</td><td>' + spark(r.last) + '</td>'
@@ -62,5 +80,13 @@
             .then(function (s) { plays = s.docs.map(function (d) { return d.data(); }); render(); })
             .catch(function () { plays = []; render(); });
     }
-    window.gameAdmin = { refresh: refresh, rows: rows, pick: function (g) { pick = g; render(); }, _set: function (l) { plays = l || []; render(); } };
+    function loadAll() {   // V102.705 ตลอดกาล: every game_plays doc, at most every 5 minutes
+        if (typeof db === 'undefined' || (all && Date.now() - allAt < 5 * 60000)) return render();
+        allAt = Date.now();
+        db.collection('game_plays').get().then(function (s) { all = s.docs.map(function (d) { return d.data(); }); render(); }, function () { all = all || []; render(); });
+    }
+    window.gameAdmin = { refresh: refresh, rows: rows, pick: function (g) { pick = g; render(); }, _set: function (l) { plays = l || []; render(); },
+        view: function (v) { view = v === 'rank' ? 'rank' : 'time'; if (view === 'rank' && per === 'all') loadAll(); else render(); },
+        per: function (k) { per = k === 'all' ? 'all' : 'week'; if (per === 'all') loadAll(); else render(); },
+        _setAll: function (l) { all = l || []; allAt = Date.now(); render(); } };
 })();

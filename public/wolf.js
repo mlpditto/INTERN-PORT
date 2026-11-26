@@ -200,7 +200,7 @@
     function voteWords() { var v = g.lastVote; return !v ? '' : v.out ? '🗳 ' + esc(nm(v.out)) + ' ถูกโหวตออก ' + E[g.st.roles[v.out]] : '🗳 เสมอ · ไม่มีใครออก'; }
 
     function lobbyHtml() {
-        var c = W.defaultCounts(ui.n), was = ui.prevN ? W.defaultCounts(ui.prevN) : null, h = '<div class="ww ww-lobby">' + top('🐺 มนุษย์หมาป่า', pill('🤖<span class="tx"> เล่นกับบอท</span>', 'acc') + (window.WWTour ? '<button type="button" class="ww-pill ww-help" id="ww-help" onclick="WWTour.open()" title="วิธีเล่น">❓</button>' : ''), true);
+        var c = W.defaultCounts(ui.n), was = ui.prevN ? W.defaultCounts(ui.prevN) : null, h = '<div class="ww ww-lobby">' + top('🐺 มนุษย์หมาป่า', pill('🤖<span class="tx"> เล่นกับบอท</span>', 'acc') + (window.WWTour ? '<button type="button" class="ww-pill ww-help" id="ww-help" onclick="WWTour.open()" title="วิธีเล่น">❓</button>' : ''), true) + (window.GameTop ? GameTop.line('wolf') : '');   // V101.375 🏆 Top 3
         h += '<div class="ww-row"><span class="ww-mini">👥 คน</span>' + [5, 7, 9].map(function (n) { return '<button type="button" class="ww-chip' + (ui.n === n ? ' on' : '') + '" onclick="WW.set(\'n\',' + n + ')">' + n + '</button>'; }).join('') + '</div>';
         var rs = W.ROLES.filter(function (r) { return c[r]; }), tip = rs.indexOf(ui.tip) >= 0 ? ui.tip : null;
         h += '<div class="ww-tiles" id="ww-roles" style="grid-template-columns:repeat(' + rs.length + ',minmax(0,1fr))">' + rs.map(function (r) {
