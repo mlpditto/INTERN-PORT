@@ -14,6 +14,11 @@
 (function () {
     'use strict';
     var ALL = [0, 1, 2, 3, 4, 5, 6, 7, 8], WIN_AT = 5, rng = Math.random, g = null, lvl = 2, toast = null, nb = false, shown = 9, revT = null, sent = '';
+    // VV101.376 (owner "ทำให้ user เล่น 2 คน", pick A of A+B+C, mockup-shadow-2p/): 📱 2 คน เครื่องเดียว — 1️⃣ and 2️⃣ pass the phone; a cover
+    // screen hides the last hand between turns, the round shows colours only, the end opens every number. Not in the 🏆 board (2️⃣ has no login).
+    var two = false, P = { me: '1️⃣', bot: '2️⃣' };
+    function other(s) { return s === 'me' ? 'bot' : 'me'; }
+    function side() { return g.lt == null ? g.lead : other(g.lead); }   // whose hand is out now
     var col = function (n) { return n % 2 ? 'w' : 'b'; };
     function S(k, d) { if (window.BWSound) BWSound.play(k, d); }   // V101.369 sounds (shadow-sound.js, pick C) — only from a tap
     function endKey() { return g.sc.me > g.sc.bot ? 'endW' : g.sc.me < g.sc.bot ? 'endL' : 'endD'; }
@@ -96,12 +101,12 @@
 
     // ---- game ------------------------------------------------------------------------------------------------------------------
     function newGame(level) {
-        lvl = level; g = { me: ALL.slice(), bot: ALL.slice(), hist: [], sc: { me: 0, bot: 0 }, lead: rng() < 0.5 ? 'me' : 'bot', sel: null, botTile: null, last: null, end: false, mem: level === 3 };
-        if (g.lead === 'bot') g.botTile = botPick(null);
+        lvl = level; g = { me: ALL.slice(), bot: ALL.slice(), hist: [], sc: { me: 0, bot: 0 }, lead: rng() < 0.5 ? 'me' : 'bot', sel: null, botTile: null, last: null, end: false, mem: level === 3 && !two, two: two, lt: null, cover: two };
+        if (g.lead === 'bot' && !two) g.botTile = botPick(null);
     }
-    function play(n) {
+    function play(n, given) {
         if (!g || g.end || g.last || g.me.indexOf(n) < 0) return;
-        var b = g.lead === 'bot' ? g.botTile : botPick(col(n)), res = cmp(n, b);
+        var b = given != null ? given : g.lead === 'bot' ? g.botTile : botPick(col(n)), res = cmp(n, b);
         g.me.splice(g.me.indexOf(n), 1); g.bot.splice(g.bot.indexOf(b), 1);
         g.hist.push({ m: n, b: b, mc: col(n), bc: col(b), res: res, lead: g.lead });
         if (res === 'win') g.sc.me++; else if (res === 'lose') g.sc.bot++;
@@ -111,11 +116,11 @@
     }
     function next() {
         if (!g || g.end || !g.last) return;
-        g.last = null; if (g.lead === 'bot') g.botTile = botPick(null); render();
+        g.last = null; if (g.two) g.cover = true; else if (g.lead === 'bot') g.botTile = botPick(null); render();
     }
     function finish() {
         g.end = true; var s = get(), k = 'l' + lvl, r = g.sc.me > g.sc.bot ? 'w' : g.sc.me < g.sc.bot ? 'l' : 'd';
-        s[k] = s[k] || { w: 0, l: 0, d: 0 }; s[k][r]++; put(s);
+        if (!g.two) { s[k] = s[k] || { w: 0, l: 0, d: 0 }; s[k][r]++; put(s); }
         nb = false; sent = ''; clearInterval(revT); var still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
         shown = still ? g.hist.length : 0;   // §9.3: no motion → every tile at once
         // V101.369: each 🤖 tile sounds its number as it opens (the only time a number has a sound), then the end tune
@@ -161,6 +166,7 @@
         + '#bwModal .bw-act{display:flex;gap:8px}#bwModal .bw-act #bw-again{flex:1}#bwModal .bw-act .ic{flex:0 0 58px;padding:0}#bwModal .bw-act .done{color:#86efac}'
         + '.bw-lvs{display:flex;gap:6px;justify-content:center}#bwModal .bw-lvs button{border:1px solid #e2e8f0;background:#fff;border-radius:999px;padding:8px 12px;font-weight:800}#bwModal .bw-lvs button.on{border-color:#0f172a;background:#0f172a;color:#fff}'
         + '.bw-rule{font-size:.85em;color:#475569;text-align:center;line-height:1.6}.bw-toast{text-align:center;font-size:.85em;font-weight:800;color:#b45309}'
+        + '#bwModal .bw-cover{min-height:440px;text-align:center}#bwModal .bw-cv{font-size:54px;margin-top:auto}#bwModal .bw-cvt{font-size:1.3em;font-weight:900;color:#e9d5ff}#bwModal .bw-cover .bw-go{margin-top:auto}'   // VV101.376 📱 2 คน
         // V101.374 ❓ tour — fixed height so ถัดไป ▸ never moves
         + '#bwModal .bw-tour{min-height:440px}#bwModal .bw-say{background:#1d1a3d;border:1px solid #3f3a74;border-radius:14px;padding:10px 12px;font-weight:800;line-height:1.5;color:#e9d5ff}'
         + '#bwModal .bw-say small{display:block;font-size:.72em;font-weight:600;color:#8b87c9;margin-top:2px}#bwModal .bw-tour .bw-hand button:disabled{cursor:default}'
@@ -187,8 +193,9 @@
         return '<div class="bw"><div class="bw-top"><h3>⚫⚪ ไพ่เงา</h3><button type="button" class="bw-snd" id="bw-help" onclick="BW.tour()" aria-label="How to play" title="How to play" data-th-title="วิธีเล่น">❓</button>' + snd() + X + '</div>'
             + (window.GameTop ? GameTop.line('bw', true) : '')   // V101.375 🏆 Top 3 (game-top.js)
             + '<div class="bw-rule">ไพ่ 0–8 คนละชุด · คู่ ⚫ คี่ ⚪<br>เห็นแค่สีของอีกฝั่ง · เลขสูงกว่าชนะตานั้น<br>9 ตา · ถึง 5 ก่อนชนะ</div>'
-            + '<div class="bw-lvs">' + [1, 2, 3].map(function (n) { var r = s['l' + n]; return '<button type="button" class="' + (lvl === n ? 'on' : '') + '" id="bw-lv' + n + '" onclick="BW.level(' + n + ')" title="' + ['', 'ง่าย', 'กลาง', 'ยาก · 🧠 จำเอง'][n] + '">' + '🥄'.repeat(n) + (n === 3 ? ' 🧠' : '') + (r ? ' · ' + r.w + '/' + (r.w + r.l + r.d) : '') + '</button>'; }).join('') + '</div>'
-            + (lvl === 3 ? '<div class="bw-note">🧠 ไพ่ที่ลงแล้วไม่จาง · สมุดไม่บอกเลขคุณ</div>' : '')
+            + '<div class="bw-lvs" role="group" aria-label="Who">' + [['bot', '🤖 กับบอท'], ['two', '📱 2 คน เครื่องเดียว']].map(function (k) { var on = (k[0] === 'two') === two; return '<button type="button" id="bw-who-' + k[0] + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" onclick="BW.who(\'' + k[0] + '\')">' + k[1] + '</button>'; }).join('') + '</div>'
+            + (two ? '<div class="bw-note" id="bw-two-note">ส่งเครื่องให้กันทีละตา · ไม่ต้องใช้เน็ต</div>' : '<div class="bw-lvs">' + [1, 2, 3].map(function (n) { var r = s['l' + n]; return '<button type="button" class="' + (lvl === n ? 'on' : '') + '" id="bw-lv' + n + '" onclick="BW.level(' + n + ')" title="' + ['', 'ง่าย', 'กลาง', 'ยาก · 🧠 จำเอง'][n] + '">' + '🥄'.repeat(n) + (n === 3 ? ' 🧠' : '') + (r ? ' · ' + r.w + '/' + (r.w + r.l + r.d) : '') + '</button>'; }).join('') + '</div>')
+            + (lvl === 3 && !two ? '<div class="bw-note">🧠 ไพ่ที่ลงแล้วไม่จาง · สมุดไม่บอกเลขคุณ</div>' : '')
             + '<button type="button" class="bw-go" id="bw-start" onclick="BW.start()">▸ เริ่ม</button></div>';
     }
     function dots() {
@@ -197,7 +204,33 @@
         return h + '</div>';
     }
     function botLeft() { var b = g.bot.filter(function (n) { return col(n) === 'b'; }).length - (g.botTile != null && col(g.botTile) === 'b' ? 1 : 0), w = g.bot.length - (g.botTile != null ? 1 : 0) - b; return '🤖 เหลือ ⚫ ' + b + ' · ⚪ ' + w; }
+    function play2Html() {   // VV101.376 📱 2 คน
+        var L = g.last, a = side(), top = '<div class="bw-top"><h3>⚫⚪ ไพ่เงา</h3><span class="bw-pill">' + Math.min(9, g.hist.length + (L ? 0 : 1)) + '/9</span><span class="bw-pill sc" id="bw-score">' + P.me + ' ' + g.sc.me + ' : ' + g.sc.bot + ' ' + P.bot + '</span>' + snd() + X + '</div>';
+        if (g.cover) return '<div class="bw bw-cover" id="bw-cover">' + top + '<div class="bw-cv">📱🔁</div><div class="bw-cvt" id="bw-cvt">ส่งเครื่องให้ ' + P[a] + '</div>'
+            + '<div class="bw-note">' + (g.lt != null ? P[g.lead] + ' ลงแล้ว · ' + P[a] + ' จะเห็นแค่ ' + CE[col(g.lt)] : g.hist.length ? 'ไพ่ของ ' + P[other(a)] + ' ซ่อนแล้ว' : P[a] + ' ลงก่อน') + '</div>'
+            + '<button type="button" class="bw-go" id="bw-ready" onclick="BW.ready()">👆 ' + P[a] + ' แตะเมื่อพร้อม</button></div>';
+        var h = '<div class="bw">' + top + dots() + '<div class="bw-table" id="bw-table">';
+        if (L) h += '<div class="bw-pair"><div>' + back(L.mc, 'huge') + '<small>' + P.me + '</small></div><div>' + back(L.bc, 'huge') + '<small>' + P.bot + '</small></div></div><div class="bw-res ' + L.res + '" id="bw-res">' + (L.res === 'draw' ? RW.draw : '🏆 ' + P[L.res === 'win' ? 'me' : 'bot'] + ' ชนะตานี้') + '</div>';
+        else if (g.lt != null) h += back(col(g.lt), 'huge') + '<div class="bw-note" id="bw-say">' + P[g.lead] + ' ลง ' + CE[col(g.lt)] + ' · ตา ' + P[a] + '</div>';
+        else h += '<div class="bw-note" id="bw-say">' + P[a] + ' ลงก่อน · อีกฝั่งเห็นแค่สี</div>';
+        h += '</div>';
+        if (L) h += '<button type="button" class="bw-go" id="bw-next" onclick="BW.next()">▸ ต่อ</button>';
+        else {
+            var hand = g[a];
+            h += '<div class="bw-hand" id="bw-hand">' + ALL.map(function (n) { var used = hand.indexOf(n) < 0; return '<button type="button" class="' + col(n) + (used ? ' used' : '') + (g.sel === n ? ' sel' : '') + '" data-n="' + n + '" onclick="BW.pick(' + n + ')"' + (used ? ' disabled' : '') + '>' + n + '</button>'; }).join('') + '</div>'
+                + '<button type="button" class="bw-go" id="bw-play" onclick="BW.play()"' + (g.sel == null ? ' disabled' : '') + '>▸ ' + P[a] + ' ลง' + (g.sel != null ? ' ' + t(g.sel, 'mini') : '') + '</button>';
+        }
+        if (g.hist.length) {   // 📓: colours only — both people read this phone
+            var left = function (s) { var b = g[s].filter(function (n) { return col(n) === 'b'; }).length; return P[s] + ' ⚫ ' + b + ' · ⚪ ' + (g[s].length - b); };
+            var bar = '<button type="button" class="bw-bar" id="bw-nb" aria-expanded="' + nb + '" onclick="BW.nb()">📓 ' + g.hist.length + ' ตา<span id="bw-left">' + left('me') + '  ' + left('bot') + ' ' + (nb ? '▾' : '▴') + '</span></button>';
+            h += nb ? '<div class="bw-sheet" id="bw-sheet">' + bar + '<div class="bw-nb">' + g.hist.map(function (r, i) {
+                return '<div class="bw-r"><span class="d">' + (i + 1) + '</span>' + back(r.mc, 'mini') + ' vs ' + back(r.bc, 'mini') + '<span class="rs ' + r.res + '">' + (r.res === 'draw' ? RW.draw : P[r.res === 'win' ? 'me' : 'bot']) + '</span></div>';
+            }).join('') + '</div></div>' : bar;
+        }
+        return h + '</div>';
+    }
     function playHtml() {
+        if (g.two) return play2Html();
         var L = g.last, h = '<div class="bw"><div class="bw-top"><h3>⚫⚪ ไพ่เงา</h3><span class="bw-pill">' + Math.min(9, g.hist.length + (L ? 0 : 1)) + '/9</span><span class="bw-pill sc" id="bw-score">คุณ ' + g.sc.me + ' : ' + g.sc.bot + ' 🤖</span>' + snd() + X + '</div>' + dots();
         h += '<div class="bw-table" id="bw-table">';
         if (L) h += '<div class="bw-pair"><div>' + t(L.m, 'huge') + '<small>คุณ</small></div><div>' + back(L.bc, 'huge') + '<small>🤖</small></div></div><div class="bw-res ' + L.res + '" id="bw-res">' + RW[L.res] + '</div>';
@@ -225,17 +258,17 @@
     // round (my tile vs the 🤖 tile, the left bar = its result, still opening one by one), one action row ↺ อีกตา · 📤 (✓ once sent) · 🥄
     function endHtml() {
         var r = g.sc.me > g.sc.bot ? 'win' : g.sc.me < g.sc.bot ? 'lose' : 'draw';
-        return '<div class="bw"><div class="bw-top"><h3>⚫⚪ จบเกม</h3><span class="bw-res bw-fin ' + r + '" id="bw-final">' + { win: '🏆', lose: '😞', draw: '🤝' }[r] + ' ' + g.sc.me + ' : ' + g.sc.bot + '</span>' + snd() + X + '</div>'
+        return '<div class="bw"><div class="bw-top"><h3>⚫⚪ จบเกม</h3><span class="bw-res bw-fin ' + (g.two ? (r === 'draw' ? 'draw' : 'win') : r) + '" id="bw-final">' + (g.two ? (r === 'draw' ? '🤝 ' : '🏆 ' + P[r === 'win' ? 'me' : 'bot'] + ' ') + P.me + ' ' + g.sc.me + ' : ' + g.sc.bot + ' ' + P.bot : { win: '🏆', lose: '😞', draw: '🤝' }[r] + ' ' + g.sc.me + ' : ' + g.sc.bot) + '</span>' + snd() + X + '</div>'
             + '<div class="bw-cards" id="bw-reveal" onclick="BW.showAll()" aria-label="Rounds">' + g.hist.map(function (x, i) {
                 var open = i < shown;   // V101.366: one by one; a tap opens the rest
                 return '<div class="bw-card' + (open ? ' ' + x.res : '') + (i === shown - 1 && shown < g.hist.length ? ' now' : '') + '"><span class="d">' + (i + 1) + '</span>' + t(x.m, 'mid') + '<small>vs</small>' + (open ? t(x.b, 'mid') : back(x.bc, 'mid')) + '</div>';
             }).join('') + '</div>'
             + '<div class="bw-act"><button type="button" class="bw-go" id="bw-again" onclick="BW.start()">↺ อีกตา</button>'
-            + '<button type="button" class="bw-go alt ic' + (sent ? ' done' : '') + '" id="bw-share" onclick="BW.share()" title="Share in LINE" data-th-title="แชร์ผลใน LINE" aria-label="' + (sent || 'Share in LINE') + '">' + (sent ? '✓' : '📤') + '</button>'
-            + '<button type="button" class="bw-go alt ic" id="bw-lvl" onclick="BW.lobby()" title="Change level" data-th-title="เปลี่ยนระดับ" aria-label="เปลี่ยนระดับ">' + '🥄'.repeat(lvl) + '</button></div></div>';
+            + (g.two ? '' : '<button type="button" class="bw-go alt ic' + (sent ? ' done' : '') + '" id="bw-share" onclick="BW.share()" title="Share in LINE" data-th-title="แชร์ผลใน LINE" aria-label="' + (sent || 'Share in LINE') + '">' + (sent ? '✓' : '📤') + '</button>')
+            + '<button type="button" class="bw-go alt ic" id="bw-lvl" onclick="BW.lobby()" title="Change level" data-th-title="เปลี่ยนระดับ" aria-label="เปลี่ยนระดับ">' + (g.two ? '📱' : '🥄'.repeat(lvl)) + '</button></div></div>';
     }
     function render() { var m = root(); document.getElementById('bw-body').innerHTML = tour >= 0 ? tourHtml() : !g ? lobbyHtml() : g.end ? endHtml() : playHtml(); m.style.display = 'flex';
-        if (g && tour < 0 && window.GameLog) GameLog.see('bw', { id: g.gid || (g.gid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), n: g.hist.length, done: g.end, mode: 'l' + lvl, win: g.sc.me > g.sc.bot ? 'w' : g.sc.me < g.sc.bot ? 'l' : 'd', score: g.sc.me + ':' + g.sc.bot, res: g.hist.map(function (h) { return h.res; }) });   // V101.370 🎮 game time for the admin (game-log.js)
+        if (g && tour < 0 && window.GameLog) GameLog.see('bw', { id: g.gid || (g.gid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), n: g.hist.length, done: g.end, mode: g.two ? 'two' : 'l' + lvl, win: g.two ? null : g.sc.me > g.sc.bot ? 'w' : g.sc.me < g.sc.bot ? 'l' : 'd', score: g.sc.me + ':' + g.sc.bot, res: g.hist.map(function (h) { return h.res; }) });   // V101.370 🎮 game time for the admin (game-log.js)
     }
 
     window.BW = {
@@ -266,17 +299,24 @@
             });
         },
         level: function (n) { lvl = n; render(); },
-        start: function () { clearInterval(revT); toast = null; nb = false; newGame(lvl); botSays(); render(); },
-        pick: function (n) { if (!g || g.end || g.last) return; toast = null; if (g.me.indexOf(n) < 0) { toast = '🧠 ' + n + ' ลงไปแล้ว'; g.sel = null; S('oops'); } else { g.sel = n; S('pick'); } render(); },
+        who: function (k) { two = k === 'two'; render(); },   // VV101.376 🤖 │ 📱 2 คน
+        ready: function () { if (g && g.two && g.cover) { g.cover = false; S('pick'); render(); } },
+        start: function () { clearInterval(revT); toast = null; nb = false; newGame(lvl); if (!two) botSays(); render(); },
+        pick: function (n) { if (!g || g.end || g.last || g.cover) return; toast = null; if (g.two) { if (g[side()].indexOf(n) >= 0) { g.sel = n; S('pick'); render(); } return; } if (g.me.indexOf(n) < 0) { toast = '🧠 ' + n + ' ลงไปแล้ว'; g.sel = null; S('oops'); } else { g.sel = n; S('pick'); } render(); },
         play: function () {
-            if (!g || g.sel == null) return;
+            if (!g || g.sel == null || g.cover) return;
+            if (g.two) {   // 📱 the leader's tile waits face down; the follower's resolves the round
+                if (g.lt == null) { g.lt = g.sel; g.sel = null; g.cover = true; S('place'); return render(); }
+                var f = g.sel, lt = g.lt; g.lt = null; if (g.lead === 'me') play(lt, f); else play(f, lt);
+                S('place'); S(g.hist[g.hist.length - 1].res, 0.3); if (g.end && shown >= g.hist.length) S(endKey(), 0.6); return render();
+            }
             var led = g.lead; play(g.sel); var L = g.hist[g.hist.length - 1], at = 0.25; S('place');
             if (!g.end && led === 'me') { S('think', at); S(L.bc, at += 0.45); }   // I led: 🤖 answers with a colour
             S(L.res, g.end ? 0.2 : at + 0.35);
             if (g.end && shown >= g.hist.length) S(endKey(), 0.6);   // reduced motion: every tile opens at once → the tune now
             render();
         },
-        next: function () { var was = g && g.last; next(); if (was) botSays(); },
+        next: function () { var was = g && g.last; next(); if (was && !(g && g.two)) botSays(); },
         close: function () { clearInterval(revT); hush(); tour = -1; g = null; nb = false; var m = document.getElementById('bwModal'); if (m) m.style.display = 'none'; },
         // for scripts/shadow-qa.cjs
         _g: function () { return g; }, _rng: function (f) { rng = f; }, _odds: function () { return myOdds(); }, _botPick: function (c) { return botPick(c); }
