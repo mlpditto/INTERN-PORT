@@ -17,6 +17,10 @@
 // Names (2026-11-26, owner pick B): a player joins under their Telegram name, and any plain text they DM the bot becomes
 // their in-game name — in a lobby it renames them at once (the lobby line and the host tag follow), otherwise it is kept
 // in wolf_tg/{tgId}.name for the next room. 24 chars, one line, no duplicate in the same room; never changeable mid-game.
+// Clock C1 (2026-11-26, owner pick, every 30 s): when a phase starts, run() enqueues one Cloud Task per 30 s step and one at
+// the deadline (deps.tasks); each calls phase(), which edits the phase message's ⏳ (night → the 🌙 line, day → the ☀️ line
+// with its 🗳 button, vote → the ballot) or ends the phase on the second. Task names are deterministic, so a repeat is a
+// harmless 409. Without deps.tasks, or when the enqueue fails, wolfTick (every minute) still runs the game as before.
 'use strict';
 const W = require('./wolf-rules');
 
@@ -31,6 +35,8 @@ const ROLE_CARD = {
 const LIVE = ['night', 'day', 'vote'];
 const QUIET = ' · ขอเงียบในกลุ่มจนจบเกมนะ 🤐';   // owner pick Q8: ask once, delete nothing
 const WARN_SEC = 60;   // ⏳ the warning goes out at the first tick with ≤ 60 s left (W1)
+const STEP_SEC = 30;   // C1: the ⏳ in the phase message is edited this often
+const leftSec = (g, now) => Math.max(0, Math.round((g.deadline - now) / 5000) * 5);   // what the ⏳ shows: to 5 s, task jitter hidden
 const mmss = (sec) => Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
 const RULES = [   // owner pick R1: a line per role + the flow + the win rule, plain text (~450 chars)
   '🐺 มนุษย์หมาป่า · กติกา',
@@ -95,6 +101,23 @@ async function run(deps, g, out) {
     if (r && r.message_id && o.save) await deps.db.collection('wolf_games').doc(g.code).update({ [o.save]: r.message_id });
   }
   if (missed.length) await safe(deps, 'sendMessage', { chat_id: g.chatId, text: '⚠️ ส่ง DM ไม่ถึง: ' + [...new Set(missed)].join(', ') + ' · เปิดแชทกับบอทแล้วกด Start' });
+  await armClock(deps, g);
+}
+/* C1: at a phase start enqueue one task per STEP_SEC and one at the deadline, once per phase (g.clock = 'status:round').
+   deps.tasks(name, delaySec, body) must treat an existing name as done (409). An enqueue failure is logged, not thrown:
+   wolfTick still ends the phase within a minute. */
+async function armClock(deps, g) {
+  const key = g.status + ':' + g.round;
+  if (!deps.tasks || !LIVE.includes(g.status) || !g.deadline || g.clock === key) return;
+  const total = Math.round((g.deadline - deps.now) / 1000);
+  const steps = [];
+  for (let t = STEP_SEC; t < total; t += STEP_SEC) steps.push(t);
+  steps.push(total);
+  try {
+    for (const t of steps) await deps.tasks('w-' + g.code + '-' + g.status + '-' + g.round + '-' + t, t, { code: g.code, key });
+    g.clock = key;
+    await deps.db.collection('wolf_games').doc(g.code).update({ clock: key });
+  } catch (e) { console.error('[wolfClock] ' + (e && e.message)); }
 }
 
 // ---- /werewolf in a group ------------------------------------------------------------------------------------------------
@@ -228,10 +251,14 @@ function afterWolves(g, st, out, rng) {
   }
   else st.picks.witchDone = true;
 }
+const nightView = (g, left) => ({ text: '🌙 คืนที่ ' + g.round + ' · ⏳ ' + mmss(left) + '\n💤 หลับตา · คนมีบทดู DM' });
+/* The ☀️ line (g.dayLead = who died, set by finishNight) with the talk time left and the host's 🗳 button. */
+const dayView = (g, st, left) => ({ text: '☀️ เช้าวันที่ ' + g.round + ' · ' + (g.dayLead || '') + '\n👥 ' + liveIds(st).length + ' · 💬 คุย ' + mmss(left),
+  reply_markup: { inline_keyboard: [[{ text: '🗳 โหวตเลย (หัวห้อง)', callback_data: 'talk:' + g.code + ':' + g.round }]] } });
 function beginNight(g, st, now, out, rng) {
   g.status = 'night'; g.deadline = now + W.NIGHT_SEC * 1000;
   st.picks = { wolf: {}, bite: null, seer: null, guard: null, heal: false, poison: null, witchDone: false };
-  out.push({ method: 'sendMessage', body: { chat_id: g.chatId, text: '🌙 คืนที่ ' + g.round + ' · ⏳ ' + mmss(W.NIGHT_SEC) + '\n💤 หลับตา · คนมีบทดู DM' } });
+  out.push({ method: 'sendMessage', body: Object.assign({ chat_id: g.chatId }, nightView(g, W.NIGHT_SEC)), save: 'phaseMsgId' });
   const turns = W.nightTurns(st);
   for (const id of Object.keys(turns)) {
     const k = turns[id];
@@ -278,21 +305,20 @@ function finishNight(g, st, now, out, rng) {
   const deadTxt = r.dead.length ? 'เมื่อคืน 💀 ' + r.dead.map((id) => nm(g, id)).join(', ') + ' ตาย' + QUIET : 'คืนสงบ ไม่มีใครตาย';
   r.dead.forEach((id) => out.push({ method: 'sendMessage', body: { chat_id: id, text: '💀 คุณตายเมื่อคืน · ดูเกมต่อได้ แต่ขอเงียบในกลุ่มจนจบนะ 🤐' } }));
   if (endIf(g, st, out, '☀️ เช้าวันที่ ' + g.round + ' · ' + deadTxt)) return;
-  g.status = 'day'; g.deadline = now + (g.talkSec || W.TALK_DEFAULT) * 1000;
-  out.push({ method: 'sendMessage', body: { chat_id: g.chatId, text: '☀️ เช้าวันที่ ' + g.round + ' · ' + deadTxt + '\n👥 ' + liveIds(st).length + ' · 💬 คุย ' + mmss(g.talkSec || W.TALK_DEFAULT),
-    reply_markup: { inline_keyboard: [[{ text: '🗳 โหวตเลย (หัวห้อง)', callback_data: 'talk:' + g.code + ':' + g.round }]] } } });
+  g.status = 'day'; g.deadline = now + (g.talkSec || W.TALK_DEFAULT) * 1000; g.dayLead = deadTxt;
+  out.push({ method: 'sendMessage', body: Object.assign({ chat_id: g.chatId }, dayView(g, st, g.talkSec || W.TALK_DEFAULT)), save: 'phaseMsgId' });
   remind(g, st, missed, out);
 }
-function voteView(g, st) {
+function voteView(g, st, left) {
   const live = seated(g).map(([id]) => id).filter((id) => st.alive[id]);
   const btns = live.map((id) => ({ text: nm(g, id), callback_data: 'v:' + g.code + ':' + g.round + ':' + id }));
   btns.push({ text: '⏭ ข้าม', callback_data: 'v:' + g.code + ':' + g.round + ':skip' });
   const n = Object.keys(st.ballot || {}).length;
-  return { text: '🗳 โหวตลับ วันที่ ' + g.round + ' · ⏳ ' + mmss(W.VOTE_SEC) + ' · เปลี่ยนได้\n✅ ' + n + '/' + live.length, reply_markup: { inline_keyboard: rows2(btns) } };
+  return { text: '🗳 โหวตลับ วันที่ ' + g.round + ' · ⏳ ' + mmss(left) + ' · เปลี่ยนได้\n✅ ' + n + '/' + live.length, reply_markup: { inline_keyboard: rows2(btns) } };
 }
 function beginVote(g, st, now, out) {
   g.status = 'vote'; g.deadline = now + W.VOTE_SEC * 1000; st.ballot = {};
-  out.push({ method: 'sendMessage', body: Object.assign({ chat_id: g.chatId }, voteView(g, st)), save: 'voteMsgId' });
+  out.push({ method: 'sendMessage', body: Object.assign({ chat_id: g.chatId }, voteView(g, st, W.VOTE_SEC)), save: 'voteMsgId' });
 }
 function finishVote(g, st, now, out, rng) {
   const acted = {};
@@ -469,7 +495,7 @@ async function onVote(q, parts, deps) {
     st.ballot[me] = arg;
     const out = [];
     if (liveIds(st).every((id) => id in st.ballot)) finishVote(g, st, deps.now, out, deps.rng);
-    else if (g.voteMsgId) out.push({ method: 'editMessageText', body: Object.assign({ chat_id: g.chatId, message_id: g.voteMsgId }, voteView(g, st)) });
+    else if (g.voteMsgId) out.push({ method: 'editMessageText', body: Object.assign({ chat_id: g.chatId, message_id: g.voteMsgId }, voteView(g, st, leftSec(g, deps.now))) });
     commit(tx, db, gRef, g, st, deps.now);
     return { g, out, toast: '🗳 ' + (arg === 'skip' ? 'ข้าม' : 'โหวต ' + nm(g, arg)) + ' · เปลี่ยนได้' };
   });
@@ -512,6 +538,40 @@ function warn(g, st, out) {
   }
   return true;
 }
+/* C1: one Cloud Task for room code at step key = 'status:round' (wolfPhase). A step edits the phase message's ⏳ (and gives the
+   one-minute warning when due); the last one ends the phase on the second. Stale (the phase already moved on) → nothing. */
+async function phase(body, deps) {
+  const { db } = deps;
+  const code = String((body || {}).code || ''), key = String((body || {}).key || '');
+  if (!/^[A-Z0-9]{6}$/.test(code)) return null;
+  const gRef = db.collection('wolf_games').doc(code);
+  const res = await db.runTransaction(async (tx) => {
+    const gs = await tx.get(gRef);
+    const ss = await tx.get(gRef.collection('secret').doc('state'));
+    if (!gs.exists || !ss.exists) return null;
+    const g = gs.data(), st = ss.data();
+    if (g.status + ':' + g.round !== key || !LIVE.includes(g.status) || !g.deadline) return null;
+    const out = [];
+    if (g.deadline - deps.now > 2000) {
+      const left = leftSec(g, deps.now);
+      const warned = left <= WARN_SEC && warn(g, st, out);
+      const edit = (id, view) => id && out.push({ method: 'editMessageText', body: Object.assign({ chat_id: g.chatId, message_id: id }, view) });
+      if (g.status === 'night') edit(g.phaseMsgId, nightView(g, left));
+      else if (g.status === 'day') edit(g.phaseMsgId, dayView(g, st, left));
+      else edit(g.voteMsgId, voteView(g, st, left));
+      if (warned) commit(tx, db, gRef, g, st, deps.now);
+      return { g, out, step: true };
+    }
+    if (g.status === 'night') finishNight(g, st, deps.now, out, deps.rng);
+    else if (g.status === 'day') beginVote(g, st, deps.now, out);
+    else finishVote(g, st, deps.now, out, deps.rng);
+    commit(tx, db, gRef, g, st, deps.now);
+    return { g, out };
+  });
+  if (res) await run(deps, res.g, res.out);
+  return res;
+}
+
 async function tick(deps) {
   const { db } = deps;
   const due = await db.collection('wolf_games').where('deadline', '<=', deps.now + WARN_SEC * 1000).get();
@@ -562,4 +622,4 @@ async function handle(update, deps) {
   if (msg.chat.type === 'private' && !cmdRaw.startsWith('/')) return rename(msg, deps);
 }
 
-module.exports = { handle, tick, lobbyView, startedView, roleCard, ROLE_CARD, RULES };
+module.exports = { handle, tick, phase, lobbyView, startedView, roleCard, ROLE_CARD, RULES, STEP_SEC };

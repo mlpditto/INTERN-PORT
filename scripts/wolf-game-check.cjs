@@ -12,7 +12,7 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const idx = fs.readFileSync(path.join(root, 'functions', 'index.js'), 'utf8');
 const tickSrc = idx.slice(idx.indexOf('exports.wolfTick'), idx.indexOf('exports.askNika'));
-assert.ok(/schedule: 'every 1 minutes'/.test(tickSrc) && /secrets: \['TELEGRAM_WOLF_TOKEN'\]/.test(tickSrc) && /require\('\.\/wolf-bot'\)\.tick\(/.test(tickSrc), 'wolfTick: every minute, wolf token only, calls tick()');
+assert.ok(/schedule: 'every 1 minutes'/.test(tickSrc) && /secrets: \['TELEGRAM_WOLF_TOKEN', 'TELEGRAM_WOLF_HOOK_SECRET'\]/.test(tickSrc) && !/TELEGRAM_BOT_TOKEN/.test(tickSrc) && /require\('\.\/wolf-bot'\)\.tick\(wolfDeps\(\)\)/.test(tickSrc), 'wolfTick: every minute, the wolf bot secrets only (the hook secret arms Clock C1 tasks), calls tick()');
 const B = require(path.join(root, 'functions', 'wolf-bot.js'));
 const W = require(path.join(root, 'functions', 'wolf-rules.js'));
 
