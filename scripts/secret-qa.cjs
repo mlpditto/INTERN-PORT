@@ -32,15 +32,15 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   await page.click('#u-games-row .u-game:nth-child(5)');
   assert.ok(await page.isVisible('#sn-tour'), 'first open = the tour'); assert.deepEqual(await page.evaluate(() => window.__played), ['secret-voice/t1.mp3']);
   const tops = [];
-  for (let i = 0; i < 4; i++) { tops.push(await page.$eval('#sn-tnext', (b) => Math.round(b.getBoundingClientRect().top))); await page.click('#sn-tnext'); }
+  for (let i = 0; i < 5; i++) { tops.push(await page.$eval('#sn-tnext', (b) => Math.round(b.getBoundingClientRect().top))); await page.click('#sn-tnext'); }
   assert.equal(new Set(tops).size, 1, 'ถัดไป ▸ stays put ' + tops);
-  assert.deepEqual(await page.evaluate(() => window.__played), ['secret-voice/t1.mp3', 'stop', 'secret-voice/t2.mp3', 'stop', 'secret-voice/t3.mp3', 'stop', 'secret-voice/t4.mp3', 'stop']);
+  assert.deepEqual(await page.evaluate(() => window.__played), ['secret-voice/t1.mp3', 'stop', 'secret-voice/t2.mp3', 'stop', 'secret-voice/t3.mp3', 'stop', 'secret-voice/t4.mp3', 'stop', 'secret-voice/t5.mp3', 'stop']);
   assert.ok(await page.isVisible('#sn-start'), '▸ เริ่ม → lobby'); assert.equal(await page.evaluate(() => localStorage.getItem('snTourSeen')), '1');
   await page.click('#sn-help'); await page.click('#sn-voice');
   assert.equal(await page.evaluate(() => localStorage.getItem('snVoice')), 'off'); await page.evaluate(() => { window.__played = []; });
   await page.click('#sn-tnext'); assert.deepEqual(await page.evaluate(() => window.__played), [], '🔇 kept: silent');
   await page.click('.sn-skip');
-  for (const f of [1, 2, 3, 4]) { const b = fs.statSync('public/secret-voice/t' + f + '.mp3').size; assert.ok(b > 20000 && b < 100000, 't' + f + ' ' + b); }
+  for (const f of [1, 2, 3, 4, 5]) { const b = fs.statSync('public/secret-voice/t' + f + '.mp3').size; assert.ok(b > 20000 && b < 100000, 't' + f + ' ' + b); }
 
   // truth table: every question over 2000 random pairs, checked against plain arithmetic
   const truth = await page.evaluate(() => {
