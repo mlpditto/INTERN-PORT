@@ -7,7 +7,7 @@
     var data = null, at = 0, busy = false, open = {}, per = 'week', dirty = 0;
     var MED = ['🥇', '🥈', '🥉'];
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-    function fmt(game, v) { if (game !== 'count') return String(v); v = Math.round(v); return Math.floor(v / 60) + ':' + ('0' + (v % 60)).slice(-2); }
+    function fmt(game, v) { if (game === 'secret') return v + '🎫'; if (game !== 'count') return String(v); v = Math.round(v); return Math.floor(v / 60) + ':' + ('0' + (v % 60)).slice(-2); }
     function av(p) { return p.pic ? '<img class="gtop-av" src="' + esc(p.pic) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '<span class="gtop-av">' + esc((p.name || '?').slice(0, 1)) + '</span>'; }
     function css() {
         if (document.getElementById('gtop-css')) return;
@@ -35,7 +35,7 @@
     }
     function inner(game) {
         var b = data && data[game] && data[game][per]; if (!b) return '';
-        var unit = game === 'count' ? '' : ' ชนะ', me = b.me ? '<span class="gtop-me">คุณ #' + b.me.r + '</span>' : '';
+        var unit = game === 'count' || game === 'secret' ? '' : ' ชนะ', me = b.me ? '<span class="gtop-me">คุณ #' + b.me.r + '</span>' : '';
         if (!open[game]) {
             if (!b.top.length) return '<div class="gtop-l">🏆 <span class="gtop-e">' + (per === 'week' ? 'สัปดาห์นี้' : '') + 'ยังว่าง · ชนะก่อนได้ 🥇</span></div>';
             return '<div class="gtop-l">🏆 ' + b.top.map(function (p, i) { return '<span class="gtop-c">' + av(p) + MED[i] + fmt(game, p.v) + '</span>'; }).join('') + me + '</div>';
@@ -43,7 +43,7 @@
         return '<div class="gtop-b"><div class="gtop-rail" role="group" aria-label="Period">' + [['week', 'สัปดาห์นี้'], ['all', 'ตลอดกาล']].map(function (k) {
             return '<button type="button" class="' + (per === k[0] ? 'on' : '') + '" aria-pressed="' + (per === k[0]) + '" onclick="event.stopPropagation();GameTop.per(\'' + k[0] + '\')">' + k[1] + '</button>';
         }).join('') + '</div>'
-            + (game === 'count' ? '<div class="gtop-e" style="text-align:center">🥄🥄🥄 ยาก · ✓ 5/5 เวลาดีสุด</div>' : '')   // V101.375 the board counts ยาก only
+            + (game === 'count' ? '<div class="gtop-e" style="text-align:center">🥄🥄🥄 ยาก · ✓ 5/5 เวลาดีสุด</div>' : game === 'secret' ? '<div class="gtop-e" style="text-align:center">🧠 ไม่มีตัวช่วย · 🎫 น้อยสุด</div>' : '')   // V101.375 the board counts ยาก only
             + (b.top.length ? b.top.map(function (p, i) { return '<div class="gtop-r"><b>' + MED[i] + '</b>' + av(p) + '<span class="nm">' + esc(p.name) + '</span><b>' + fmt(game, p.v) + unit + '</b></div>'; }).join('') : '<div class="gtop-e" style="text-align:center">ยังว่าง · ชนะก่อนได้ 🥇</div>')
             + (b.me ? '<div class="gtop-me" style="text-align:center">คุณ #' + b.me.r + ' · ' + fmt(game, b.me.v) + unit + '</div>' : '') + '</div>';
     }

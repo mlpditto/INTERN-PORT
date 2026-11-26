@@ -8,7 +8,7 @@
 (function () {
     'use strict';
     var WEEK = 7 * 864e5, last = 0, plays = [], pick = null, view = 'time', per = 'week', all = null, allAt = 0;
-    var GAMES = [['bw', '⚫', 'ไพ่เงา'], ['count', '🧊', 'นับไว'], ['cereal', '🥣', 'Cereal'], ['wolf', '🐺', 'หมาป่า']];
+    var GAMES = [['bw', '⚫', 'ไพ่เงา'], ['count', '🧊', 'นับไว'], ['cereal', '🥣', 'Cereal'], ['wolf', '🐺', 'หมาป่า'], ['secret', '🔢', 'เลขลับ']];
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function avg(a) { return a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : 0; }
     function median(a) { var b = a.slice().sort(function (x, y) { return x - y; }), k = b.length >> 1; return b.length ? (b.length % 2 ? b[k] : (b[k - 1] + b[k]) / 2) : 0; }
@@ -44,8 +44,8 @@
         var skip = function (id) { var u = (typeof usersData !== 'undefined' ? usersData : []).find(function (x) { return x.id === id; }); return !!(u && u.isIgnored); };
         var rs = R.board(src, pick, skip, true), cnt = pick === 'count';
         if (!rs.length) return '<div class="gt-k">ยังไม่มีใครเล่น' + (per === 'week' ? 'สัปดาห์นี้' : '') + '</div>';
-        return '<table class="gt-t" id="gt-rank"><thead><tr><th class="n">#</th><th>คน</th><th class="n">' + (cnt ? '⏱ ดีสุด 5/5' : '🏆 ชนะ') + '</th><th class="n">🎮</th></tr></thead><tbody>'
-            + rs.map(function (r, i) { return '<tr><td class="n">' + (r.v == null ? '' : i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1) + '</td><td>' + who(r.userId) + '</td><td class="n">' + (r.v == null ? (cnt ? '—' : '0') : cnt ? fmt(r.v) : r.v) + '</td><td class="n">' + r.n + '</td></tr>'; }).join('')
+        return '<table class="gt-t" id="gt-rank"><thead><tr><th class="n">#</th><th>คน</th><th class="n">' + (pick === 'secret' ? '🎫 น้อยสุด 🧠' : cnt ? '⏱ ดีสุด 5/5' : '🏆 ชนะ') + '</th><th class="n">🎮</th></tr></thead><tbody>'
+            + rs.map(function (r, i) { return '<tr><td class="n">' + (r.v == null ? '' : i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1) + '</td><td>' + who(r.userId) + '</td><td class="n">' + (r.v == null ? (cnt || pick === 'secret' ? '—' : '0') : cnt ? fmt(r.v) : r.v) + '</td><td class="n">' + r.n + '</td></tr>'; }).join('')
             + '</tbody></table>';
     }
     function html() {
@@ -53,7 +53,7 @@
         var have = GAMES.filter(function (g) { return src.some(function (p) { return p.game === g[0]; }); });
         if (!have.length) return '';
         if (!pick || !have.some(function (g) { return g[0] === pick; })) pick = have[0][0];
-        var rs = rows(plays, pick), unit = pick === 'count' ? 'ข้อ' : pick === 'bw' ? 'ตา' : 'วัน';
+        var rs = rows(plays, pick), unit = pick === 'count' ? 'ข้อ' : pick === 'bw' ? 'ตา' : pick === 'secret' ? '🎫' : 'วัน';
         var top = '<div class="gt-chips" role="group" aria-label="View">' + chip(view === 'time', "gameAdmin.view('time')", '⏱ เวลา') + chip(view === 'rank', "gameAdmin.view('rank')", '🏆 อันดับ')
             + (view === 'rank' ? '<span style="width:8px"></span>' + chip(per === 'week', "gameAdmin.per('week')", 'สัปดาห์นี้') + chip(per === 'all', "gameAdmin.per('all')", 'ตลอดกาล') : '') + '</div>';
         var games = '<div class="gt-chips" role="group" aria-label="Game">' + have.map(function (g) {
