@@ -11,6 +11,7 @@ async function open(browser, opts = {}) {
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.addInitScript((webkit) => {
         window.__calls = []; window.__opened = 0;
+        for (const k of ['cerealTourSeen', 'wolfTourSeen', 'countTourSeen', 'bwTourSeen']) localStorage.setItem(k, '1');   // a game's first-open tour is a full-screen layer over the photo
         // webkit: like iPhone / LINE on it — a finger's touchstart / pointerdown may not start sound, only touchend / click may
         window.Audio = function (src) { this.src = src; this.paused = true; this.play = () => { const t = window.event && window.event.type; if (webkit && /touchstart|pointerdown/.test(t)) { window.__calls.push('refused'); return Promise.reject(new Error('NotAllowedError')); } this.paused = false; window.__calls.push('play'); return Promise.resolve(); }; this.pause = () => { this.paused = true; window.__calls.push('pause'); }; };
         window.liff = { isInClient: () => true, openWindow: () => { window.__opened++; }, init: () => new Promise(() => {}), isLoggedIn: () => false, getProfile: () => new Promise(() => {}) };
@@ -86,7 +87,7 @@ async function open(browser, opts = {}) {
         for (const [open, id] of [['cerealOpen', 'cerealModal'], ['wolfOpen', 'wolfModal'], ['countOpen', 'countModal'], ['bwOpen', 'bwModal']]) {
             await page.evaluate((f) => window[f](), open); await page.waitForTimeout(50);
             assert.equal(await page.evaluate(() => window.xmMusic.isOn()), false, open + ': game open = music paused');
-            await page.mouse.click(5, 5);
+            { const r = await page.evaluate((m) => { const c = document.getElementById(m).firstElementChild.getBoundingClientRect(); return [c.left + 12, c.top + 12]; }, id); await page.mouse.click(r[0], r[1]); }   // inside the popup — a backdrop tap closes it
             assert.equal(await page.evaluate(() => window.xmMusic.isOn()), false, open + ': taps in the game do not restart it');
             await page.evaluate((m) => { document.getElementById(m).style.display = 'none'; }, id); await page.waitForTimeout(50);
             assert.equal(await page.evaluate(() => window.xmMusic.isOn()), true, open + ': game closed = music back');

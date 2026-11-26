@@ -13,7 +13,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
   await page.addInitScript(() => {
-    for (const k of ['internGuideSeen', 'journalTourSeen', 'cerealTourSeen', 'wolfTourSeen', 'countTourSeen']) localStorage.setItem(k, '1'); localStorage.setItem('wolfCoachSeen', 'all'); localStorage.setItem('cerealCoachSeen', 'all');
+    for (const k of ['internGuideSeen', 'journalTourSeen', 'cerealTourSeen', 'wolfTourSeen', 'bwTourSeen', 'countTourSeen']) localStorage.setItem(k, '1'); localStorage.setItem('wolfCoachSeen', 'all'); localStorage.setItem('cerealCoachSeen', 'all');
     let T = 1.8e12; const real = Date.now; Date.now = () => T; window.__adv = (ms) => { T += ms; }; window.__adds = [];
     const any = new Proxy(function () {}, { get: (t, k) => (k === 'then' ? undefined : any), apply: () => any });
     const q = (name) => ({ add: (d) => { window.__adds.push([name, JSON.parse(JSON.stringify(d))]); return Promise.resolve({ id: 'x' }); }, where: () => q(name), orderBy: () => q(name), limit: () => q(name), get: async () => ({ docs: [], size: 0, empty: true, forEach() {} }), onSnapshot: () => () => {}, doc: () => ({ get: async () => ({ exists: false, data: () => null }), onSnapshot: () => () => {}, set: async () => {}, update: async () => {}, collection: q }) });

@@ -242,7 +242,7 @@
     function tourScene(i) {
         clearInterval(tourT); var still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
         tour = { i: i, step: i === 0 && !still ? 1 : 3 }; render(); say(i);
-        if (i === 0 && !still) tourT = setInterval(function () { if (!tour || tour.i !== 0) return clearInterval(tourT); tour.step++; if (tour.step >= 3) clearInterval(tourT); render(); }, vOn() ? 2600 : 900);
+        if (i === 0 && !still) tourT = setInterval(function () { var m = document.getElementById('countModal'); if (!tour || tour.i !== 0 || !m || m.style.display !== 'flex') return clearInterval(tourT);   /* V101.374: a hidden popup stays hidden */ tour.step++; if (tour.step >= 3) clearInterval(tourT); render(); }, vOn() ? 2600 : 900);
     }
     function render() { var m = root(); document.getElementById('cg-body').innerHTML = tour ? tourHtml() : !g ? lobbyHtml() : g.end ? endHtml() : playHtml(); m.style.display = 'flex';
         if (g && !tour && window.GameLog) GameLog.see('count', { id: g.gid || (g.gid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), n: g.res.length, done: !!g.end, mode: g.mode + (g.free ? ' free' : ''), win: null, score: g.right + '/' + Q, res: g.res.map(function (x) { return x ? 'ok' : 'no'; }) });   // V101.370 🎮 game time for the admin (game-log.js)
