@@ -51,7 +51,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     return { right: g.right, res: g.res.map((x) => (x ? 'ok' : 'no')) };
   });
   p = await plays(); assert.equal(p.length, 2);
-  assert.deepEqual({ game: p[1].game, mode: p[1].mode, rounds: p[1].rounds, score: p[1].score, res: p[1].res, win: p[1].win }, { game: 'count', mode: 'rect', rounds: [3, 3, 3, 3, 3], score: cg.right + '/5', res: cg.res, win: null }, 'นับไว: seconds per question');
+  assert.deepEqual({ game: p[1].game, mode: p[1].mode, rounds: p[1].rounds, score: p[1].score, res: p[1].res, win: p[1].win }, { game: 'count', mode: 'rect l2', rounds: [3, 3, 3, 3, 3], score: cg.right + '/5', res: cg.res, win: null }, 'นับไว: seconds per question');
   await page.evaluate(() => CG.close());
 
   // ---- 🥣 Cereal vs 🤖 as 🕵️: a day = a round; finished → my side's win ----

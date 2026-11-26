@@ -21,14 +21,15 @@ const P = [
   { userId: 'a', game: 'bw', win: 'w', endedAt: MON + 10 }, { userId: 'b', game: 'bw', win: 'w', endedAt: MON + 5 }, { userId: 'b', game: 'bw', win: 'l', endedAt: MON + 6 },
   { userId: 'c', game: 'bw', win: 'l', endedAt: MON + 1 }, { userId: 'a', game: 'bw', win: 'w', endedAt: MON - 100 }, { userId: 'x', game: 'bw', win: 'w', endedAt: MON + 2 },
   { userId: 'x', game: 'bw', win: 'w', endedAt: MON + 3 },
-  { userId: 'a', game: 'count', score: '5/5', sec: 80, endedAt: MON + 1 }, { userId: 'b', game: 'count', score: '5/5', sec: 60, endedAt: MON + 1 },
-  { userId: 'c', game: 'count', score: '4/5', sec: 20, endedAt: MON + 1 }, { userId: 'a', game: 'count', score: '5/5', sec: 50, endedAt: MON - 9 },
+  { userId: 'a', game: 'count', mode: 'rect l3', score: '5/5', sec: 80, endedAt: MON + 1 }, { userId: 'b', game: 'count', mode: 'cube free l3', score: '5/5', sec: 60, endedAt: MON + 1 },
+  { userId: 'c', game: 'count', mode: 'rect l3', score: '4/5', sec: 20, endedAt: MON + 1 }, { userId: 'a', game: 'count', mode: 'cube l3', score: '5/5', sec: 50, endedAt: MON - 9 },
+  { userId: 'c', game: 'count', mode: 'rect l2', score: '5/5', sec: 10, endedAt: MON + 1 }, { userId: 'c', game: 'count', mode: 'rect', score: '5/5', sec: 10, endedAt: MON + 1 },
 ];
 const skip = (id) => id === 'x';
 const r = R.rank(P, MON + 1000, skip);
 assert.deepEqual(r.boards.bw.week.map((x) => x.userId + x.v), ['b1', 'a1'], 'week: one win each, b got there first; x is ignored');
 assert.deepEqual(r.boards.bw.all.map((x) => x.userId + x.v), ['a2', 'b1'], 'all time counts last week');
-assert.deepEqual(r.boards.count.week.map((x) => x.userId + x.v), ['b60', 'a80'], '🧊 fastest 5/5 first, 4/5 never counts');
+assert.deepEqual(r.boards.count.week.map((x) => x.userId + x.v), ['b60', 'a80'], '🧊 fastest 5/5 at 🥄🥄🥄 first; 4/5, 🥄🥄 and old plays without a level never count');
 assert.deepEqual(r.boards.count.all.map((x) => x.userId + x.v), ['a50', 'b60']);
 assert.deepEqual(R.board(P, 'bw', skip, true).map((x) => x.userId + x.v), ['a2', 'b1', 'cnull'], 'the admin list keeps who never won, last');
 const mine = R.forIntern(r, 'c', (id) => ({ name: 'N' + id, pic: '' }));
@@ -88,6 +89,9 @@ const DATA = {
   assert.equal(await page.$('[data-gtop="bw"] .gtop-b'), null, 'a second tap folds it');
   assert.match(await line('bw'), /🥇30/, 'the line follows the period');
   await page.click('[data-gtop="bw"]'); await page.click('[data-gtop="bw"] .gtop-rail button:nth-child(1)'); await page.click('[data-gtop="bw"]');
+  await page.evaluate(() => { BW.close(); countOpen(); }); await page.click('[data-gtop="count"]');
+  assert.match(await line('count'), /🥄🥄🥄 ยาก · ✓ 5\/5 เวลาดีสุด/, '🧊 board says it counts ยาก only');
+  await page.click('[data-gtop="count"]'); await page.evaluate(() => { CG.close(); bwOpen(); });
   // a finished game → the next lobby asks again
   await page.evaluate(() => { BW._rng(() => 0.3); BW.start(); const g = BW._g(); while (!g.end) { if (g.last) BW.next(); else { BW.pick(g.me[0]); BW.play(); } } });
   await page.evaluate(() => { BW.lobby ? BW.lobby() : BW.open(); });

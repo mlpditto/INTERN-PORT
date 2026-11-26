@@ -43,6 +43,7 @@
         return '<div class="gtop-b"><div class="gtop-rail" role="group" aria-label="Period">' + [['week', 'สัปดาห์นี้'], ['all', 'ตลอดกาล']].map(function (k) {
             return '<button type="button" class="' + (per === k[0] ? 'on' : '') + '" aria-pressed="' + (per === k[0]) + '" onclick="event.stopPropagation();GameTop.per(\'' + k[0] + '\')">' + k[1] + '</button>';
         }).join('') + '</div>'
+            + (game === 'count' ? '<div class="gtop-e" style="text-align:center">🥄🥄🥄 ยาก · ✓ 5/5 เวลาดีสุด</div>' : '')   // V101.375 the board counts ยาก only
             + (b.top.length ? b.top.map(function (p, i) { return '<div class="gtop-r"><b>' + MED[i] + '</b>' + av(p) + '<span class="nm">' + esc(p.name) + '</span><b>' + fmt(game, p.v) + unit + '</b></div>'; }).join('') : '<div class="gtop-e" style="text-align:center">ยังว่าง · ชนะก่อนได้ 🥇</div>')
             + (b.me ? '<div class="gtop-me" style="text-align:center">คุณ #' + b.me.r + ' · ' + fmt(game, b.me.v) + unit + '</div>' : '') + '</div>';
     }

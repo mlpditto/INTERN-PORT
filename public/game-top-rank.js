@@ -1,6 +1,6 @@
 /* V101.375 🏆 Top 3 per game (owner 2026-11-26: "แต่ละเกม ให้เก็บคะแนนผู้ชนะไว้ด้วย ประกาศ Top 3 แต่ละเกม ให้แต่ละ user ทราบ ส่วน ADMIN
    จะทราบทั้งหมด"; picks: count wins · this week + all time · line B, mockup-game-top3/). Ranks game_plays (game-log.js writes one
-   per finished game): 🥣 🐺 ⚫⚪ = games won (win 'w'); 🧊 นับไว = the best total seconds of a game with all 5 right. A tie goes to
+   per finished game): 🥣 🐺 ⚫⚪ = games won (win 'w'); 🧊 นับไว = the best total seconds of a 🥄🥄🥄 (mode ' l3') game with all 5 right. A tie goes to
    who got there first. The week starts Monday 00:00 Bangkok. Pure; the same file runs in the gameTop callable (functions/) and on
    the admin page (public/, window.GameTopRank) — scripts/game-top-qa.cjs checks the two copies are the same. */
 (function (root, factory) {
@@ -18,7 +18,7 @@
     function value(p) {
         if (p.game === 'count') {
             var s = String(p.score || '').split('/'), right = +s[0], of = +s[1];
-            return right > 0 && right === of && p.sec > 0 ? p.sec : null;
+            return right > 0 && right === of && p.sec > 0 && / l3\b/.test(String(p.mode || '')) ? p.sec : null;   // ยาก only (owner pick)
         }
         return p.win === 'w' ? 1 : null;
     }

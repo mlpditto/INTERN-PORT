@@ -24,6 +24,11 @@
     function hush() { if (aud) { try { aud.pause(); } catch (e) { } aud = null; } }
     function say(i) { hush(); if (!vOn()) return; try { aud = new Audio('count-voice/t' + (i + 1) + '.mp3'); var p = aud.play(); if (p && p.catch) p.catch(function () { /* the phone wants a tap first */ }); } catch (e) { aud = null; } }
     var rng = Math.random, g = null, tick = null;
+    // V101.375 (owner "เกมนี้ควรมีให้เลือกระดับความยากด้วย", pick A = a 🥄 rail like ไพ่เงา): the level moves the 5 questions' range —
+    // 🥄 easy = puzzle levels 0 0 1 1 2 · 🥄🥄 = 0–4 (as before) · 🥄🥄🥄 = 2–6. Kept on the phone (countLv); 🥄🥄 keeps the old best keys.
+    var LV = { 1: [0, 0, 1, 1, 2], 2: [0, 1, 2, 3, 4], 3: [2, 3, 4, 5, 6] }, LVN = { 1: 'ง่าย', 2: 'กลาง', 3: 'ยาก' };
+    function lvNow() { var v = +(function () { try { return localStorage.getItem('countLv'); } catch (e) { return 0; } })(); return LV[v] ? v : 2; }
+    function bk(base, mode, lv) { return base + mode + (lv === 2 ? '' : '_l' + lv); }   // the best key per level
     function mmss(s) { return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
     function ri(a, b) { return a + Math.floor(rng() * (b - a + 1)); }
     function get(k) { try { return +localStorage.getItem(k) || 0; } catch (e) { return 0; } }
@@ -31,7 +36,7 @@
 
     // ---- 🟥 rectangles: outlines of a few rectangles on a W×H lattice; count = every rectangle whose 4 sides are drawn --------------
     function rectPuzzle(level) {
-        var W = 8, H = 6, lo = [5, 7, 9, 11, 13][level], hi = [10, 14, 18, 24, 30][level];
+        var W = 8, H = 6, lo = [5, 7, 9, 11, 13, 16, 20][level], hi = [10, 14, 18, 24, 30, 36, 44][level];
         for (var tries = 0; tries < 400; tries++) {
             var hs = {}, vs = {}, k = 1 + level + ri(0, 1), boxes = [[0, 0, W, H]];
             for (var i = 0; i < k; i++) { var x1 = ri(0, W - 2), y1 = ri(0, H - 2); boxes.push([x1, y1, ri(x1 + 1, Math.min(W, x1 + 5)), ri(y1 + 1, Math.min(H, y1 + 4))]); }
@@ -75,7 +80,7 @@
 
     // ---- 🧊 cubes: a staircase height map (back corner tallest, never taller toward you) so every column's top is in sight --------
     function cubePuzzle(level) {
-        var n = level < 2 ? 3 : 4, lo = [4, 6, 8, 11, 14][level], hi = [9, 12, 16, 20, 26][level];
+        var n = level < 2 ? 3 : level < 5 ? 4 : 5, lo = [4, 6, 8, 11, 14, 18, 22][level], hi = [9, 12, 16, 20, 26, 32, 40][level];
         for (var tries = 0; tries < 400; tries++) {
             var h = [], sum = 0;
             for (var r = 0; r < n; r++) {
@@ -118,7 +123,7 @@
 
     // ---- game -------------------------------------------------------------------------------------------------------------
     function count(p) { return p.mode === 'rect' ? p.n : p.n2; }
-    function newQ() { g.p = g.mode === 'rect' ? rectPuzzle(g.i) : cubePuzzle(g.i); g.typed = ''; g.left = SEC; g.el = 0; g.done = null; startTick(); }
+    function newQ() { var lv = LV[g.lv || 2][g.i]; g.p = g.mode === 'rect' ? rectPuzzle(lv) : cubePuzzle(lv); g.typed = ''; g.left = SEC; g.el = 0; g.done = null; startTick(); }
     function startTick() { clearInterval(tick); tick = setInterval(function () { if (!g || g.done) return clearInterval(tick); if (tour) return; if (g.free) { g.el++; return paintClock(); } g.left--; if (g.left <= 0) { g.left = 0; answer(); } else paintClock(); }, 1000); }
     function answer() {
         clearInterval(tick); var right = g.typed !== '' && +g.typed === count(g.p), pts = right && !g.free ? 100 + g.left * 5 : 0;
@@ -176,11 +181,12 @@
     function q() { return '<button type="button" class="cg-q" id="cg-help" onclick="CG.tour()" aria-label="How to count" title="How to count" data-th-title="วิธีนับ">?</button>'; }
     function dots() { var h = '<div class="cg-dots" aria-label="Questions">'; for (var i = 0; i < Q; i++) h += '<i class="' + (i < g.res.length ? (g.res[i] ? 'ok' : 'no') : i === g.i && !g.done ? 'now' : '') + '"></i>'; return h + '</div>'; }
     function lobbyHtml() {
-        var free = get('countFree') === 1;
+        var free = get('countFree') === 1, lv = lvNow();
         return '<div class="cg"><div class="cg-top"><h3>🧊 นับไว</h3>' + q() + x() + '</div>'
             + (window.GameTop ? GameTop.line('count') : '')   // V101.375 🏆 Top 3 (game-top.js)
             + '<div class="cg-rail" role="group" aria-label="Timer"><button type="button" id="cg-timed" class="' + (free ? '' : 'on') + '" aria-pressed="' + !free + '" onclick="CG.free(0)">⏱ แข่งเวลา ' + SEC + ' วิ</button><button type="button" id="cg-free" class="' + (free ? 'on' : '') + '" aria-pressed="' + free + '" onclick="CG.free(1)">🧘 ไม่จับเวลา</button></div>'
-            + '<div class="cg-modes">' + ['rect', 'cube'].map(function (k) { var b = get(free ? 'countFreeBest_' + k : 'countBest_' + k); return '<button type="button" id="cg-' + k + '" onclick="CG.start(\'' + k + '\')"><i>' + MODES[k].e + '</i>' + MODES[k].n + '<small>' + (free ? (b ? '⏱ ดีสุด ' + mmss(b) : Q + ' ข้อ · ไม่จับเวลา') : b ? '🏆 ' + b : Q + ' ข้อ · ' + SEC + ' วิ') + '</small></button>'; }).join('') + '</div>'
+            + '<div class="cg-rail" role="group" aria-label="Level">' + [1, 2, 3].map(function (n) { return '<button type="button" id="cg-lv' + n + '" class="' + (lv === n ? 'on' : '') + '" aria-pressed="' + (lv === n) + '" onclick="CG.lv(' + n + ')">' + '🥄'.repeat(n) + ' ' + LVN[n] + '</button>'; }).join('') + '</div>'   // V101.375
+            + '<div class="cg-modes">' + ['rect', 'cube'].map(function (k) { var b = get(bk(free ? 'countFreeBest_' : 'countBest_', k, lv)); return '<button type="button" id="cg-' + k + '" onclick="CG.start(\'' + k + '\')"><i>' + MODES[k].e + '</i>' + MODES[k].n + '<small>' + (free ? (b ? '⏱ ดีสุด ' + mmss(b) : Q + ' ข้อ · ไม่จับเวลา') : b ? '🏆 ' + b : Q + ' ข้อ · ' + SEC + ' วิ') + '</small></button>'; }).join('') + '</div>'
             + '<div class="cg-note">' + (free ? 'ไม่มีนับถอยหลัง · จับเวลาไว้ดูทีหลัง' : 'ตอบแล้วดูเฉลยทุกข้อ') + '</div></div>';
     }
     function playHtml() {
@@ -203,16 +209,16 @@
     function qtRow() { return '<div class="cg-qt" id="cg-qt">' + g.qt.map(function (s, i) { return '<span class="' + (g.res[i] ? 'ok' : 'no') + '">ข้อ' + (i + 1) + ' ' + s + 'วิ</span>'; }).join('') + '</div>'; }   // V101.372: both modes
     function endHtml() {
         if (g.free) {   // V101.371 🧘: right · total · average, each question's seconds; a best total only for 5/5
-            var tot = g.qt.reduce(function (a, b) { return a + b; }, 0), fk = 'countFreeBest_' + g.mode, fb = get(fk), fnb = g.right === Q && (!fb || tot < fb);
+            var tot = g.qt.reduce(function (a, b) { return a + b; }, 0), fk = bk('countFreeBest_', g.mode, g.lv || 2), fb = get(fk), fnb = g.right === Q && (!fb || tot < fb);
             if (fnb) set(fk, tot);
-            return '<div class="cg"><div class="cg-top"><h3>' + MODES[g.mode].e + ' จบรอบ · 🧘</h3>' + x() + '</div>'
+            return '<div class="cg"><div class="cg-top"><h3>' + MODES[g.mode].e + ' จบรอบ · 🧘 ' + '🥄'.repeat(g.lv || 2) + '</h3>' + x() + '</div>'
                 + '<div class="cg-stats" id="cg-stats"><div>✓ ' + g.right + '/' + Q + '<small>ถูก</small></div><div>' + mmss(tot) + '<small>เวลารวม</small></div><div>' + Math.round(tot / Q) + ' วิ<small>เฉลี่ย/ข้อ</small></div></div>'
                 + qtRow()
                 + '<div class="cg-note" id="cg-best">' + (fnb ? '🎉 สถิติใหม่ · ดีสุด ' + mmss(tot) : fb ? 'ดีสุด ' + mmss(fb) + ' (✓ 5/5)' : 'ถูกครบ 5 ข้อ = เก็บสถิติเวลา') + '</div>'
                 + '<button type="button" class="cg-go" onclick="CG.start(\'' + g.mode + '\')">↻ เล่นอีก</button><button type="button" class="cg-x" style="align-self:center" onclick="CG.lobby()">⬅ เลือกเกม</button></div>';
         }
-        var best = get('countBest_' + g.mode), nb = g.score > best; if (nb) set('countBest_' + g.mode, g.score);
-        return '<div class="cg"><div class="cg-top"><h3>' + MODES[g.mode].e + ' จบรอบ</h3>' + x() + '</div>'
+        var bkey = bk('countBest_', g.mode, g.lv || 2), best = get(bkey), nb = g.score > best; if (nb) set(bkey, g.score);
+        return '<div class="cg"><div class="cg-top"><h3>' + MODES[g.mode].e + ' จบรอบ · ' + '🥄'.repeat(g.lv || 2) + '</h3>' + x() + '</div>'
             + '<div class="cg-ans" id="cg-final">🏆 ' + g.score + '</div><div class="cg-note">✓ ' + g.right + '/' + Q + (nb ? ' · 🎉 สถิติใหม่' : best ? ' · สถิติ ' + best : '') + '</div>' + qtRow()
             + '<button type="button" class="cg-go" onclick="CG.start(\'' + g.mode + '\')">↻ เล่นอีก</button><button type="button" class="cg-x" style="align-self:center" onclick="CG.lobby()">⬅ เลือกเกม</button></div>';
     }
@@ -246,7 +252,7 @@
         if (i === 0 && !still) tourT = setInterval(function () { var m = document.getElementById('countModal'); if (!tour || tour.i !== 0 || !m || m.style.display !== 'flex') return clearInterval(tourT);   /* V101.374: a hidden popup stays hidden */ tour.step++; if (tour.step >= 3) clearInterval(tourT); render(); }, vOn() ? 2600 : 900);
     }
     function render() { var m = root(); document.getElementById('cg-body').innerHTML = tour ? tourHtml() : !g ? lobbyHtml() : g.end ? endHtml() : playHtml(); m.style.display = 'flex';
-        if (g && !tour && window.GameLog) GameLog.see('count', { id: g.gid || (g.gid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), n: g.res.length, done: !!g.end, mode: g.mode + (g.free ? ' free' : ''), win: null, score: g.right + '/' + Q, res: g.res.map(function (x) { return x ? 'ok' : 'no'; }) });   // V101.370 🎮 game time for the admin (game-log.js)
+        if (g && !tour && window.GameLog) GameLog.see('count', { id: g.gid || (g.gid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), n: g.res.length, done: !!g.end, mode: g.mode + (g.free ? ' free' : '') + ' l' + (g.lv || 2), win: null, score: g.right + '/' + Q, res: g.res.map(function (x) { return x ? 'ok' : 'no'; }) });   // V101.370 🎮 game time for the admin (game-log.js)
     }
     function onKey(e) {
         var m = document.getElementById('countModal'); if (!m || m.style.display !== 'flex') return;
@@ -263,7 +269,8 @@
         tourEnd: function () { clearInterval(tourT); hush(); tour = null; set('countTourSeen', 1); render(); },   // back to the lobby / the same question
         lobby: function () { clearInterval(tick); g = null; render(); },
         free: function (v) { set('countFree', v ? 1 : 0); render(); },   // V101.371: ⏱ / 🧘, kept on the phone
-        start: function (mode) { g = { mode: mode, i: 0, score: 0, right: 0, res: [], qt: [], free: get('countFree') === 1 }; newQ(); render(); },
+        lv: function (n) { set('countLv', LV[n] ? n : 2); render(); },   // V101.375 🥄 level, kept on the phone
+        start: function (mode) { g = { mode: mode, lv: lvNow(), i: 0, score: 0, right: 0, res: [], qt: [], free: get('countFree') === 1 }; newQ(); render(); },
         key: function (k) {
             if (!g || g.done) return;
             g.typed = k === 'del' ? g.typed.slice(0, -1) : (g.typed + k).replace(/^0+(?=\d)/, '').slice(0, 2);
