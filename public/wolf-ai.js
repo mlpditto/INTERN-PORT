@@ -15,7 +15,7 @@
   function alive(g) { return g.ids.filter(function (id) { return g.st.alive[id]; }); }
   function role(g, id) { return g.st.roles[id]; }
   function dead(g, id) { return !g.st.alive[id]; }
-  function isBot(g, id) { return id !== g.me; }
+  function isBot(g, id) { return g.bots ? g.bots.indexOf(id) >= 0 : id !== g.me; }   // Telegram (2026-11-26): g.bots lists the bot seats; solo: everyone but me
   function argmax(m, ids) { var best = null; ids.forEach(function (id) { if (best === null || m[id] > m[best]) best = id; }); return best; }
   function argmin(m, ids) { var best = null; ids.forEach(function (id) { if (best === null || m[id] < m[best]) best = id; }); return best; }
   function noise(g, b, t) { return (hash(g.id + '|' + b + '|' + t + '|' + g.day) - 0.5) * 2 * (NOISE[g.level] || 1.5); }
