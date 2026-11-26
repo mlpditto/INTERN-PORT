@@ -26,6 +26,10 @@
 // phase starts: night picks at 🌙 (a human 🐺 sees a bot mate's wish in the DM), one line of table talk in the ☀️ message
 // (🤨 / 👍 / 🔮 claims, fakes shown 🤥 at the end), ballots at 🗳. Bot ids are bot1…bot9, names carry 🤖; a game needs ≥ 1
 // human. Bot knowledge lives in secret/state.ai (checks, claims, said, votes). Nothing is ever sent to a bot id.
+// 🎲 extra role (2026-11-26, owner pick 4A, first role 🏹): the host's lobby chip swaps one 👤 for a 🏹 นักล่า from 6 seats,
+// shown in the deck line. When the hunter dies (night or vote) the game pauses in status 'shot' (SHOT_SEC, clock-armed):
+// the group sees who the hunter was and a ⏳, the hunter gets a DM menu; a press or the deadline (no shot) resolves it and
+// the day / next night goes on. A bot hunter shoots at once (wolf-ai hunterPick), no pause.
 'use strict';
 const W = require('./wolf-rules');
 const AI = require('./wolf-ai');
@@ -37,14 +41,16 @@ const ROLE_CARD = {
   guard: '🛡️ คุณคือ บอดี้การ์ด\nกลางคืนคุ้มกัน 1 คน (ห้ามคนเดิม 2 คืนติด)',
   witch: '🧪 คุณคือ แม่มด\nมี 💚 ชุบ 1 + ☠️ พิษ 1 ใช้ได้ทั้งเกม',
   villager: '👤 คุณคือ ชาวบ้าน\nกลางวันช่วยกันหา 🐺 แล้วโหวตออก',
+  hunter: '🏹 คุณคือ นักล่า\nตายเมื่อไร (คืนหรือโหวต) ยิงได้ 1 คนทันที · กลางวันช่วยกันหา 🐺',
 };
-const LIVE = ['night', 'day', 'vote'];
+const LIVE = ['night', 'day', 'vote', 'shot'];
 const QUIET = ' · ขอเงียบในกลุ่มจนจบเกมนะ 🤐';   // owner pick Q8: ask once, delete nothing
 const WARN_SEC = 60;   // ⏳ the warning goes out at the first tick with ≤ 60 s left (W1)
 const STEP_SEC = 30;   // C1: the ⏳ in the phase message is edited this often
 const BOT_NAMES = ['ต้น', 'ใบ', 'ฟ้า', 'นนท์', 'มุก', 'ภู', 'แพร', 'ก้อง', 'เจ'];   // the solo game's names, in order
 const LEVELS = { 1: '🌆 หัวค่ำ', 2: '🌙 เที่ยงคืน', 3: '🌕 คืนเดือนเพ็ญ' };   // the solo lobby's night levels
 const isBotId = (id) => /^bot\d$/.test(String(id));
+const SHOT_SEC = 30;   // 🏹 the dead hunter's time to aim
 const leftSec = (g, now) => Math.max(0, Math.round((g.deadline - now) / 5000) * 5);   // what the ⏳ shows: to 5 s, task jitter hidden
 const mmss = (sec) => Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
 const RULES = [   // owner pick R1: a line per role + the flow + the win rule, plain text (~450 chars)
@@ -54,6 +60,7 @@ const RULES = [   // owner pick R1: a line per role + the flow + the win rule, p
   '🔮 ผู้หยั่งรู้ ส่อง 1 คน ว่าเป็น 🐺 ไหม',
   '🛡️ บอดี้การ์ด คุ้มกัน 1 คน · ห้ามคนเดิม 2 คืนติด',
   '🧪 แม่มด 💚 ชุบ 1 + ☠️ พิษ 1 ทั้งเกม · 7 คนขึ้นไป',
+  '🏹 นักล่า ตายแล้วยิง 1 คนทันที · เมื่อหัวห้องเปิด 🎲 (6 คนขึ้นไป)',
   '👤 ชาวบ้าน ช่วยกันหา 🐺',
   '🌙 คืน ' + mmss(W.NIGHT_SEC) + ' → ☀️ เช้า บอกใครตาย (ไม่บอกบท) → 💬 คุย ' + mmss(W.TALK_DEFAULT) + ' → 🗳 โหวตลับ ' + mmss(W.VOTE_SEC) + ' · เสมอ = ไม่มีใครออก',
   '🏆 🐺 หมด = ชาวบ้านชนะ · 🐺 ≥ คนที่เหลือ = 🐺 ชนะ',
@@ -75,10 +82,12 @@ function lobbyView(g, bot) {
   const n = list.length, total = n + bl.length;
   const text = '🐺 มนุษย์หมาป่า · ห้อง ' + g.code + '\n👥 ' + n + '/' + W.MAX_PLAYERS + (n ? ' · ' + list.join(', ') : '') +
     (bl.length ? '\n🤖 ' + bl.length + ' · ' + bl.join(' ') + ' · ' + LEVELS[g.level || 2] : '') +
+    (g.extra ? '\n🎲 🏹 นักล่า แทน 👤 1 คน' + (total < 6 ? ' · ต้อง 6 คนขึ้นไป' : '') : '') +
     '\n' + (total >= W.MIN_PLAYERS ? '✅ ครบแล้ว หัวห้องกด ▸ เริ่ม' : '⏳ อีก ' + (W.MIN_PLAYERS - total) + ' คน · กติกา /rules' + (bl.length ? '' : ' · หรือเติม 🤖'));
   const rows = [];
   if (total < W.MAX_PLAYERS) rows.push([{ text: '▸ เข้าร่วม', url: 'https://t.me/' + bot + '?start=' + g.code }]);
   rows.push([{ text: '🤖 +1', callback_data: 'bot:+:' + g.code }, { text: '🤖 −1', callback_data: 'bot:-:' + g.code }, { text: LEVELS[g.level || 2], callback_data: 'lvl:' + g.code }]);
+  rows.push([{ text: '🎲 บทพิเศษ: ' + (g.extra ? '🏹 นักล่า' : 'ปิด'), callback_data: 'extra:' + g.code }]);
   rows.push([{ text: '▸ เริ่ม', callback_data: 'start:' + g.code }, { text: '✕ ยกเลิก', callback_data: 'cancel:' + g.code }]);
   return { text, reply_markup: { inline_keyboard: rows } };
 }
@@ -375,9 +384,60 @@ function finishNight(g, st, now, out, rng) {
   const deadTxt = r.dead.length ? 'เมื่อคืน 💀 ' + r.dead.map((id) => nm(g, id)).join(', ') + ' ตาย' + QUIET : 'คืนสงบ ไม่มีใครตาย';
   r.dead.forEach((id) => out.push({ method: 'sendMessage', body: { chat_id: id, text: '💀 คุณตายเมื่อคืน · ดูเกมต่อได้ แต่ขอเงียบในกลุ่มจนจบนะ 🤐' } }));
   if (endIf(g, st, out, '☀️ เช้าวันที่ ' + g.round + ' · ' + deadTxt)) return;
-  g.status = 'day'; g.deadline = now + (g.talkSec || W.TALK_DEFAULT) * 1000; g.dayLead = deadTxt; g.botSay = botTalk(g, st);
-  out.push({ method: 'sendMessage', body: Object.assign({ chat_id: g.chatId }, dayView(g, st, g.talkSec || W.TALK_DEFAULT)), save: 'phaseMsgId' });
   remind(g, st, missed, out);
+  let lead = deadTxt;
+  const hunter = r.dead.find((id) => st.roles[id] === 'hunter');
+  if (hunter) {
+    const line = hunterTurn(g, st, now, out, hunter, 'day', deadTxt);
+    if (line === null) return;   // a human 🏹 aims first; the day starts after the shot
+    lead += '\n' + line;
+    if (endIf(g, st, out, '☀️ เช้าวันที่ ' + g.round + ' · ' + lead)) return;
+  }
+  beginDay(g, st, now, out, lead);
+}
+/* ☀️ the talk. lead = who died (+ the 🏹 line). editId = the shot message to turn into the day message. */
+function beginDay(g, st, now, out, lead, editId) {
+  g.status = 'day'; g.deadline = now + (g.talkSec || W.TALK_DEFAULT) * 1000; g.dayLead = lead; g.botSay = botTalk(g, st);
+  const body = Object.assign({ chat_id: g.chatId }, dayView(g, st, g.talkSec || W.TALK_DEFAULT));
+  if (editId) out.push({ method: 'editMessageText', body: Object.assign({ message_id: editId }, body) });
+  else out.push({ method: 'sendMessage', body, save: 'phaseMsgId' });
+}
+// ---- 🏹 the hunter's shot ------------------------------------------------------------------------------------------------
+const shotView = (g, left) => ({ text: (g.shot.then === 'day' ? '☀️ เช้าวันที่ ' + g.round + ' · ' + g.shot.lead + '\n' : '') + '🏹 ' + nm(g, g.shot.who) + ' เป็นนักล่า · เล็งปืนอยู่ ⏳ ' + mmss(left) });
+/* Apply the shot (target null = none) and say so. */
+function shotLine(g, st, hunter, target) {
+  if (target && !W.shotError(st, hunter, target)) {
+    Object.assign(st, W.eliminate(st, target)); g.players[target].alive = false;
+    return '🏹 ' + nm(g, hunter) + ' ยิง ' + nm(g, target) + ' 💀';
+  }
+  return '🏹 ' + nm(g, hunter) + ' ไม่ได้ยิงใคร';
+}
+/* The hunter just died. A bot shoots at once (returns the line); a human gets SHOT_SEC and a DM menu (status 'shot', returns
+   null) — then = 'day' (died at night, lead = the morning line) or 'night' (voted out). */
+function hunterTurn(g, st, now, out, hunter, then, lead) {
+  if (isBotId(hunter)) return shotLine(g, st, hunter, AI.hunterPick(aiView(g, st), hunter));
+  g.status = 'shot'; g.deadline = now + SHOT_SEC * 1000; g.shot = { who: hunter, then, lead };
+  out.push({ method: 'sendMessage', body: Object.assign({ chat_id: g.chatId }, shotView(g, SHOT_SEC)), save: 'phaseMsgId' });
+  const btns = seated(g).map(([id]) => id).filter((id) => !W.shotError(st, hunter, id)).map((id) => ({ text: nm(g, id), callback_data: 'h:' + g.code + ':' + g.round + ':' + id }));
+  out.push({ method: 'sendMessage', body: { chat_id: hunter, text: '🏹 คุณเป็นนักล่า · ยิงใครก่อนไป? ⏳ ' + mmss(SHOT_SEC), reply_markup: { inline_keyboard: rows2(btns) } }, dm: nm(g, hunter) });
+  return null;
+}
+/* The human's press (target) or the clock (null): say it, then the day (the shot message becomes the ☀️ message) or the next night. */
+function resolveShot(g, st, now, out, target, rng) {
+  const { who, then, lead } = g.shot;
+  const line = shotLine(g, st, who, target);
+  g.shot = null;
+  const edit = (text) => { if (g.phaseMsgId) out.push({ method: 'editMessageText', body: { chat_id: g.chatId, message_id: g.phaseMsgId, text } }); };
+  if (then === 'day') {
+    const full = lead + '\n' + line;
+    if (W.winner(st)) { edit('☀️ เช้าวันที่ ' + g.round + ' · ' + full); endIf(g, st, out, line); return; }
+    beginDay(g, st, now, out, full, g.phaseMsgId);
+  } else {
+    edit(line);
+    if (endIf(g, st, out, line)) return;
+    g.round += 1; g.voteMsgId = null;
+    beginNight(g, st, now, out, rng);
+  }
 }
 function voteView(g, st, left) {
   const live = seated(g).map(([id]) => id).filter((id) => st.alive[id]);
@@ -407,9 +467,15 @@ function finishVote(g, st, now, out, rng) {
   if (g.voteMsgId) out.push({ method: 'editMessageText', body: { chat_id: g.chatId, message_id: g.voteMsgId, text: '🗳 ปิดโหวตวันที่ ' + g.round } });
   if (endIf(g, st, out, txt)) return;
   out.push({ method: 'sendMessage', body: { chat_id: g.chatId, text: txt } });
+  remind(g, st, missed, out);
+  if (t.out && st.roles[t.out] === 'hunter') {
+    const line = hunterTurn(g, st, now, out, t.out, 'night', '');
+    if (line === null) return;   // a human 🏹 aims first; the night starts after the shot
+    if (endIf(g, st, out, line)) return;
+    out.push({ method: 'sendMessage', body: { chat_id: g.chatId, text: line } });
+  }
   g.round += 1; g.voteMsgId = null;
   beginNight(g, st, now, out, rng);
-  remind(g, st, missed, out);
 }
 /* The end: the winner and every role (the only group text that ever names roles). */
 function endIf(g, st, out, lead) {
@@ -440,7 +506,8 @@ async function onButton(q, deps) {
   if (parts[0] === 'n') return onNight(q, parts, deps);
   if (parts[0] === 'v') return onVote(q, parts, deps);
   if (parts[0] === 'talk') return onTalkEnd(q, parts, deps);
-  if (parts[0] === 'bot' || parts[0] === 'lvl') return onLobbyBots(q, parts, deps);
+  if (parts[0] === 'bot' || parts[0] === 'lvl' || parts[0] === 'extra') return onLobbyBots(q, parts, deps);
+  if (parts[0] === 'h') return onShot(q, parts, deps);
   const { db } = deps;
   const [kind, code] = parts;
   const me = String(q.from.id);
@@ -463,7 +530,8 @@ async function onButton(q, deps) {
     const ids = seated(d).map(([id]) => id);
     if (ids.length < W.MIN_PLAYERS) return { say: 'ต้องมีอย่างน้อย ' + W.MIN_PLAYERS + ' คน (ตอนนี้ ' + ids.length + ')' };
     if (!humans(d).length) return { say: 'ต้องมีคนจริงอย่างน้อย 1 คน' };
-    const counts = W.defaultCounts(ids.length);
+    let counts = W.defaultCounts(ids.length);
+    if (d.extra && ids.length >= 6) counts = W.addExtra(counts, 'hunter');   // 🎲 (owner pick 4A: shown in the deck line)
     const roles = W.deal(ids, counts, deps.rng);
     const st = W.newState(roles);
     const out = [];
@@ -503,7 +571,8 @@ async function onLobbyBots(q, parts, deps) {
     const g = gs.data();
     if (g.host !== me) return { say: 'เฉพาะหัวห้อง (' + hostNm(g) + ') กดได้' };
     if (g.status !== 'lobby') return { say: 'เกมเริ่มไปแล้ว' };
-    if (parts[0] === 'lvl') g.level = ((g.level || 2) % 3) + 1;
+    if (parts[0] === 'extra') g.extra = !g.extra;
+    else if (parts[0] === 'lvl') g.level = ((g.level || 2) % 3) + 1;
     else if (parts[1] === '+') {
       if (seated(g).length >= W.MAX_PLAYERS) return { say: 'เต็มแล้ว (' + W.MAX_PLAYERS + ' ที่)' };
       const used = seated(g).map(([, p]) => p.name);
@@ -515,11 +584,37 @@ async function onLobbyBots(q, parts, deps) {
       if (!last) return { say: 'ยังไม่มีบอทในห้อง' };
       delete g.players[last[0]];
     }
-    tx.update(gRef, { players: g.players, level: g.level || 2, updatedAt: deps.now });
+    tx.update(gRef, { players: g.players, level: g.level || 2, extra: !!g.extra, updatedAt: deps.now });
     return { g };
   });
   await safe(deps, 'answerCallbackQuery', { callback_query_id: q.id, text: res.say, show_alert: !!res.say });
   if (res.g && res.g.msgId) await safe(deps, 'editMessageText', Object.assign({ chat_id: res.g.chatId, message_id: res.g.msgId }, lobbyView(res.g, bot)));
+}
+
+/* 🏹 the dead hunter's button: h:<code>:<round>:<target>. */
+async function onShot(q, parts, deps) {
+  const { db } = deps;
+  const [, code, round, arg] = parts;
+  const me = String(q.from.id);
+  const gRef = db.collection('wolf_games').doc(code || '-');
+  const dmMsg = q.message ? { chat_id: q.message.chat.id, message_id: q.message.message_id } : null;
+  const res = await db.runTransaction(async (tx) => {
+    const gs = await tx.get(gRef);
+    const ss = await tx.get(gRef.collection('secret').doc('state'));
+    if (!gs.exists || !ss.exists) return { say: 'ไม่พบห้องนี้' };
+    const g = gs.data(), st = ss.data();
+    if (g.status === 'cancelled') return { say: 'เกมนี้ถูกยกเลิกแล้ว' };
+    if (g.status !== 'shot' || String(g.round) !== round || !g.shot) return { say: 'หมดเวลายิงแล้ว' };
+    if (g.shot.who !== me) return { say: 'ไม่ใช่ตาคุณ' };
+    if (W.shotError(st, me, arg)) return { say: 'ยิงคนนี้ไม่ได้' };
+    const out = [];
+    if (dmMsg) out.push({ method: 'editMessageText', body: Object.assign({}, dmMsg, { text: '🏹 คุณยิง ' + nm(g, arg) }) });
+    resolveShot(g, st, deps.now, out, arg, deps.rng);
+    commit(tx, db, gRef, g, st, deps.now);
+    return { g, out };
+  });
+  await safe(deps, 'answerCallbackQuery', { callback_query_id: q.id, text: res.say, show_alert: !!res.say });
+  if (res.out) await run(deps, res.g, res.out);
 }
 
 async function onNight(q, parts, deps) {
@@ -634,7 +729,7 @@ async function onTalkEnd(q, parts, deps) {
    composite index is needed; lobby / over / cancelled rooms keep deadline null. Returns how many rooms moved. */
 function warn(g, st, out) {
   const key = g.status + ':' + g.round;
-  if (g.warned === key || g.status === 'vote') return false;   // the vote is only 1:00 long: no warning
+  if (g.warned === key || g.status === 'vote' || g.status === 'shot') return false;   // the vote (1:00) and the shot (0:30) get no warning
   g.warned = key;
   if (g.status === 'day') out.push({ method: 'sendMessage', body: { chat_id: g.chatId, text: '⏳ เหลือ ~1 นาที · แล้วโหวต 🗳' } });
   else {
@@ -663,12 +758,14 @@ async function phase(body, deps) {
       const edit = (id, view) => id && out.push({ method: 'editMessageText', body: Object.assign({ chat_id: g.chatId, message_id: id }, view) });
       if (g.status === 'night') edit(g.phaseMsgId, nightView(g, left));
       else if (g.status === 'day') edit(g.phaseMsgId, dayView(g, st, left));
+      else if (g.status === 'shot') edit(g.phaseMsgId, shotView(g, left));
       else edit(g.voteMsgId, voteView(g, st, left));
       if (warned) commit(tx, db, gRef, g, st, deps.now);
       return { g, out, step: true };
     }
     if (g.status === 'night') finishNight(g, st, deps.now, out, deps.rng);
     else if (g.status === 'day') beginVote(g, st, deps.now, out);
+    else if (g.status === 'shot') resolveShot(g, st, deps.now, out, null, deps.rng);
     else finishVote(g, st, deps.now, out, deps.rng);
     commit(tx, db, gRef, g, st, deps.now);
     return { g, out };
@@ -697,6 +794,7 @@ async function tick(deps) {
       }
       if (g.status === 'night') finishNight(g, st, deps.now, out, deps.rng);
       else if (g.status === 'day') beginVote(g, st, deps.now, out);
+      else if (g.status === 'shot') resolveShot(g, st, deps.now, out, null, deps.rng);
       else finishVote(g, st, deps.now, out, deps.rng);
       commit(tx, db, gRef, g, st, deps.now);
       return { g, out };
@@ -727,4 +825,4 @@ async function handle(update, deps) {
   if (msg.chat.type === 'private' && !cmdRaw.startsWith('/')) return rename(msg, deps);
 }
 
-module.exports = { handle, tick, phase, lobbyView, startedView, roleCard, ROLE_CARD, RULES, STEP_SEC, BOT_NAMES, LEVELS };
+module.exports = { handle, tick, phase, lobbyView, startedView, roleCard, ROLE_CARD, RULES, STEP_SEC, SHOT_SEC, BOT_NAMES, LEVELS };
