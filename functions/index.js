@@ -2893,29 +2893,64 @@ async function wolfTg(method, body) {
         throw new Error(method + ' ' + (e && e.response ? e.response.status : 'no-response') + ' ' + String(desc).slice(0, 200));
     }
 }
+// 🐺 Clock C1 (owner 2026-11-26): a live ⏳ per phase. At each phase start wolf-bot enqueues one Cloud Task per 30 s and one at
+// the deadline into queue wolf-phase (us-central1); each POSTs to wolfPhase with the hook secret in X-Wolf-Task-Secret, which
+// edits the phase message or ends the phase on the second. Owner setup, once: enable cloudtasks.googleapis.com and
+// `gcloud tasks queues create wolf-phase --location=us-central1` (the runtime service account needs roles/cloudtasks.enqueuer;
+// the default compute account has it). Until then every enqueue fails quietly and wolfTick (1 min) runs the game as before.
+const WOLF_QUEUE = 'wolf-phase', WOLF_LOC = 'us-central1';
+async function wolfEnqueue(name, delaySec, body) {
+    const project = process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId;
+    const parent = `projects/${project}/locations/${WOLF_LOC}/queues/${WOLF_QUEUE}`;
+    const client = await new GoogleAuth({ scopes: 'https://www.googleapis.com/auth/cloud-platform' }).getClient();
+    try {
+        await client.request({ url: `https://cloudtasks.googleapis.com/v2/${parent}/tasks`, method: 'POST', data: { task: {
+            name: `${parent}/tasks/${name}`,
+            scheduleTime: new Date(Date.now() + delaySec * 1000).toISOString(),
+            httpRequest: { httpMethod: 'POST', url: `https://${WOLF_LOC}-${project}.cloudfunctions.net/wolfPhase`,
+                headers: { 'Content-Type': 'application/json', 'X-Wolf-Task-Secret': process.env.TELEGRAM_WOLF_HOOK_SECRET || '' },
+                body: Buffer.from(JSON.stringify(body)).toString('base64') } } } });
+    } catch (e) {
+        if (e && e.response && e.response.status === 409) return;   // that step is queued already (two presses at once, a retry)
+        throw new Error('tasks ' + (e && e.response ? e.response.status : 'network') + ' ' + String((e && e.message) || '').slice(0, 200));
+    }
+}
+const wolfDeps = () => ({
+    db: admin.firestore(), tg: wolfTg, now: Date.now(), rng: Math.random, tasks: wolfEnqueue,
+    botName: async () => wolfBotName || (wolfBotName = (await wolfTg('getMe', {})).username)
+});
 exports.wolfBot = onRequest({ secrets: ['TELEGRAM_WOLF_TOKEN', 'TELEGRAM_WOLF_HOOK_SECRET'], timeoutSeconds: 60 }, async (req, res) => {
     const want = process.env.TELEGRAM_WOLF_HOOK_SECRET;
     if (req.method !== 'POST' || !want || req.get('X-Telegram-Bot-Api-Secret-Token') !== want) return res.status(403).send('forbidden');
     try {
-        await require('./wolf-bot').handle(req.body, {
-            db: admin.firestore(), tg: wolfTg, now: Date.now(), rng: Math.random,
-            botName: async () => wolfBotName || (wolfBotName = (await wolfTg('getMe', {})).username)
-        });
+        await require('./wolf-bot').handle(req.body, wolfDeps());
     } catch (e) {
         console.error('[wolfBot] ' + (e && e.message));
     }
     res.status(200).send('ok');
 });
+// 🐺 Clock C1: the Cloud Task target. Always 200 after the secret check — a failed task would be retried, and a stale step must not be.
+exports.wolfPhase = onRequest({ secrets: ['TELEGRAM_WOLF_TOKEN', 'TELEGRAM_WOLF_HOOK_SECRET'], timeoutSeconds: 60 }, async (req, res) => {
+    const want = process.env.TELEGRAM_WOLF_HOOK_SECRET;
+    if (req.method !== 'POST' || !want || req.get('X-Wolf-Task-Secret') !== want) return res.status(403).send('forbidden');
+    try {
+        await require('./wolf-bot').phase(req.body, wolfDeps());
+    } catch (e) {
+        console.error('[wolfPhase] ' + (e && e.message));
+    }
+    res.status(200).send('ok');
+});
 // 🐺 Werewolf Phase 2 (owner pick Q6: a 1-minute clock, nothing new to enable): ends every night / talk / vote whose deadline
-// has passed. A phase where everyone already pressed moves on at once from wolfBot; this only catches the slow ones.
+// has passed. A phase where everyone already pressed moves on at once from wolfBot; with Clock C1 the Cloud Task ends it on
+// the second, so this only catches a room whose tasks never ran (queue missing, enqueue failed).
 exports.wolfTick = onSchedule({
     schedule: 'every 1 minutes',
     timeZone: 'Asia/Bangkok',
     region: 'us-central1',
-    secrets: ['TELEGRAM_WOLF_TOKEN']
+    secrets: ['TELEGRAM_WOLF_TOKEN', 'TELEGRAM_WOLF_HOOK_SECRET']
 }, async () => {
     try {
-        await require('./wolf-bot').tick({ db: admin.firestore(), tg: wolfTg, now: Date.now(), rng: Math.random, botName: async () => wolfBotName || (wolfBotName = (await wolfTg('getMe', {})).username) });
+        await require('./wolf-bot').tick(wolfDeps());
     } catch (e) {
         console.error('[wolfTick] ' + (e && e.message));
     }
