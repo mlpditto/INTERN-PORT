@@ -171,8 +171,39 @@ assert.deepEqual(W.addExtra({ wolf: 2, seer: 1, guard: 1, witch: 0, hunter: 0, v
   assert.equal(W.EMOJI.hunter, '🏹'); assert.ok(W.ROLES.indexOf('hunter') < W.ROLES.indexOf('villager'), 'deck order 🏹 before 👤');
 }
 
+// 💘 cupid (2026-11-26): never by default, one at most, 6 up; night-1 turn until the pair is set; a dead lover takes the other; a mixed pair alone wins
+for (let n = W.MIN_PLAYERS; n <= W.MAX_PLAYERS; n++) assert.equal(W.defaultCounts(n).cupid, 0, n + ': no 💘 by default');
+assert.equal(W.countsError(W.addExtra(W.defaultCounts(5), 'cupid'), 5), 'cupid-needs-6');
+assert.equal(W.countsError(W.addExtra(W.defaultCounts(6), 'cupid'), 6), null);
+assert.equal(W.countsError(Object.assign(W.addExtra(W.defaultCounts(8), 'cupid'), { cupid: 2, villager: 1 }), 8), 'one-cupid');
+{
+  const st = W.newState({ p1: 'wolf', p2: 'cupid', p3: 'seer', p4: 'guard', p5: 'villager', p6: 'villager' });
+  assert.equal(st.lovers, null);
+  assert.equal(W.nightTurns(st).p2, 'cupid', 'night 1: the cupid has a turn');
+  assert.equal(W.pickError(st, 'p2', 'cupid', 'p2'), null, 'the cupid may pick themself');
+  assert.equal(W.pickError(st, 'p3', 'cupid', 'p1'), 'not-your-role');
+  assert.equal(W.loversError(st, 'p1', 'p1'), 'same'); assert.equal(W.loversError(st, 'p1', 'px'), 'no-player'); assert.equal(W.loversError(st, 'p1', 'p6'), null);
+  const paired = W.setLovers(st, 'p1', 'p6');
+  assert.deepEqual(paired.lovers, ['p1', 'p6']); assert.equal(st.lovers, null, 'setLovers never mutates');
+  assert.ok(!('p2' in W.nightTurns(paired)), 'paired: no cupid turn');
+  const night2 = Object.assign({}, paired, { night: 2 });
+  assert.ok(!('p2' in W.nightTurns(Object.assign({}, st, { night: 2 }))), 'night 2: no cupid turn even unpaired');
+  const r = W.resolveNight(paired, { bite: 'p6' });
+  assert.deepEqual(r.dead.sort(), ['p1', 'p6'], '💔 the bitten lover takes the wolf lover along'); assert.equal(r.state.alive.p1, false);
+  const r2 = W.resolveNight(paired, { bite: 'p6', guard: 'p6' });
+  assert.deepEqual(r2.dead, [], 'saved = nobody dies');
+  const e = W.eliminate(paired, 'p1');
+  assert.equal(e.alive.p6, false, 'the vote chains too'); assert.equal(paired.alive.p6, true);
+  let s = paired; for (const id of ['p2', 'p3', 'p4', 'p5']) s = W.eliminate(s, id);
+  assert.equal(W.winner(s), 'lovers', '🐺 + 👤 lovers alone = lovers win');
+  const same = W.setLovers(st, 'p5', 'p6'); let s2 = same; for (const id of ['p2', 'p3', 'p4']) s2 = W.eliminate(s2, id);
+  assert.equal(W.winner(s2), null, 'two villagers in love + a wolf: no winner yet (1 🐺 vs 2)');
+  assert.equal(W.winner(W.eliminate(s2, 'p1')), 'village', 'same-side lovers win with their side');
+  void night2;
+}
+
 // V101.353: the page loads public/wolf-rules.js — it must be the same bytes as the functions copy
 const fsx = require('fs'), px = require('path');
 const lf = (p) => fsx.readFileSync(px.join(__dirname, p), 'utf8').replace(/\r\n/g, '\n');
 assert.equal(lf('../public/wolf-rules.js'), lf('../functions/wolf-rules.js'), 'public/wolf-rules.js = functions/wolf-rules.js');
-console.log('wolf-rules-check: OK (decks 5–10, picks, night order, votes, win, 2 scripted games, 🏹 extra + shot, public copy)');
+console.log('wolf-rules-check: OK (decks 5–10, picks, night order, votes, win, 2 scripted games, 🏹 extra + shot, 💘 lovers, public copy)');

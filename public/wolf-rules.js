@@ -3,7 +3,9 @@
    these inside a transaction, the same way cerealAct calls cereal-rules.js. Plan: docs/WEREWOLF-PLAN.md §3.
    Players are ids (Telegram user ids as strings). Roles: wolf 🐺 · seer 🔮 · guard 🛡️ · witch 🧪 · villager 👤 ·
    hunter 🏹 (2026-11-26, the 🎲 extra role: never in a default deck, addExtra swaps one villager for it from 6 players;
-   when the hunter dies, night or vote, they shoot one living player — shotError checks the shot, eliminate applies it).
+   when the hunter dies, night or vote, they shoot one living player — shotError checks the shot, eliminate applies it) ·
+   cupid 💘 (2026-11-26, the second 🎲 role): on night 1 pairs two lovers (self allowed) — setLovers; when one lover dies the
+   other dies with them (resolveNight and eliminate chain it); lovers from different sides win alone when only they remain.
    Every random choice takes rng (a () => [0, 1) function) so the check script can replay a game exactly. */
 /* The same file runs in node (functions/, scripts/) and in the page (window.WolfRules); public/wolf-rules.js is a byte-for-byte copy (wolf-rules-check.cjs fails when they differ). */
 (function (root, factory) {
@@ -11,8 +13,8 @@
 })(typeof self !== 'undefined' ? self : this, function () {
 'use strict';
 
-const ROLES = ['wolf', 'seer', 'guard', 'witch', 'hunter', 'villager'];   // deck order (🏹 before 👤 in the deck line)
-const EMOJI = { wolf: '🐺', seer: '🔮', guard: '🛡️', witch: '🧪', hunter: '🏹', villager: '👤' };
+const ROLES = ['wolf', 'seer', 'guard', 'witch', 'hunter', 'cupid', 'villager'];   // deck order (extras before 👤 in the deck line)
+const EMOJI = { wolf: '🐺', seer: '🔮', guard: '🛡️', witch: '🧪', hunter: '🏹', cupid: '💘', villager: '👤' };
 const DECK_ROLES = ['wolf', 'seer', 'guard', 'witch', 'villager'];   // what DECKS counts; extras start at 0
 const MIN_PLAYERS = 5, MAX_PLAYERS = 10;
 const NIGHT_SEC = 90, VOTE_SEC = 60, TALK_SEC = [120, 180, 300], TALK_DEFAULT = 180;
@@ -53,8 +55,9 @@ function countsError(counts, n) {
   const w = counts.wolf || 0;
   if (w < 1) return 'no-wolf';
   if (w * 2 >= n) return 'too-many-wolves';   // wolves would win before the first morning
-  for (const r of ['seer', 'guard', 'witch', 'hunter']) if ((counts[r] || 0) > 1) return 'one-' + r;
+  for (const r of ['seer', 'guard', 'witch', 'hunter', 'cupid']) if ((counts[r] || 0) > 1) return 'one-' + r;
   if ((counts.hunter || 0) > 0 && n < 6) return 'hunter-needs-6';
+  if ((counts.cupid || 0) > 0 && n < 6) return 'cupid-needs-6';
   return null;
 }
 
@@ -81,7 +84,7 @@ const withRole = (roles, alive, role) => aliveIds(alive).filter((id) => roles[id
 function newState(roles) {
   const alive = {};
   Object.keys(roles).forEach((id) => { alive[id] = true; });
-  return { roles, alive, witch: { heal: true, poison: true }, lastGuard: null, night: 1 };
+  return { roles, alive, witch: { heal: true, poison: true }, lastGuard: null, night: 1, lovers: null };
 }
 
 /** Who still has to press a button tonight: { id: kind }. Villagers sleep. The witch acts after the wolves. */
@@ -91,8 +94,31 @@ function nightTurns(state) {
     const r = state.roles[id];
     if (r === 'wolf' || r === 'seer' || r === 'guard') out[id] = r;
     else if (r === 'witch' && (state.witch.heal || state.witch.poison)) out[id] = 'witch';
+    else if (r === 'cupid' && state.night === 1 && !state.lovers) out[id] = 'cupid';   // 💘 night 1 only, until the pair is set
   }
   return out;
+}
+/** null when a and b can be the lovers (two different living players; the cupid may pick themself), else a reason code. */
+function loversError(state, a, b) {
+  if (!(a in state.alive) || !(b in state.alive)) return 'no-player';
+  if (a === b) return 'same';
+  if (!state.alive[a] || !state.alive[b]) return 'target-dead';
+  return null;
+}
+/** The pair, as a new state. */
+function setLovers(state, a, b) {
+  const next = JSON.parse(JSON.stringify(state));
+  next.lovers = [a, b];
+  return next;
+}
+/** 💔 a dead lover takes the other along: extends dead (in place) and marks next.alive. */
+function chainLovers(next, dead) {
+  const l = next.lovers;
+  if (!l) return dead;
+  const [a, b] = l;
+  if (dead.includes(a) && next.alive[b]) { dead.push(b); next.alive[b] = false; }
+  else if (dead.includes(b) && next.alive[a]) { dead.push(a); next.alive[a] = false; }
+  return dead;
 }
 
 /** null when actor may make this pick, else a reason code.
@@ -141,6 +167,7 @@ function resolveNight(state, picks) {
     if (!dead.includes(p.poison)) dead.push(p.poison);
   }
   dead.forEach((id) => { next.alive[id] = false; });
+  chainLovers(next, dead);
   next.lastGuard = p.guard || null;
   next.night = state.night + 1;
   const seen = p.seer ? { id: p.seer, wolf: state.roles[p.seer] === 'wolf' } : null;
@@ -177,13 +204,15 @@ function shotError(state, hunter, target) {
 /** Remove the voted-out player (or nobody). Returns a new state. */
 function eliminate(state, id) {
   const next = JSON.parse(JSON.stringify(state));
-  if (id) next.alive[id] = false;
+  if (id) { next.alive[id] = false; chainLovers(next, [id]); }
   return next;
 }
 
 /** 'village' when no wolf is alive, 'wolf' when wolves are at least everyone else alive, else null. */
 function winner(state) {
   const live = aliveIds(state.alive);
+  const l = state.lovers;
+  if (l && live.length === 2 && live.includes(l[0]) && live.includes(l[1]) && (state.roles[l[0]] === 'wolf') !== (state.roles[l[1]] === 'wolf')) return 'lovers';   // 💘 a mixed pair, alone
   const w = live.filter((id) => state.roles[id] === 'wolf').length;
   if (w === 0) return 'village';
   if (w >= live.length - w) return 'wolf';
@@ -193,6 +222,6 @@ function winner(state) {
 return {
   ROLES, EMOJI, MIN_PLAYERS, MAX_PLAYERS, NIGHT_SEC, VOTE_SEC, TALK_SEC, TALK_DEFAULT, DECKS,
   defaultCounts, countsError, addExtra, deal, newState, nightTurns, pickError, wolfTarget, resolveNight,
-  tallyVotes, shotError, eliminate, winner, aliveIds, withRole,
+  tallyVotes, shotError, loversError, setLovers, eliminate, winner, aliveIds, withRole,
 };
 });
