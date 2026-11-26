@@ -7,7 +7,10 @@
    every colour and result so far (all consistent histories). Reads and writes nothing but localStorage shadowStats. window.BW, bwOpen.
    V101.366 (owner pick B + end screen, mockup-black-white/looks/): a dark popup, the 🤖 tile glows in its colour; the 📓 is one bar
    (📓 n ตา · 🤖 เหลือ ⚫ · ⚪ ▴) that pulls up a sheet; the end screen opens the 🤖 tiles one by one (at once with reduced motion), and
-   📤 LINE shares the result (shareTargetPicker → OS share → clipboard, like Cereal); the card's button opens ?bw=1. */
+   📤 LINE shares the result (shareTargetPicker → OS share → clipboard, like Cereal); the card's button opens ?bw=1.
+   V101.374 (owner pick A, mockup-shadow-tutorial/tutorial-ABC.png): ❓ วิธีเล่น — 4 scenes inside the popup (tiles 0–8 · colour only ·
+   higher wins, first to 5 · 📓 + 🥄 levels), each read aloud in Thai (public/shadow-voice/t1…t4.mp3, Paxa foithong, made once; only
+   with the game's 🔊 on). Plays on the first open (bwTourSeen) and from ❓ in the lobby; ข้าม / ▸ เริ่ม / ✕ end it and stop the voice. */
 (function () {
     'use strict';
     var ALL = [0, 1, 2, 3, 4, 5, 6, 7, 8], WIN_AT = 5, rng = Math.random, g = null, lvl = 2, toast = null, nb = false, shown = 9, revT = null, sent = '';
@@ -16,6 +19,28 @@
     function endKey() { return g.sc.me > g.sc.bot ? 'endW' : g.sc.me < g.sc.bot ? 'endL' : 'endD'; }
     function botSays() { if (g && !g.end && g.lead === 'bot' && g.botTile != null) { S('think'); S(col(g.botTile), 0.45); } }   // the colour only
     var CE = { b: '⚫', w: '⚪' };
+    // ---- V101.374 ❓ the tour: 4 scenes, each with its Thai clip ----------------------------------------------------------------------
+    var tour = -1, aud = null;
+    function seen() { try { return !!localStorage.getItem('bwTourSeen'); } catch (e) { return true; } }
+    function vOn() { return !window.BWSound || BWSound.on(); }
+    function hush() { if (aud) { try { aud.pause(); } catch (e) { } aud = null; } }
+    function say(i) { hush(); if (!vOn()) return; try { aud = new Audio('shadow-voice/t' + (i + 1) + '.mp3'); var p = aud.play(); if (p && p.catch) p.catch(function () { /* the phone wants a tap first */ }); } catch (e) { aud = null; } }
+    function tourHtml() {
+        var i = tour, fig, cap, en;
+        if (i === 0) { cap = 'คุณมีไพ่ 0–8 ใช้ได้ใบละครั้ง<br>เลขคู่ ⚫ · เลขคี่ ⚪'; en = 'Tiles 0–8, once each. Even ⚫, odd ⚪.';
+            fig = '<div class="bw-hand" aria-hidden="true">' + ALL.map(function (n) { return '<button type="button" tabindex="-1" disabled class="' + col(n) + (n === 6 ? ' sel' : '') + '">' + n + '</button>'; }).join('') + '</div>'; }
+        else if (i === 1) { cap = 'ลงคว่ำทีละใบ · อีกฝั่งเห็นแค่ <b>สี</b>'; en = 'Face down: the other side sees only the colour.';
+            fig = '<div class="bw-table"><div class="bw-pair"><div>' + t(6, 'huge') + '<small>คุณ</small></div><div>' + back('w', 'huge') + '<small>🤖</small></div></div><div class="bw-note">🤖 ลง ⚪ → เป็น 1 3 5 หรือ 7</div></div>'; }
+        else if (i === 2) { cap = 'เลขสูงกว่าได้ตานั้น · ชนะตาไหนลงก่อนตาถัดไป<br>9 ตา · ถึง 5 ก่อนชนะ'; en = 'Higher wins the round · first to 5.';
+            fig = '<div class="bw-table"><div class="bw-pair"><div>' + t(6, 'huge') + '<small>คุณ</small></div><div>' + t(3, 'huge') + '<small>🤖</small></div></div><div class="bw-res win">' + RW.win + '</div></div>'; }
+        else { cap = '📓 จดให้ว่า 🤖 เหลือ ⚫ กี่ใบ ⚪ กี่ใบ<br>🥄 ง่าย · 🥄🥄 กลาง · 🥄🥄🥄 🧠 จำเอง'; en = 'The notebook counts 🤖 colours left · pick a level.';
+            fig = '<div class="bw-bar" aria-hidden="true">📓 1 ตา<span>🤖 เหลือ ⚫ 5 · ⚪ 3</span></div>'; }
+        return '<div class="bw bw-tour" id="bw-tour"><div class="bw-top"><h3>❓ วิธีเล่น</h3><span class="bw-pill">' + (i + 1) + '/4</span>' + snd()
+            + '<button type="button" class="bw-x" onclick="BW.tourEnd()" aria-label="Close the tour">✕</button></div>'
+            + '<div class="bw-say" id="bw-tcap">' + cap + '<small>' + en + '</small></div>' + fig
+            + '<div class="bw-tnav"><button type="button" class="bw-tskip" onclick="BW.tourEnd()">ข้าม</button><div class="bw-tdots">' + [0, 1, 2, 3].map(function (n) { return '<i class="' + (n === i ? 'on' : '') + '"></i>'; }).join('') + '</div>'
+            + '<button type="button" class="bw-go" id="bw-tnext" onclick="BW.tourNext()">' + (i === 3 ? '▸ เริ่ม' : 'ถัดไป ▸') + '</button></div></div>';
+    }
     function get() { try { return JSON.parse(localStorage.getItem('shadowStats') || '{}') || {}; } catch (e) { return {}; } }
     function put(s) { try { localStorage.setItem('shadowStats', JSON.stringify(s)); } catch (e) { } }
     function cmp(a, b) { return a > b ? 'win' : a < b ? 'lose' : 'draw'; }   // from the first argument's side
@@ -135,7 +160,12 @@
         + '#bwModal .bw-card .d{position:absolute;top:3px;left:9px;font-size:10px;font-weight:900;color:#6b7280}#bwModal .bw-card.win{background:#17302a;box-shadow:inset 4px 0 0 #22c55e}#bwModal .bw-card.lose{background:#2e1a24;box-shadow:inset 4px 0 0 #ef4444}#bwModal .bw-card.draw{box-shadow:inset 4px 0 0 #94a3b8}#bwModal .bw-card.now{outline:2px solid #a78bfa}'
         + '#bwModal .bw-act{display:flex;gap:8px}#bwModal .bw-act #bw-again{flex:1}#bwModal .bw-act .ic{flex:0 0 58px;padding:0}#bwModal .bw-act .done{color:#86efac}'
         + '.bw-lvs{display:flex;gap:6px;justify-content:center}#bwModal .bw-lvs button{border:1px solid #e2e8f0;background:#fff;border-radius:999px;padding:8px 12px;font-weight:800}#bwModal .bw-lvs button.on{border-color:#0f172a;background:#0f172a;color:#fff}'
-        + '.bw-rule{font-size:.85em;color:#475569;text-align:center;line-height:1.6}.bw-toast{text-align:center;font-size:.85em;font-weight:800;color:#b45309}';
+        + '.bw-rule{font-size:.85em;color:#475569;text-align:center;line-height:1.6}.bw-toast{text-align:center;font-size:.85em;font-weight:800;color:#b45309}'
+        // V101.374 ❓ tour — fixed height so ถัดไป ▸ never moves
+        + '#bwModal .bw-tour{min-height:440px}#bwModal .bw-say{background:#1d1a3d;border:1px solid #3f3a74;border-radius:14px;padding:10px 12px;font-weight:800;line-height:1.5;color:#e9d5ff}'
+        + '#bwModal .bw-say small{display:block;font-size:.72em;font-weight:600;color:#8b87c9;margin-top:2px}#bwModal .bw-tour .bw-hand button:disabled{cursor:default}'
+        + '#bwModal .bw-tnav{display:flex;align-items:center;gap:8px;margin-top:auto}#bwModal .bw-tnav .bw-go{padding:11px 18px}#bwModal .bw-tskip{background:none;border:0;color:#8b87c9;font-weight:800;padding:6px 4px}'
+        + '#bwModal .bw-tdots{flex:1;display:flex;gap:4px;justify-content:center}#bwModal .bw-tdots i{width:6px;height:6px;border-radius:9px;background:#3f3a74;display:block}#bwModal .bw-tdots i.on{width:16px;background:#a78bfa}';
     function root() {
         var m = document.getElementById('bwModal');
         if (!m) {
@@ -154,7 +184,7 @@
     var RW = { win: '🏆 ชนะ', lose: '😞 แพ้', draw: '🤝 เสมอ' };
     function lobbyHtml() {
         var s = get();
-        return '<div class="bw"><div class="bw-top"><h3>⚫⚪ ไพ่เงา</h3>' + snd() + X + '</div>'
+        return '<div class="bw"><div class="bw-top"><h3>⚫⚪ ไพ่เงา</h3><button type="button" class="bw-snd" id="bw-help" onclick="BW.tour()" aria-label="How to play" title="How to play" data-th-title="วิธีเล่น">❓</button>' + snd() + X + '</div>'
             + '<div class="bw-rule">ไพ่ 0–8 คนละชุด · คู่ ⚫ คี่ ⚪<br>เห็นแค่สีของอีกฝั่ง · เลขสูงกว่าชนะตานั้น<br>9 ตา · ถึง 5 ก่อนชนะ</div>'
             + '<div class="bw-lvs">' + [1, 2, 3].map(function (n) { var r = s['l' + n]; return '<button type="button" class="' + (lvl === n ? 'on' : '') + '" id="bw-lv' + n + '" onclick="BW.level(' + n + ')" title="' + ['', 'ง่าย', 'กลาง', 'ยาก · 🧠 จำเอง'][n] + '">' + '🥄'.repeat(n) + (n === 3 ? ' 🧠' : '') + (r ? ' · ' + r.w + '/' + (r.w + r.l + r.d) : '') + '</button>'; }).join('') + '</div>'
             + (lvl === 3 ? '<div class="bw-note">🧠 ไพ่ที่ลงแล้วไม่จาง · สมุดไม่บอกเลขคุณ</div>' : '')
@@ -203,16 +233,19 @@
             + '<button type="button" class="bw-go alt ic' + (sent ? ' done' : '') + '" id="bw-share" onclick="BW.share()" title="Share in LINE" data-th-title="แชร์ผลใน LINE" aria-label="' + (sent || 'Share in LINE') + '">' + (sent ? '✓' : '📤') + '</button>'
             + '<button type="button" class="bw-go alt ic" id="bw-lvl" onclick="BW.lobby()" title="Change level" data-th-title="เปลี่ยนระดับ" aria-label="เปลี่ยนระดับ">' + '🥄'.repeat(lvl) + '</button></div></div>';
     }
-    function render() { var m = root(); document.getElementById('bw-body').innerHTML = !g ? lobbyHtml() : g.end ? endHtml() : playHtml(); m.style.display = 'flex';
-        if (g && window.GameLog) GameLog.see('bw', { id: g.gid || (g.gid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), n: g.hist.length, done: g.end, mode: 'l' + lvl, win: g.sc.me > g.sc.bot ? 'w' : g.sc.me < g.sc.bot ? 'l' : 'd', score: g.sc.me + ':' + g.sc.bot, res: g.hist.map(function (h) { return h.res; }) });   // V101.370 🎮 game time for the admin (game-log.js)
+    function render() { var m = root(); document.getElementById('bw-body').innerHTML = tour >= 0 ? tourHtml() : !g ? lobbyHtml() : g.end ? endHtml() : playHtml(); m.style.display = 'flex';
+        if (g && tour < 0 && window.GameLog) GameLog.see('bw', { id: g.gid || (g.gid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), n: g.hist.length, done: g.end, mode: 'l' + lvl, win: g.sc.me > g.sc.bot ? 'w' : g.sc.me < g.sc.bot ? 'l' : 'd', score: g.sc.me + ':' + g.sc.bot, res: g.hist.map(function (h) { return h.res; }) });   // V101.370 🎮 game time for the admin (game-log.js)
     }
 
     window.BW = {
-        open: function () { g = null; toast = null; render(); },
+        open: function () { g = null; toast = null; if (!seen()) return BW.tour(); render(); },
+        tour: function () { tour = 0; render(); say(0); },   // V101.374 ❓
+        tourNext: function () { if (tour < 0) return; if (tour < 3) { tour++; render(); say(tour); } else BW.tourEnd(); },
+        tourEnd: function () { hush(); tour = -1; try { localStorage.setItem('bwTourSeen', '1'); } catch (e) { } render(); },
         lobby: function () { clearInterval(revT); g = null; nb = false; render(); },
         nb: function () { nb = !nb; render(); },
         showAll: function () { if (g && g.end && shown < g.hist.length) { clearInterval(revT); shown = g.hist.length; S(endKey()); render(); } },
-        sound: function () { if (window.BWSound && BWSound.toggle()) S('pick'); render(); },
+        sound: function () { if (window.BWSound && BWSound.toggle()) S('pick'); if (tour >= 0) { if (vOn()) say(tour); else hush(); } render(); },
         share: function () {   // V101.366: a Flex card via shareTargetPicker → the OS share sheet → the clipboard (as Cereal)
             if (!g || !g.end) return;
             var r = g.sc.me > g.sc.bot ? 'win' : g.sc.me < g.sc.bot ? 'lose' : 'draw', head = (r === 'win' ? '🏆 ชนะ ' : r === 'lose' ? '😞 แพ้ ' : '🤝 เสมอ ') + g.sc.me + ' : ' + g.sc.bot;
@@ -243,7 +276,7 @@
             render();
         },
         next: function () { var was = g && g.last; next(); if (was) botSays(); },
-        close: function () { clearInterval(revT); g = null; nb = false; var m = document.getElementById('bwModal'); if (m) m.style.display = 'none'; },
+        close: function () { clearInterval(revT); hush(); tour = -1; g = null; nb = false; var m = document.getElementById('bwModal'); if (m) m.style.display = 'none'; },
         // for scripts/shadow-qa.cjs
         _g: function () { return g; }, _rng: function (f) { rng = f; }, _odds: function () { return myOdds(); }, _botPick: function (c) { return botPick(c); }
     };

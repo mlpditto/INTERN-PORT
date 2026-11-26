@@ -11,11 +11,18 @@
    the end shows ✓ n/5 · total · average and each question's seconds; a best total is kept only for 5/5 (countFreeBest_rect / _cube);
    the admin log says "rect free" / "cube free". The answer (both modes): 🟥 pick C = every rectangle as a small numbered picture, grouped
    by how many pieces it covers, with "1 ช่อง a + 2 ช่อง b … = n รูป" (the old one-by-one lighting is gone); 🧊 pick B = a top-view table
-   of heights beside the stack, each row's sum and "… = n ก้อน". */
+   of heights beside the stack, each row's sum and "… = n ก้อน".
+   V101.373 (owner "tutorial ครบ? ขอเสียงบรรยายไทยด้วย"): each ❓ scene reads itself in Thai — public/count-voice/t1…t3.mp3, made once
+   with Paxa TTS (voice foithong, like 🥣 / 🐺; no call at play time). 🔊 / 🔇 beside ✕ in the tour, kept as countVoice; ข้าม / ✕ / the
+   next scene stop it; with the voice on, scene 1's three steps keep its pace (2.6 s each). */
 (function () {
     'use strict';
     var Q = 5, SEC = 30, MODES = { rect: { e: '🟥', n: 'สี่เหลี่ยม', ask: 'มีสี่เหลี่ยมกี่รูป?', sub: 'รวมรูปซ้อน · รวมกรอบนอก' }, cube: { e: '🧊', n: 'ลูกบาศก์', ask: 'มีลูกบาศก์กี่ก้อน?', sub: 'รวมก้อนที่ถูกบัง' } };
     var tour = null, tourT = null;   // V101.367: { i: scene, step: 1–3 on scene 1 }
+    var aud = null;   // V101.373: the ❓ voice now playing
+    function vOn() { try { return localStorage.getItem('countVoice') !== 'off'; } catch (e) { return true; } }
+    function hush() { if (aud) { try { aud.pause(); } catch (e) { } aud = null; } }
+    function say(i) { hush(); if (!vOn()) return; try { aud = new Audio('count-voice/t' + (i + 1) + '.mp3'); var p = aud.play(); if (p && p.catch) p.catch(function () { /* the phone wants a tap first */ }); } catch (e) { aud = null; } }
     var rng = Math.random, g = null, tick = null;
     function mmss(s) { return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
     function ri(a, b) { return a + Math.floor(rng() * (b - a + 1)); }
@@ -227,15 +234,15 @@
             steps = ['① ซ้าย', '② ขวา', '③ ทั้งกรอบ'].map(function (t, n) { return '<span class="' + (n < k ? 'on' : '') + '">' + t + '</span>'; }).join(''); }
         else if (i === 1) { fig = tourCubes(); cap = 'ก้อนที่ถูกบัง (เส้นประ) ก็นับ = <b>5 ก้อน</b><small>กองไม่มีรู · ไม่มีก้อนลอย</small>'; }
         else { fig = '<div class="cg-trules">⏱ ' + SEC + ' วิ · ' + Q + ' ข้อ<br>⌨️ ตอบ → 💡 ดูเฉลย</div>'; cap = 'ตอบถูกเร็ว = 🏆 มาก · 🧘 ไม่จับเวลาก็ได้'; }
-        return '<div class="cg" id="cg-tour"><div class="cg-top"><h3>❓ วิธีนับ</h3><button type="button" class="cg-x" onclick="CG.tourEnd()" aria-label="Close the tour">✕</button></div>'
+        return '<div class="cg" id="cg-tour"><div class="cg-top"><h3>❓ วิธีนับ</h3><button type="button" class="cg-x" id="cg-voice" onclick="CG.voice()" aria-label="Sound" aria-pressed="' + vOn() + '">' + (vOn() ? '🔊' : '🔇') + '</button><button type="button" class="cg-x" onclick="CG.tourEnd()" aria-label="Close the tour">✕</button></div>'
             + '<div class="cg-tfig" id="cg-tfig">' + fig + '</div><div class="cg-tcap" id="cg-tcap">' + cap + '</div><div class="cg-tsteps">' + steps + '</div>'
             + '<div class="cg-tnav"><button type="button" class="cg-tskip" onclick="CG.tourEnd()">ข้าม</button><div class="cg-tdots">' + [0, 1, 2].map(function (n) { return '<i class="' + (n === i ? 'on' : '') + '"></i>'; }).join('') + '</div>'
             + '<button type="button" class="cg-tnext" id="cg-tnext" onclick="CG.tourNext()">' + (i === 2 ? '▸ เริ่ม' : 'ถัดไป ▸') + '</button></div></div>';
     }
     function tourScene(i) {
         clearInterval(tourT); var still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-        tour = { i: i, step: i === 0 && !still ? 1 : 3 }; render();
-        if (i === 0 && !still) tourT = setInterval(function () { if (!tour || tour.i !== 0) return clearInterval(tourT); tour.step++; if (tour.step >= 3) clearInterval(tourT); render(); }, 900);
+        tour = { i: i, step: i === 0 && !still ? 1 : 3 }; render(); say(i);
+        if (i === 0 && !still) tourT = setInterval(function () { var m = document.getElementById('countModal'); if (!tour || tour.i !== 0 || !m || m.style.display !== 'flex') return clearInterval(tourT);   /* V101.374: a hidden popup stays hidden */ tour.step++; if (tour.step >= 3) clearInterval(tourT); render(); }, vOn() ? 2600 : 900);
     }
     function render() { var m = root(); document.getElementById('cg-body').innerHTML = tour ? tourHtml() : !g ? lobbyHtml() : g.end ? endHtml() : playHtml(); m.style.display = 'flex';
         if (g && !tour && window.GameLog) GameLog.see('count', { id: g.gid || (g.gid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), n: g.res.length, done: !!g.end, mode: g.mode + (g.free ? ' free' : ''), win: null, score: g.right + '/' + Q, res: g.res.map(function (x) { return x ? 'ok' : 'no'; }) });   // V101.370 🎮 game time for the admin (game-log.js)
@@ -252,7 +259,7 @@
         open: function () { g = null; if (!get('countTourSeen')) tourScene(0); else render(); },   // V101.367: the tour on the first open
         tour: function () { tourScene(0); },
         tourNext: function () { if (!tour) return; if (tour.i < 2) tourScene(tour.i + 1); else CG.tourEnd(); },
-        tourEnd: function () { clearInterval(tourT); tour = null; set('countTourSeen', 1); render(); },   // back to the lobby / the same question
+        tourEnd: function () { clearInterval(tourT); hush(); tour = null; set('countTourSeen', 1); render(); },   // back to the lobby / the same question
         lobby: function () { clearInterval(tick); g = null; render(); },
         free: function (v) { set('countFree', v ? 1 : 0); render(); },   // V101.371: ⏱ / 🧘, kept on the phone
         start: function (mode) { g = { mode: mode, i: 0, score: 0, right: 0, res: [], qt: [], free: get('countFree') === 1 }; newQ(); render(); },
@@ -263,7 +270,8 @@
         },
         ok: function () { if (g && !g.done && g.typed !== '') { answer(); } },
         next: function () { if (!g || !g.done) return; if (g.i + 1 >= Q) { g.end = true; render(); return; } g.i++; newQ(); render(); },
-        close: function () { clearInterval(tick); clearInterval(tourT); tour = null; g = null; var m = document.getElementById('countModal'); if (m) m.style.display = 'none'; },
+        voice: function () { try { localStorage.setItem('countVoice', vOn() ? 'off' : 'on'); } catch (e) { } if (vOn() && tour) say(tour.i); else hush(); render(); },   // V101.373 🔊 / 🔇
+        close: function () { clearInterval(tick); clearInterval(tourT); hush(); tour = null; g = null; var m = document.getElementById('countModal'); if (m) m.style.display = 'none'; },
         // for scripts/count-game-qa.cjs
         _g: function () { return g; }, _rng: function (f) { rng = f; }, _rects: rectsIn, _count: count
     };
