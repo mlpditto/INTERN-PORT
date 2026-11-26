@@ -61,7 +61,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.equal(end.best, null, 'not 5/5 → no best time');
   await page.evaluate(() => { CG.start('rect'); for (let i = 0; i < 5; i++) { const g = CG._g(); g.el = 7; String(CG._count(g.p)).split('').forEach((d) => CG.key(+d)); CG.ok(); CG.next(); } });
   assert.equal(await page.evaluate(() => localStorage.getItem('countFreeBest_rect')), '35', '5/5 → best total kept'); assert.match(await page.textContent('#cg-best'), /ดีสุด 0:35/);
-  assert.ok((await page.evaluate(() => window.__modes)).includes('rect free'), 'the admin log says "rect free"');
+  assert.ok((await page.evaluate(() => window.__modes)).includes('rect free l2'), 'the admin log says "rect free l2" (V101.375: the 🥄 level last)');
 
   // ---- 🧊 answer: top-view table ----
   await page.evaluate(() => { CG.start('cube'); CG.key(0); CG.ok(); });

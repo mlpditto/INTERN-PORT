@@ -185,6 +185,7 @@
     function lobbyHtml() {
         var s = get();
         return '<div class="bw"><div class="bw-top"><h3>⚫⚪ ไพ่เงา</h3><button type="button" class="bw-snd" id="bw-help" onclick="BW.tour()" aria-label="How to play" title="How to play" data-th-title="วิธีเล่น">❓</button>' + snd() + X + '</div>'
+            + (window.GameTop ? GameTop.line('bw', true) : '')   // V101.375 🏆 Top 3 (game-top.js)
             + '<div class="bw-rule">ไพ่ 0–8 คนละชุด · คู่ ⚫ คี่ ⚪<br>เห็นแค่สีของอีกฝั่ง · เลขสูงกว่าชนะตานั้น<br>9 ตา · ถึง 5 ก่อนชนะ</div>'
             + '<div class="bw-lvs">' + [1, 2, 3].map(function (n) { var r = s['l' + n]; return '<button type="button" class="' + (lvl === n ? 'on' : '') + '" id="bw-lv' + n + '" onclick="BW.level(' + n + ')" title="' + ['', 'ง่าย', 'กลาง', 'ยาก · 🧠 จำเอง'][n] + '">' + '🥄'.repeat(n) + (n === 3 ? ' 🧠' : '') + (r ? ' · ' + r.w + '/' + (r.w + r.l + r.d) : '') + '</button>'; }).join('') + '</div>'
             + (lvl === 3 ? '<div class="bw-note">🧠 ไพ่ที่ลงแล้วไม่จาง · สมุดไม่บอกเลขคุณ</div>' : '')
