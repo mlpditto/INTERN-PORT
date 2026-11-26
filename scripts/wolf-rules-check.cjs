@@ -37,7 +37,7 @@ assert.equal(E({ seer: 1, guard: 1, villager: 3 }, 5), 'no-wolf');
 assert.equal(E({ wolf: 3, seer: 1, villager: 2 }, 6), 'too-many-wolves');
 assert.equal(E({ wolf: 1, seer: 2, villager: 2 }, 5), 'one-seer');
 assert.equal(E({ wolf: 1, witch: 2, villager: 2 }, 5), 'one-witch');
-assert.equal(E({ wolf: 1, hunter: 1, villager: 3 }, 5), 'role');
+assert.equal(E({ wolf: 1, jester: 1, villager: 3 }, 5), 'role');   // (hunter is a real role since 2026-11-26; see the 🎲 block below)
 assert.equal(E({ wolf: 1.5, villager: 3.5 }, 5), 'count');
 assert.equal(E({ wolf: 1, villager: 3 }, 4), 'players');
 assert.equal(E({ wolf: 1, villager: 4 }, 5), null, 'a plain 🐺 + 👤 deck is allowed');
@@ -148,8 +148,31 @@ g = play([
 ]);
 assert.equal(g.win, 'wolf', '🐺 2 vs 👤 1 left'); assert.deepEqual(W.aliveIds(g.st.alive).sort(), ['p1', 'p2', 'p7']);
 
+// 🎲 extra role (2026-11-26): 🏹 hunter — never in a default deck, one at most, 6 players up, swapped for a 👤; the shot after death
+for (let n = W.MIN_PLAYERS; n <= W.MAX_PLAYERS; n++) assert.equal(W.defaultCounts(n).hunter, 0, n + ': no 🏹 by default');
+assert.equal(W.countsError(W.addExtra(W.defaultCounts(5), 'hunter'), 5), 'hunter-needs-6');
+for (let n = 6; n <= W.MAX_PLAYERS; n++) {
+  const c = W.addExtra(W.defaultCounts(n), 'hunter');
+  assert.equal(W.countsError(c, n), null, n + ': 🏹 deck is legal'); assert.equal(c.hunter, 1); assert.equal(c.villager, W.defaultCounts(n).villager - 1);
+  const r = W.deal(ids(n), c, rngOf(n));
+  assert.equal(Object.values(r).filter((x) => x === 'hunter').length, 1, n + ': exactly one 🏹 dealt');
+}
+assert.equal(W.countsError(Object.assign(W.addExtra(W.defaultCounts(8), 'hunter'), { hunter: 2, villager: 1 }), 8), 'one-hunter');
+assert.deepEqual(W.addExtra({ wolf: 2, seer: 1, guard: 1, witch: 0, hunter: 0, villager: 0 }, 'hunter'), { wolf: 2, seer: 1, guard: 1, witch: 0, hunter: 0, villager: 0 }, 'no 👤 to swap = unchanged');
+{
+  const st = W.newState({ p1: 'wolf', p2: 'hunter', p3: 'seer', p4: 'guard', p5: 'villager', p6: 'villager' });
+  assert.equal(W.shotError(st, 'p2', 'p1'), 'alive', 'a living hunter has no shot');
+  const dead = W.eliminate(st, 'p2');
+  assert.equal(W.shotError(dead, 'p2', 'p1'), null);
+  assert.equal(W.shotError(dead, 'p3', 'p1'), 'not-hunter');
+  assert.equal(W.shotError(dead, 'p2', 'p2'), 'target-dead');
+  assert.equal(W.shotError(dead, 'p2', 'px'), 'no-player');
+  assert.equal(W.winner(W.eliminate(dead, 'p1')), 'village', 'the shot can end the game');
+  assert.equal(W.EMOJI.hunter, '🏹'); assert.ok(W.ROLES.indexOf('hunter') < W.ROLES.indexOf('villager'), 'deck order 🏹 before 👤');
+}
+
 // V101.353: the page loads public/wolf-rules.js — it must be the same bytes as the functions copy
 const fsx = require('fs'), px = require('path');
 const lf = (p) => fsx.readFileSync(px.join(__dirname, p), 'utf8').replace(/\r\n/g, '\n');
 assert.equal(lf('../public/wolf-rules.js'), lf('../functions/wolf-rules.js'), 'public/wolf-rules.js = functions/wolf-rules.js');
-console.log('wolf-rules-check: OK (decks 5–10, picks, night order, votes, win, 2 scripted games, public copy)');
+console.log('wolf-rules-check: OK (decks 5–10, picks, night order, votes, win, 2 scripted games, 🏹 extra + shot, public copy)');

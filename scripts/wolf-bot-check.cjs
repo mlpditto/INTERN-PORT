@@ -85,7 +85,7 @@ const ROLE_WORDS = /คุณคือ|ผู้หยั่งรู้|บอ�
   assert.equal(lobby.chat_id, '-1001');
   const code = /ห้อง ([A-Z0-9]{6})/.exec(lobby.text)[1];
   assert.equal(lobby.reply_markup.inline_keyboard[0][0].url, 'https://t.me/NikaWolfBot?start=' + code, '▸ เข้าร่วม is a deep link');
-  assert.equal(lobby.reply_markup.inline_keyboard[2][0].callback_data, 'start:' + code);   // row 1 = 🤖 +1 / −1 / level (bot players)
+  assert.equal(lobby.reply_markup.inline_keyboard[3][0].callback_data, 'start:' + code);   // row 1 = 🤖 +1 / −1 / level, row 2 = 🎲
   const msgId = nextMsg;
   assert.equal(store.get('wolf_games/' + code).msgId, msgId);
   assert.equal(store.get('wolf_chats/-1001').game, code);

@@ -181,6 +181,12 @@
     return out;
   }
 
+  /** 🏹 (2026-11-26, Telegram 🎲 extra role): the dead hunter bot b shoots the living player it suspects most. */
+  function hunterPick(g, b) {
+    var c = alive(g).filter(function (t) { return t !== b; });
+    if (!c.length) return null;
+    return g.level === 1 ? c[Math.floor(hash(g.id + b + 'shot') * c.length)] : argmax(sus(g, b), c);
+  }
   /** V101.358 (owner pick D on 🌕): why the wolves want t, in a few words — what the day showed (a 🔮 claim, a finger at a wolf,
    *  the table trusting t). null = nothing to say (a first-night guess). */
   function wolfWhy(g, t) {
@@ -190,5 +196,5 @@
     var con = consensus(g); if ((con[t] || 0) <= -1.5) return 'คนไว้ใจเยอะ';
     return null;
   }
-  return { sus: sus, consensus: consensus, wolfScore: wolfScore, wolfVotes: wolfVotes, wolfWhy: wolfWhy, seerPick: seerPick, guardPick: guardPick, witchPick: witchPick, talk: talk, votes: votes, hash: hash };
+  return { sus: sus, consensus: consensus, wolfScore: wolfScore, wolfVotes: wolfVotes, wolfWhy: wolfWhy, seerPick: seerPick, guardPick: guardPick, witchPick: witchPick, hunterPick: hunterPick, talk: talk, votes: votes, hash: hash };
 });

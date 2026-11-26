@@ -1,7 +1,9 @@
 /* 🐺 Werewolf — rules engine (Phase 0, 2026-11-23). Phase 1 = the Telegram wolfBot (PR #2437); solo vs 🤖 on LIFF = public/wolf.js (V101.353).
    Pure functions: no Telegram, no Firebase, no state of its own. Phase 1–2 (the wolfBot webhook + wolfTick clock) call
    these inside a transaction, the same way cerealAct calls cereal-rules.js. Plan: docs/WEREWOLF-PLAN.md §3.
-   Players are ids (Telegram user ids as strings). Roles: wolf 🐺 · seer 🔮 · guard 🛡️ · witch 🧪 · villager 👤.
+   Players are ids (Telegram user ids as strings). Roles: wolf 🐺 · seer 🔮 · guard 🛡️ · witch 🧪 · villager 👤 ·
+   hunter 🏹 (2026-11-26, the 🎲 extra role: never in a default deck, addExtra swaps one villager for it from 6 players;
+   when the hunter dies, night or vote, they shoot one living player — shotError checks the shot, eliminate applies it).
    Every random choice takes rng (a () => [0, 1) function) so the check script can replay a game exactly. */
 /* The same file runs in node (functions/, scripts/) and in the page (window.WolfRules); public/wolf-rules.js is a byte-for-byte copy (wolf-rules-check.cjs fails when they differ). */
 (function (root, factory) {
@@ -9,8 +11,9 @@
 })(typeof self !== 'undefined' ? self : this, function () {
 'use strict';
 
-const ROLES = ['wolf', 'seer', 'guard', 'witch', 'villager'];
-const EMOJI = { wolf: '🐺', seer: '🔮', guard: '🛡️', witch: '🧪', villager: '👤' };
+const ROLES = ['wolf', 'seer', 'guard', 'witch', 'hunter', 'villager'];   // deck order (🏹 before 👤 in the deck line)
+const EMOJI = { wolf: '🐺', seer: '🔮', guard: '🛡️', witch: '🧪', hunter: '🏹', villager: '👤' };
+const DECK_ROLES = ['wolf', 'seer', 'guard', 'witch', 'villager'];   // what DECKS counts; extras start at 0
 const MIN_PLAYERS = 5, MAX_PLAYERS = 10;
 const NIGHT_SEC = 90, VOTE_SEC = 60, TALK_SEC = [120, 180, 300], TALK_DEFAULT = 180;
 // The default deck per player count (plan §3): [wolf, seer, guard, witch, villager]
@@ -24,7 +27,15 @@ function defaultCounts(n) {
   const d = DECKS[n];
   if (!d) throw new Error('players must be ' + MIN_PLAYERS + '–' + MAX_PLAYERS + ', got ' + n);
   const out = {};
-  ROLES.forEach((r, i) => { out[r] = d[i]; });
+  ROLES.forEach((r) => { out[r] = 0; });
+  DECK_ROLES.forEach((r, i) => { out[r] = d[i]; });
+  return out;
+}
+/** The 🎲 extra role: one villager seat becomes `role` (unchanged when there is no villager to swap). A new object. */
+function addExtra(counts, role) {
+  const out = Object.assign({}, counts);
+  if (!(out.villager > 0) || !ROLES.includes(role)) return out;
+  out.villager -= 1; out[role] = (out[role] || 0) + 1;
   return out;
 }
 
@@ -42,7 +53,8 @@ function countsError(counts, n) {
   const w = counts.wolf || 0;
   if (w < 1) return 'no-wolf';
   if (w * 2 >= n) return 'too-many-wolves';   // wolves would win before the first morning
-  for (const r of ['seer', 'guard', 'witch']) if ((counts[r] || 0) > 1) return 'one-' + r;
+  for (const r of ['seer', 'guard', 'witch', 'hunter']) if ((counts[r] || 0) > 1) return 'one-' + r;
+  if ((counts.hunter || 0) > 0 && n < 6) return 'hunter-needs-6';
   return null;
 }
 
@@ -153,6 +165,15 @@ function tallyVotes(state, votes) {
   return { counts, out };
 }
 
+/** null when the dead hunter may shoot target now, else a reason code (apply the shot with eliminate). */
+function shotError(state, hunter, target) {
+  if (state.roles[hunter] !== 'hunter') return 'not-hunter';
+  if (state.alive[hunter]) return 'alive';   // the shot comes with the death
+  if (!(target in state.alive)) return 'no-player';
+  if (!state.alive[target]) return 'target-dead';
+  return null;
+}
+
 /** Remove the voted-out player (or nobody). Returns a new state. */
 function eliminate(state, id) {
   const next = JSON.parse(JSON.stringify(state));
@@ -171,7 +192,7 @@ function winner(state) {
 
 return {
   ROLES, EMOJI, MIN_PLAYERS, MAX_PLAYERS, NIGHT_SEC, VOTE_SEC, TALK_SEC, TALK_DEFAULT, DECKS,
-  defaultCounts, countsError, deal, newState, nightTurns, pickError, wolfTarget, resolveNight,
-  tallyVotes, eliminate, winner, aliveIds, withRole,
+  defaultCounts, countsError, addExtra, deal, newState, nightTurns, pickError, wolfTarget, resolveNight,
+  tallyVotes, shotError, eliminate, winner, aliveIds, withRole,
 };
 });
