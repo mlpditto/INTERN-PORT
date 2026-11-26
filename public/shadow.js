@@ -24,6 +24,7 @@
     var N = (function () { try { var v = JSON.parse(localStorage.getItem('bwNames') || '{}') || {}; return { me: clean(v.me), bot: clean(v.bot) }; } catch (e) { return { me: '', bot: '' }; } })();
     function nm(x) { return N[x] ? esc(N[x]) : P[x]; }
     function val(id) { var el = document.getElementById(id); return el ? el.value : null; }
+    var net = null;   // V101.379 🌐 'online' (with a friend through LINE) · 🔢 'live' (a live room) — shadow-online.js draws them
     function other(s) { return s === 'me' ? 'bot' : 'me'; }
     function side() { return g.lt == null ? g.lead : other(g.lead); }   // whose hand is out now
     var col = function (n) { return n % 2 ? 'w' : 'b'; };
@@ -174,6 +175,7 @@
         + '.bw-lvs{display:flex;gap:6px;justify-content:center}#bwModal .bw-lvs button{border:1px solid #e2e8f0;background:#fff;border-radius:999px;padding:8px 12px;font-weight:800}#bwModal .bw-lvs button.on{border-color:#0f172a;background:#0f172a;color:#fff}'
         + '.bw-rule{font-size:.85em;color:#475569;text-align:center;line-height:1.6}.bw-toast{text-align:center;font-size:.85em;font-weight:800;color:#b45309}'
         + '#bwModal .bw-names{display:flex;gap:8px}#bwModal .bw-names input{flex:1;min-width:0;width:0;padding:10px 12px;border-radius:12px;border:1px solid #2e2a5a;background:#1d1a3d;color:#f5f3ff;font:inherit;font-size:16px;font-weight:800;text-align:center}#bwModal .bw-names input::placeholder{color:#8b87c9;font-weight:600}'   // V101.377 names
+        + '#bwModal .bw-who{flex-wrap:nowrap}#bwModal .bw-who button{flex:1;min-width:0;padding-left:4px;padding-right:4px;white-space:nowrap;font-size:.85em}'   // V101.379
         + '#bwModal .bw-cover{min-height:440px;text-align:center}#bwModal .bw-cv{font-size:54px;margin-top:auto}#bwModal .bw-cvt{font-size:1.3em;font-weight:900;color:#e9d5ff}#bwModal .bw-cover .bw-go{margin-top:auto}'   // VV101.376 📱 2 คน
         // V101.374 ❓ tour — fixed height so ถัดไป ▸ never moves
         + '#bwModal .bw-tour{min-height:440px}#bwModal .bw-say{background:#1d1a3d;border:1px solid #3f3a74;border-radius:14px;padding:10px 12px;font-weight:800;line-height:1.5;color:#e9d5ff}'
@@ -201,10 +203,11 @@
         return '<div class="bw"><div class="bw-top"><h3>⚫⚪ ไพ่เงา</h3><button type="button" class="bw-snd" id="bw-help" onclick="BW.tour()" aria-label="How to play" title="How to play" data-th-title="วิธีเล่น">❓</button>' + snd() + X + '</div>'
             + (window.GameTop ? GameTop.line('bw', true) : '')   // V101.375 🏆 Top 3 (game-top.js)
             + '<div class="bw-rule">ไพ่ 0–8 คนละชุด · คู่ ⚫ คี่ ⚪<br>เห็นแค่สีของอีกฝั่ง · เลขสูงกว่าชนะตานั้น<br>9 ตา · ถึง 5 ก่อนชนะ</div>'
-            + '<div class="bw-lvs" role="group" aria-label="Who">' + [['bot', '🤖 กับบอท'], ['two', '📱 2 คน เครื่องเดียว']].map(function (k) { var on = (k[0] === 'two') === two; return '<button type="button" id="bw-who-' + k[0] + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" onclick="BW.who(\'' + k[0] + '\')">' + k[1] + '</button>'; }).join('') + '</div>'
-            + (two ? '<div class="bw-names"><input id="bw-n1" maxlength="10" placeholder="1️⃣ ชื่อ" value="' + esc(N.me) + '" aria-label="Player 1 name" autocomplete="off"><input id="bw-n2" maxlength="10" placeholder="2️⃣ ชื่อ" value="' + esc(N.bot) + '" aria-label="Player 2 name" autocomplete="off"></div><div class="bw-note" id="bw-two-note">ส่งเครื่องให้กันทีละตา · ไม่ต้องใช้เน็ต</div>' : '<div class="bw-lvs">' + [1, 2, 3].map(function (n) { var r = s['l' + n]; return '<button type="button" class="' + (lvl === n ? 'on' : '') + '" id="bw-lv' + n + '" onclick="BW.level(' + n + ')" title="' + ['', 'ง่าย', 'กลาง', 'ยาก · 🧠 จำเอง'][n] + '">' + '🥄'.repeat(n) + (n === 3 ? ' 🧠' : '') + (r ? ' · ' + r.w + '/' + (r.w + r.l + r.d) : '') + '</button>'; }).join('') + '</div>')
-            + (lvl === 3 && !two ? '<div class="bw-note">🧠 ไพ่ที่ลงแล้วไม่จาง · สมุดไม่บอกเลขคุณ</div>' : '')
-            + '<button type="button" class="bw-go" id="bw-start" onclick="BW.start()">▸ เริ่ม</button></div>';
+            + '<div class="bw-lvs bw-who" role="group" aria-label="Who">' + [['bot', '🤖 บอท'], ['two', '📱 2 คน'], ['online', '🌐 เพื่อน'], ['live', '🔢 ห้องสด']].filter(function (k) { return k[0] === 'bot' || k[0] === 'two' || window.BWOnline; }).map(function (k) { var on = k[0] === 'bot' ? !two && !net : k[0] === 'two' ? two : net === k[0]; return '<button type="button" id="bw-who-' + k[0] + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" onclick="BW.who(\'' + k[0] + '\')">' + k[1] + '</button>'; }).join('') + '</div>'
+            + (net && window.BWOnline ? BWOnline.lobbyHtml(net === 'live') + '</div>' : '')
+            + (net && window.BWOnline ? '' : two ? '<div class="bw-names"><input id="bw-n1" maxlength="10" placeholder="1️⃣ ชื่อ" value="' + esc(N.me) + '" aria-label="Player 1 name" autocomplete="off"><input id="bw-n2" maxlength="10" placeholder="2️⃣ ชื่อ" value="' + esc(N.bot) + '" aria-label="Player 2 name" autocomplete="off"></div><div class="bw-note" id="bw-two-note">ส่งเครื่องให้กันทีละตา · ไม่ต้องใช้เน็ต</div>' : '<div class="bw-lvs">' + [1, 2, 3].map(function (n) { var r = s['l' + n]; return '<button type="button" class="' + (lvl === n ? 'on' : '') + '" id="bw-lv' + n + '" onclick="BW.level(' + n + ')" title="' + ['', 'ง่าย', 'กลาง', 'ยาก · 🧠 จำเอง'][n] + '">' + '🥄'.repeat(n) + (n === 3 ? ' 🧠' : '') + (r ? ' · ' + r.w + '/' + (r.w + r.l + r.d) : '') + '</button>'; }).join('') + '</div>')
+            + (net && window.BWOnline ? '' : (lvl === 3 && !two ? '<div class="bw-note">🧠 ไพ่ที่ลงแล้วไม่จาง · สมุดไม่บอกเลขคุณ</div>' : '')
+            + '<button type="button" class="bw-go" id="bw-start" onclick="BW.start()">▸ เริ่ม</button></div>');
     }
     function dots() {
         var h = '<div class="bw-dots" aria-label="Rounds">';
@@ -275,8 +278,8 @@
             + (g.two ? '' : '<button type="button" class="bw-go alt ic' + (sent ? ' done' : '') + '" id="bw-share" onclick="BW.share()" title="Share in LINE" data-th-title="แชร์ผลใน LINE" aria-label="' + (sent || 'Share in LINE') + '">' + (sent ? '✓' : '📤') + '</button>')
             + '<button type="button" class="bw-go alt ic" id="bw-lvl" onclick="BW.lobby()" title="Change level" data-th-title="เปลี่ยนระดับ" aria-label="เปลี่ยนระดับ">' + (g.two ? '📱' : '🥄'.repeat(lvl)) + '</button></div></div>';
     }
-    function render() { var m = root(); document.getElementById('bw-body').innerHTML = tour >= 0 ? tourHtml() : !g ? lobbyHtml() : g.end ? endHtml() : playHtml(); m.style.display = 'flex';
-        if (g && tour < 0 && window.GameLog) GameLog.see('bw', { id: g.gid || (g.gid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), n: g.hist.length, done: g.end, mode: g.two ? 'two' : 'l' + lvl, win: g.two ? null : g.sc.me > g.sc.bot ? 'w' : g.sc.me < g.sc.bot ? 'l' : 'd', score: g.sc.me + ':' + g.sc.bot, res: g.hist.map(function (h) { return h.res; }) });   // V101.370 🎮 game time for the admin (game-log.js)
+    function render() { var m = root(); document.getElementById('bw-body').innerHTML = tour >= 0 ? tourHtml() : window.BWOnline && BWOnline.active() ? BWOnline.html() : !g ? lobbyHtml() : g.end ? endHtml() : playHtml(); m.style.display = 'flex';
+        if (g && tour < 0 && !(window.BWOnline && BWOnline.active()) && window.GameLog) GameLog.see('bw', { id: g.gid || (g.gid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), n: g.hist.length, done: g.end, mode: g.two ? 'two' : 'l' + lvl, win: g.two ? null : g.sc.me > g.sc.bot ? 'w' : g.sc.me < g.sc.bot ? 'l' : 'd', score: g.sc.me + ':' + g.sc.bot, res: g.hist.map(function (h) { return h.res; }) });   // V101.370 🎮 game time for the admin (game-log.js)
     }
 
     window.BW = {
@@ -307,7 +310,9 @@
             });
         },
         level: function (n) { lvl = n; render(); },
-        who: function (k) { two = k === 'two'; render(); },   // VV101.376 🤖 │ 📱 2 คน
+        who: function (k) { two = k === 'two'; net = k === 'online' || k === 'live' ? k : null; g = null; render(); },
+        online: function () { two = false; net = 'online'; g = null; render(); },   // V101.379 ?bw=<code> from an invite card
+        _render: function () { if (document.getElementById('bwModal') && document.getElementById('bwModal').style.display === 'flex') render(); },   // VV101.376 🤖 │ 📱 2 คน
         ready: function () { if (g && g.two && g.cover) { g.cover = false; S('pick'); render(); } },
         start: function () {
             if (two && val('bw-n1') !== null) { N.me = clean(val('bw-n1')); N.bot = clean(val('bw-n2')); try { localStorage.setItem('bwNames', JSON.stringify(N)); } catch (e) { } }   // V101.377
@@ -328,7 +333,7 @@
             render();
         },
         next: function () { var was = g && g.last; next(); if (was && !(g && g.two)) botSays(); },
-        close: function () { clearInterval(revT); hush(); tour = -1; g = null; nb = false; var m = document.getElementById('bwModal'); if (m) m.style.display = 'none'; },
+        close: function () { if (window.BWOnline) BWOnline.close(); clearInterval(revT); hush(); tour = -1; g = null; nb = false; var m = document.getElementById('bwModal'); if (m) m.style.display = 'none'; },
         // for scripts/shadow-qa.cjs
         _g: function () { return g; }, _rng: function (f) { rng = f; }, _odds: function () { return myOdds(); }, _botPick: function (c) { return botPick(c); }
     };

@@ -25,7 +25,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
   // lobby
   await page.evaluate(() => bwOpen());
-  assert.deepEqual(await page.$$eval('[aria-label="Who"] button', (b) => b.map((x) => x.textContent + (x.classList.contains('on') ? '*' : ''))), ['🤖 กับบอท*', '📱 2 คน เครื่องเดียว']);
+  assert.deepEqual(await page.$$eval('[aria-label="Who"] button', (b) => b.map((x) => x.textContent + (x.classList.contains('on') ? '*' : ''))), ['🤖 บอท*', '📱 2 คน', '🌐 เพื่อน', '🔢 ห้องสด']);
   assert.ok(await page.$('#bw-lv2'), 'levels with the bot');
   await page.click('#bw-who-two');
   assert.equal(await page.$('#bw-lv2'), null, 'no levels for 2 คน'); assert.match(await page.textContent('#bw-two-note'), /ส่งเครื่องให้กัน/);
