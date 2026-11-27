@@ -1,4 +1,4 @@
-/* V101.353 🐺 Werewolf solo — you and 4–8 🤖 on this phone (owner pick B, mockup-werewolf-solo/: seats with a speech tag under
+/* V101.353 🐺 Werewolf solo — you and 4–9 🤖 on this phone (V101.387: any table of 5–10, was 5 / 7 / 9) (owner pick B, mockup-werewolf-solo/: seats with a speech tag under
    each name, the whole table on one screen). Flow: lobby → your role card → 🌙 night (your power on a seat) → ☀️ day (bots
    speak as tags; you tap a seat, then 🤨 / 👍 / 🔮) → 🗳 vote (the bots' counts on the seats, you add yours or ⏭) → night …
    → reveal. Rules = wolf-rules.js (the same file the Telegram bot uses), the bots = wolf-ai.js; this file draws and stores.
@@ -201,7 +201,8 @@
 
     function lobbyHtml() {
         var c = W.defaultCounts(ui.n), was = ui.prevN ? W.defaultCounts(ui.prevN) : null, h = '<div class="ww ww-lobby">' + top('🐺 มนุษย์หมาป่า', pill('🤖<span class="tx"> เล่นกับบอท</span>', 'acc') + (window.WWTour ? '<button type="button" class="ww-pill ww-help" id="ww-help" onclick="WWTour.open()" title="วิธีเล่น">❓</button>' : ''), true) + (window.GameTop ? GameTop.line('wolf') : '');   // V101.375 🏆 Top 3
-        h += '<div class="ww-row"><span class="ww-mini">👥 คน</span>' + [5, 7, 9].map(function (n) { return '<button type="button" class="ww-chip' + (ui.n === n ? ' on' : '') + '" onclick="WW.set(\'n\',' + n + ')">' + n + '</button>'; }).join('') + '</div>';
+        // V101.387 (owner: "รองรับได้ถึง 10 player"): every table size the engine deals, like the Telegram room (was 5 / 7 / 9)
+        h += '<div class="ww-row"><span class="ww-mini">👥 คน</span>' + [5, 6, 7, 8, 9, 10].map(function (n) { return '<button type="button" class="ww-chip' + (ui.n === n ? ' on' : '') + '" onclick="WW.set(\'n\',' + n + ')">' + n + '</button>'; }).join('') + '</div>';
         var rs = W.ROLES.filter(function (r) { return c[r]; }), tip = rs.indexOf(ui.tip) >= 0 ? ui.tip : null;
         h += '<div class="ww-tiles" id="ww-roles" style="grid-template-columns:repeat(' + rs.length + ',minmax(0,1fr))">' + rs.map(function (r) {
             return '<button type="button" class="ww-tile' + (tip === r ? ' on' : '') + (was && was[r] !== c[r] ? ' bump' : '') + '" data-role="' + r + '" aria-pressed="' + (tip === r) + '" onclick="WW.set(\'tip\',\'' + (tip === r ? '' : r) + '\')"><span class="e">' + E[r] + '</span>' + SHORT[r] + '<b>' + c[r] + '</b></button>';

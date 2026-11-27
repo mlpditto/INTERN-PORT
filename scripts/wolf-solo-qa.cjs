@@ -47,7 +47,7 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
   const lobby = await page.$eval('#wolfModal', (m) => ({ shown: getComputedStyle(m).display, txt: m.textContent, empty: !!m.querySelector('#ww-empty') }));
   assert.equal(lobby.shown, 'flex'); assert.ok(lobby.empty, 'no games → the empty line');
   // V101.355 (owner picks B + L4): role tiles with a short name + count, a one-line tip under the tapped tile, three nights for the bot level
-  assert.match(lobby.txt, /👥 คน579/);
+  assert.match(lobby.txt, /👥 คน5678910/);
   const tiles = () => page.$$eval('#ww-roles .ww-tile', (t) => t.map((x) => [x.dataset.role, x.textContent, x.getAttribute('aria-pressed')]));
   assert.deepEqual(await tiles(), [['wolf', '🐺หมาป่า2', 'true'], ['seer', '🔮ผู้หยั่งรู้1', 'false'], ['guard', '🛡️การ์ด1', 'false'], ['witch', '🧪แม่มด1', 'false'], ['villager', '👤ชาวบ้าน2', 'false']], '7 players: 5 tiles, 🐺 tip open by default');
   assert.match(await page.textContent('#ww-tip'), /^🐺 หมาป่า กัด 1 คนทุกคืน/);
@@ -67,6 +67,16 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
   await page.click('#ww-levels button:has-text("คืนเดือนเพ็ญ")'); assert.match(await page.textContent('#ww-lvtip'), /^🌕 คืนเดือนเพ็ญ บอทหลอกเก่ง/);
   await page.click('#ww-levels button:has-text("เที่ยงคืน")');
   assert.match(await page.$eval('#ww-levels button.on', (b) => getComputedStyle(b).boxShadow), /251, 191, 36/, 'the chosen night glows gold');
+  // V101.387: every table size 5–10 (was 5 / 7 / 9); 10 = 🐺 3 and a 4-column table of 3 rows, no sideways scroll
+  assert.deepEqual(await page.$$eval('#wolfModal .ww-row .ww-chip', (c) => c.map((x) => x.textContent)), ['5', '6', '7', '8', '9', '10'], 'the 👥 row');
+  await page.click('#wolfModal button.ww-chip:has-text("10")');
+  assert.deepEqual((await tiles()).map((t) => t[1]), ['🐺หมาป่า3', '🔮ผู้หยั่งรู้1', '🛡️การ์ด1', '🧪แม่มด1', '👤ชาวบ้าน4'], '10 players → 🐺 3, 👤 4');
+  await page.evaluate(() => { WW.start(); WW.night(); });   // the role card, then the table
+  assert.equal(await page.$$eval('#wolfModal .ww-seat', (s) => s.length), 10, '10 seats');
+  assert.equal(await page.$eval('#wolfModal .ww-seats', (el) => new Set([...el.children].map((c) => c.offsetTop)).size), 3, '10 seats = 3 rows of the 4-column table');
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'no sideways scroll at 10 seats');
+  await page.evaluate(() => WW.back());
+  await page.click('#wolfModal button.ww-chip:has-text("7")');   // back to the default size before the bump test below
   await page.click('#wolfModal button.ww-chip:has-text("5")');
   assert.deepEqual(await page.$$eval('#ww-roles .ww-tile.bump', (t) => t.map((x) => x.dataset.role)), ['wolf'], '7 → 5: only the changed count bumps');
   assert.deepEqual((await tiles()).map((t) => t[1]), ['🐺หมาป่า1', '🔮ผู้หยั่งรู้1', '🛡️การ์ด1', '👤ชาวบ้าน2'], '5 players → 4 tiles, 🐺 1');
