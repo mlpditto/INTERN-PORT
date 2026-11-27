@@ -93,7 +93,7 @@
     function lobbyHtml() {
         var M = multi && window.SNOnline;   // V101.380
         return '<div class="sn"><div class="sn-top"><h3>🔢 เลขลับ</h3>' + HQ + X + '</div>'
-            + (window.GameTop ? GameTop.line('secret') : '')
+            + (window.GameTop ? GameTop.line(M ? 'secretOn' : 'secret') : '')
             + (window.SNOnline ? '<div class="sn-lvs" role="group" aria-label="Mode">' + [[0, '🤖 ฝึกกับบอท'], [1, '🌐 หลายคน']].map(function (k) { var on = !!k[0] === !!multi; return '<button type="button" id="sn-mode-' + k[0] + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" onclick="SN.multi(' + k[0] + ')">' + k[1] + '</button>'; }).join('') + '</div>' : '')
             + (M ? SNOnline.lobbyHtml() + '</div>' : '<div class="sn-note">🤖 คิดเลข 1–100 · ถามข้อละ 🎫 1 · ใช้น้อยสุดชนะ</div>'
             + '<div class="sn-lvs" role="group" aria-label="Help">' + [1, 2, 3, 4].map(function (k) { var b = get('snBest_h' + k); return '<button type="button" id="sn-h' + k + '" class="' + (help === k ? 'on' : '') + '" aria-pressed="' + (help === k) + '" onclick="SN.help(' + k + ')">' + HELP[k][0] + ' ' + HELP[k][1] + (b ? ' · ' + b + '🎫' : '') + '</button>'; }).join('') + '</div>'
