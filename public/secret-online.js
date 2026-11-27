@@ -102,7 +102,8 @@
         h += '</div>';
         if (myT) {
             var Q = st.q && (SN._qs || []).filter(function (x) { return x[0] === st.q; })[0];
-            h += '<div class="sn-chips" role="group" aria-label="Questions">' + (SN._qs || []).map(function (x) { return '<button type="button" data-q="' + x[0] + '" class="' + (st.q === x[0] ? 'on' : '') + '" onclick="SNOnline.pick(\'' + x[0] + '\')">' + x[1] + '</button>'; }).join('') + '</div>'
+            var mine = (hd.notes || []).filter(function (x) { return x.to === st.to; });   // V101.385 a question with no number: once per person
+            h += '<div class="sn-chips" role="group" aria-label="Questions">' + (SN._qs || []).map(function (x) { var d = !x[2] && mine.filter(function (m) { return m.q === x[0]; })[0]; return '<button type="button" data-q="' + x[0] + '" class="' + (st.q === x[0] ? 'on' : '') + (d ? ' done' : '') + '"' + (d ? ' disabled' : ' onclick="SNOnline.pick(\'' + x[0] + '\')"') + '>' + x[1] + (d ? (d.ans ? ' ✓' : ' ✗') : '') + '</button>'; }).join('') + '</div>'
                 + '<div class="sn-row">' + (Q && Q[2] ? '<input id="sno-a" type="number" inputmode="numeric" placeholder="' + (Q[0] === 'unit' ? '0–9' : '1–100') + '" aria-label="Number">' : '') + (Q && Q[2] === 2 ? '<span>–</span><input id="sno-b" type="number" inputmode="numeric" placeholder="1–100" aria-label="To">' : '')
                 + '<button type="button" class="sn-go" style="flex:1" id="sno-ask" onclick="SNOnline.ask()"' + (!Q || st.busy ? ' disabled' : '') + '>ถาม ' + name(g, st.to) + ' 🎫</button></div>'
                 + '<div class="sn-note">แตะเลขในตาราง = ทายเลข ' + name(g, st.to) + ' · ถูก ⭐ +3 · ผิด ⭐ −1 🎫 −1</div>';
@@ -185,6 +186,8 @@
             var a = Q[2] ? +(document.getElementById('sno-a') || {}).value : 0, b = Q[2] === 2 ? +(document.getElementById('sno-b') || {}).value : 0;
             var lo = Q[0] === 'unit' ? 0 : 1, hi = Q[0] === 'unit' ? 9 : MAX;
             if (Q[2] && !(Number.isInteger(a) && a >= lo && a <= hi && (Q[2] < 2 || (Number.isInteger(b) && b >= 1 && b <= MAX)))) { st.msg = 'ใส่เลข ' + lo + '–' + hi; return rr(); }
+            var hd = st.hand || {}, dup = (hd.notes || []).some(function (m) { return m.to === st.to && m.q === Q[0] && (Q[0] === 'range' ? Math.min(m.a, m.b) === Math.min(a, b) && Math.max(m.a, m.b) === Math.max(a, b) : !Q[2] || m.a === a); });
+            if (dup) { st.msg = 'ถามข้อนี้ไปแล้ว'; return rr(); }   // V101.385 never pay 🎫 twice for the same question
             return busy(call({ action: 'ask', roomId: st.open, to: st.to, q: Q[0], a: a, b: b })).then(function (r) { if (r) st.q = null; });
         },
         guess: function (n) { var g = st.room; if (!g || !window.confirm('ทายเลข' + ((g.players[st.to] || {}).name || '') + ' = ' + n + ' ?')) return; return busy(call({ action: 'guess', roomId: st.open, to: st.to, n: n })); },
