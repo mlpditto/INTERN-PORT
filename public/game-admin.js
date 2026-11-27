@@ -8,7 +8,7 @@
 (function () {
     'use strict';
     var WEEK = 7 * 864e5, last = 0, plays = [], pick = null, view = 'time', per = 'week', all = null, allAt = 0;
-    var GAMES = [['bw', '⚫', 'ไพ่เงา'], ['count', '🧊', 'นับไว'], ['cereal', '🥣', 'Cereal'], ['wolf', '🐺', 'หมาป่า'], ['secret', '🔢', 'เลขลับ'], ['secretOn', '🔢🌐', 'เลขลับ หลายคน'], ['rock13', '🪨', 'แบกหิน']];
+    var GAMES = [['bw', '⚫', 'ไพ่เงา'], ['count', '🧊', 'นับไว'], ['cereal', '🥣', 'Cereal'], ['wolf', '🐺', 'หมาป่า'], ['secret', '🔢', 'เลขลับ'], ['secretOn', '🔢🌐', 'เลขลับ หลายคน'], ['rock13', '🪨', 'Carry 13']];
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function is(p, g) { return window.GameTopRank ? GameTopRank.is(p, g) : p.game === g; }   // V102.708 🔢🌐 its own chip
     function avg(a) { return a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : 0; }

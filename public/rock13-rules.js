@@ -1,4 +1,4 @@
-/* V101.382 🪨 คนแบกหิน 13 — the rules, pure (owner 2026-11-27, game 4 of docs/MIND-GAMES-PLAN.md: a game-show mechanic, our own name
+/* V101.382 🪨 Carry 13 — the rules, pure (owner 2026-11-27, game 4 of docs/MIND-GAMES-PLAN.md: a game-show mechanic, our own name
    and look, pick A3 = carriers holding a board, mockup-rock13/). 3 carriers 🔴🟢🔵. Each set every player holds cards 0–6 and chips
    🔴🔴🟢🟢🔵🔵🌈, each used once. A round: everyone picks a card + a chip in secret → reveal → place one by one: 🌈 first, then the
    higher card first; a tie goes clockwise from the 👑. At your turn you may ⏭ Pass once a round (you then place after everyone who

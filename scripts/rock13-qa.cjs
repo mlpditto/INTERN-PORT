@@ -1,4 +1,4 @@
-// V101.382 🪨 คนแบกหิน 13 · ฝึกกับ 🤖 (owner 2026-11-27, docs/MIND-GAMES-PLAN.md §8, pick A3 mockup-rock13/) on the REAL index.html,
+// V101.382 🪨 Carry 13 · ฝึกกับ 🤖 (owner 2026-11-27, docs/MIND-GAMES-PLAN.md §8, pick A3 mockup-rock13/) on the REAL index.html,
 // 390×844. Proves: the 6th tile opens it; the first open plays a 5-scene tour of the rules read aloud (t1…t5), ❓ replays, 🔊/🔇 kept;
 // the lobby rails 👥 3–7 and 7 │ 14 รอบ are remembered; a round: ▸ ส่ง waits for a card + a chip, used ones grey out, the bots
 // place in the queue's order, at your turn ▸ วาง shows what it does (💥 when it takes stones), ⏭ Pass shows only when allowed,
@@ -30,7 +30,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
   // the doorway: the 6th tile; the first open = the tour, read aloud
   const tiles = await page.$$eval('#u-games-row .u-game', (b) => b.map((x) => x.textContent.replace(/\s+/g, '')));
-  assert.equal(tiles.length, 6); assert.match(tiles[5], /🪨แบกหิน/);
+  assert.equal(tiles.length, 6); assert.match(tiles[5], /🪨Carry13/);
   await page.click('#u-games-row .u-game:nth-child(6)');
   assert.ok(await page.isVisible('#r13-tour'), 'first open = the tour'); assert.deepEqual(await page.evaluate(() => window.__played), ['rock13-voice/t1.mp3']);
   const caps = [];

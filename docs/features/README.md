@@ -33,7 +33,7 @@ Walk the areas top to bottom for a broad regression: intern surfaces first, then
 - [count-game](count-game.md): 🧊 นับไว — solo Count the Rectangles + Count the Cubes, number pad, answer then the answer shows (V101.362); 🧘 no-timer mode + small numbered pictures / top-view table answers (V101.371).
 - [shadow](shadow.md): ⚫⚪ ไพ่เงา — hidden-number duel vs 🤖 (0–8, see only the colour), 3 levels, 🧠 memory mode at 🥄🥄🥄 (V101.365).
 - [secret-number](secret-number.md): 🔢 เลขลับ — guess 🤖's 1–100 with the fewest 🎫; 4 help levels (🟩 ✏️ 📏 🧠), tour read aloud (V101.378).
-- [rock13](rock13.md): 🪨 คนแบกหิน 13 — keep 3 carriers under 13; 3–7 players with 🤖, ⏭ Pass, 🌈; tour of the rules read aloud (V101.382).
+- [rock13](rock13.md): 🪨 Carry 13 — keep 3 carriers under 13; 3–7 players with 🤖, ⏭ Pass, 🌈; tour of the rules read aloud (V101.382).
 - [game-time](game-time.md): 🎮 seconds per round for all 4 games → admin Dashboard table per person (intern V101.370 / admin V102.704).
 - Games row (V101.368): on phones the 4 game doorways (🥣 🐺 🧊 ⚫) are one row of named cards under History, above the version (`#u-games-row`, `scripts/games-row-qa.cjs`); PC keeps the header rail.
 - [content-creator](content-creator.md): The social-content division: intern post form, admin content board, separate CAFE points.

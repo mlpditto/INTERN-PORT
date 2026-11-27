@@ -1,6 +1,6 @@
-# 🪨 คนแบกหิน 13 · practice vs 🤖
+# 🪨 Carry 13 · practice vs 🤖
 
-Owner 2026-11-27. Game 4 in `docs/MIND-GAMES-PLAN.md` §8 (OneDrive copy, untracked). It uses a game-show mechanic only; the name and look are our own. Picks (mockup-rock13/):
+Owner 2026-11-27. Game 4 in `docs/MIND-GAMES-PLAN.md` §8 (OneDrive copy, untracked). It uses a game-show mechanic only; the name and look are our own (owner picked the name Carry 13). Picks (mockup-rock13/):
 - A3: each carrier holds a board above the shoulders, and the stones sit on it as numbered cubes, 3 to a row
 - 3–7 players
 - the 6th tile in the games row, plus 🪨 in the PC 🎮 menu

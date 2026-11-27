@@ -1,11 +1,11 @@
-/* V101.382 🪨 คนแบกหิน 13 · ฝึกกับ 🤖 (owner 2026-11-27: game 4 of docs/MIND-GAMES-PLAN.md, our own name and look, pick A3 =
+/* V101.382 🪨 Carry 13 · ฝึกกับ 🤖 (owner 2026-11-27: game 4 of docs/MIND-GAMES-PLAN.md, our own name and look, pick A3 =
    carriers holding a board with the stones as numbered cubes, mockup-rock13/rock13-A3.png). You + 2–6 🤖, 7 or 14 rounds. Rules in
    rock13-rules.js. Each round: pick a card + a chip → ▸ ส่ง → everyone places in order (the queue bar); at your turn ▸ วาง or ⏭ Pass,
    🌈 taps a carrier. A ❓ tour of the rules only, read aloud in Thai (rock13-voice/t1…t5.mp3) — no tactics (owner: "ไม่เผยเทคนิค").
    game_plays: game 'rock13', mode 'bot', win 'w' when you rank first, score = your 🪨. window.R13, window.rock13Open. */
 (function () {
     'use strict';
-    var NAME = 'คนแบกหิน 13', R = function () { return window.Rock13Rules; };
+    var NAME = 'Carry 13', R = function () { return window.Rock13Rules; };
     var COL = { r: '#dc2626', g: '#16a34a', b: '#2563eb' }, CHIP = { r: '🔴', g: '🟢', b: '🔵', w: '🌈' };
     var g = null, id = null, cfg = { n: 5, rounds: 14 }, pick = { card: null, chip: null }, news = '', timer = null, rng = Math.random, SPEED = 650;
     function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
