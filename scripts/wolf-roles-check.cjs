@@ -114,7 +114,7 @@ async function night1(code, { bite, look, cover, seer, guard, witch, t }) {
   const dealt = S(a).roles, by = (r) => Object.keys(dealt).filter((id) => dealt[id] === r);
   const minion = by('minion')[0], jester = by('jester')[0], wolves = by('wolf');
   assert.ok(card(out, minion).startsWith(B.ROLE_CARD.minion));
-  assert.match(card(out, minion), new RegExp('\n🐺 หมาป่า: ' + wolves.map((id) => G(a).players[id].name).join(', ') + ' · พวกเขาไม่รู้จักคุณ\n'), 'the 😈 card names the wolves');
+  assert.match(card(out, minion), new RegExp('\n🐺 หมาป่าในเกมนี้: ' + wolves.map((id) => G(a).players[id].name).join(', ') + '\nไม่มีพลังกลางคืน'), 'the 😈 card names the wolves');
   for (const w of wolves) { assert.ok(!card(out, w).includes(G(a).players[minion].name), 'a wolf card does not name the minion'); assert.ok(!/😈/.test(card(out, w))); }
   assert.ok(card(out, jester).startsWith(B.ROLE_CARD.jester));
   const asked = out.filter((x) => x.method === 'sendMessage' && /คืนนี้/.test(x.body.text)).map((x) => x.body.chat_id);
