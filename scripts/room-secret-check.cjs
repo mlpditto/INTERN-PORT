@@ -59,7 +59,7 @@ const truth = { gt: (n, a) => n > a, even: (n) => n % 2 === 0, div3: (n) => n % 
   assert.equal(r1.ans, sec['auth' + other] > 50); g = pub(c1.roomId);
   assert.deepEqual(hand(c1.roomId, turnX).notes, [{ to: 'auth' + other, q: 'gt', a: 50, b: 0, ans: r1.ans }], 'the answer goes to the asker only');
   assert.equal((hand(c1.roomId, other).notes || []).length, 0);
-  assert.deepEqual(Object.keys(g.log[0]).sort(), ['at', 'by', 'k', 'to', 'txt']); assert.equal(g.log[0].txt, 'มากกว่า 50 ?');
+  assert.deepEqual(Object.keys(g.log[0]).sort(), ['at', 'by', 'k', 'to', 'txt']); assert.equal(g.log[0].txt, '> 50?');
   assert.equal(g.tickets['auth' + turnX], 5);
   // claim skips a late turn
   await refused(call(turnX, { action: 'claim', roomId: c1.roomId }), 'early');

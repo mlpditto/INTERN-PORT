@@ -72,15 +72,30 @@ const until = (p, fn, arg) => p.waitForFunction(fn, arg, { timeout: 5000 });
   const code = (await text(A, '#sno-roomcode')).replace(/\D/g, ''); assert.match(code, /^\d{4}$/);
   assert.ok(await A.$eval('#sno-start', (b) => b.disabled), 'alone: ▸ เริ่ม waits');
   await A.evaluate(() => { window.__clip = null; }); await A.click('#sno-invite');
-  await until(A, () => /\?sn=\d{4}/.test(window.__clip || '')); assert.match(await A.evaluate(() => window.__clip), new RegExp('มายด์ ชวนเล่นเลขลับ · รหัส ' + code));
+  await until(A, () => /\?sn=\d{4}/.test(window.__clip || '')); assert.match(await A.evaluate(() => window.__clip), new RegExp('มายด์ invites you to Secret number · code ' + code));
   for (const X of [B, C]) { await X.evaluate(() => { secretOpen(); SN.multi(1); }); await until(X, () => !!document.getElementById('sno-code')); await X.fill('#sno-code', code); await X.click('#sno-join'); await until(X, () => !!document.getElementById('sno-seats')); }
-  assert.match(await text(B, '#sno-seats'), /มายด์.*เจ้าของห้อง.*คุณ/); assert.equal(await B.$('#sno-start'), null, 'only the host starts');
-  await until(A, () => /3 คน/.test((document.getElementById('sno-start') || {}).textContent || ''));
+  assert.match(await text(B, '#sno-seats'), /มายด์.*host.*You/); assert.equal(await B.$('#sno-start'), null, 'only the host starts');
+  await until(A, () => /Start · 3/.test((document.getElementById('sno-start') || {}).textContent || ''));
   await A.click('#sno-start');
   for (const X of [A, B, C]) await until(X, () => !!document.getElementById('sno-players'));
   const [rk, room] = roomOf(code), rid = rk.split('/')[1], nums = store.get('rooms/' + rid + '/secret/hands').nums;
-  for (const [u, X] of Object.entries(P)) assert.match(await X.textContent('.sn-top'), new RegExp('เลขคุณ ' + nums[u] + '\\b'), 'each phone shows its own number');
+  for (const [u, X] of Object.entries(P)) assert.match(await X.textContent('.sn-top'), new RegExp('🔒 ' + nums[u] + '\\b'), 'each phone shows its own number');
   void room;
+  {
+    const g0 = store.get(rk), holder = P[g0.turn], waiter = P[Object.keys(P).find((u) => u !== g0.turn)];
+    const hold = await holder.evaluate((u) => ({ h: document.getElementById('sno-turn').textContent, mine: document.getElementById('sno-turn').classList.contains('sno-mine'), ring: !!document.querySelector('#sno-players [data-u="' + u + '"] #sno-ring'), rings: document.querySelectorAll('#sno-ring').length, nudge: !!document.getElementById('sno-nudge'), clock: !!document.getElementById('sno-clock') }), g0.turn);
+    assert.deepEqual(hold, { h: '👉 Your turn', mine: true, ring: true, rings: 1, nudge: false, clock: false }, 'V101.387 my turn: the header pulses, a ring round my face, no ⏳ pill');
+    const dash = await holder.$eval('#sno-ring', (c) => parseFloat(c.getAttribute('stroke-dasharray')));
+    assert.ok(dash > 90 && dash <= 100, 'the ring starts nearly full: ' + dash);
+    const wait = await waiter.evaluate((u) => ({ h: document.getElementById('sno-turn').textContent, mine: document.getElementById('sno-turn').classList.contains('sno-mine'), ring: !!document.querySelector('#sno-players [data-u="' + u + '"] #sno-ring'), nudge: (document.getElementById('sno-nudge') || {}).textContent, inTop: !!document.querySelector('.sn-top #sno-nudge'), ask: !!document.getElementById('sno-ask') }), g0.turn);
+    assert.deepEqual(wait, { h: g0.players[g0.turn].name + "'s turn", mine: false, ring: true, nudge: '👋 Nudge', inTop: true, ask: false }, 'someone else\'s turn: their face has the ring, 👋 Nudge in the header');
+    for (const X of [A, B, C]) {
+      const t = await X.$eval('#snModal', (m) => m.textContent.replace(/มายด์|ต้นข้าว|ภูมิ/g, '').replace(/[มตภ](?=You|🎫)/g, ''));
+      assert.doesNotMatch(t, /[\u0E00-\u0E7F]/, 'the room is English (names aside)');
+    }
+    const bottom = await holder.$eval('#sno-resign', (b) => { const r = b.getBoundingClientRect(), m = document.querySelector('#snModal .modal-content').getBoundingClientRect(); return r.bottom <= m.bottom + 1; });
+    assert.ok(bottom, 'the last button sits inside the popup');
+  }
 
   // the turn holder asks, the answer crosses out only on their grid
   let g = store.get(rk), me = P[g.turn], others = Object.keys(P).filter((u) => u !== g.turn);
@@ -95,7 +110,7 @@ const until = (p, fn, arg) => p.waitForFunction(fn, arg, { timeout: 5000 });
   assert.deepEqual(chip, [true, true, false], 'V101.385: Even? asked of this person → its chip is off on my next turn; > __? stays');
   for (const u of others) await until(P[u], () => /🔒/.test((document.getElementById('sno-last') || {}).textContent || ''));
   assert.equal(await P[others[1]].$$eval('#sno-grid .out', (e) => e.length), 0, 'someone else\'s answer never crosses my grid');
-  assert.match(await text(P[others[1]], '#sno-last'), /ถาม .* · เลขคู่ \? 🔒/);
+  assert.match(await text(P[others[1]], '#sno-last'), /→.* · Even\? 🔒/);
   // the next turn guesses right on its grid: +3 and the target is out
   g = store.get(rk); me = P[g.turn]; const tgt = Object.keys(P).find((u) => u !== g.turn);
   await until(me, () => !!document.getElementById('sno-ask'));
@@ -103,7 +118,7 @@ const until = (p, fn, arg) => p.waitForFunction(fn, arg, { timeout: 5000 });
   me.once('dialog', (d) => d.accept()); await me.click('#sno-grid [data-n="' + nums[tgt] + '"]');
   await until(me, (t) => (document.querySelector('#sno-players [data-u="' + t + '"]') || {}).className.includes('out'), tgt);
   g = store.get(rk); assert.equal(g.out[tgt], true); assert.equal(g.score[Object.keys(P).find((u) => P[u] === me)], 3);
-  await until(P[tgt], () => /ออก · เลข/.test((document.getElementById('sno-last') || {}).textContent || ''));
+  await until(P[tgt], () => / out · \d/.test((document.getElementById('sno-last') || {}).textContent || ''));
   // play to the end: the remaining two guess each other's numbers
   for (let guard = 0; guard < 30; guard++) {
     g = store.get(rk); if (g.status !== 'playing') break;
@@ -115,10 +130,10 @@ const until = (p, fn, arg) => p.waitForFunction(fn, arg, { timeout: 5000 });
   }
   for (const X of [A, B, C]) await until(X, () => !!document.getElementById('sno-final'));
   const finals = await Promise.all([A, B, C].map((X) => text(X, '#sno-final')));
-  const own = ['มายด์', 'ต้นข้าว', 'ภูมิ'];   // each phone calls itself "คุณ"
-  const norm = finals.map((f, i) => f.replace('คุณ', own[i]).replace(/^🏆 | ชนะ$/g, '').split(' · ').sort().join(','));
+  const own = ['มายด์', 'ต้นข้าว', 'ภูมิ'];   // each phone calls itself "You"
+  const norm = finals.map((f, i) => f.replace('You', own[i]).replace(/^🏆 /, '').split(' · ').sort().join(','));
   assert.equal(new Set(norm).size, 1, 'the same winner on every phone: ' + finals);
-  for (const [u] of Object.entries(P)) assert.match(await text(A, '#sno-rank'), new RegExp('เลข ' + nums[u]), 'every number revealed');
+  for (const [u] of Object.entries(P)) assert.match(await text(A, '#sno-rank'), new RegExp('🔒 ' + nums[u]), 'every number revealed');
   const logs = await Promise.all([A, B, C].map((X) => X.evaluate(() => window.__logs.filter((x) => x.g === 'secret'))));
   logs.forEach((l) => assert.equal(l[0].mode, 'online')); assert.ok(logs.some((l) => l[0].win === 'w'));
 
@@ -127,7 +142,7 @@ const until = (p, fn, arg) => p.waitForFunction(fn, arg, { timeout: 5000 });
   await until(A, () => !!document.getElementById('sno-roomcode'));
   const code2 = (await text(A, '#sno-roomcode')).replace(/\D/g, '');
   await B.evaluate(() => SNOnline.leave()); await until(B, () => !!document.getElementById('sno-code')); await B.fill('#sno-code', code2); await B.click('#sno-join');
-  await until(A, () => /2 คน/.test((document.getElementById('sno-start') || {}).textContent || '')); await A.click('#sno-start');
+  await until(A, () => /Start · 2/.test((document.getElementById('sno-start') || {}).textContent || '')); await A.click('#sno-start');
   const [rk2] = roomOf(code2); await until(B, () => !!document.getElementById('sno-players'));
   const late = store.get(rk2).turn;
   store.set(rk2, Object.assign(store.get(rk2), { turnDeadline: Date.now() - 1000, updatedAt: Date.now() }));
@@ -135,11 +150,11 @@ const until = (p, fn, arg) => p.waitForFunction(fn, arg, { timeout: 5000 });
   assert.notEqual(store.get(rk2).turn, late, 'the waiting phone skipped the late turn'); assert.equal(store.get(rk2).log.slice(-1)[0].k, 'skip');
   // 🏳 leave, 320 px
   const leaver = P[store.get(rk2).turn === 'authA' ? 'authB' : 'authA'];
-  leaver.once('dialog', (d) => d.accept()); await leaver.click('text=🏳 ออกจากเกม');
+  leaver.once('dialog', (d) => d.accept()); await leaver.click('#sno-resign');
   await until(A, () => !!document.getElementById('sno-final'));
   await C.setViewportSize({ width: 320, height: 640 }); await C.evaluate(() => SNOnline.leave());
   assert.ok(await C.$eval('#snModal .modal-content', (e) => e.scrollWidth <= e.clientWidth + 1), '320 px fits');
   for (const X of [A, B, C]) assert.deepEqual(X.errors, []);
   await browser.close();
-  console.log('secret-online-qa: OK — 🤖 │ 🌐 rail; room by host, 📤 ?sn=<code>, join by code, only the host starts; each phone its own number; an answer crosses only the asker\'s grid, others see 🔒; a right guess +3 and out; same winner + all numbers on every phone, logged online; ⚡ late turn skipped; 🏳; 320 px');
+  console.log('secret-online-qa: OK — V101.387 ring round the turn holder, 👉 Your turn, 👋 Nudge in the header, English; 🤖 │ 🌐 rail; room by host, 📤 ?sn=<code>, join by code, only the host starts; each phone its own number; an answer crosses only the asker\'s grid, others see 🔒; a right guess +3 and out; same winner + all numbers on every phone, logged online; ⚡ late turn skipped; 🏳; 320 px');
 })().catch((e) => { console.error(e); process.exit(1); });
