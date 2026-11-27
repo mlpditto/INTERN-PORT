@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.383)</title>
+    <title>Internship Portfolio (V101.384)</title>
     <script>document.addEventListener('touchstart', function () {}, { passive: true }); /* V101.337: lets iOS show :active on tap */</script>
     <link rel="stylesheet" href="nika-ask.css?v=V101.308">
     <link rel="stylesheet" href="daily-canvas.css?v=V101.266">
@@ -7022,7 +7022,7 @@
                     Welcome! Please enter the registration code provided by your admin ยินดีต้อนรับ! กรุณากรอกรหัสลงทะเบียนที่คุณได้รับจากผู้ดูแลระบบ</p>
 
                 <div style="margin: 20px 0;">
-                    <input type="text" id="enroll-code-input" placeholder="6-digit code" data-th-placeholder="รหัส 6 หลัก" data-kr-placeholder="6자리 코드" maxlength="6"
+                    <input type="text" id="enroll-code-input" placeholder="6-digit code" data-th-placeholder="รหัส 6 หลัก" data-kr-placeholder="6자리 코드" maxlength="9"
                         style="text-align:center; font-size:1.6em; font-family:'Courier New', monospace; font-weight:900; letter-spacing:6px; text-transform:uppercase; padding:15px; border:2px solid #6f42c1; border-radius:14px; width: 100%; box-shadow: 0 4px 12px rgba(111, 66, 193, 0.15);"
                         onkeypress="if(event.key==='Enter')claimEnrollmentCode()">
                 </div>
@@ -9199,6 +9199,7 @@
                     }
 
                     checkGraduation(da);
+                    if (window.TesterJoin) TesterJoin.check(da);   // V101.384 🧪 a tester whose code has ended
                     updateDivisionAndVisibility(); // 🔥 Update UI
 
                     // Ensure quiz/assignment lists refresh after group/profile is resolved
@@ -9547,7 +9548,9 @@
         }
 
         // 🔥 V79.6 & V84.3: Enrollment Code & Request System
-        function showEnrollmentModal(rematchMode = false) {
+        function showEnrollmentModal(rematchMode = false, noTesterLink = false) {
+            // V101.384 🧪 a LINE tester link (?tester=TEST-nnnn) skips Register: tester-join.js asks only to read the device
+            try { const tc = new URLSearchParams(location.search).get('tester'); if (!rematchMode && !noTesterLink && window.TesterJoin && TesterJoin.isCode(tc)) { document.getElementById('enrollModal').style.display = 'none'; return TesterJoin.open(tc); } } catch (_) { }
             window.enrollmentRematchMode = rematchMode === true;
             document.getElementById('enrollModal').style.display = 'flex';
             document.getElementById('enroll-code-input').value = '';
@@ -9688,6 +9691,7 @@
                 statusEl.innerHTML = '<span style="color:#ef233c;">❌ Please enter the full code กรุณากรอกรหัสให้ครบ</span>';
                 return;
             }
+            if (!window.enrollmentRematchMode && window.TesterJoin && TesterJoin.isCode(code)) return TesterJoin.open(code);   // V101.384 🧪 a tester code
 
             statusEl.innerHTML = '<span style="color:#999;">🔍 Verifying code กำลังตรวจสอบรหัส...</span>';
 
@@ -28579,6 +28583,7 @@ async function archiveDoneCard(cardId) {
 <script src="rock13-rules.js?v=V101.382" defer></script>
 <script src="rock13-sound.js?v=V101.382" defer></script>
 <script src="rock13.js?v=V101.382" defer></script>
+<script src="tester-join.js?v=V101.384" defer></script>
 <script src="intern-guide.js?v=V101.136" defer></script>
 <script src="complete-moments.js?v=V101.212" defer></script>
 <script src="articles.js?v=V101.354" defer></script>
