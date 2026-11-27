@@ -54,6 +54,30 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   // the levels are ordered: vs a random hand (seeded, 400 games — the same every run), 🥄🥄🥄 wins clearly more than it loses
   const st = await page.evaluate(() => { let w = 0, l = 0, z = 11; const R = () => ((z = (z * 48271) % 2147483647) / 2147483647); for (let i = 0; i < 400; i++) { BW.level(3); BW.start(); const g = BW._g(); while (!g.end) { if (g.last) BW.next(); else { BW.pick(g.me[Math.floor(R() * g.me.length)]); BW.play(); } } if (g.sc.bot > g.sc.me) w++; else if (g.sc.bot < g.sc.me) l++; } BW.close(); return { w, l }; });
   assert.ok(st.w > st.l * 1.3, '🥄🥄🥄 beats a random hand ' + JSON.stringify(st));
+  // V101.386 bot styles (owner "ทั้งสาม"): 🥄 reads my colour only · 🥄🥄+ throws its lowest when beaten, the smallest sure win · 🥄🥄🥄 bluffs
+  const bot = await page.evaluate(() => {
+    const r = {};
+    BW.level(1); BW.start(); let g = BW._g(); g.hist = []; g.bot = [0, 3, 6, 8];
+    BW._rng(() => 0.9); r.easy7 = BW._botPick('w');    // guesses ⚪ 7 → 8
+    BW._rng(() => 0.6); r.easy5 = BW._botPick('w');    // guesses ⚪ 5 → 6
+    BW.level(2); BW.start(); g = BW._g(); g.hist = []; g.bot = [0, 1]; BW._rng(() => 0.5);
+    r.dumpT = BW._botPick('b');
+    g.bot = [0, 1, 8]; r.sure = BW._botPick('w');      // only 8 beats every ⚪ → 8
+    // a dump lands on the round: me ⚫ 8 vs [0, 1] → the bot throws 0, h.dump on the end card data
+    g = BW._g(); g.bot = [0, 1]; g.me = [8, 7]; g.lead = 'me'; g.botTile = null; BW.pick(8); BW.play(); r.hist = g.hist.slice(-1).map((h) => [h.b, h.dump])[0]; g.end = true; BW.level(2); const dc = [...document.querySelectorAll('#bw-reveal .bw-card')]; r.flag = dc.map((c) => c.classList.contains('dump') ? getComputedStyle(c, '::after').content : '');
+    let z = 5; BW._rng(() => ((z = (z * 16807) % 2147483647) / 2147483647));
+    const first = new Set(); for (let i = 0; i < 24; i++) { BW.level(3); BW.start(); const q = BW._g(); q.hist = []; q.bot = [0, 1, 2, 3, 4, 5, 6, 7, 8]; first.add(BW._botPick(null)); }
+    r.leads = first.size;
+    let s = 3; BW._rng(() => ((s = (s * 16807) % 2147483647) / 2147483647)); BW.close();
+    return r;
+  });
+  assert.equal(bot.easy7, 8, '🥄: my ⚪ → it guesses one ⚪ (7) and answers with its smallest tile above it');
+  assert.equal(bot.easy5, 6, '🥄: guesses ⚪ 5 → 6');
+  assert.equal(bot.dumpT, 0, '🥄🥄: no tile wins 1 in 3 vs my ⚫ → throws its lowest');
+  assert.equal(bot.sure, 8, '🥄🥄: a sure win (above every ⚪) is used');
+  assert.deepEqual(bot.hist, [0, true], 'the dump is kept on the round (h.dump)');
+  assert.deepEqual(bot.flag, ['"🏳"'], 'pick A: 🏳 in the corner of that round’s end card, none on the others');
+  assert.ok(bot.leads >= 3, '🥄🥄🥄 bluffs: its first lead is not always the same tile (' + bot.leads + ')');
 
   // ---- phone doorway → lobby → a game ----
   assert.equal(await page.isVisible('#u-bw-chip'), false, 'phone: no header chip');

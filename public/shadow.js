@@ -86,12 +86,33 @@
         }
         return sb > sm ? 1 : sb === sm ? 0.5 : 0;
     }
-    // 🥄 random · 🥄🥄 / 🥄🥄🥄: for each tile, sample hands I may hold (and, when I led, my tile of the colour I showed), play the
-    // round and the rest out many times, keep the tile that wins most (🥄🥄 fewer samples + a little noise)
+    // V101.386 (owner "ทั้งสาม"): 🥄 looks at my colour only — no memory, no maths: it guesses one tile of that colour and answers with
+    // its smallest tile above it, else its lowest (half the time just any tile; it leads at random). 🥄🥄 / 🥄🥄🥄: when no tile wins the
+    // round 1 time in 3 against the tiles I may hold of that colour it throws its lowest (h.dump, shown on the end card); when a tile wins for sure
+    // it uses the smallest such. Otherwise, for each tile, sample hands I may hold (and, when I led, my tile of the colour I showed),
+    // play the round and the rest out many times, keep the tile that wins most (🥄🥄 fewer samples + a little noise). 🥄🥄🥄 bluffs:
+    // any tile within a hair of the best may come out (more room when it leads), so its colours cannot be read off a pattern.
+    var dump = false;
+    function lowest(h) { return Math.min.apply(null, h); }
     function botPick(myColour) {
-        var hand = g.bot.slice();
-        if (lvl === 1 || hand.length === 1) return hand[Math.floor(rng() * hand.length)];
-        var o = myOdds(), N = lvl === 3 ? 60 : 14, best = null, bestV = -1;
+        var hand = g.bot.slice(); dump = false;
+        if (hand.length === 1) return hand[0];
+        if (lvl === 1) {
+            if (!myColour || rng() < 0.5) return hand[Math.floor(rng() * hand.length)];
+            var ofC = ALL.filter(function (n) { return col(n) === myColour; }), guess = ofC[Math.floor(rng() * ofC.length)];
+            var up1 = hand.filter(function (n) { return n > guess; });
+            return up1.length ? lowest(up1) : lowest(hand);
+        }
+        var o = myOdds(), N = lvl === 3 ? 60 : 14, best = null, bestV = -1, vals = [];
+        if (myColour) {
+            var may = [], wt = {}, sw = 0; o.hands.forEach(function (h) { var p = h.filter(function (n) { return col(n) === myColour; }); p.forEach(function (n) { if (may.indexOf(n) < 0) may.push(n); wt[n] = (wt[n] || 0) + 1 / p.length; sw += 1 / p.length; }); });
+            if (may.length) {
+                var lo = lowest(may), hi = Math.max.apply(null, may), sure = hand.filter(function (n) { return n > hi; });
+                var pw = function (t) { var a = 0; may.forEach(function (n) { if (n < t) a += wt[n]; }); return a / sw; };
+                if (Math.max.apply(null, hand.map(pw)) < 0.35) { dump = true; return lowest(hand); }   // (almost) beaten whatever it plays
+                if (sure.length) return lowest(sure);                                                    // a sure win, as cheap as it gets
+            }
+        }
         hand.forEach(function (t) {
             var v = 0, k = 0;
             for (var i = 0; i < N * 3 && k < N; i++) {
@@ -102,8 +123,12 @@
                 v += sm >= WIN_AT ? 0 : sb >= WIN_AT ? 1 : rollout(h.filter(function (n) { return n !== m; }), hand.filter(function (n) { return n !== t; }), sm, sb, m > t ? 'me' : t > m ? 'bot' : g.lead); k++;
             }
             v = k ? v / k : 0; if (lvl === 2) v += (rng() - 0.5) * 0.15;
-            if (v > bestV) { bestV = v; best = t; }
+            vals.push([t, v]); if (v > bestV) { bestV = v; best = t; }
         });
+        if (lvl === 3) {   // bluff: any tile this close to the best
+            var near = vals.filter(function (x) { return x[1] >= bestV - (myColour ? 0.03 : 0.06); });
+            best = near[Math.floor(rng() * near.length)][0];
+        }
         return best;
     }
 
@@ -114,9 +139,10 @@
     }
     function play(n, given) {
         if (!g || g.end || g.last || g.me.indexOf(n) < 0) return;
+        dump = false;
         var b = given != null ? given : g.lead === 'bot' ? g.botTile : botPick(col(n)), res = cmp(n, b);
         g.me.splice(g.me.indexOf(n), 1); g.bot.splice(g.bot.indexOf(b), 1);
-        g.hist.push({ m: n, b: b, mc: col(n), bc: col(b), res: res, lead: g.lead });
+        g.hist.push({ m: n, b: b, mc: col(n), bc: col(b), res: res, lead: g.lead, dump: dump && given == null && !g.two });
         if (res === 'win') g.sc.me++; else if (res === 'lose') g.sc.bot++;
         g.last = g.hist[g.hist.length - 1]; g.sel = null; g.botTile = null;
         if (res !== 'draw') g.lead = res === 'win' ? 'me' : 'bot';
@@ -170,7 +196,7 @@
         + '#bwModal .bw-sheet{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:400px;max-height:70vh;overflow:auto;background:#1d1a3d;border-radius:18px 18px 0 0;padding:12px 14px calc(18px + env(safe-area-inset-bottom));z-index:10001;box-shadow:0 -10px 30px rgba(0,0,0,.5);box-sizing:border-box}'
         + '#bwModal .bw-top .bw-fin{border-radius:999px;padding:3px 10px;white-space:nowrap}.bw-t.mid{width:26px;height:34px;font-size:16px;border-radius:6px}@media (min-width:360px){.bw-t.mid{width:30px;height:40px;font-size:18px}}'
         + '#bwModal .bw-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;cursor:pointer}#bwModal .bw-card{position:relative;display:flex;align-items:center;justify-content:center;gap:4px;border-radius:12px;padding:16px 2px 10px;background:#1d1a3d;box-shadow:inset 4px 0 0 #3f3a74;font-size:11px;color:#94a3b8}'
-        + '#bwModal .bw-card .d{position:absolute;top:3px;left:9px;font-size:10px;font-weight:900;color:#6b7280}#bwModal .bw-card.win{background:#17302a;box-shadow:inset 4px 0 0 #22c55e}#bwModal .bw-card.lose{background:#2e1a24;box-shadow:inset 4px 0 0 #ef4444}#bwModal .bw-card.draw{box-shadow:inset 4px 0 0 #94a3b8}#bwModal .bw-card.now{outline:2px solid #a78bfa}'
+        + '#bwModal .bw-card .d{position:absolute;top:3px;left:9px;font-size:10px;font-weight:900;color:#6b7280}#bwModal .bw-card.win{background:#17302a;box-shadow:inset 4px 0 0 #22c55e}#bwModal .bw-card.lose{background:#2e1a24;box-shadow:inset 4px 0 0 #ef4444}#bwModal .bw-card.draw{box-shadow:inset 4px 0 0 #94a3b8}#bwModal .bw-card.now{outline:2px solid #a78bfa}#bwModal .bw-card.dump::after{content:"🏳";position:absolute;top:2px;right:6px;font-size:11px}'
         + '#bwModal .bw-act{display:flex;gap:8px}#bwModal .bw-act #bw-again{flex:1}#bwModal .bw-act .ic{flex:0 0 58px;padding:0}#bwModal .bw-act .done{color:#86efac}'
         + '.bw-lvs{display:flex;gap:6px;justify-content:center}#bwModal .bw-lvs button{border:1px solid #e2e8f0;background:#fff;border-radius:999px;padding:8px 12px;font-weight:800}#bwModal .bw-lvs button.on{border-color:#0f172a;background:#0f172a;color:#fff}'
         + '.bw-rule{font-size:.85em;color:#475569;text-align:center;line-height:1.6}.bw-toast{text-align:center;font-size:.85em;font-weight:800;color:#b45309}'
@@ -272,7 +298,7 @@
         return '<div class="bw"><div class="bw-top"><h3>⚫⚪ จบเกม</h3><span class="bw-res bw-fin ' + (g.two ? (r === 'draw' ? 'draw' : 'win') : r) + '" id="bw-final">' + (g.two ? (r === 'draw' ? '🤝 ' : '🏆 ' + nm(r === 'win' ? 'me' : 'bot') + ' ') + nm('me') + ' ' + g.sc.me + ' : ' + g.sc.bot + ' ' + nm('bot') : { win: '🏆', lose: '😞', draw: '🤝' }[r] + ' ' + g.sc.me + ' : ' + g.sc.bot) + '</span>' + snd() + X + '</div>'
             + '<div class="bw-cards" id="bw-reveal" onclick="BW.showAll()" aria-label="Rounds">' + g.hist.map(function (x, i) {
                 var open = i < shown;   // V101.366: one by one; a tap opens the rest
-                return '<div class="bw-card' + (open ? ' ' + x.res : '') + (i === shown - 1 && shown < g.hist.length ? ' now' : '') + '"><span class="d">' + (i + 1) + '</span>' + t(x.m, 'mid') + '<small>vs</small>' + (open ? t(x.b, 'mid') : back(x.bc, 'mid')) + '</div>';
+                return '<div class="bw-card' + (open ? ' ' + x.res + (x.dump ? ' dump' : '') : '') + (i === shown - 1 && shown < g.hist.length ? ' now' : '') + '"><span class="d">' + (i + 1) + '</span>' + t(x.m, 'mid') + '<small>vs</small>' + (open ? t(x.b, 'mid') : back(x.bc, 'mid')) + '</div>';
             }).join('') + '</div>'
             + '<div class="bw-act"><button type="button" class="bw-go" id="bw-again" onclick="BW.start()">↺ อีกตา</button>'
             + (g.two ? '' : '<button type="button" class="bw-go alt ic' + (sent ? ' done' : '') + '" id="bw-share" onclick="BW.share()" title="Share in LINE" data-th-title="แชร์ผลใน LINE" aria-label="' + (sent || 'Share in LINE') + '">' + (sent ? '✓' : '📤') + '</button>')
