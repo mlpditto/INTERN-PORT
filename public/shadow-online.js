@@ -141,7 +141,7 @@
             body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: big, size: 'xxl', weight: 'bold', align: 'center' }, { type: 'text', text: '9 ตา · ถึง 5 ก่อนชนะ', size: 'xs', color: '#6b7280', align: 'center' }] },
             footer: { type: 'box', layout: 'vertical', contents: [{ type: 'button', style: 'primary', color: '#6d28d9', height: 'sm', action: { type: 'uri', label: button, uri: uri } }] } } };
         var text = alt + '\n' + uri;
-        var viaLine = window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker') ? Promise.resolve(liff.shareTargetPicker([card])).then(function (x) { return x ? 'sent' : 'closed'; }, function () { return null; }) : Promise.resolve(null);
+        var viaLine = window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker') && (!liff.isLoggedIn || liff.isLoggedIn()) ? Promise.resolve(liff.shareTargetPicker([card])).then(function (x) { return x ? 'sent' : 'closed'; }, function () { return null; }) : Promise.resolve(null);
         return viaLine.then(function (x) {
             if (x === 'sent') return true; if (x === 'closed') return false;
             if (navigator.share) return navigator.share({ text: text }).then(function () { return true; }, function () { return false; });

@@ -52,7 +52,7 @@
     async function share(no, name) {
         var link = VERIFY + encodeURIComponent(no), head = '🎓 Certificate · ' + no;
         try {
-            if (window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')) {
+            if (window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker') && (!liff.isLoggedIn || liff.isLoggedIn())) {
                 await liff.shareTargetPicker([{ type: 'flex', altText: head, contents: { type: 'bubble', size: 'kilo',
                     header: { type: 'box', layout: 'vertical', backgroundColor: '#7a1f2b', paddingAll: '16px', contents: [
                         { type: 'text', text: '🎓 CERTIFICATE', color: '#f5d77a', size: 'xs', weight: 'bold' },

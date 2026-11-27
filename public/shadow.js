@@ -328,7 +328,7 @@
                 body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: [{ type: 'text', text: 'vs 🤖 ' + '🥄'.repeat(lvl), size: 'sm', color: '#3c3c3c' }, { type: 'text', text: dots, size: 'sm', wrap: true }] },
                 footer: { type: 'box', layout: 'vertical', contents: [{ type: 'button', style: 'primary', color: '#6d28d9', height: 'sm', action: { type: 'uri', label: '⚫ เล่นบ้าง', uri: uri } }] } } };
             var text = alt + '\n' + uri, done = function (ok) { if (ok) { sent = '📤 ส่งแล้ว'; render(); } };
-            var viaLine = window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker') ? Promise.resolve(liff.shareTargetPicker([card])).then(function (x) { return x ? 'sent' : 'closed'; }, function () { return null; }) : Promise.resolve(null);
+            var viaLine = window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker') && (!liff.isLoggedIn || liff.isLoggedIn()) ? Promise.resolve(liff.shareTargetPicker([card])).then(function (x) { return x ? 'sent' : 'closed'; }, function () { return null; }) : Promise.resolve(null);
             return viaLine.then(function (x) {
                 if (x === 'sent') return done(true); if (x === 'closed') return;
                 if (navigator.share) return navigator.share({ text: text }).then(function () { done(true); }, function () { });

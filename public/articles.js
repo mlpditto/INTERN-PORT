@@ -757,7 +757,7 @@
         var go = where === 'fb' ? 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(u) : 'https://line.me/R/share?text=' + encodeURIComponent(text);
         var open = function () { internArticles.openSrc(go); return true; };
         // in LINE: the friend / group picker (like 🏅 badges); a cancel is not a share
-        var p = where === 'line' && window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')
+        var p = where === 'line' && window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker') && (!liff.isLoggedIn || liff.isLoggedIn())
             ? Promise.resolve().then(function () { return liff.shareTargetPicker([{ type: 'text', text: text }]); }).then(function (r) { return !!r; }, open)
             : Promise.resolve(open());
         return p.then(function (ok) { return ok ? markShared(id, where) : false; });

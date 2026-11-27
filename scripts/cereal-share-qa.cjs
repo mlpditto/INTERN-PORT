@@ -127,8 +127,14 @@ const until = (page, fn, arg, msg) => page.waitForFunction(fn, arg, { timeout: 5
         await D.page.click('#ck-on-nudge');
         await until(D.page, () => window.__clip.length === 1, null, 'clipboard fallback');
         assert.ok((await D.page.evaluate(() => window.__clip[0])).includes('?cereal=' + gameId), 'copied text has the link');
+        // V101.388: picker there but not logged in to LINE (a browser / Google / tester sign-in) → no LINE login page, the fallback instead
+        await D.page.evaluate(() => { window.__noPicker = false; window.liff.isLoggedIn = () => false; CKOnline.state().sent = ''; CK._.render(); });
+        const before = await D.page.evaluate(() => window.__shared.length);
+        await D.page.click('#ck-on-nudge');
+        await until(D.page, () => window.__clip.length === 2, null, 'not logged in → clipboard, not the LINE picker');
+        assert.equal(await D.page.evaluate(() => window.__shared.length), before, 'shareTargetPicker is never called without a LINE login');
         assert.equal(await K.page.evaluate(() => window.__writes) + await D.page.evaluate(() => window.__writes), 0, 'the pages never write Firestore');
         assert.deepEqual(K.errors, []); assert.deepEqual(D.errors, []);
-        console.log('cereal-share-qa: OK — room 📤 LINE beside 📋 (pick B), Flex invite with code + ?cereal=<code>, own link reopens my room, friend link joins without typing, 📤 สะกิด in the waiting row (pick B), ถึงตาคุณ card coloured for the receiver + ?cereal=<gameId>, id link opens the game, clipboard fallback, nothing secret in cards, zero direct writes');
+        console.log('cereal-share-qa: OK — no LINE login → no picker (V101.388); room 📤 LINE beside 📋 (pick B), Flex invite with code + ?cereal=<code>, own link reopens my room, friend link joins without typing, 📤 สะกิด in the waiting row (pick B), ถึงตาคุณ card coloured for the receiver + ?cereal=<gameId>, id link opens the game, clipboard fallback, nothing secret in cards, zero direct writes');
     } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

@@ -305,7 +305,7 @@
     /** Flex card via shareTargetPicker → the OS share sheet → the clipboard. Resolves true when something was handed over. */
     function share(o) {
         var text = o.alt + '\n' + o.uri;
-        var viaLine = window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')
+        var viaLine = window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker') && (!liff.isLoggedIn || liff.isLoggedIn())
             ? Promise.resolve(liff.shareTargetPicker([card(o)])).then(function (r) { return r ? 'sent' : 'closed'; }, function () { return null; })
             : Promise.resolve(null);
         return viaLine.then(function (r) {

@@ -78,7 +78,7 @@ const slice = (src, a, b) => { const i = src.indexOf(a), j = src.indexOf(b, i); 
         // ---- 4. intern sheet ----
         assert.ok(Number((/<title>Internship Portfolio \(V101\.(\d+)\)/.exec(index) || [])[1]) >= 297, 'intern V101.297 or later');
         assert.match(index, /show\('🎓<i class="cert-tick"[^\n]*openMyCertSheet\(\), false,/, '🎓✓ is tappable now');
-        assert.match(index, /<script src="cert-download\.js\?v=V101\.297" defer><\/script>/);
+        assert.match(index, /<script src="cert-download\.js\?v=V101\.(?:29[7-9]|3\d\d)" defer><\/script>/);
         const p2 = await browser.newPage({ viewport: { width: 390, height: 760 } });
         await p2.setContent('<meta charset="utf-8"><body></body>');
         const boot = async ({ idToken, fail, inClient = true }) => p2.evaluate(o => {
