@@ -50,6 +50,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   // play: seeded bots, no waiting
   await page.evaluate(() => { let s = 11; R13._rng(() => ((s = (s * 16807) % 2147483647) / 2147483647)); R13._speed(5); });
   await page.click('#r13-start');
+  assert.equal(await page.evaluate(() => R13Sound.playing), true, 'your pick = your turn: the soft loop plays');
   assert.equal(await page.$$eval('#r13Modal svg', (e) => e.length), 3, 'three carriers');
   assert.ok(await page.$eval('#r13-send', (b) => b.disabled), '▸ ส่ง waits for a card and a chip');
   let sawTurn = 0, sawPass = 0, sawRainbow = 0, sawBoom = 0;
@@ -81,6 +82,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     }
   }
   await page.waitForSelector('#r13-final');
+  const snd = await page.evaluate(() => R13Sound.log.join(' '));
+  for (const k of ['music+', 'music-', 'put', 'pass', 'turn']) assert.ok(snd.split(' ').includes(k), 'sound cue ' + k + ': ' + snd.slice(0, 200));
+  assert.ok(/(win|lose)/.test(snd.split(' ').slice(-3).join(' ')), 'the end has its sound'); assert.equal(await page.evaluate(() => R13Sound.playing), false, 'the loop stops at the end');
   const g = await page.evaluate(() => R13._g());
   assert.equal(g.phase, 'end'); assert.equal(g.round, 7);
   const rows = await page.$$eval('#r13-rank div', (d) => d.map((x) => x.textContent));
@@ -90,6 +94,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.ok(sawTurn >= 7 && sawRainbow >= 1 && sawPass >= 1, 'played my turns, 🌈 and ⏭ ' + JSON.stringify({ sawTurn, sawRainbow, sawPass, sawBoom }));
   await page.screenshot({ path: process.env.R13_SHOT || path.join(require('node:os').tmpdir(), 'r13-end.png') });
   await page.click('#r13-again'); assert.ok(await page.isVisible('#r13-send'), '↻ starts again');
+  await page.click('#r13-snd'); assert.equal(await page.evaluate(() => [localStorage.getItem('r13Sound'), R13Sound.playing].join()), 'off,false', '🔇 stops the loop and is kept');
+  assert.equal(await page.textContent('#r13-snd'), '🔇'); await page.click('#r13-snd'); assert.equal(await page.evaluate(() => R13Sound.playing), true);
 
   // 320 px
   await page.setViewportSize({ width: 320, height: 640 });
@@ -97,5 +103,5 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.ok(await page.$eval('#u-games-row', (r) => [...r.children].every((b) => b.getBoundingClientRect().right <= r.getBoundingClientRect().right + 1)), 'the 6 tiles fit 320 px');
   assert.deepEqual(errors, []);
   await browser.close();
-  console.log('rock13-qa: OK — 6th tile; 5-scene rules tour read aloud (no tactics), ❓ + 🔇 kept; 👥 3–7 + 7│14 remembered; ▸ ส่ง needs card + chip; bots place in queue order; ▸ วาง says the new weight / 💥; ⏭ only when allowed; 🌈 taps a carrier; 7 rounds to a ranking; logged rock13 bot; 320 px');
+  console.log('rock13-qa: OK — 6th tile; 5-scene rules tour read aloud (no tactics), ❓ + 🔇 kept; 👥 3–7 + 7│14 remembered; ▸ ส่ง needs card + chip; bots place in queue order; ▸ วาง says the new weight / 💥; ⏭ only when allowed; 🌈 taps a carrier; 7 rounds to a ranking; logged rock13 bot; the A2 loop only on your turn, cues put/fall/pass/turn/end, 🔇 kept; 320 px');
 })().catch((e) => { console.error(e); process.exit(1); });

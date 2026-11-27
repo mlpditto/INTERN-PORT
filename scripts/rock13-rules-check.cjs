@@ -57,4 +57,7 @@ for (let k = 0; k < 2000; k++) {
   const placed = g.log.filter((x) => x.k === 'place').length; assert.equal(placed, n * rounds, 'everyone places once a round');
 }
 assert.ok(tally.pass > 0 && tally.take > 0, 'bots pass and stones get taken ' + JSON.stringify(tally));
-console.log('rock13-rules-check: OK — order 🌈 → high → 👑 clockwise; ⏭ once, first to pass places last, never the last one; 13 takes the old stones (0 counts); 👑 to the last taker; ranking; 2000 bot games legal to the end ' + JSON.stringify(tally));
+// the 13 s loop (rock13-sound.js) is pure: exactly 13 s and no jump where it joins itself
+const L = require(path.resolve('public/rock13-sound.js')).loopSamples(44100);
+assert.equal(L.length, 13 * 44100); assert.ok(Math.abs(L[0] - L[L.length - 1]) < 0.01, 'no click at the seam');
+console.log('rock13-rules-check: OK — order 🌈 → high → 👑 clockwise; ⏭ once, first to pass places last, never the last one; 13 takes the old stones (0 counts); 👑 to the last taker; ranking; the 13 s loop has no seam; 2000 bot games legal to the end ' + JSON.stringify(tally));

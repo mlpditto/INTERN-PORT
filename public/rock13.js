@@ -12,7 +12,7 @@
     function put(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
     try { var c = JSON.parse(get('r13Cfg') || '{}'); if (c.n >= 3 && c.n <= 7) cfg.n = c.n; if (c.rounds === 7) cfg.rounds = 7; } catch (e) { }
     function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-    function S(k) { if (window.BWSound && BWSound.play) { try { BWSound.play(k); } catch (e) { } } }
+    function S(k) { if (window.R13Sound) R13Sound.play(k); }   // rock13-sound.js: cues + the soft A2 loop on your turn
     function nm(s) { return s === 0 ? 'คุณ' : g.players[s].name; }
 
     // ---- a carrier holding a board; the stones are cubes, 3 a row, the newest on top; knees bend toward 13 --------------------
@@ -80,8 +80,9 @@
 
     // ---- screens --------------------------------------------------------------------------------------------------------------
     var X = '<button type="button" class="r13-x" onclick="R13.close()" aria-label="Close">✕</button>';
+    function SND() { var o = !window.R13Sound || R13Sound.on(); return '<button type="button" class="r13-x" id="r13-snd" onclick="R13.sound()" aria-label="Sound" aria-pressed="' + o + '">' + (o ? '🔊' : '🔇') + '</button>'; }
     var HQ = '<button type="button" class="r13-x" id="r13-help" onclick="R13.tour()" aria-label="How to play" title="วิธีเล่น">❓</button>';
-    function top(extra) { return '<div class="r13-top"><h3>🪨 ' + NAME + '</h3>' + (extra || '') + HQ + X + '</div>'; }
+    function top(extra) { return '<div class="r13-top"><h3>🪨 ' + NAME + '</h3>' + (extra || '') + SND() + HQ + X + '</div>'; }
     function lobbyHtml() {
         return '<div class="r13">' + top() + (window.GameTop ? GameTop.line('rock13') : '')
             + '<div class="r13-note">🔴🟢🔵 ห้ามแบกถึง 13 · 🪨 น้อยสุดชนะ</div>'
@@ -167,6 +168,8 @@
     }
     function render() {
         var m = root(); document.getElementById('r13-body').innerHTML = tour >= 0 ? tourHtml() : !g ? lobbyHtml() : g.phase === 'end' ? endHtml() : playHtml(); m.style.display = 'flex';
+        var mine = !!g && tour < 0 && (g.phase === 'submit' || (g.phase === 'place' && R().turn(g) === 0));
+        if (window.R13Sound) R13Sound.music(mine);   // the soft loop only on your turn
         if (g && tour < 0 && window.GameLog) {
             var end = g.phase === 'end';
             GameLog.see('rock13', { id: id, n: g.round, done: end, mode: 'bot', win: end ? (R().ranking(g)[0] === 0 ? 'w' : 'l') : null, score: String(g.players[0].pen), res: [] });
@@ -180,7 +183,8 @@
         timer = setTimeout(function () {
             timer = null; if (!g || g.phase !== 'place' || R().turn(g) !== s) return;
             var t = R().botTurn(g, s);
-            if (t.pass) { R().pass(g, s); news = '⏭ ' + esc(nm(s)) + ' Pass'; } else act(s, t.pick);
+            if (t.pass) { R().pass(g, s); news = '⏭ ' + esc(nm(s)) + ' Pass'; S('pass'); } else act(s, t.pick);
+            if (g.phase === 'place' && R().turn(g) === 0) S('turn');
             render(); run();
         }, SPEED);
     }
@@ -188,8 +192,8 @@
         var round = g.round, pv = R().place(g, s, st);
         if (!pv) return;
         news = pv.take ? '💥 ' + esc(nm(s)) + ' ทำหินหล่น · 🪨 +' + pv.take : '';
-        if (pv.take) S(s === 0 ? 'lose' : 'pick');
-        if (g.phase === 'end') S(R().ranking(g)[0] === 0 ? 'endW' : 'endL');
+        S(pv.take ? 'fall' : 'put');
+        if (g.phase === 'end') S(R().ranking(g)[0] === 0 ? 'win' : 'lose');
         else if (g.round !== round) pick = { card: null, chip: null };
     }
 
@@ -214,15 +218,16 @@
             if (!g || !R().canSubmit(g, 0, pick.card, pick.chip)) return;
             R().submit(g, 0, pick.card, pick.chip);
             for (var s = 1; s < g.players.length; s++) { var b = R().botPick(g, s, rng); R().submit(g, s, b.card, b.chip); }
-            news = ''; render(); run();
+            news = ''; render(); run(); if (g.phase === 'place' && R().turn(g) === 0) S('turn');
         },
         put: function (st) {
             if (!g || g.phase !== 'place' || R().turn(g) !== 0) return;
             var chip = g.subs[0].chip; if (chip === 'w' && !st) return; if (chip !== 'w') st = null;
             act(0, st); render(); run();
         },
-        pass: function () { if (g && R().pass(g, 0)) { news = '⏭ คุณ Pass · วางท้าย'; render(); run(); } },
-        close: function () { clearTimeout(timer); timer = null; hush(); tour = -1; var m = document.getElementById('r13Modal'); if (m) m.style.display = 'none'; },
+        pass: function () { if (g && R().pass(g, 0)) { news = '⏭ คุณ Pass · วางท้าย'; S('pass'); render(); run(); } },
+        sound: function () { if (window.R13Sound) R13Sound.toggle(); render(); },
+        close: function () { clearTimeout(timer); timer = null; hush(); if (window.R13Sound) R13Sound.music(false); tour = -1; var m = document.getElementById('r13Modal'); if (m) m.style.display = 'none'; },
         // for scripts/rock13-qa.cjs
         _g: function () { return g; }, _rng: function (f) { rng = f; }, _speed: function (ms) { SPEED = ms; }
     };

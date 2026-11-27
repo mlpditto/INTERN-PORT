@@ -22,6 +22,7 @@ Files:
   - 🌈 taps a carrier.
 - **Reaching 13 or more:** you take every stone that was already there, at 🪨 1 each (a 0 counts too). Your stone stays on the board. The last one to take stones gets 👑 for the next round.
 - **Winning:** fewest 🪨 wins. On a tie, whoever took stones longer ago ranks higher.
+- **Sound** (`public/rock13-sound.js`, owner pick A2): a 13 s music-box loop in a minor key over a soft heartbeat, built in the phone with no file so it loops with no seam. It fades in only on your turn (picking, or placing). Cues: a stone down, stones falling 💥, ⏭, your turn, the end. 🔊/🔇 in the header, kept as `r13Sound`.
 - **Lobby:** 👥 3–7 and 7 │ 14 รอบ, kept as `r13Cfg`. The tour shows on the first open (`r13TourSeen`); 🔊/🔇 is kept as `r13Voice`.
 - **`game_plays`:** game `rock13`, mode `bot`, win `w` when you rank first, score = your 🪨. 🏆 counts wins.
 - **Rules:** `game_plays.game` now allows `rock13`. Deploy with `firebase deploy --only firestore:rules,functions:gameTop`.
