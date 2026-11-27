@@ -34,6 +34,12 @@
 // (two presses, self allowed; the clock pairs at random if they never press; a bot cupid pairs at once), both lovers get a DM.
 // When one lover dies the other dies with them (engine), said as 💔 in the morning / vote / shot line; a mixed pair (🐺 + not)
 // wins alone when only they remain. Bots never bite or vote their own lover.
+// 🎲 row B + 😈 🃏 🧱 (2026-11-27, owner pick "ตามแนะนำทั้งหมด" on mockup werewolf-more-roles): the chip became a row of toggles, one per
+// extra role (🏹 💘 😈 🃏 🧱, ✓ when ticked, g.extras in row order) and, from two ticks, a mode chip (🎲 ใส่ทุกบทที่ติ๊ก / สุ่ม 1 จากที่ติ๊ก,
+// g.extraMode). ▸ เริ่ม applies every ticked role that fits the seats (each swaps a 👤, the 🧱 pair two; 😈 🧱 need 7 seats) in row
+// order, or one of the fitting ones at random; the lobby line says what the current seats get. 😈 สมุน: its card names the wolves,
+// the wolves are not told; no night action; it is 'everyone else' for the win rule. 🃏 คนบ้า: voted out = the game ends with
+// 🃏 คนบ้าชนะ! (engine jesterWin); any other death is just a death. 🧱 ช่าง ×2: each card names the other mason.
 'use strict';
 const W = require('./wolf-rules');
 const AI = require('./wolf-ai');
@@ -47,6 +53,9 @@ const ROLE_CARD = {
   villager: '👤 คุณคือ ชาวบ้าน\nกลางวันช่วยกันหา 🐺 แล้วโหวตออก',
   hunter: '🏹 คุณคือ นักล่า\nตายเมื่อไร (คืนหรือโหวต) ยิงได้ 1 คนทันที · กลางวันช่วยกันหา 🐺',
   cupid: '💘 คุณคือ กามเทพ\nคืนแรกจับคู่รัก 2 คน (รวมตัวเองได้) · คนหนึ่งตาย อีกคนตายตาม · คู่ต่างฝ่ายชนะด้วยกันเมื่อเหลือแค่ 2 คน',
+  minion: '😈 คุณคือ สมุนรับใช้\nคุณอยู่ฝ่ายหมาป่า แต่หมาป่าไม่รู้ว่าคุณเป็นใคร · 🔮 ส่องคุณเห็นเป็นชาวบ้าน',
+  jester: '🃏 คุณคือ คนบ้า\nอยู่ฝ่ายตัวเอง · ไม่มีพลังกลางคืน\n🏆 ชนะคนเดียวทันที ถ้าหมู่บ้านโหวตคุณออก · ตายตอนกลางคืน = แพ้',
+  mason: '🧱 คุณคือ ช่างก่ออิฐ\nไม่มีพลังกลางคืน · กลางวันช่วยกันหา 🐺',
 };
 const LIVE = ['night', 'day', 'vote', 'shot'];
 const QUIET = ' · ขอเงียบในกลุ่มจนจบเกมนะ 🤐';   // owner pick Q8: ask once, delete nothing
@@ -56,10 +65,39 @@ const BOT_NAMES = ['ต้น', 'ใบ', 'ฟ้า', 'นนท์', 'มุ�
 const LEVELS = { 1: '🌆 หัวค่ำ', 2: '🌙 เที่ยงคืน', 3: '🌕 คืนเดือนเพ็ญ' };   // the solo lobby's night levels
 const isBotId = (id) => /^bot\d$/.test(String(id));
 const SHOT_SEC = 30;   // 🏹 the dead hunter's time to aim
-const EXTRAS = { hunter: '🏹 นักล่า', cupid: '💘 กามเทพ' };   // the 🎲 roles, in cycle order
-const EXTRA_CYCLE = [false, 'hunter', 'cupid', 'random'];
-const extraOf = (g) => (g.extra === true ? 'hunter' : g.extra || false);   // rooms from before 💘 stored true
-const extraLabel = (x) => (x === 'random' ? '🎲 สุ่ม 🏹/💘' : EXTRAS[x] || 'ปิด');
+const EXTRAS = { hunter: '🏹 นักล่า', cupid: '💘 กามเทพ', minion: '😈 สมุนรับใช้', jester: '🃏 คนบ้า', mason: '🧱 ช่างก่ออิฐ ×2' };   // the 🎲 roles, row order
+const EXTRA_MIN = { hunter: 6, cupid: 6, minion: 7, jester: 6, mason: 7 };   // seats a 🎲 role needs (the engine's countsError agrees)
+/* The ticked 🎲 roles (owner pick B, 2026-11-27): g.extras = ['hunter', …] in row order, g.extraMode = 'all' | 'one'. Rooms from
+   before kept g.extra = false | true | 'hunter' | 'cupid' | 'random' (true = hunter, random = both, one of them). */
+const extrasOf = (g) => (Array.isArray(g.extras) ? g.extras : g.extra === 'random' ? ['hunter', 'cupid'] : g.extra === true ? ['hunter'] : g.extra ? [g.extra] : []);
+const modeOf = (g) => g.extraMode || (g.extra === 'random' ? 'one' : 'all');
+const exEmoji = (r) => (r === 'mason' ? '🧱🧱' : W.EMOJI[r]);
+/* What n seats get from the ticked roles, in row order (pick = only that role): { counts, used, skipped: [{ role, why }] }. */
+function extraPlan(g, n, pick) {
+  let counts = W.defaultCounts(n);
+  const used = [], skipped = [];
+  for (const r of extrasOf(g)) {
+    if (pick && r !== pick) continue;
+    const next = W.addExtra(counts, r);
+    if (n < EXTRA_MIN[r]) skipped.push({ role: r, why: 'ต้อง ' + EXTRA_MIN[r] + ' ที่' });
+    else if (next.villager === counts.villager || W.countsError(next, n)) skipped.push({ role: r, why: '👤 ไม่พอ' });
+    else { counts = next; used.push(r); }
+  }
+  return { counts, used, skipped };
+}
+/* The lobby's 🎲 line for `total` seats (counted at 5–10): what gets in, what still needs seats; '' when nothing is ticked. */
+function extraLine(g, total) {
+  const ex = extrasOf(g);
+  if (!ex.length) return '';
+  const n = Math.min(Math.max(total, W.MIN_PLAYERS), W.MAX_PLAYERS);
+  if (modeOf(g) === 'one' && ex.length > 1) {
+    const fit = ex.filter((r) => extraPlan(g, n, r).used.length), no = ex.filter((r) => !fit.includes(r));
+    return '\n🎲 สุ่ม 1 จาก ' + (fit.length ? fit.map(exEmoji).join(' ') : '–') + (no.length ? ' · ' + no.map((r) => exEmoji(r) + ' ต้อง ' + EXTRA_MIN[r] + ' ที่').join(' · ') : '');
+  }
+  const p = extraPlan(g, n), swapped = p.used.reduce((k, r) => k + (r === 'mason' ? 2 : 1), 0);
+  return '\n🎲 ' + (p.used.length ? p.used.map(exEmoji).join(' ') + ' แทน 👤 ' + swapped + ' คน' : '') +
+    (p.skipped.length ? (p.used.length ? ' · ' : '') + p.skipped.map((x) => exEmoji(x.role) + ' ' + x.why).join(' · ') : '');
+}
 const loverOf = (st, id) => (st.lovers ? (st.lovers[0] === id ? st.lovers[1] : st.lovers[1] === id ? st.lovers[0] : null) : null);
 const leftSec = (g, now) => Math.max(0, Math.round((g.deadline - now) / 5000) * 5);   // what the ⏳ shows: to 5 s, task jitter hidden
 const mmss = (sec) => Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
@@ -70,7 +108,8 @@ const RULES = [   // owner pick R1: a line per role + the flow + the win rule, p
   '🔮 ผู้หยั่งรู้ ส่อง 1 คน ว่าเป็น 🐺 ไหม',
   '🛡️ บอดี้การ์ด คุ้มกัน 1 คน · ห้ามคนเดิม 2 คืนติด',
   '🧪 แม่มด 💚 ชุบ 1 + ☠️ พิษ 1 ทั้งเกม · 7 คนขึ้นไป',
-  '🏹 นักล่า ตายแล้วยิง 1 คนทันที · 💘 กามเทพ คืนแรกจับคู่รัก คนหนึ่งตายอีกคนตายตาม · เมื่อหัวห้องเปิด 🎲 (6 คนขึ้นไป)',
+  '🎲 เมื่อหัวห้องติ๊ก: 🏹 นักล่า ตายแล้วยิง 1 คนทันที · 💘 กามเทพ คืนแรกจับคู่รัก คนหนึ่งตายอีกคนตายตาม (6 คนขึ้นไป)',
+  '😈 สมุน รู้จัก 🐺 ชนะกับ 🐺 · 🧱 ช่าง 2 คนรู้จักกัน (7 คนขึ้นไป) · 🃏 คนบ้า ชนะคนเดียวถ้าถูกโหวตออก',
   '👤 ชาวบ้าน ช่วยกันหา 🐺',
   '🌙 คืน ' + mmss(W.NIGHT_SEC) + ' → ☀️ เช้า บอกใครตาย (ไม่บอกบท) → 💬 คุย ' + mmss(W.TALK_DEFAULT) + ' → 🗳 โหวตลับ ' + mmss(W.VOTE_SEC) + ' · เสมอ = ไม่มีใครออก',
   '🏆 🐺 หมด = ชาวบ้านชนะ · 🐺 ≥ คนที่เหลือ = 🐺 ชนะ',
@@ -92,12 +131,14 @@ function lobbyView(g, bot) {
   const n = list.length, total = n + bl.length;
   const text = '🐺 มนุษย์หมาป่า · ห้อง ' + g.code + '\n👥 ' + n + '/' + W.MAX_PLAYERS + (n ? ' · ' + list.join(', ') : '') +
     (bl.length ? '\n🤖 ' + bl.length + ' · ' + bl.join(' ') + ' · ' + LEVELS[g.level || 2] : '') +
-    (extraOf(g) ? '\n🎲 ' + extraLabel(extraOf(g)) + ' แทน 👤 1 คน' + (total < 6 ? ' · ต้อง 6 คนขึ้นไป' : '') : '') +
+    extraLine(g, total) +
     '\n' + (total >= W.MIN_PLAYERS ? '✅ ครบแล้ว หัวห้องกด ▸ เริ่ม' : '⏳ อีก ' + (W.MIN_PLAYERS - total) + ' คน · กติกา /rules' + (bl.length ? '' : ' · หรือเติม 🤖'));
   const rows = [];
   if (total < W.MAX_PLAYERS) rows.push([{ text: '▸ เข้าร่วม', url: 'https://t.me/' + bot + '?start=' + g.code }]);
   rows.push([{ text: '🤖 +1', callback_data: 'bot:+:' + g.code }, { text: '🤖 −1', callback_data: 'bot:-:' + g.code }, { text: LEVELS[g.level || 2], callback_data: 'lvl:' + g.code }]);
-  rows.push([{ text: '🎲 บทพิเศษ: ' + extraLabel(extraOf(g)), callback_data: 'extra:' + g.code }]);
+  const ex = extrasOf(g);   // 🎲 row B: a toggle per extra role, then the mode chip once two are ticked
+  rows.push(Object.keys(EXTRAS).map((r) => ({ text: W.EMOJI[r] + (ex.includes(r) ? ' ✓' : ''), callback_data: 'x:' + r + ':' + g.code })));
+  if (ex.length > 1) rows.push([{ text: modeOf(g) === 'one' ? '🎲 สุ่ม 1 จากที่ติ๊ก' : '🎲 ใส่ทุกบทที่ติ๊ก', callback_data: 'xm:' + g.code }]);
   rows.push([{ text: '▸ เริ่ม', callback_data: 'start:' + g.code }, { text: '✕ ยกเลิก', callback_data: 'cancel:' + g.code }]);
   return { text, reply_markup: { inline_keyboard: rows } };
 }
@@ -116,6 +157,12 @@ function roleCard(roles, players, me, code) {
   if (role === 'wolf') {
     const mates = Object.keys(roles).filter((id) => id !== me && roles[id] === 'wolf').map((id) => players[id].name);
     t += '\n🐺 เพื่อน: ' + (mates.length ? mates.join(', ') : 'ไม่มี (คุณคนเดียว)');
+  }
+  if (role === 'minion') t += '\n🐺 หมาป่าในเกมนี้: ' + Object.keys(roles).filter((id) => roles[id] === 'wolf').map((id) => players[id].name).join(', ') +
+    '\nไม่มีพลังกลางคืน · ช่วยหมาป่าตอนกลางวัน โดยไม่ให้ใครสงสัยว่าคุณรู้มากเกินไป\n🏆 ชนะพร้อม 🐺 · ถ้าคุณตาย 🐺 ยังชนะได้';
+  if (role === 'mason') {
+    const other = Object.keys(roles).find((id) => id !== me && roles[id] === 'mason');
+    t += '\n🧱 อีกคน: ' + (other ? players[other].name : 'ไม่มี') + ' · ไว้ใจกันได้ 100%';
   }
   return t + '\n🤫 อย่าบอกใคร · ห้อง ' + code;
 }
@@ -436,7 +483,7 @@ const shotView = (g, left) => ({ text: (g.shot.then === 'day' ? '☀️ เช�
 function shotLine(g, st, hunter, target) {
   if (target && !W.shotError(st, hunter, target)) {
     const before = liveIds(st);
-    Object.assign(st, W.eliminate(st, target));
+    Object.assign(st, W.eliminate(st, target, 'shot'));   // a shot 🃏 does not win
     const gone = before.filter((id) => !st.alive[id]); gone.forEach((id) => { g.players[id].alive = false; });
     const lover = gone.find((id) => id !== target);
     return '🏹 ' + nm(g, hunter) + ' ยิง ' + nm(g, target) + ' 💀' + (lover ? ' · 💔 ' + nm(g, lover) + ' ตายตาม' : '');
@@ -493,7 +540,7 @@ function finishVote(g, st, now, out, rng) {
   let gone = [];
   if (t.out) {
     const before = liveIds(st);
-    Object.assign(st, W.eliminate(st, t.out));
+    Object.assign(st, W.eliminate(st, t.out, 'vote'));   // a voted-out 🃏 wins (engine jesterWin)
     gone = before.filter((id) => !st.alive[id]); gone.forEach((id) => { g.players[id].alive = false; });
     const lover = gone.find((id) => id !== t.out);
     txt += '\n👋 ' + nm(g, t.out) + ' ออกจากหมู่บ้าน' + (lover ? ' · 💔 ' + nm(g, lover) + ' ตายตาม' : '') + QUIET;
@@ -521,7 +568,7 @@ function endIf(g, st, out, lead) {
   const faked = (id) => !!(st.ai && st.ai.claims.some((c) => c.fake && c.by === id));
   const inLove = (id) => !!(st.lovers && st.lovers.includes(id));
   const list = seated(g).map(([id]) => W.EMOJI[st.roles[id]] + ' ' + nm(g, id) + (inLove(id) ? ' 💘' : '') + (faked(id) ? ' 🤥' : '') + (st.alive[id] ? '' : ' 💀')).join('\n');
-  const who = w === 'wolf' ? '🐺 หมาป่าชนะ!' : w === 'lovers' ? '💘 คู่รักชนะ!' : '🏆 ฝั่งชาวบ้านชนะ!';
+  const who = w === 'wolf' ? '🐺 หมาป่าชนะ!' : w === 'lovers' ? '💘 คู่รักชนะ!' : w === 'jester' ? '🃏 คนบ้าชนะ! · ' + nm(g, st.jesterWin) + ' หลอกทุกคนได้' : '🏆 ฝั่งชาวบ้านชนะ!';
   out.push({ method: 'sendMessage', body: { chat_id: g.chatId, text: lead + '\n\n' + who + '\n' + list + '\n\nเล่นอีก พิมพ์ /werewolf' } });
   g.freed = true;
   return true;
@@ -544,7 +591,7 @@ async function onButton(q, deps) {
   if (parts[0] === 'n') return onNight(q, parts, deps);
   if (parts[0] === 'v') return onVote(q, parts, deps);
   if (parts[0] === 'talk') return onTalkEnd(q, parts, deps);
-  if (parts[0] === 'bot' || parts[0] === 'lvl' || parts[0] === 'extra') return onLobbyBots(q, parts, deps);
+  if (['bot', 'lvl', 'extra', 'x', 'xm'].includes(parts[0])) return onLobbyBots(q, parts, deps);
   if (parts[0] === 'h') return onShot(q, parts, deps);
   const { db } = deps;
   const [kind, code] = parts;
@@ -568,9 +615,10 @@ async function onButton(q, deps) {
     const ids = seated(d).map(([id]) => id);
     if (ids.length < W.MIN_PLAYERS) return { say: 'ต้องมีอย่างน้อย ' + W.MIN_PLAYERS + ' คน (ตอนนี้ ' + ids.length + ')' };
     if (!humans(d).length) return { say: 'ต้องมีคนจริงอย่างน้อย 1 คน' };
-    let counts = W.defaultCounts(ids.length);
-    const ex = extraOf(d);   // 🎲 (owner pick 4A: shown in the deck line) · 'random' = one of the two
-    if (ex && ids.length >= 6) counts = W.addExtra(counts, ex === 'random' ? Object.keys(EXTRAS)[Math.floor(deps.rng() * 2)] : ex);
+    const ex = extrasOf(d);   // 🎲 row B: every ticked role that fits the seats, or one fitting role at random (shown in the deck line, pick 4A)
+    let pick = null;
+    if (modeOf(d) === 'one' && ex.length > 1) { const fit = ex.filter((r) => extraPlan(d, ids.length, r).used.length); pick = fit.length ? fit[Math.floor(deps.rng() * fit.length)] : '-'; }
+    const counts = extraPlan(d, ids.length, pick).counts;
     const roles = W.deal(ids, counts, deps.rng);
     const st = W.newState(roles);
     const out = [];
@@ -598,10 +646,11 @@ async function onButton(q, deps) {
 }
 
 /* n:<code>:<round>:<kind>:<target> — a night pick from a player's DM menu. */
-/* 🤖 +1 / −1 and the level chip in the lobby (owner pick 1A): host only, humans + bots ≤ 10, names from BOT_NAMES in order. */
+/* 🤖 +1 / −1 and the level chip in the lobby (owner pick 1A): host only, humans + bots ≤ 10, names from BOT_NAMES in order.
+   Also the 🎲 row: x:<role>:<code> toggles a role, xm:<code> flips the mode; an old message's extra:<code> chip just redraws. */
 async function onLobbyBots(q, parts, deps) {
   const { db } = deps;
-  const code = parts[0] === 'bot' ? parts[2] : parts[1], me = String(q.from.id);
+  const code = parts[0] === 'bot' || parts[0] === 'x' ? parts[2] : parts[1], me = String(q.from.id);
   const bot = await deps.botName();
   const gRef = db.collection('wolf_games').doc(code || '-');
   const res = await db.runTransaction(async (tx) => {
@@ -610,7 +659,12 @@ async function onLobbyBots(q, parts, deps) {
     const g = gs.data();
     if (g.host !== me) return { say: 'เฉพาะหัวห้อง (' + hostNm(g) + ') กดได้' };
     if (g.status !== 'lobby') return { say: 'เกมเริ่มไปแล้ว' };
-    if (parts[0] === 'extra') g.extra = EXTRA_CYCLE[(EXTRA_CYCLE.indexOf(extraOf(g)) + 1) % EXTRA_CYCLE.length];
+    if (parts[0] === 'x') {
+      const r = parts[1], ex = extrasOf(g);
+      if (!EXTRAS[r]) return { say: '?' };
+      g.extras = ex.includes(r) ? ex.filter((x) => x !== r) : Object.keys(EXTRAS).filter((x) => ex.includes(x) || x === r);
+    } else if (parts[0] === 'xm') g.extraMode = modeOf(g) === 'one' ? 'all' : 'one';
+    else if (parts[0] === 'extra') { /* an old lobby message's chip: redraw with the row */ }
     else if (parts[0] === 'lvl') g.level = ((g.level || 2) % 3) + 1;
     else if (parts[1] === '+') {
       if (seated(g).length >= W.MAX_PLAYERS) return { say: 'เต็มแล้ว (' + W.MAX_PLAYERS + ' ที่)' };
@@ -623,7 +677,8 @@ async function onLobbyBots(q, parts, deps) {
       if (!last) return { say: 'ยังไม่มีบอทในห้อง' };
       delete g.players[last[0]];
     }
-    tx.update(gRef, { players: g.players, level: g.level || 2, extra: g.extra || false, updatedAt: deps.now });
+    g.extras = extrasOf(g); g.extraMode = modeOf(g);
+    tx.update(gRef, { players: g.players, level: g.level || 2, extras: g.extras, extraMode: g.extraMode, updatedAt: deps.now });
     return { g };
   });
   await safe(deps, 'answerCallbackQuery', { callback_query_id: q.id, text: res.say, show_alert: !!res.say });
@@ -878,4 +933,4 @@ async function handle(update, deps) {
   if (msg.chat.type === 'private' && !cmdRaw.startsWith('/')) return rename(msg, deps);
 }
 
-module.exports = { handle, tick, phase, lobbyView, startedView, roleCard, ROLE_CARD, RULES, STEP_SEC, SHOT_SEC, BOT_NAMES, LEVELS, EXTRAS };
+module.exports = { handle, tick, phase, lobbyView, startedView, roleCard, ROLE_CARD, RULES, STEP_SEC, SHOT_SEC, BOT_NAMES, LEVELS, EXTRAS, EXTRA_MIN };

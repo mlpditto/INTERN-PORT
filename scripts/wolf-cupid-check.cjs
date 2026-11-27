@@ -1,5 +1,5 @@
 // 🐺 Werewolf 🎲 extra role · 💘 cupid (2026-11-26) — functions/wolf-bot.js on a fake Telegram + tiny Firestore + fake Tasks, no
-// network. Proves: the 🎲 chip cycles ปิด → 🏹 → 💘 → สุ่ม → ปิด with its labels; 💘 at 6 seats shows in the deck line and the cupid
+// network. Proves: the 🎲 row (2026-11-27 pick B) ticks 🏹 / 💘 with the mode chip from two ticks; 💘 at 6 seats shows in the deck line and the cupid
 // gets the card; the cupid pairs by two DM presses (self allowed, the second keyboard drops the first pick, a repeat refused),
 // both lovers get a DM, the night does not end before the pair is set; a lover voted out takes the other (💔 in the result);
 // a mixed pair alone wins (💘 คู่รักชนะ! and 💘 marks in the list); a lover bitten at night takes the other (💔 in the morning);
@@ -11,7 +11,7 @@ const B = require(path.join(root, 'functions', 'wolf-bot.js'));
 const W = require(path.join(root, 'functions', 'wolf-rules.js'));
 assert.match(B.ROLE_CARD.cupid, /^💘 คุณคือ กามเทพ\n/);
 assert.match(B.RULES, /💘 กามเทพ คืนแรกจับคู่รัก/);
-assert.deepEqual(Object.keys(B.EXTRAS), ['hunter', 'cupid']);
+assert.deepEqual(Object.keys(B.EXTRAS), ['hunter', 'cupid', 'minion', 'jester', 'mason']);
 
 // ---- tiny Firestore ------------------------------------------------------------------------------------------------------
 const store = new Map();
@@ -72,26 +72,29 @@ function forceRoles(code, roles, extra) {
   Object.assign(st, extra || {});
   store.set(SP(code), st);
 }
-async function openRoom(host, chatId, n, extraPresses) {
+async function openRoom(host, chatId, n, presses) {
   await say(user(host), { id: chatId, type: 'supergroup' }, '/werewolf');
   const code = /ห้อง ([A-Z0-9]{6})/.exec(take()[0].body.text)[1];
   for (let k = 1; k <= n; k++) await dm(k, '/start ' + code);
-  for (let k = 0; k < (extraPresses || 0); k++) await press(host, 'extra:' + code);
+  for (const p of presses || []) await press(host, p(code));
   take();
   return code;
 }
 const ROLES6 = { 501: 'wolf', 502: 'wolf', 503: 'cupid', 504: 'seer', 505: 'guard', 506: 'villager' };
 
 (async () => {
-  // ---- the chip cycles ---------------------------------------------------------------------------------------------------
+  // ---- the 🎲 row: toggles, the mode chip from two ticks ------------------------------------------------------------------
   const A = '-4001';
   const a = await openRoom(1, A, 6);
   const labels = [];
-  for (let i = 0; i < 4; i++) { await press(1, 'extra:' + a); labels.push(lastEdit(take()).body.reply_markup.inline_keyboard[2][0].text); }
-  assert.deepEqual(labels, ['🎲 บทพิเศษ: 🏹 นักล่า', '🎲 บทพิเศษ: 💘 กามเทพ', '🎲 บทพิเศษ: 🎲 สุ่ม 🏹/💘', '🎲 บทพิเศษ: ปิด']);
-  await press(1, 'extra:' + a); await press(1, 'extra:' + a);
-  assert.match(lastEdit(take()).body.text, /🎲 💘 กามเทพ แทน 👤 1 คน\n✅ ครบแล้ว/);
-  assert.equal(G(a).extra, 'cupid');
+  await press(1, 'x:hunter:' + a); let kb = lastEdit(take()).body.reply_markup.inline_keyboard; labels.push(kb[2].map((b) => b.text).join(' ')); assert.equal(kb[3][0].callback_data, 'start:' + a, 'one tick: no mode row');
+  await press(1, 'x:cupid:' + a); kb = lastEdit(take()).body.reply_markup.inline_keyboard; labels.push(kb[2].map((b) => b.text).join(' ')); labels.push(kb[3][0].text); assert.equal(kb[3][0].callback_data, 'xm:' + a);
+  await press(1, 'xm:' + a); kb = lastEdit(take()).body.reply_markup.inline_keyboard; labels.push(kb[3][0].text); assert.equal(kb[4][0].callback_data, 'start:' + a, 'the mode row sits above ▸ เริ่ม');
+  assert.deepEqual(labels, ['🏹 ✓ 💘 😈 🃏 🧱', '🏹 ✓ 💘 ✓ 😈 🃏 🧱', '🎲 ใส่ทุกบทที่ติ๊ก', '🎲 สุ่ม 1 จากที่ติ๊ก']);
+  assert.match(lastEdit([{ method: 'editMessageText', body: { text: G(a).code } }]).body.text, /^[A-Z0-9]{6}$/);
+  await press(1, 'x:hunter:' + a);   // 💘 alone again (the mode stays 'one', one role = that role)
+  assert.match(lastEdit(take()).body.text, /🎲 💘 แทน 👤 1 คน\n✅ ครบแล้ว/);
+  assert.deepEqual(G(a).extras, ['cupid']);
   // start: 💘 in the deck line, the card
   await press(1, 'start:' + a); let out = take(); takeQ();
   assert.match(out.find((x) => x.method === 'editMessageText').body.text, /🐺 2 · 🔮 1 · 🛡️ 1 · 💘 1 · 👤 1$/);
@@ -129,7 +132,7 @@ const ROLES6 = { 501: 'wolf', 502: 'wolf', 503: 'cupid', 504: 'seer', 505: 'guar
 
   // ---- room B: a mixed pair alone wins -----------------------------------------------------------------------------------
   const Bc = '-4002';
-  const b = await openRoom(1, Bc, 6, 2);
+  const b = await openRoom(1, Bc, 6, [(k) => 'x:cupid:' + k]);
   await press(1, 'start:' + b); take(); takeQ();
   forceRoles(b, ROLES6);
   await press(3, 'n:' + b + ':1:cupid:503'); await press(3, 'n:' + b + ':1:cupid:501'); take();   // the cupid loves the wolf
@@ -154,7 +157,7 @@ const ROLES6 = { 501: 'wolf', 502: 'wolf', 503: 'cupid', 504: 'seer', 505: 'guar
 
   // ---- room C: a lover bitten at night takes the other; the clock pairs when the cupid never presses ----------------------
   const Cc = '-4003';
-  const c = await openRoom(1, Cc, 6, 2);
+  const c = await openRoom(1, Cc, 6, [(k) => 'x:cupid:' + k]);
   await press(1, 'start:' + c); take(); takeQ();
   forceRoles(c, ROLES6);
   await press(1, 'n:' + c + ':1:wolf:506'); await press(2, 'n:' + c + ':1:wolf:506'); await press(4, 'n:' + c + ':1:seer:501'); take();
@@ -177,7 +180,8 @@ const ROLES6 = { 501: 'wolf', 502: 'wolf', 503: 'cupid', 504: 'seer', 505: 'guar
     const d = /ห้อง ([A-Z0-9]{6})/.exec(take()[0].body.text)[1];
     await dm(1, '/start ' + d);
     for (let k = 0; k < 5; k++) await press(1, 'bot:+:' + d);
-    for (let k = 0; k < (i % 2 ? 3 : 2); k++) await press(1, 'extra:' + d);   // odd rooms: สุ่ม · even rooms: 💘
+    await press(1, 'x:cupid:' + d);
+    if (i % 2) { await press(1, 'x:hunter:' + d); await press(1, 'xm:' + d); }   // odd rooms: สุ่ม 1 จาก 🏹 💘 · even rooms: 💘
     take();
     await press(1, 'start:' + d); out = take(); takeQ();
     const st = S(d), g = G(d);
@@ -194,5 +198,5 @@ const ROLES6 = { 501: 'wolf', 502: 'wolf', 503: 'cupid', 504: 'seer', 505: 'guar
   assert.ok(botCupidSeen, 'saw a bot cupid'); assert.ok(randomDealt.hunter && randomDealt.cupid, 'สุ่ม dealt both over the rooms: ' + JSON.stringify(randomDealt));
 
   assert.ok(!all.some((x) => x.body && /^bot\d$/.test(String(x.body.chat_id))), 'nothing was ever sent to a bot id');
-  console.log('wolf-cupid-check: OK (chip cycle + labels, 💘 deck line + card, two-press pairing with self + refusals, lovers DM, night waits for the pair, vote 💔 chain, mixed pair wins 💘, night 💔 chain / clock pairs at random, bot cupid at once, สุ่ม deals both)');
+  console.log('wolf-cupid-check: OK (🎲 row toggles + mode chip, 💘 deck line + card, two-press pairing with self + refusals, lovers DM, night waits for the pair, vote 💔 chain, mixed pair wins 💘, night 💔 chain / clock pairs at random, bot cupid at once, สุ่ม deals both)');
 })().catch((e) => { console.error(e); process.exit(1); });
