@@ -85,16 +85,17 @@ async function openRoom(host, chatId, n) {
   // ---- room A: the chip, the deck, a hunter bitten at night, the shot, the day ---------------------------------------------
   const A = '-3001';
   const a = await openRoom(1, A, 5);
-  await press(2, 'extra:' + a); assert.match(alertOf(take()), /เฉพาะหัวห้อง/, 'only the host flips 🎲');
-  await press(1, 'extra:' + a);
+  await press(2, 'x:hunter:' + a); assert.match(alertOf(take()), /เฉพาะหัวห้อง/, 'only the host ticks 🎲');
+  await press(1, 'x:hunter:' + a);
   let out = take(), lob = out.find((x) => x.method === 'editMessageText').body;
-  assert.match(lob.text, /🎲 🏹 นักล่า แทน 👤 1 คน · ต้อง 6 คนขึ้นไป/);
-  assert.equal(lob.reply_markup.inline_keyboard[2][0].text, '🎲 บทพิเศษ: 🏹 นักล่า');
-  assert.equal(lob.reply_markup.inline_keyboard[2][0].callback_data, 'extra:' + a);
-  assert.equal(G(a).extra, 'hunter');
-  await press(1, 'extra:' + a); assert.equal(G(a).extra, 'cupid'); await press(1, 'extra:' + a); assert.equal(G(a).extra, 'random');   // the chip cycles (💘 check covers the labels)
-  await press(1, 'extra:' + a); assert.match(take().find((x) => x.method === 'editMessageText').body.text, /\n⏳ อีก|✅ ครบแล้ว/); assert.equal(G(a).extra, false);
-  await press(1, 'extra:' + a); take();
+  assert.match(lob.text, /\n🎲 🏹 ต้อง 6 ที่\n/, '5 seats: the note says what the 🏹 needs');
+  assert.deepEqual(lob.reply_markup.inline_keyboard[2].map((b) => b.text), ['🏹 ✓', '💘', '😈', '🃏', '🧱'], 'row B: a toggle per role');
+  assert.equal(lob.reply_markup.inline_keyboard[2][0].callback_data, 'x:hunter:' + a);
+  assert.equal(lob.reply_markup.inline_keyboard[3][0].callback_data, 'start:' + a, 'one tick: no mode row');
+  assert.deepEqual(G(a).extras, ['hunter']);
+  await press(1, 'x:cupid:' + a); assert.deepEqual(G(a).extras, ['hunter', 'cupid']); await press(1, 'xm:' + a); assert.equal(G(a).extraMode, 'one');   // (💘 check covers the labels)
+  await press(1, 'x:hunter:' + a); await press(1, 'x:cupid:' + a); assert.match(take().find((x) => x.method === 'editMessageText').body.text, /\n⏳ อีก|✅ ครบแล้ว/); assert.deepEqual(G(a).extras, []);
+  await press(1, 'x:hunter:' + a); take();
   // at 5 seats the deck is the default one
   await press(1, 'start:' + a); out = take();
   assert.match(out.find((x) => x.method === 'editMessageText').body.text, /🐺 1 · 🔮 1 · 🛡️ 1 · 👤 2$/, '5 seats: no 🏹 even with 🎲 on');
@@ -103,11 +104,11 @@ async function openRoom(host, chatId, n) {
 
   // 6 seats: the deck line shows 🏹 1, one 👤 less, the hunter gets the card
   const b = await openRoom(1, A, 6);
-  await press(1, 'extra:' + b);
-  out = take(); assert.match(out.find((x) => x.method === 'editMessageText').body.text, /🎲 🏹 นักล่า แทน 👤 1 คน\n✅ ครบแล้ว/, 'the 6-seat note has no warning');
+  await press(1, 'x:hunter:' + b);
+  out = take(); assert.match(out.find((x) => x.method === 'editMessageText').body.text, /🎲 🏹 แทน 👤 1 คน\n✅ ครบแล้ว/, 'the 6-seat note has no warning');
   await press(1, 'start:' + b); out = take(); takeQ();
   assert.match(out.find((x) => x.method === 'editMessageText').body.text, /🐺 2 · 🔮 1 · 🛡️ 1 · 🏹 1 · 👤 1$/, '6 seats: 🏹 in the deck line (pick 4A)');
-  assert.deepEqual(G(b).counts, { wolf: 2, seer: 1, guard: 1, witch: 0, hunter: 1, cupid: 0, villager: 1 });
+  assert.deepEqual(G(b).counts, { wolf: 2, seer: 1, guard: 1, witch: 0, hunter: 1, cupid: 0, minion: 0, jester: 0, mason: 0, villager: 1 });
   const dealt = store.get(SP(b)).roles, hunterDealt = Object.keys(dealt).find((id) => dealt[id] === 'hunter');
   assert.ok(out.some((x) => x.body.chat_id === hunterDealt && x.body.text.startsWith(B.ROLE_CARD.hunter)), 'the hunter gets the 🏹 card');
   // now a known table: 501 🐺 502 🐺 503 🏹 504 🔮 505 🛡️ 506 👤
@@ -155,7 +156,7 @@ async function openRoom(host, chatId, n) {
   // ---- room B: a hunter voted out, the clock ends the shot with nobody shot, night 2 ---------------------------------------
   const Bc = '-3002';
   const c = await openRoom(1, Bc, 6);
-  await press(1, 'extra:' + c); take();
+  await press(1, 'x:hunter:' + c); take();
   await press(1, 'start:' + c); take(); takeQ();
   forceRoles(c, { 501: 'wolf', 502: 'wolf', 503: 'hunter', 504: 'seer', 505: 'guard', 506: 'villager' });
   await press(1, 'n:' + c + ':1:wolf:506'); await press(2, 'n:' + c + ':1:wolf:506'); await press(4, 'n:' + c + ':1:seer:502'); take();
@@ -193,7 +194,7 @@ async function openRoom(host, chatId, n) {
   const d = /ห้อง ([A-Z0-9]{6})/.exec(take()[0].body.text)[1];
   for (let k = 1; k <= 3; k++) await dm(k, '/start ' + d);
   for (let k = 0; k < 4; k++) await press(1, 'bot:+:' + d);   // 7 seats: whoever the bot shoots, 2 🐺 vs 3 keeps the game going
-  await press(1, 'extra:' + d); take();
+  await press(1, 'x:hunter:' + d); take();
   await press(1, 'start:' + d); out = take(); takeQ();
   assert.equal(G(d).status, 'night', 'room C started (3 humans + 4 bots)');
   assert.match(out.find((x) => x.method === 'editMessageText').body.text, /🏹 1/);

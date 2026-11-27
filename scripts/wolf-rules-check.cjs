@@ -37,7 +37,7 @@ assert.equal(E({ seer: 1, guard: 1, villager: 3 }, 5), 'no-wolf');
 assert.equal(E({ wolf: 3, seer: 1, villager: 2 }, 6), 'too-many-wolves');
 assert.equal(E({ wolf: 1, seer: 2, villager: 2 }, 5), 'one-seer');
 assert.equal(E({ wolf: 1, witch: 2, villager: 2 }, 5), 'one-witch');
-assert.equal(E({ wolf: 1, jester: 1, villager: 3 }, 5), 'role');   // (hunter is a real role since 2026-11-26; see the 🎲 block below)
+assert.equal(E({ wolf: 1, alpha: 1, villager: 3 }, 5), 'role');   // (hunter / jester are real roles since 2026-11-26/27; see the 🎲 blocks below)
 assert.equal(E({ wolf: 1.5, villager: 3.5 }, 5), 'count');
 assert.equal(E({ wolf: 1, villager: 3 }, 4), 'players');
 assert.equal(E({ wolf: 1, villager: 4 }, 5), null, 'a plain 🐺 + 👤 deck is allowed');
@@ -206,4 +206,42 @@ assert.equal(W.countsError(Object.assign(W.addExtra(W.defaultCounts(8), 'cupid')
 const fsx = require('fs'), px = require('path');
 const lf = (p) => fsx.readFileSync(px.join(__dirname, p), 'utf8').replace(/\r\n/g, '\n');
 assert.equal(lf('../public/wolf-rules.js'), lf('../functions/wolf-rules.js'), 'public/wolf-rules.js = functions/wolf-rules.js');
-console.log('wolf-rules-check: OK (decks 5–10, picks, night order, votes, win, 2 scripted games, 🏹 extra + shot, 💘 lovers, public copy)');
+// 😈 🃏 🧱 (2026-11-27): never by default; 😈 one, 7 up, no turn, counts as everyone else; 🃏 one, 6 up, wins when voted out only; 🧱 a pair, 7 up
+for (const r of ['minion', 'jester', 'mason']) for (let n = W.MIN_PLAYERS; n <= W.MAX_PLAYERS; n++) assert.equal(W.defaultCounts(n)[r], 0, n + ': no ' + r + ' by default');
+assert.equal(W.countsError(W.addExtra(W.defaultCounts(6), 'minion'), 6), 'minion-needs-7');
+assert.equal(W.countsError(W.addExtra(W.defaultCounts(7), 'minion'), 7), null);
+assert.equal(W.countsError(Object.assign(W.addExtra(W.defaultCounts(8), 'minion'), { minion: 2, villager: 1 }), 8), 'one-minion');
+assert.equal(W.countsError(W.addExtra(W.defaultCounts(5), 'jester'), 5), 'jester-needs-6');
+assert.equal(W.countsError(W.addExtra(W.defaultCounts(6), 'jester'), 6), null);
+assert.equal(W.countsError(Object.assign(W.addExtra(W.defaultCounts(8), 'jester'), { jester: 2, villager: 1 }), 8), 'one-jester');
+assert.equal(W.countsError(Object.assign(W.defaultCounts(8), { mason: 1, villager: 2 }), 8), 'masons-2', 'a lone mason is refused');
+assert.equal(W.countsError(W.addExtra(W.defaultCounts(6), 'mason'), 6), 'masons-need-7');
+{
+  const c = W.addExtra(W.defaultCounts(7), 'mason');
+  assert.equal(c.mason, 2); assert.equal(c.villager, 0, '🧱 swap two 👤'); assert.equal(W.countsError(c, 7), null);
+  assert.equal(W.addExtra(W.addExtra(W.defaultCounts(7), 'minion'), 'mason').mason, 0, '7 seats: one 👤 left after 😈 = no room for the pair');
+  assert.deepEqual(W.addExtra(W.defaultCounts(7), 'wolf'), W.defaultCounts(7), 'no extra wolves');
+  const r = W.deal(['a', 'b', 'c', 'd', 'e', 'f', 'g'], c, rngOf(5));
+  assert.equal(Object.values(r).filter((x) => x === 'mason').length, 2, 'both masons dealt');
+}
+{
+  const st = W.newState({ p1: 'wolf', p2: 'wolf', p3: 'minion', p4: 'jester', p5: 'seer', p6: 'guard', p7: 'villager' });
+  assert.equal(st.jesterWin, null);
+  assert.deepEqual(Object.keys(W.nightTurns(st)).sort(), ['p1', 'p2', 'p5', 'p6'], '😈 🃏 have no night turn');
+  assert.equal(W.pickError(st, 'p3', 'wolf', 'p7'), 'not-your-role', 'the minion cannot bite');
+  assert.equal(W.resolveNight(st, { seer: 'p3' }).seen.wolf, false, '🔮 sees the minion as not a wolf');
+  // 🃏 voted out = jester wins at once; bitten or shot = just dead
+  const voted = W.eliminate(st, 'p4');
+  assert.equal(voted.jesterWin, 'p4'); assert.equal(W.winner(voted), 'jester'); assert.equal(st.jesterWin, null, 'input untouched');
+  assert.equal(W.winner(W.eliminate(st, 'p4', 'vote')), 'jester');
+  assert.equal(W.winner(W.eliminate(st, 'p4', 'shot')), null, 'a shot jester does not win');
+  assert.equal(W.winner(W.resolveNight(st, { bite: 'p4' }).state), null, 'a bitten jester does not win');
+  assert.equal(W.eliminate(st, 'p7', 'vote').jesterWin, null);
+  // 😈 counts as everyone else: 2 🐺 + 😈 + 👤 = wolves 2 vs 2 → wolf win; 2 🐺 + 😈 + 2 others → on
+  const four = W.eliminate(W.eliminate(W.eliminate(st, 'p4'), 'p5'), 'p6'); four.jesterWin = null;
+  assert.equal(W.winner(four), 'wolf', '2 🐺 vs 😈 + 👤 = wolves');
+  const five = W.eliminate(W.eliminate(st, 'p5', 'shot'), 'p6', 'shot');
+  assert.equal(W.winner(five), null, '2 🐺 vs 😈 🃏 👤 = on');
+  assert.equal(W.winner(W.eliminate(W.eliminate(st, 'p1', 'shot'), 'p2', 'shot')), 'village', 'no wolves = village, the minion loses');
+}
+console.log('wolf-rules-check: OK (decks 5–10, picks, night order, votes, win, 2 scripted games, 🏹 extra + shot, 💘 lovers, 😈 🃏 🧱, public copy)');

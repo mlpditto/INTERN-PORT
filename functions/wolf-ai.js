@@ -15,6 +15,9 @@
   function alive(g) { return g.ids.filter(function (id) { return g.st.alive[id]; }); }
   function role(g, id) { return g.st.roles[id]; }
   function dead(g, id) { return !g.st.alive[id]; }
+  // 2026-11-27 (🎲 😈 🃏 🧱): the 😈 minion is wolf-side without being a wolf — it knows the wolves (never accuses or votes one), the
+  // wolves do not know it; a 🧱 mason trusts the other mason like a 🔮 check; a 🃏 jester says nothing and skips every vote.
+  function evil(g, id) { var r = role(g, id); return r === 'wolf' || r === 'minion'; }
   function isBot(g, id) { return g.bots ? g.bots.indexOf(id) >= 0 : id !== g.me; }   // Telegram (2026-11-26): g.bots lists the bot seats; solo: everyone but me
   function argmax(m, ids) { var best = null; ids.forEach(function (id) { if (best === null || m[id] > m[best]) best = id; }); return best; }
   function argmin(m, ids) { var best = null; ids.forEach(function (id) { if (best === null || m[id] < m[best]) best = id; }); return best; }
@@ -36,6 +39,7 @@
     others.forEach(function (t) {
       var s = noise(g, b, t);
       if (t in mine) s += mine[t] ? 50 : -50;
+      if (me === 'mason' && role(g, t) === 'mason') s -= 50;   // 🧱 the pair know each other
       if (me === 'seer' && claimers(g).indexOf(t) >= 0) s += 50;          // only I am the seer: any other claimant lies
       if (cl.length > 1 && cl.indexOf(t) >= 0) s += 3;                    // two seers: one of them is lying
       out[t] = s;
@@ -61,7 +65,7 @@
   }
   /** The village bots' average suspicion of each living player — what the table "thinks". Wolves follow it to blend in. */
   function consensus(g) {
-    var out = {}, n = {}, vb = alive(g).filter(function (id) { return isBot(g, id) && role(g, id) !== 'wolf'; });
+    var out = {}, n = {}, vb = alive(g).filter(function (id) { return isBot(g, id) && !evil(g, id) && role(g, id) !== 'jester'; });
     vb.forEach(function (b) { var s = sus(g, b); Object.keys(s).forEach(function (t) { out[t] = (out[t] || 0) + s[t]; n[t] = (n[t] || 0) + 1; }); });
     alive(g).forEach(function (t) { out[t] = n[t] ? out[t] / n[t] : 0; });
     return out;
@@ -129,6 +133,7 @@
       var r = role(g, b), c = null;
       var old = g.claims.filter(function (x) { return x.by === b; });
       if (today(b)) { var t0 = old[old.length - 1]; tags[b] = { k: 'claim', t: t0.t, wolf: t0.wolf }; return; }
+      if (r === 'jester') { tags[b] = { k: 'quiet' }; return; }   // 🃏 never defends itself
       if (r === 'seer') {
         var mine = (g.checks && g.checks[b]) || {}, told = old.map(function (x) { return x.t; });
         var fresh = Object.keys(mine).filter(function (t) { return told.indexOf(t) < 0; });
@@ -151,14 +156,14 @@
       }
       if (c) { claims.push(c); tags[b] = { k: 'claim', t: c.t, wolf: c.wolf }; return; }
       var ids = alive(g).filter(function (t) { return t !== b; });
-      var m = r === 'wolf' ? (function () { var o = {}; ids.forEach(function (t) { o[t] = role(g, t) === 'wolf' ? -99 : (con[t] || 0) + noise(g, b, t); }); return o; })() : sus(g, b);
+      var m = evil(g, b) ? (function () { var o = {}; ids.forEach(function (t) { o[t] = role(g, t) === 'wolf' ? -99 : (con[t] || 0) + noise(g, b, t); }); return o; })() : sus(g, b);
       var hi = argmax(m, ids), lo = argmin(m, ids);
       // a low bar to speak (day 1 has only noise to go on), a higher one to vote (votes() needs ≥ 1)
       // V101.356 (owner's playthrough): day 1 has only noise — a bot speaks only on a strong hunch (90 % of its level's noise), so about
       // a quarter accuse, a quarter say 👍, the rest stay quiet, instead of a wall of red 🤨
       var bar = g.day === 1 ? (NOISE[g.level] || 1.5) * 0.9 : 0.4;
       if (hi && m[hi] >= bar) tags[b] = { k: 'sus', t: hi, soft: m[hi] < 1 };
-      else if (lo && m[lo] <= -bar && r !== 'wolf') tags[b] = { k: 'trust', t: lo, soft: m[lo] > -1 };
+      else if (lo && m[lo] <= -bar && !evil(g, b)) tags[b] = { k: 'trust', t: lo, soft: m[lo] > -1 };
       else tags[b] = { k: 'quiet' };
     });
     return { tags: tags, claims: claims };
@@ -169,7 +174,8 @@
     alive(g).forEach(function (b) {
       if (!isBot(g, b)) return;
       var ids = alive(g).filter(function (t) { return t !== b; });
-      if (role(g, b) === 'wolf') {
+      if (role(g, b) === 'jester') { out[b] = 'skip'; return; }   // 🃏 wants the votes, casts none
+      if (evil(g, b)) {
         var prey = ids.filter(function (t) { return role(g, t) !== 'wolf'; }), m = {};
         prey.forEach(function (t) { m[t] = (con[t] || 0) + noise(g, b, t) * 0.5; });
         out[b] = argmax(m, prey) || 'skip';

@@ -6,6 +6,10 @@
    when the hunter dies, night or vote, they shoot one living player — shotError checks the shot, eliminate applies it) ·
    cupid 💘 (2026-11-26, the second 🎲 role): on night 1 pairs two lovers (self allowed) — setLovers; when one lover dies the
    other dies with them (resolveNight and eliminate chain it); lovers from different sides win alone when only they remain.
+   minion 😈 · jester 🃏 · mason 🧱 (2026-11-27, from the owner's One Night box): the minion knows the wolves (its card), the
+   wolves do not know it, no night action, counts as a non-wolf for parity and wins with the wolves; the jester wins alone the
+   moment the village votes it out (eliminate how 'vote' → jesterWin, winner 'jester'; a night death or a 🏹 shot is only a
+   death); masons are a pair of villagers who know each other (addExtra swaps two 👤, 7 players up).
    Every random choice takes rng (a () => [0, 1) function) so the check script can replay a game exactly. */
 /* The same file runs in node (functions/, scripts/) and in the page (window.WolfRules); public/wolf-rules.js is a byte-for-byte copy (wolf-rules-check.cjs fails when they differ). */
 (function (root, factory) {
@@ -13,8 +17,8 @@
 })(typeof self !== 'undefined' ? self : this, function () {
 'use strict';
 
-const ROLES = ['wolf', 'seer', 'guard', 'witch', 'hunter', 'cupid', 'villager'];   // deck order (extras before 👤 in the deck line)
-const EMOJI = { wolf: '🐺', seer: '🔮', guard: '🛡️', witch: '🧪', hunter: '🏹', cupid: '💘', villager: '👤' };
+const ROLES = ['wolf', 'seer', 'guard', 'witch', 'hunter', 'cupid', 'minion', 'jester', 'mason', 'villager'];   // deck order (extras before 👤 in the deck line)
+const EMOJI = { wolf: '🐺', seer: '🔮', guard: '🛡️', witch: '🧪', hunter: '🏹', cupid: '💘', minion: '😈', jester: '🃏', mason: '🧱', villager: '👤' };
 const DECK_ROLES = ['wolf', 'seer', 'guard', 'witch', 'villager'];   // what DECKS counts; extras start at 0
 const MIN_PLAYERS = 5, MAX_PLAYERS = 10;
 const NIGHT_SEC = 90, VOTE_SEC = 60, TALK_SEC = [120, 180, 300], TALK_DEFAULT = 180;
@@ -33,11 +37,12 @@ function defaultCounts(n) {
   DECK_ROLES.forEach((r, i) => { out[r] = d[i]; });
   return out;
 }
-/** The 🎲 extra role: one villager seat becomes `role` (unchanged when there is no villager to swap). A new object. */
+/** The 🎲 extra role: one villager seat becomes `role` (two for the 🧱 pair; unchanged when there is no villager to swap). A new object. */
 function addExtra(counts, role) {
   const out = Object.assign({}, counts);
-  if (!(out.villager > 0) || !ROLES.includes(role)) return out;
-  out.villager -= 1; out[role] = (out[role] || 0) + 1;
+  const need = role === 'mason' ? 2 : 1;
+  if (!(out.villager >= need) || !ROLES.includes(role) || role === 'villager' || role === 'wolf') return out;
+  out.villager -= need; out[role] = (out[role] || 0) + need;
   return out;
 }
 
@@ -55,9 +60,13 @@ function countsError(counts, n) {
   const w = counts.wolf || 0;
   if (w < 1) return 'no-wolf';
   if (w * 2 >= n) return 'too-many-wolves';   // wolves would win before the first morning
-  for (const r of ['seer', 'guard', 'witch', 'hunter', 'cupid']) if ((counts[r] || 0) > 1) return 'one-' + r;
+  for (const r of ['seer', 'guard', 'witch', 'hunter', 'cupid', 'minion', 'jester']) if ((counts[r] || 0) > 1) return 'one-' + r;
   if ((counts.hunter || 0) > 0 && n < 6) return 'hunter-needs-6';
   if ((counts.cupid || 0) > 0 && n < 6) return 'cupid-needs-6';
+  if ((counts.minion || 0) > 0 && n < 7) return 'minion-needs-7';
+  if ((counts.jester || 0) > 0 && n < 6) return 'jester-needs-6';
+  if (![0, 2].includes(counts.mason || 0)) return 'masons-2';   // 🧱 always a pair
+  if ((counts.mason || 0) > 0 && n < 7) return 'masons-need-7';
   return null;
 }
 
@@ -84,7 +93,7 @@ const withRole = (roles, alive, role) => aliveIds(alive).filter((id) => roles[id
 function newState(roles) {
   const alive = {};
   Object.keys(roles).forEach((id) => { alive[id] = true; });
-  return { roles, alive, witch: { heal: true, poison: true }, lastGuard: null, night: 1, lovers: null };
+  return { roles, alive, witch: { heal: true, poison: true }, lastGuard: null, night: 1, lovers: null, jesterWin: null };
 }
 
 /** Who still has to press a button tonight: { id: kind }. Villagers sleep. The witch acts after the wolves. */
@@ -201,15 +210,20 @@ function shotError(state, hunter, target) {
   return null;
 }
 
-/** Remove the voted-out player (or nobody). Returns a new state. */
-function eliminate(state, id) {
+/** Remove the voted-out player (or nobody). how = 'vote' (default) | 'shot': a 🃏 jester voted out wins at once (jesterWin). Returns a new state. */
+function eliminate(state, id, how) {
   const next = JSON.parse(JSON.stringify(state));
-  if (id) { next.alive[id] = false; chainLovers(next, [id]); }
+  if (id) {
+    next.alive[id] = false; chainLovers(next, [id]);
+    if ((how || 'vote') === 'vote' && state.roles[id] === 'jester') next.jesterWin = id;
+  }
   return next;
 }
 
-/** 'village' when no wolf is alive, 'wolf' when wolves are at least everyone else alive, else null. */
+/** 'village' when no wolf is alive, 'wolf' when wolves are at least everyone else alive (😈 counts as everyone else), 'jester' once
+ *  the 🃏 was voted out, 'lovers' for a mixed pair alone, else null. */
 function winner(state) {
+  if (state.jesterWin) return 'jester';   // 🃏 the village voted the jester out
   const live = aliveIds(state.alive);
   const l = state.lovers;
   if (l && live.length === 2 && live.includes(l[0]) && live.includes(l[1]) && (state.roles[l[0]] === 'wolf') !== (state.roles[l[1]] === 'wolf')) return 'lovers';   // 💘 a mixed pair, alone
