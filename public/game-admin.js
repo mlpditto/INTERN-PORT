@@ -8,15 +8,16 @@
 (function () {
     'use strict';
     var WEEK = 7 * 864e5, last = 0, plays = [], pick = null, view = 'time', per = 'week', all = null, allAt = 0;
-    var GAMES = [['bw', '⚫', 'ไพ่เงา'], ['count', '🧊', 'นับไว'], ['cereal', '🥣', 'Cereal'], ['wolf', '🐺', 'หมาป่า'], ['secret', '🔢', 'เลขลับ']];
+    var GAMES = [['bw', '⚫', 'ไพ่เงา'], ['count', '🧊', 'นับไว'], ['cereal', '🥣', 'Cereal'], ['wolf', '🐺', 'หมาป่า'], ['secret', '🔢', 'เลขลับ'], ['secretOn', '🔢🌐', 'เลขลับ หลายคน']];
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function is(p, g) { return window.GameTopRank ? GameTopRank.is(p, g) : p.game === g; }   // V102.708 🔢🌐 its own chip
     function avg(a) { return a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : 0; }
     function median(a) { var b = a.slice().sort(function (x, y) { return x - y; }), k = b.length >> 1; return b.length ? (b.length % 2 ? b[k] : (b[k - 1] + b[k]) / 2) : 0; }
     function fmt(s) { s = Math.round(s); return s >= 60 ? Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2) : String(s); }
     /** rows for one game: [{ userId, games, perRound, last: [s…], wins, score }], slowest first, with flag 'slow' | 'fast' | '' */
     function rows(list, game) {
         var by = {};
-        list.filter(function (p) { return p.game === game && p.userId && p.rounds && p.rounds.length; }).forEach(function (p) { (by[p.userId] = by[p.userId] || []).push(p); });
+        list.filter(function (p) { return is(p, game) && p.userId && p.rounds && p.rounds.length; }).forEach(function (p) { (by[p.userId] = by[p.userId] || []).push(p); });
         var out = Object.keys(by).map(function (u) {
             var ps = by[u].sort(function (a, b) { return (b.endedAt || 0) - (a.endedAt || 0); }), all = [];
             ps.forEach(function (p) { all = all.concat(p.rounds); });
@@ -50,7 +51,7 @@
     }
     function html() {
         var src = view === 'rank' && per === 'all' ? (all || []) : plays;
-        var have = GAMES.filter(function (g) { return src.some(function (p) { return p.game === g[0]; }); });
+        var have = GAMES.filter(function (g) { return src.some(function (p) { return is(p, g[0]); }); });
         if (!have.length) return '';
         if (!pick || !have.some(function (g) { return g[0] === pick; })) pick = have[0][0];
         var rs = rows(plays, pick), unit = pick === 'count' ? 'ข้อ' : pick === 'bw' ? 'ตา' : pick === 'secret' ? '🎫' : 'วัน';

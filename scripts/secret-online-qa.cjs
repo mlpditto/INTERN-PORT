@@ -66,6 +66,7 @@ const until = (p, fn, arg) => p.waitForFunction(fn, arg, { timeout: 5000 });
   assert.ok(await A.$('#sn-h1'), 'practice keeps its help levels');
   await A.click('#sn-mode-1'); await until(A, () => !!document.getElementById('sno-new'));
   assert.equal(await A.$('#sn-h1'), null);
+  assert.ok(await A.$('[data-gtop="secretOn"]') && !(await A.$('[data-gtop="secret"]')), 'V101.381 🌐 shows its own 🏆 board');
   await A.click('#sno-live-false'); await A.click('#sno-new');
   await until(A, () => !!document.getElementById('sno-roomcode'));
   const code = (await text(A, '#sno-roomcode')).replace(/\D/g, ''); assert.match(code, /^\d{4}$/);

@@ -36,6 +36,13 @@ assert.deepEqual(R.board(P, 'bw', skip, true).map((x) => x.userId + x.v), ['a2',
 const SP = [{ userId: 'a', game: 'secret', mode: 'h4', win: 'w', score: '9', endedAt: MON + 1 }, { userId: 'b', game: 'secret', mode: 'h4', win: 'w', score: '6', endedAt: MON + 2 },
   { userId: 'c', game: 'secret', mode: 'h1', win: 'w', score: '2', endedAt: MON + 1 }, { userId: 'a', game: 'secret', mode: 'h4', win: 'w', score: '7', endedAt: MON + 3 }];
 assert.deepEqual(R.rank(SP, MON + 1000).boards.secret.week.map((x) => x.userId + x.v), ['b6', 'a7'], '🔢 fewest 🎫 at 🧠 first; 🟩 never counts');
+// V101.381 🔢🌐 เลขลับ หลายคน: its own board, games won (online + ⚡ live); never mixed into the 🧠 board
+const SO = SP.concat([{ userId: 'c', game: 'secret', mode: 'online', win: 'w', score: '3', endedAt: MON + 4 }, { userId: 'd', game: 'secret', mode: 'live', win: 'w', score: '0', endedAt: MON + 5 },
+  { userId: 'd', game: 'secret', mode: 'online', win: 'w', score: '6', endedAt: MON + 6 }, { userId: 'a', game: 'secret', mode: 'online', win: 'l', score: '9', endedAt: MON + 7 }]);
+const ro = R.rank(SO, MON + 1000);
+assert.deepEqual(ro.boards.secretOn.week.map((x) => x.userId + x.v), ['d2', 'c1'], '🌐 most wins first, a loss never counts');
+assert.deepEqual(ro.boards.secret.week.map((x) => x.userId + x.v), ['b6', 'a7'], 'online games stay off the 🧠 board');
+assert.equal(R.board(SO, 'secret', null, true).find((x) => x.userId === 'a').n, 2, 'the 🧠 board counts practice games only');
 const mine = R.forIntern(r, 'c', (id) => ({ name: 'N' + id, pic: '' }));
 assert.deepEqual(mine.bw.week, { top: [{ v: 1, name: 'Nb', pic: '' }, { v: 1, name: 'Na', pic: '' }], me: null });
 assert.deepEqual(R.forIntern(r, 'a', (id) => ({ name: id })).count.all.me, { r: 1, v: 50 });
