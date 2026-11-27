@@ -48,3 +48,14 @@ Owner 2026-11-27: "Yes, start it". Picks: A, player cards + a grid of what I kno
 - **Tutorial:** a 5th scene about playing with friends, with voice `secret-voice/t5.mp3`.
 - QA: `scripts/room-secret-check.cjs` (the referee: 200 random games, answers only to the asker, refusals), `scripts/secret-online-qa.cjs` (three phones through the real referee).
 - **Deploy:** `firebase deploy --only functions:roomAct`. The rules are unchanged; `rooms` already exists.
+
+## Refresh (V101.385)
+
+Owner 2026-11-27: English first, no tactics. The owner picked play layout B from mockup-secret-refresh/, and added that questions should not be reusable.
+- **Language:** the lobby, play and end screens are English. The tour shows the English line large, with the Thai line the voice reads in small type underneath.
+- **🟩 count:** a mini bar beside 🎫 in the header. The play title is just 🔢 plus the level.
+- **Grid:** live cells are tinted and framed. Ruled-out cells are struck through and hatched, so they read without relying on colour.
+- **Wrong guess:** the cell flashes (vibrate on Android), with `✗ Not n · 🎫 +1` above the grid.
+- **Repeat questions:** a question with no number (Even?, ÷3?, Prime?) can be asked once; its chip then shows ✓/✗ and is off. The same numbered question again says "Already asked" and costs nothing. In Friends mode this is per person.
+- **Log:** shows the last 3 questions, plus "+n more".
+- **End:** 🏅 New best with light confetti (none with reduced motion), and 📤 Share (LINE). The "halving ≈ 7" tip is gone.

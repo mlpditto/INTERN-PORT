@@ -35,7 +35,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   for (let i = 0; i < 5; i++) { tops.push(await page.$eval('#sn-tnext', (b) => Math.round(b.getBoundingClientRect().top))); await page.click('#sn-tnext'); }
   assert.equal(new Set(tops).size, 1, 'ถัดไป ▸ stays put ' + tops);
   assert.deepEqual(await page.evaluate(() => window.__played), ['secret-voice/t1.mp3', 'stop', 'secret-voice/t2.mp3', 'stop', 'secret-voice/t3.mp3', 'stop', 'secret-voice/t4.mp3', 'stop', 'secret-voice/t5.mp3', 'stop']);
-  assert.ok(await page.isVisible('#sn-start'), '▸ เริ่ม → lobby'); assert.equal(await page.evaluate(() => localStorage.getItem('snTourSeen')), '1');
+  assert.ok(await page.isVisible('#sn-start'), '▸ Start → lobby'); assert.equal(await page.evaluate(() => localStorage.getItem('snTourSeen')), '1');
   await page.click('#sn-help'); await page.click('#sn-voice');
   assert.equal(await page.evaluate(() => localStorage.getItem('snVoice')), 'off'); await page.evaluate(() => { window.__played = []; });
   await page.click('#sn-tnext'); assert.deepEqual(await page.evaluate(() => window.__played), [], '🔇 kept: silent');
@@ -60,19 +60,27 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.equal(await page.evaluate(() => SN._g().n), 42);
   await page.click('[data-q="gt"]'); await page.fill('#sn-a', '50'); await page.click('#sn-ask');
   await page.click('[data-q="even"]');
-  assert.match(await page.textContent('#sn-log'), /2 · เลขคู่ \?✓ ใช่.*1 · มากกว่า 50 \?✗ ไม่/);
-  assert.equal(await page.textContent('#sn-left'), 'เหลือ 25 ตัว · แตะเลข = ทาย');
+  assert.match(await page.textContent('#sn-log'), /2 · Even\?✓ Yes.*1 · > 50\?✗ No/);
+  // V101.385 a question with no number once: its chip shows the answer and is off; the same numbered question costs nothing
+  assert.ok(await page.$eval('[data-q="even"]', (b) => b.disabled && b.classList.contains('done') && /Even\? ✓/.test(b.textContent)), 'Even? asked: chip shows ✓ and is off');
+  await page.click('[data-q="gt"]'); await page.fill('#sn-a', '50'); await page.click('#sn-ask');
+  assert.equal(await page.textContent('#sn-toast'), 'Already asked'); assert.equal(await page.textContent('#sn-used'), '🎫 2', 'the same question is not charged');
+  assert.match(await page.textContent('#sn-left'), /^25/); assert.equal(await page.$eval('#sn-left b', (b) => b.style.width), '25%', 'the count is a mini bar beside 🎫');
+  assert.ok(await page.$eval('#sn-left', (e) => !!e.closest('.sn-top')), 'in the header');
   assert.ok(await page.$eval('[data-n="51"]', (b) => b.classList.contains('out')) && await page.$eval('[data-n="41"]', (b) => b.classList.contains('out')), 'odd and > 50 crossed out');
   await page.click('[data-n="40"]');
-  assert.match(await page.textContent('#sn-toast'), /✗ ไม่ใช่ 40 · 🎫 \+1/); assert.ok(await page.$eval('[data-n="40"]', (b) => b.disabled && b.classList.contains('bad')));
+  assert.match(await page.textContent('#sn-toast'), /✗ Not 40 · 🎫 \+1/); assert.ok(await page.$eval('[data-n="40"]', (b) => b.disabled && b.classList.contains('bad') && b.classList.contains('flash')), 'the wrong cell flashes');
+  assert.ok(await page.$eval('#sn-toast', (t) => t.compareDocumentPosition(document.getElementById('sn-grid')) & Node.DOCUMENT_POSITION_FOLLOWING), 'the line sits above the grid');
   assert.equal(await page.textContent('#sn-used'), '🎫 3');
   await page.click('[data-q="gt"]'); await page.fill('#sn-a', '500'); await page.click('#sn-ask');
-  assert.match(await page.textContent('#sn-toast'), /ใส่เลข 1–100/); assert.equal(await page.textContent('#sn-used'), '🎫 3', 'a bad number costs nothing');
+  assert.match(await page.textContent('#sn-toast'), /Enter 1–100/); assert.equal(await page.textContent('#sn-used'), '🎫 3', 'a bad number costs nothing');
   const logs = []; await page.exposeFunction('__log', (x) => logs.push(x));
   await page.evaluate(() => { const s = GameLog.see; GameLog.see = function (gm, st) { if (st && st.done) window.__log({ gm, mode: st.mode, win: st.win, score: st.score }); return s.apply(this, arguments); }; });
   await page.click('[data-n="42"]');
-  assert.equal(await page.textContent('#sn-final'), '🎯 42'); assert.match(await page.textContent('#sn-stats'), /^3🎫 ที่ใช้1ทายผิด/);
-  assert.match(await page.textContent('#sn-best'), /🎉 สถิติใหม่ · 3 🎫/); assert.equal(await page.evaluate(() => localStorage.getItem('snBest_h1')), '3');
+  assert.equal(await page.textContent('#sn-final'), '🎯 42'); assert.match(await page.textContent('#sn-stats'), /^3🎫 used1wrong/);
+  assert.match(await page.textContent('#sn-best'), /🏅 New best · 3 🎫/); assert.equal(await page.evaluate(() => localStorage.getItem('snBest_h1')), '3');
+  assert.ok(await page.$('#snModal .sn-conf i'), 'confetti on a new best'); assert.doesNotMatch(await page.textContent('#snModal'), /≈|halv/i, 'no tip on how to play');
+  assert.ok(await page.isVisible('#sn-share'), '📤 Share');
   assert.deepEqual(logs[0], { gm: 'secret', mode: 'h1', win: 'w', score: '3' });
 
   // ✏️ crosses only what you tap
@@ -86,12 +94,16 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   // 📏 the range; 🧠 the log only
   await page.evaluate(() => { SN.lobby(); SN.help(3); SN.start(); });
   await page.click('[data-q="range"]'); await page.fill('#sn-a', '30'); await page.fill('#sn-b', '60'); await page.click('#sn-ask');
-  assert.equal(await page.textContent('#sn-range'), 'อยู่ระหว่าง 30–60'); assert.equal(await page.$('#sn-grid'), null, '📏 no board');
+  assert.equal(await page.textContent('#sn-range'), '30–60'); assert.equal(await page.$('#sn-grid'), null, '📏 no board');
   await page.fill('#sn-g', '42'); await page.click('#sn-guess'); assert.ok(await page.isVisible('#sn-final'));
   await page.evaluate(() => { SN.lobby(); SN.help(4); SN.start(); });
   assert.equal(await page.$('#sn-grid'), null); assert.equal(await page.$('#sn-bar'), null, '🧠 no help');
+  for (const [q, v] of [['gt', 10], ['gt', 20], ['gt', 30], ['gt', 40]]) { await page.click('[data-q="' + q + '"]'); await page.fill('#sn-a', String(v)); await page.click('#sn-ask'); }
+  assert.equal(await page.$$eval('#sn-log > div', (d) => d.length), 3, 'the log shows the last 3'); assert.equal(await page.textContent('#sn-more'), '+1 more ▾');
+  await page.click('#sn-more'); assert.equal(await page.$$eval('#sn-log > div', (d) => d.length), 4); await page.click('#sn-more');
   // best per level shown in the lobby; ↻
-  await page.evaluate(() => SN.lobby()); assert.match(await page.textContent('#sn-h1'), /🟩 ขีดให้ · 3🎫/);
+  await page.evaluate(() => SN.lobby()); assert.match(await page.textContent('#sn-h1'), /🟩 Auto · 3🎫/);
+  assert.doesNotMatch(await page.textContent('#snModal'), /[\u0E00-\u0E7F]/, 'the lobby is English');
   // 320 px
   await page.setViewportSize({ width: 320, height: 640 });
   const fits = () => page.$eval('#snModal .modal-content', (e) => e.scrollWidth <= e.clientWidth + 1);

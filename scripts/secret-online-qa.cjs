@@ -62,7 +62,7 @@ const until = (p, fn, arg) => p.waitForFunction(fn, arg, { timeout: 5000 });
 
   // the mode rail and a room with ⏱ 1 ชม.
   await A.evaluate(() => { secretOpen(); });
-  assert.deepEqual(await A.$$eval('[aria-label="Mode"] button', (b) => b.map((x) => x.textContent + (x.classList.contains('on') ? '*' : ''))), ['🤖 ฝึกกับบอท*', '🌐 หลายคน']);
+  assert.deepEqual(await A.$$eval('[aria-label="Mode"] button', (b) => b.map((x) => x.textContent + (x.classList.contains('on') ? '*' : ''))), ['🤖 Practice*', '🌐 Friends']);
   assert.ok(await A.$('#sn-h1'), 'practice keeps its help levels');
   await A.click('#sn-mode-1'); await until(A, () => !!document.getElementById('sno-new'));
   assert.equal(await A.$('#sn-h1'), null);
@@ -90,6 +90,9 @@ const until = (p, fn, arg) => p.waitForFunction(fn, arg, { timeout: 5000 });
   await until(me, () => document.querySelectorAll('#sno-grid .out').length === 50);
   const even = nums[t1] % 2 === 0;
   assert.equal(await me.$eval('#sno-grid [data-n="1"]', (b) => b.classList.contains('out')), even, 'odd numbers crossed out after a ✓ even (or the reverse)');
+  await until(me, () => ((SNOnline._st().hand || {}).notes || []).length === 1);
+  const chip = await me.evaluate((t) => { const st = SNOnline._st(), r = st.room, was = r.turn; r.turn = st.uid; st.to = t; const d = document.createElement('div'); d.innerHTML = SNOnline.html(); r.turn = was; const b = d.querySelector('[data-q="even"]'); const g2 = d.querySelector('[data-q="gt"]'); return [b.disabled, b.classList.contains('done'), g2.disabled]; }, t1);
+  assert.deepEqual(chip, [true, true, false], 'V101.385: Even? asked of this person → its chip is off on my next turn; > __? stays');
   for (const u of others) await until(P[u], () => /🔒/.test((document.getElementById('sno-last') || {}).textContent || ''));
   assert.equal(await P[others[1]].$$eval('#sno-grid .out', (e) => e.length), 0, 'someone else\'s answer never crosses my grid');
   assert.match(await text(P[others[1]], '#sno-last'), /ถาม .* · เลขคู่ \? 🔒/);
