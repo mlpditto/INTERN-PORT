@@ -1,4 +1,4 @@
-// V102.710 🧪 tester-admin.js (owner pick B: its own 🧪 in the User Hub bar). The 🧪 button sits right after 📋 Entry in the REAL
+// V102.711 🧪 tester-admin.js (owner pick B: its own 🧪 in the User Hub bar). The 🧪 button sits right after 📋 Entry in the REAL
 // admin.html; the panel (run on a blank page with a small in-memory Firestore): Group · 👥 cycles 5→10→20 · ⏳ 3→7→14 d · ＋
 // makes TEST-nnnn with exactly { label, max, used 0, untilMs, paused false, testers [] }; rows show used/max and →end, live first,
 // ended rows dim without 📤 ⏸; 📤 copies the LINE link ?tester= and opens LINE share; ⏸ ↔ ▶; the people list shows each tester's
@@ -11,7 +11,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const admin = fs.readFileSync('public/admin.html', 'utf8');
 const entry = admin.indexOf('onclick="openPreRegModal()" title="Entry (pre-registration)"'), ta = admin.indexOf('id="ta-open"');
 assert.ok(entry > 0 && ta > entry && ta - entry < 1200, 'the 🧪 button sits right after 📋 Entry');
-assert.match(admin, /<script src="tester-admin\.js\?v=V102\.710"><\/script>/);
+assert.match(admin, /<script src="tester-admin\.js\?v=V102.711"><\/script>/);
 
 (async () => {
   const browser = await chromium.launch();

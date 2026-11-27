@@ -1,4 +1,4 @@
-/* V102.710 🧪 Tester codes on the admin (owner 2026-11-27, pick B = its own 🧪 in the User Hub bar; lean · inline · less text ·
+/* V102.711 🧪 Tester codes on the admin (owner 2026-11-27, pick B = its own 🧪 in the User Hub bar; lean · inline · less text ·
    English only, mockup-tester-code/tester-lean.png). One row makes a group code: Group · 👥 5/10/20 · ⏳ 3/7/14 d · ＋ →
    tester_codes/TEST-nnnn. Each code: TEST-nnnn · group · used/max · →end, 📤 copies the LINE link (?tester=) and opens LINE share,
    ⏸/▶ pauses. Under them, everyone who joined with their device (from claimTester). Live while open. window.testerAdmin */
