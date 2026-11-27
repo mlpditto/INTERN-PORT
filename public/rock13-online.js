@@ -94,6 +94,9 @@
     function lastLine(g) {
         var G = g.g, L = G.log[G.log.length - 1]; if (!L) return '';
         var who = name(g, g.order[L.s]);
+        // V101.390 a turn the clock played (newest of this round) says so once; else only 💥
+        var auto = G.log.filter(function (x) { return x.r === G.round && x.auto; }).slice(-1)[0];
+        if (auto && G.log.indexOf(auto) >= G.log.length - 3) return '<span style="color:#b45309">⏱ ' + name(g, g.order[auto.s]) + ' ran out · placed ' + auto.card + ' → ' + CH[auto.st] + '</span>';
         return L.k === 'place' && L.take ? '💥 ' + who + ' took 🪨 ' + L.take : '';
     }
     function html() {
@@ -129,7 +132,7 @@
         } else if (mine) {
             var sb = G.subs[me], pass = R().canPass(G, me) ? '<button type="button" class="r13-go alt" id="r13o-pass" onclick="R13Online.pass()"' + (st.busy ? ' disabled' : '') + '>⏭ Pass</button>' : '';
             if (sb.chip === 'w') h += pass ? '<div class="r13-row">' + pass + '</div>' : '';
-            else { var pv = R().preview(G, me, sb.chip); h += '<div class="r13-row"><button type="button" class="r13-go" id="r13o-put" onclick="R13Online.put()"' + (st.busy ? ' disabled' : '') + '>▸ Place ' + (pv.take ? '💥 🪨' + pv.take : '→ ' + pv.total) + '</button>' + pass + '</div>'; }
+            else { var pv = R().preview(G, me, sb.chip); h += '<div class="r13-row"><button type="button" class="r13-go' + (pv.take ? ' hit' : '') + '" id="r13o-put" onclick="R13Online.put()"' + (st.busy ? ' disabled' : '') + '>▸ Place ' + (pv.take ? '💥 🪨' + pv.take : '→ ' + pv.total) + '</button>' + pass + '</div>'; }
         }
         return h + note() + '<button type="button" class="r13-x" id="r13o-resign" style="align-self:center;font-size:.8em" onclick="R13Online.resign()">🏳 Leave game</button></div>';
     }

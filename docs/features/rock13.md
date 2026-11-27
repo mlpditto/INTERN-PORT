@@ -39,6 +39,17 @@ Owner picks 2026-11-27: ค = live rooms only, ⚡ 60 s for every pick and every
 - **`game_plays`:** game `rock13`, mode `live`, the same 🏆 board as practice (wins).
 - **Deploy:** `firebase deploy --only functions:roomAct`. No rules change (the `rooms` rules already cover it).
 
+## 🏛 Greek C (V101.390)
+
+Owner picks 2026-11-28: carrier look **C + animation** (mockup-rock13-carrier/), then blended with a Greek theme **drawn in code** (mockup-rock13-greek/; an outside AI picture was the reference, its coins / shop / ranks / "Lose 1 move" were left out).
+- **Carriers:** toga, sash and cape in the carrier colour, gold band, sandals; the board wrapped in cloth. Weight in the pose: knees bend, the face goes calm → strained (8) → about to drop (11), 💦 from 8, strain lines from 11.
+- **Stones:** marble cubes 24 px, serif numbers, shadows; the newest stone outlined in gold.
+- **Frames:** 8+ orange, 11+ red with a small shake. Under the sum: "n left" (no stone count: the stones are on the board).
+- **Animation, once:** a new stone drops in; on 💥 the old stones tumble off. `changes()` compares with the last picture, so bots and friends trigger it too. Off under reduced motion.
+- **Popup:** marble background, serif gold title, gold ▸ Place / ▸ วาง (48 px) with the outcome (`→ 9` / `💥 🪨3`, red), marble ⏭ Pass and cards, 44 px chips. Practice: the turn box says only "👉 ตาคุณ".
+- **Online:** a turn the clock played says `⏱ Name ran out · placed 5 → 🟢` once (the referee marks it `auto`); the faces / queue rows scroll sideways instead of wrapping.
+- **Deploy:** `functions:roomAct` again (the `auto` mark).
+
 ## QA
 
 - `scripts/rock13-rules-check.cjs`:
@@ -49,6 +60,7 @@ Owner picks 2026-11-27: ค = live rooms only, ⚡ 60 s for every pick and every
   - the lobby rails
   - a full 7-round game with ⏭, 🌈 and 💥
   - the log entry, and a 320 px fit
+  - V101.390: the outcome in ▸ วาง (red on 💥), "n left" tags, drop / fall play once, none under reduced motion
 - `scripts/room-rock13-check.cjs` (referee, no browser): rules copy matches, seats, picks hidden until all are in, the queue step by step against rock13-rules to the end, claim, 🏳, cancel.
 - `scripts/rock13-online-qa.cjs` (3 phones on the real page + the real referee): rail, room, invite, rings, 👉 Your turn, 👋 Nudge, English, 🌈, the same winner on every phone, late pick, 🏳, 320 px. `R13_SHOTS=<dir>` saves pictures.
 - `games-row-qa` (6 games), `cereal-header-qa` (🎮 menu), `secret-qa` (6 tiles).

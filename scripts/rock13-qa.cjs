@@ -75,8 +75,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
       sawRainbow++; assert.match(await page.textContent('#r13-turn'), /แตะคนแบก/); assert.ok(await page.$('#r13-st-r.pick'));
       await page.click('#r13-st-b');
     } else {
-      const t = await page.textContent('#r13-turn'), pv = await page.evaluate(() => { const g = R13._g(); return Rock13Rules.preview(g, 0, g.subs[0].chip); });
-      assert.ok(t.includes('= ' + pv.total), 'the turn box says the new weight'); if (pv.take) { sawBoom++; assert.match(t, new RegExp('💥 เก็บ 🪨 ' + pv.take)); }
+      const t = await page.textContent('#r13-put'), pv = await page.evaluate(() => { const g = R13._g(); return Rock13Rules.preview(g, 0, g.subs[0].chip); });
+      // V101.390 Greek C: the outcome lives in the button, red on 💥
+      assert.equal(t, '▸ วาง ' + (pv.take ? '💥 🪨' + pv.take : '→ ' + pv.total), 'the button says what placing does');
+      assert.equal(await page.$eval('#r13-put', (b) => b.classList.contains('hit')), !!pv.take); if (pv.take) sawBoom++;
       if (can && sawPass === 1) { await page.click('#r13-pass'); continue; }
       await page.click('#r13-put');
     }
@@ -93,6 +95,21 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.equal(log.mode, 'bot'); assert.equal(log.score, String(g.players[0].pen)); assert.ok(['w', 'l'].includes(log.win));
   assert.ok(sawTurn >= 7 && sawRainbow >= 1 && sawPass >= 1, 'played my turns, 🌈 and ⏭ ' + JSON.stringify({ sawTurn, sawRainbow, sawPass, sawBoom }));
   await page.screenshot({ path: process.env.R13_SHOT || path.join(require('node:os').tmpdir(), 'r13-end.png') });
+  // V101.390 🏛 Greek C: "n left" under each carrier (no stone count), a new stone drops in once, 💥 the old stones tumble off once
+  const fx = await page.evaluate(() => {
+    const R = Rock13Rules, G = R.create([{ id: 'a', name: 'a' }, { id: 'b', name: 'b' }, { id: 'c', name: 'c' }], 7, 0);
+    G.stands = { r: [3, 1], g: [5, 4], b: [6, 2, 4] };
+    R13._stands(G); const a = R13._stands(G);
+    G.stands.g.push(0); const b = R13._stands(G); const c = R13._stands(G);
+    G.stands.b = [3]; G.log.push({ take: 3 }); const d = R13._stands(G);
+    const box = document.createElement('div'); box.innerHTML = a;
+    return { left: [...box.querySelectorAll('.r13-left')].map((x) => x.textContent + '|' + x.className), count: /🪨<\/small>/.test(a), a: /r13-drop|r13-fall/.test(a), b: (b.match(/r13-drop/g) || []).length, c: /r13-drop|r13-fall/.test(c), d: (d.match(/r13-fall/g) || []).length };
+  });
+  assert.deepEqual(fx, { left: ['9 left|r13-left', '4 left|r13-left w', '⚠ 1 left|r13-left h'], count: false, a: false, b: 1, c: false, d: 3 }, 'Greek C tags + effects play once');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const rm = await page.evaluate(() => { const m = document.querySelector('#r13Modal .modal-content'), d = document.createElement('div'); d.innerHTML = '<svg><g class="r13-fall"></g><g class="r13-drop"></g></svg>'; m.appendChild(d); const r = [getComputedStyle(d.querySelector('.r13-fall')).display, getComputedStyle(d.querySelector('.r13-drop')).animationName]; d.remove(); return r; });
+  assert.deepEqual(rm, ['none', 'none'], 'reduced motion: no drop, no fall');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.click('#r13-again'); assert.ok(await page.isVisible('#r13-send'), '↻ starts again');
   await page.click('#r13-snd'); assert.equal(await page.evaluate(() => [localStorage.getItem('r13Sound'), R13Sound.playing].join()), 'off,false', '🔇 stops the loop and is kept');
   assert.equal(await page.textContent('#r13-snd'), '🔇'); await page.click('#r13-snd'); assert.equal(await page.evaluate(() => R13Sound.playing), true);

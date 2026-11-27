@@ -117,7 +117,7 @@ class HttpsError extends Error { constructor(code, msg, details) { super(msg); t
     const t = Rules.turn(G), late = Rules.lightest(G), chip = G.subs[t].chip, n0 = G.log.length;
     T += 61000; await call(t === 0 ? 'C' : 'B', { action: 'claim', roomId: c3.roomId });
     const log = pub(c3.roomId).g.log[n0];
-    assert.deepEqual([log.k, log.s], ['place', t], 'the late one was placed, no pass'); if (chip === 'w') { assert.equal(log.st, late, '🌈 → the lightest carrier'); rainbowLate = true; break; }
+    assert.deepEqual([log.k, log.s, log.auto], ['place', t, true], 'the late one was placed, no pass, marked auto (V101.390 ⏱ line)'); if (chip === 'w') { assert.equal(log.st, late, '🌈 → the lightest carrier'); rainbowLate = true; break; }
   }
   assert.ok(rainbowLate, 'a late 🌈 was placed for them');
   // 🏳 leaving: the seat becomes a 🤖; everyone leaving ends it
