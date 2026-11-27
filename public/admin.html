@@ -4,11 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.709)</title>
+    <title>Nika Admin (V102.710)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
-    <link rel="stylesheet" href="drug-list-ui.css?v=V102.640">
+    <link rel="stylesheet" href="drug-list-ui.css?v=V102.710">
     <link rel="stylesheet" href="mypath-ui.css?v=V102.143">
     <!-- Release: 2026-04-28 21:00 UTC+7 (V91.69: Auto-sync version badge from title — prevents drift) -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -9047,7 +9047,7 @@
 <script src="up-next.js?v=V102.650"></script>
 <script src="cereal-admin.js?v=V102.700"></script>
 <script src="game-top-rank.js?v=V102.709"></script>
-<script src="game-admin.js?v=V102.709"></script>
+<script src="game-admin.js?v=V102.710"></script>
 <script src="quiz-matrix.js?v=V102.503"></script>
 <script src="rank-quiz.js?v=V102.484"></script>
     <script src="peds-dosing.js?v=V102.80"></script>
@@ -49516,6 +49516,29 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (draft.sourceArticleId) return { key: 'articles', icon: '📰', label: 'From articles' };
             return { key: 'interns', icon: '🙋', label: 'Interns' };
         }
+        // V102.710 (owner pick A, mockup-drafts-approve-group/lean-ABC.png): "✓ n" on an import / articles group head publishes its drafts ≥ 80 %
+        // in one go. Tap 1 = "✓ n ยืนยัน" + ↩ in place (the rows it skips dim); tap 2 = publish. Interns stay one by one (their points prompt).
+        function dcaGroupReady(key) { return dcaState.drafts.filter(d => dcaDraftGroupOf(d).key === key && dcaCompletenessScore(d).pct >= 80); }
+        function dcaGroupAllBtnHtml(g) {
+            const n = g.key === 'interns' ? 0 : g.rows.filter(d => dcaCompletenessScore(d).pct >= 80).length;
+            return n >= 2 ? `<button type="button" class="dca-dgroup-all" onclick="dcaApproveGroup(this)">✓ ${n}</button>` : '';
+        }
+        async function dcaApproveGroup(btn) {
+            const box = btn.closest('.dca-dgroup'), ready = dcaGroupReady(box.dataset.gkey);
+            if (!ready.length) return;
+            if (!box.classList.contains('dca-dg-arm')) {
+                box.classList.add('dca-dg-arm');
+                btn.insertAdjacentHTML('beforebegin', '<button type="button" class="dca-dgroup-undo" onclick="dcaRenderDraftsList()" title="Cancel">↩</button>');
+                btn.textContent = '✓ ' + ready.length + ' ยืนยัน';
+                return;
+            }
+            btn.disabled = true; btn.textContent = '⏳';
+            let done = 0;
+            try { for (const d of ready) { await dcaPublishDraft(d, 0); done++; } }
+            catch (err) { console.error('[drug-codex] group approve failed:', err); alert('Approve failed after ' + done + ': ' + (err && err.message ? err.message : 'unknown error')); }
+            if (done && typeof showToast === 'function') showToast('✅ Approved ' + done);
+            dcaRenderDraftsList();
+        }
         function dcaRenderDraftsList() {
             const list = document.getElementById('dca-drafts-list');
             if (!list) return;
@@ -49528,8 +49551,8 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             list.innerHTML = groups.map(g => {
                 const notes = g.rows.map(d => String(d.internNotes || '').trim());
                 const shared = g.rows.length > 1 && notes[0] && notes.every(n => n === notes[0]) ? notes[0] : '';
-                return `<div class="dca-dgroup${g.key === 'interns' ? ' dca-dgroup-in' : ''}">
-                        <div class="dca-dgroup-head lang-no-toggle">${g.icon} ${dcaEscapeHtml(g.label)} · ${g.rows.length}</div>
+                return `<div class="dca-dgroup${g.key === 'interns' ? ' dca-dgroup-in' : ''}" data-gkey="${dcaEscapeHtml(g.key)}">
+                        <div class="dca-dgroup-head lang-no-toggle">${g.icon} ${dcaEscapeHtml(g.label)} · ${g.rows.length}${dcaGroupAllBtnHtml(g)}</div>
                         ${shared ? `<div class="dca-draft-notes-snippet" title="${dcaEscapeHtml(shared)}">📝 ${dcaEscapeHtml(shared.slice(0, 160))}${shared.length > 160 ? '…' : ''}</div>` : ''}
                         ${g.rows.map(d => dcaDraftRowHtml(d, !shared, g.key === 'interns')).join('')}
                     </div>`;
@@ -51819,6 +51842,18 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             const contributorBonus = await codexBonusPrompt({ heading: (_pct < 80 ? `⚠️ Only ${_pct}% filled.\n` : '') + `Approve & publish "${draft.genericName || draftId}" to Drug Codex as-is?\n(Press "Review & Edit" to fix fields first.)` });
             if (contributorBonus === null) return;
             if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+            try {
+                const r = await dcaPublishDraft(draft, contributorBonus);
+                if (typeof showToast === 'function') showToast(`✅ Approved "${r.name}"${r.awarded ? ` (+${r.awarded} pts)` : ''}`);
+            } catch (err) {
+                console.error('[drug-codex] approve failed:', err);
+                alert('Approve failed: ' + (err && err.message ? err.message : 'unknown error'));
+                if (btn) { btn.disabled = false; btn.textContent = '✓ Approve'; }
+            }
+        }
+        // V102.710: the publish itself (draft → drug_codex, draft → approved, contributor award) — shared by ✓ and the group "✓ n"
+        async function dcaPublishDraft(draft, contributorBonus) {
+            const draftId = draft._id;
             const nowTs = firebase.firestore.FieldValue.serverTimestamp();
             const reviewerEmail = (auth.currentUser && auth.currentUser.email) || 'admin-ui';
 
@@ -51852,7 +51887,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             // V95.71: carry the LINE user id for live usersData resolution in the chip.
             if (draft.submittedByUserId) payload.submittedByUserId = draft.submittedByUserId;
 
-            try {
+            {
                 const batch = db.batch();
                 const newRef = db.collection('drug_codex').doc();
                 dcaLinkArticleOnPublish(batch, draft, payload, newRef.id);   // V102.374
@@ -51862,11 +51897,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 // V96.19: credit the intern contributor in the same leaderboard + checkin log.
                 const _awarded = dcaQueueCodexContributorAward(batch, draft.submittedByUserId, contributorBonus, 'drug_codex', payload.genericName, newRef.id);
                 await batch.commit();
-                if (typeof showToast === 'function') showToast(`✅ Approved "${payload.genericName}"${_awarded ? ` (+${_awarded} pts)` : ''}`);
-            } catch (err) {
-                console.error('[drug-codex] approve failed:', err);
-                alert('Approve failed: ' + (err && err.message ? err.message : 'unknown error'));
-                if (btn) { btn.disabled = false; btn.textContent = '✓ Approve'; }
+                return { name: payload.genericName, awarded: _awarded };
             }
         }
 

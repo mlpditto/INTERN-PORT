@@ -24,6 +24,7 @@ Admin: Dashboard ▸ Drug Codex / Disease Codex.
 - `bronchodilator-seed-qa` — inhaled bronchodilators → pending drafts, names only
 - `peds-dosing-qa` — peds-dosing.js data, calculator, intern markup, admin import
 - `drug-codex-lean-b-qa` — V102.637 owner pick B (mockup-codex-lean): one line per drug (name + thin % bar · ATC / Cls / Brd dots — ○ = add at that field · 🤖 ✏️ ⋯ with who / when / 📰 inside), column heads filter in Incomplete first (ATC / Class / Brands chips gone), no avg line, 👶 / 🫁 imports under 📥, drafts grouped by source (note once, % per row, ✓ Approve amber + "⚠️ Only n% filled" under 80 %, no "new entry")
+- `drafts-approve-group-qa` — V102.710 owner pick A (mockup-drafts-approve-group/lean-ABC.png): "✓ n" on an import / articles drafts group head (n = drafts ≥ 80 %, shown when n ≥ 2, never on 🙋 Interns); tap 1 arms in place ("✓ n ยืนยัน" + ↩, skipped rows dim), tap 2 publishes those with bonus 0
 - `codex-bonus-blank-qa` — V102.651: the approve "🎁 Award points" box opens empty (no default score); OK = 0 points, chips fill it, an AI-suggested score is the first chip.
 - `pk-card-lines-qa` — V102.652: 📊 tab ▸ 🧠 Card lines on a published drug (five one-line A D M E T facts for the intern PK flash cards): 🤖 Shorten = one AI call, 💾 writes only `pkCard`, hidden on drafts / Add.
 - `pk-card-batch-qa` — V102.654: 📥 ▸ 🧠 Card lines sheet (`pk-card-batch.js`) — drugs with PK text and no `pkCard`, ten at a time; 🤖 Shorten = one AI call per empty row, ✓ per row, 💾 writes only ticked rows.
