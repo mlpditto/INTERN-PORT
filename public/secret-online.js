@@ -10,7 +10,7 @@
     var MAX = 100;
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function rr() { if (window.SN && SN._render) SN._render(); }
-    function call(data) { return firebase.functions().httpsCallable('roomAct')(Object.assign({ game: 'secret' }, data)).then(function (r) { return r.data || {}; }); }
+    function call(data) { return Promise.resolve(window.ensureAuthLink && ensureAuthLink()).then(function () { return firebase.functions().httpsCallable('roomAct')(Object.assign({ game: 'secret' }, data)); }).then(function (r) { return r.data || {}; }); }   // V101.383 link this sign-in first
     function msg(e) {
         var c = e && e.details && e.details.code;
         return { 'no-room': 'ไม่พบห้องที่เปิดอยู่ด้วยรหัสนี้', full: 'ห้องเต็มแล้ว (6 คน)', started: 'เกมเริ่มไปแล้ว', 'not-your-turn': 'ยังไม่ถึงตาคุณ', out: 'คนนี้ออกแล้ว', 'no-ticket': '🎫 หมดแล้ว', alone: 'รอเพื่อนอีกอย่างน้อย 1 คน', early: 'เขายังมีเวลา' }[c]

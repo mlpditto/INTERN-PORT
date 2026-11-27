@@ -11,7 +11,7 @@
     var CE = { b: '⚫', w: '⚪' };
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function rr() { if (window.BW && BW._render) BW._render(); }
-    function call(data) { return firebase.functions().httpsCallable('roomAct')(Object.assign({ game: 'bw' }, data)).then(function (r) { return r.data || {}; }); }
+    function call(data) { return Promise.resolve(window.ensureAuthLink && ensureAuthLink()).then(function () { return firebase.functions().httpsCallable('roomAct')(Object.assign({ game: 'bw' }, data)); }).then(function (r) { return r.data || {}; }); }   // V101.383 link this sign-in first
     function msg(e) {
         var c = e && e.details && e.details.code;
         return { 'no-room': 'ไม่พบห้องที่เปิดอยู่ด้วยรหัสนี้', 'own-room': 'นี่คือห้องของคุณเอง', started: 'เกมเริ่มไปแล้ว', 'not-your-turn': 'ยังไม่ถึงตาคุณ', early: 'เขายังมีเวลา', 'no-tile': 'ไพ่ใบนี้ใช้ไปแล้ว' }[c]

@@ -56,7 +56,7 @@ async function open(browser, authUid) {
         const wr = () => { window.__writes++; return Promise.resolve(); };
         db.collection = (name) => ({
             where: (f, op, uid) => ({ onSnapshot: (cb) => poll(() => window.__mine(uid), (s) => cb({ docs: JSON.parse(s).map(x => ({ id: x.__id, data: () => { const y = Object.assign({}, x); delete y.__id; return y; } })) })) }),
-            doc: (id) => ({ onSnapshot: (cb) => poll(() => window.__doc(name + '/' + id), (s) => { const v = JSON.parse(s); cb({ id, exists: !!v, data: () => v }); }), set: wr, update: wr, get: () => Promise.resolve({ exists: false, data: () => ({}) }) }),
+            doc: (id) => ({ onSnapshot: (cb) => poll(() => window.__doc(name + '/' + id), (s) => { const v = JSON.parse(s); cb({ id, exists: !!v, data: () => v }); }), set: name === 'user_auth_links' ? () => Promise.resolve() : wr, update: wr, get: () => Promise.resolve({ exists: false, data: () => ({}) }) }),
             add: wr
         });
     });

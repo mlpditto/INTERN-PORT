@@ -35,7 +35,7 @@
     function rolesOf(doc) { return doc && doc.mode === 3 ? ['killer', 'lola', 'detective'] : ['killer', 'detective']; }
     var C = function () { return window.CK && CK._; };
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-    function call(data) { return firebase.functions().httpsCallable('cerealAct')(data).then(function (r) { return r.data || {}; }); }
+    function call(data) { return Promise.resolve(window.ensureAuthLink && ensureAuthLink()).then(function () { return firebase.functions().httpsCallable('cerealAct')(data); }).then(function (r) { return r.data || {}; }); }   // V101.383 link this sign-in first
     function msg(e) {
         var c = e && e.details && e.details.code;
         return { 'no-game': 'ไม่พบห้องที่เปิดอยู่ด้วยรหัสนี้', 'own-game': 'นี่คือห้องของคุณเอง', started: 'เกมเริ่มไปแล้ว', 'not-your-turn': 'ยังไม่ถึงตาคุณ', 'too-early': 'ยังไม่ครบ 1 ชม.' }[c]
