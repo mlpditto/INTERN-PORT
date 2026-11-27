@@ -1,4 +1,4 @@
-# 🪨 Carry 13 · practice vs 🤖
+# 🪨 Carry 13 · practice vs 🤖 + 🌐 online rooms
 
 Owner 2026-11-27. Game 4 in `docs/MIND-GAMES-PLAN.md` §8 (OneDrive copy, untracked). It uses a game-show mechanic only; the name and look are our own (owner picked the name Carry 13). Picks (mockup-rock13/):
 - A3: each carrier holds a board above the shoulders, and the stones sit on it as numbered cubes, 3 to a row
@@ -7,7 +7,8 @@ Owner 2026-11-27. Game 4 in `docs/MIND-GAMES-PLAN.md` §8 (OneDrive copy, untrac
 - a ❓ tour of the rules only, read aloud in Thai. It never teaches tactics (owner: "ไม่เผยเทคนิคของเกม"); the tactics live in the bots.
 
 Files:
-- `public/rock13-rules.js`: the rules and the bots, pure (`window.Rock13Rules`). The room referee will reuse it later.
+- `public/rock13-rules.js`: the rules and the bots, pure (`window.Rock13Rules`). `functions/rock13-rules.js` is a copy for the room referee: copy it again after any rules change (`room-rock13-check` fails if they differ).
+- `public/rock13-online.js` (V101.389): the 🌐 rooms (`window.R13Online`). `functions/room-rock13.js`: the referee, reached through `roomAct` with game `rock13`.
 - `public/rock13.js`: the screens, CSS and tour (`window.R13`, `window.rock13Open`).
 - Voice: `public/rock13-voice/t1…t5.mp3` (Paxa foithong, 40 kbps mono).
 
@@ -27,6 +28,17 @@ Files:
 - **`game_plays`:** game `rock13`, mode `bot`, win `w` when you rank first, score = your 🪨. 🏆 counts wins.
 - **Rules:** `game_plays.game` now allows `rock13`. Deploy with `firebase deploy --only firestore:rules,functions:gameTop`.
 
+## 🌐 With friends (V101.389)
+
+Owner picks 2026-11-27: ค = live rooms only, ⚡ 60 s for every pick and every turn (no 1 h room) · layout B (mockup-rock13-online/), the look of the live เลขลับ room · English only apart from names.
+- **Lobby:** 🤖 Practice │ 🌐 With friends, 7 │ 14 rounds, ＋ New room, join by the 4-digit code, 📤 invite in LINE (`?r13=<code>`). 2–7 friends; with 2, 🤖 fill the room to 3. Only the host starts.
+- **Secret pick:** a ring round every face still picking; my pick shows only on my phone (🔒 You sent), the others see ✓. The picks wait in `rooms/{id}/secret/subs` (no client reads them); my own in `rooms/{id}/hand/{login}`.
+- **Placing:** the faces in placing order with chip + card · 🪨; one ring round the one placing, running down 60 s. 👉 Your turn pulses; the others see Name's turn + 👋 Nudge (`?r13=1`), then ⏭ Skip once late.
+- **Time out:** any phone in the room calls `claim` a little after 60 s. A missing pick is drawn at random; a late turn is placed without passing, and 🌈 goes to the lightest carrier.
+- **Bots** act inside the same `roomAct` call. 🏳 Leave game turns your seat into a 🤖; when everyone has left the game ends.
+- **`game_plays`:** game `rock13`, mode `live`, the same 🏆 board as practice (wins).
+- **Deploy:** `firebase deploy --only functions:roomAct`. No rules change (the `rooms` rules already cover it).
+
 ## QA
 
 - `scripts/rock13-rules-check.cjs`:
@@ -37,9 +49,12 @@ Files:
   - the lobby rails
   - a full 7-round game with ⏭, 🌈 and 💥
   - the log entry, and a 320 px fit
+- `scripts/room-rock13-check.cjs` (referee, no browser): rules copy matches, seats, picks hidden until all are in, the queue step by step against rock13-rules to the end, claim, 🏳, cancel.
+- `scripts/rock13-online-qa.cjs` (3 phones on the real page + the real referee): rail, room, invite, rings, 👉 Your turn, 👋 Nudge, English, 🌈, the same winner on every phone, late pick, 🏳, 320 px. `R13_SHOTS=<dir>` saves pictures.
 - `games-row-qa` (6 games), `cereal-header-qa` (🎮 menu), `secret-qa` (6 tiles).
 
 ## What usually lies
 
 - Audio is stubbed in QA, so real sound needs a phone.
 - The bots play on a fixed seed in QA. Real games vary.
+- The online QA polls an in-memory Firestore; real listeners, real LINE sign-in and two real phones racing a `claim` are not tested.
