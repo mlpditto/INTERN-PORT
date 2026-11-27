@@ -137,7 +137,7 @@ async function handle(request, deps, me) {
         if (d.action === 'claim') {   // the 60 s ran out: pick at random / place for them
             if (!room.turnDeadline || now < room.turnDeadline) fail('early', 'They still have time');
             if (G.phase === 'submit') G.players.forEach((p, s) => { if (!G.subs[s]) { const r = randomPick(G, s, deps.rand); R.submit(G, s, r.card, r.chip); } });
-            else if (G.phase === 'place') { const t = R.turn(G); R.place(G, t, G.subs[t].chip === 'w' ? R.lightest(G) : null); }
+            else if (G.phase === 'place') { const t = R.turn(G), n = G.log.length; R.place(G, t, G.subs[t].chip === 'w' ? R.lightest(G) : null); if (G.log[n]) G.log[n].auto = true; }   // V101.390 the page says "⏱ ran out"
             advance(G, deps.rand);
             return save(G, order);
         }

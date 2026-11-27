@@ -16,25 +16,67 @@
     function nm(s) { return s === 0 ? 'คุณ' : g.players[s].name; }
 
     // ---- a carrier holding a board; the stones are cubes, 3 a row, the newest on top; knees bend toward 13 --------------------
-    function carrier(st, a) {
-        var cube = 20, rows = Math.max(1, Math.ceil(a.length / 3)), H = 82 + rows * cube, sum = R().sum(a), bend = Math.min(1, sum / 13);
-        var headY = H - 60 + bend * 6, legY = H - 24 + bend * 4, knee = 6 + bend * 9, s = '<svg viewBox="0 0 100 ' + H + '" width="100%" height="' + H + '" aria-hidden="true">';
-        s += '<rect x="12" y="' + (headY - 15) + '" width="76" height="6" rx="3" fill="#a16207"/>';
-        a.forEach(function (v, i) {
-            var row = Math.floor(i / 3), n = Math.min(3, a.length - row * 3), x = 50 - n * cube / 2 + (i % 3) * cube, y = headY - 15 - (row + 1) * cube, sh = 70 - v * 6;
-            s += '<path d="M' + x + ' ' + y + 'l4 -4h' + cube + 'l-4 4z" fill="hsl(215 15% ' + (sh + 12) + '%)"/><path d="M' + (x + cube) + ' ' + y + 'l4 -4v' + cube + 'l-4 4z" fill="hsl(215 15% ' + (sh - 12) + '%)"/>'
-                + '<rect x="' + x + '" y="' + y + '" width="' + cube + '" height="' + cube + '" rx="2" fill="hsl(215 15% ' + sh + '%)"/><text x="' + (x + cube / 2) + '" y="' + (y + 15) + '" text-anchor="middle" font-size="12" font-weight="900" fill="#fff">' + v + '</text>';
-        });
-        s += '<path d="M38 ' + (headY + 14) + 'L20 ' + (headY - 9) + 'M62 ' + (headY + 14) + 'L80 ' + (headY - 9) + '" stroke="#fca5a5" stroke-width="5" stroke-linecap="round"/>'
-            + '<circle cx="50" cy="' + headY + '" r="8" fill="#fca5a5"/>' + (bend > .85 ? '<text x="62" y="' + (headY - 2) + '" font-size="11">💦</text>' : '')
-            + '<rect x="37" y="' + (headY + 9) + '" width="26" height="' + (legY - headY - 9) + '" rx="6" fill="' + COL[st] + '"/>'
-            + '<path d="M43 ' + legY + 'l-' + knee + ' 11l' + (knee - 4) + ' 11M57 ' + legY + 'l' + knee + ' 11l-' + (knee - 4) + ' 11" stroke="#334155" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    // V101.390 🏛 Greek C (owner 2026-11-28, mockup-rock13-greek/greek-C.png): a toga with a sash + cape in the carrier colour, gold band,
+    // sandals; the board wrapped in cloth; marble stones with serif numbers, the newest outlined in gold. Weight shows in the pose: knees
+    // bend, the face goes calm → strained (8) → about to drop (11), 💦 from 8, strain lines from 11. `fx` = { drop: the new stone falls in,
+    // fall: the old stones (an array) tumble off after a 💥 } — played once, off under reduced motion.
+    var DARK = { r: '#7f1d1d', g: '#14532d', b: '#1e3a8a' }, HAIR = { r: '#5b3417', g: '#2b1d12', b: '#c99a3b' };
+    function cubeAt(v, i, n, headY, cube, cls, gold) {
+        var row = Math.floor(i / 3), m = Math.min(3, n - row * 3), x = 50 - m * cube / 2 + (i % 3) * cube, y = headY - 17 - (row + 1) * cube;
+        return '<g' + cls + '><rect x="' + (x + 2) + '" y="' + (y + 3) + '" width="' + cube + '" height="' + cube + '" rx="2" fill="#0002"/>'
+            + '<path d="M' + x + ' ' + y + 'l4 -4h' + cube + 'l-4 4z" fill="#fbf6ea"/><path d="M' + (x + cube) + ' ' + y + 'l4 -4v' + cube + 'l-4 4z" fill="#cdbd9c"/>'
+            + '<rect x="' + x + '" y="' + y + '" width="' + cube + '" height="' + cube + '" rx="2" fill="#ece2cc"' + (gold ? ' stroke="#c9973a" stroke-width="2"' : ' stroke="#d6c7a6" stroke-width=".8"') + '/>'
+            + '<path d="M' + (x + 3) + ' ' + (y + 6) + 'q6 4 9 1t9 5" stroke="#d3c3a2" stroke-width=".7" fill="none"/>'
+            + '<text x="' + (x + cube / 2) + '" y="' + (y + 18) + '" text-anchor="middle" font-family="Georgia,serif" font-size="16" font-weight="700" fill="#5b4632">' + v + '</text></g>';
+    }
+    function carrier(st, a, fx) {
+        fx = fx || {};
+        var cube = 24, shown = fx.fall ? fx.fall.length + a.length : a.length, rows = Math.max(1, Math.ceil(shown / 3)), H = 96 + rows * cube, sum = R().sum(a), bend = Math.min(1, sum / 13);
+        var headY = H - 66 + bend * 9, legY = H - 24 + bend * 5, knee = 5 + bend * 12, c = COL[st], s = '<svg viewBox="0 0 100 ' + H + '" width="100%" height="' + H + '" aria-hidden="true" style="overflow:visible">';
+        s += '<ellipse cx="50" cy="' + (H - 1) + '" rx="' + (20 + bend * 7) + '" ry="3" fill="#0002"/>'
+            + '<rect x="10" y="' + (headY - 17) + '" width="80" height="8" rx="4" fill="' + c + '"/><path d="M14 ' + (headY - 13) + 'h72" stroke="' + DARK[st] + '" stroke-width="1.2" opacity=".6"/>';
+        if (fx.fall) fx.fall.forEach(function (v, i) { s += cubeAt(v, i, shown, headY, cube, ' class="r13-fall" style="--dx:' + ((i % 3) - 1) * 18 + 'px;--r:' + ((i % 2) ? 40 : -35) + 'deg"', false); });
+        a.forEach(function (v, i) { var k = (fx.fall ? fx.fall.length : 0) + i, last = i === a.length - 1; s += cubeAt(v, k, shown, headY, cube, last && (fx.drop || fx.fall) ? ' class="r13-drop"' : '', last); });
+        s += '<path d="M37 ' + (headY + 11) + 'q-10 ' + (legY - headY - 4) + ' -6 ' + (legY - headY + 6) + 'h38q4 -10 -6 ' + (-(legY - headY - 4) - 10) + 'z" fill="' + DARK[st] + '" opacity=".85"/>'
+            + '<path d="M38 ' + (headY + 14) + 'L20 ' + (headY - 11) + 'M62 ' + (headY + 14) + 'L80 ' + (headY - 11) + '" stroke="#e8b48f" stroke-width="5.5" stroke-linecap="round"/>'
+            + '<path d="M26 ' + (headY - 3) + 'l4 3M74 ' + (headY - 3) + 'l-4 3" stroke="#d4a017" stroke-width="3" stroke-linecap="round"/>'
+            + '<circle cx="50" cy="' + headY + '" r="8.5" fill="#f0c3a0"/><path d="M41.5 ' + (headY - 2) + 'a8.5 8.5 0 0 1 17 0" fill="' + HAIR[st] + '"/>'
+            + [42, 46, 50, 54, 58].map(function (x) { return '<circle cx="' + x + '" cy="' + (headY - 6 + Math.abs(x - 50) / 3) + '" r="2.6" fill="' + HAIR[st] + '"/>'; }).join('')
+            + '<path d="M42 ' + (headY - 3) + 'q8 -3 16 0" stroke="#d4a017" stroke-width="1.6" fill="none"/>';
+        var ey = headY + 1;
+        if (sum >= 11) s += '<path d="M45 ' + (ey - 2) + 'l3 2-3 2M55 ' + (ey - 2) + 'l-3 2 3 2" stroke="#6b2b16" stroke-width="1.4" fill="none"/><path d="M45 ' + (headY + 6) + 'q5 -3 10 0" stroke="#6b2b16" stroke-width="1.6" fill="none"/>';
+        else if (sum >= 8) s += '<circle cx="47" cy="' + ey + '" r="1.2" fill="#6b2b16"/><circle cx="53" cy="' + ey + '" r="1.2" fill="#6b2b16"/><path d="M46 ' + (headY + 5.5) + 'h8" stroke="#6b2b16" stroke-width="1.5"/>';
+        else s += '<circle cx="47" cy="' + ey + '" r="1.2" fill="#6b2b16"/><circle cx="53" cy="' + ey + '" r="1.2" fill="#6b2b16"/><path d="M46 ' + (headY + 4.5) + 'q4 3 8 0" stroke="#6b2b16" stroke-width="1.4" fill="none"/>';
+        if (sum >= 8) s += '<text x="61" y="' + (headY - 1) + '" font-size="' + (sum >= 11 ? 12 : 9) + '">💦</text>';
+        if (sum >= 11) s += '<text x="28" y="' + (headY + 3) + '" font-size="10">💦</text><path d="M13 ' + (headY + 22) + 'l-5 -2M87 ' + (headY + 22) + 'l5 -2M14 ' + (headY + 28) + 'l-6 1M86 ' + (headY + 28) + 'l6 1" stroke="#a89676" stroke-width="1.5" stroke-linecap="round"/>';
+        var ty = headY + 9, th = legY - headY - 4;
+        s += '<path d="M37 ' + ty + 'h26l3 ' + th + 'h-32z" fill="#fbf8f1" stroke="#e3dccb" stroke-width=".8"/>'
+            + '<path d="M38 ' + ty + 'l26 ' + (th * .8) + 'v' + (th * .2) + 'l-27 ' + (-th * .85) + 'z" fill="' + c + '"/>'
+            + '<rect x="36" y="' + (ty + th * .5) + '" width="28" height="3" fill="#d4a017"/>'
+            + '<path d="M44 ' + legY + 'l-' + knee + ' 11l' + (knee - 3) + ' 11M56 ' + legY + 'l' + knee + ' 11l-' + (knee - 3) + ' 11" stroke="#e8b48f" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+            + '<path d="M38 ' + (legY + 22) + 'h8M54 ' + (legY + 22) + 'h8" stroke="#8b5a2b" stroke-width="3" stroke-linecap="round"/></svg>';
         return s;
     }
+    /** what changed on each carrier since the last picture: a stone came (drop) or the old ones fell (fall) — each shows once */
+    var seen = null;
+    function changes() {
+        var out = {}, now = {};
+        R().ST.forEach(function (st) {
+            var a = g.stands[st], b = seen && seen[st];
+            now[st] = a.slice();
+            if (!b || a.length === 0) return;
+            if (a.length === b.length + 1 && b.every(function (v, i) { return v === a[i]; })) out[st] = { drop: 1 };
+            else if (a.length === 1 && b.length && (b.length > 1 || b[0] !== a[0] || g.log.length && (g.log[g.log.length - 1] || {}).take)) out[st] = { fall: b };
+        });
+        seen = now;
+        return out;
+    }
     function stands(tap, fn) {
+        var fx = changes();
         return '<div class="r13-st">' + R().ST.map(function (st) {
-            var a = g.stands[st], sum = R().sum(a), cl = sum >= 11 ? ' hot' : sum >= 8 ? ' warm' : '', on = tap && tap[st];
-            var inner = carrier(st, a) + '<div class="r13-sum"><b style="color:' + COL[st] + '">' + sum + '</b><small>/13 · ' + a.length + '🪨</small></div>' + (on ? '<div class="r13-tap">' + on + '</div>' : '');
+            var a = g.stands[st], sum = R().sum(a), cl = sum >= 11 ? ' hot' : sum >= 8 ? ' warm' : '', on = tap && tap[st], left = R().LIMIT - sum;
+            var inner = carrier(st, a, fx[st]) + '<div class="r13-sum"><b style="color:' + COL[st] + '">' + sum + '</b><small>/13</small></div>'
+                + (on ? '<div class="r13-tap">' + on + '</div>' : '<span class="r13-left' + (sum >= 11 ? ' h' : sum >= 8 ? ' w' : '') + '">' + (sum >= 11 ? '⚠ ' : '') + left + ' left</span>');
             return tap ? '<button type="button" class="r13-c' + cl + ' pick" id="r13-st-' + st + '" onclick="' + (fn || 'R13.put') + '(\'' + st + '\')" aria-label="Carrier ' + st + '">' + inner + '</button>'
                 : '<div class="r13-c' + cl + '" id="r13-st-' + st + '">' + inner + '</div>';
         }).join('') + '</div>';
@@ -110,10 +152,10 @@
     }
     function turnHtml() {
         var sb = g.subs[0], R_ = R(), pass = R_.canPass(g, 0) ? '<button type="button" class="r13-go alt" id="r13-pass" onclick="R13.pass()">⏭ Pass</button>' : '';
-        if (sb.chip === 'w') return '<div class="r13-turn" id="r13-turn"><div class="r13-tt">ตาคุณ · 🌈 ' + sb.card + ' · แตะคนแบก</div>' + (pass ? '<div class="r13-row">' + pass + '</div>' : '') + '</div>';
+        if (sb.chip === 'w') return '<div class="r13-turn" id="r13-turn"><div class="r13-tt">👉 ตาคุณ · 🌈 แตะคนแบก</div>' + (pass ? '<div class="r13-row">' + pass + '</div>' : '') + '</div>';
         var pv = R_.preview(g, 0, sb.chip);
-        return '<div class="r13-turn" id="r13-turn"><div class="r13-tt">ตาคุณ · ' + sb.card + ' → ' + CHIP[sb.chip] + ' = ' + pv.total + (pv.take ? ' 💥 เก็บ 🪨 ' + pv.take : '') + '</div>'
-            + '<div class="r13-row"><button type="button" class="r13-go" id="r13-put" onclick="R13.put()">▸ วาง</button>' + pass + '</div></div>';
+        return '<div class="r13-turn" id="r13-turn"><div class="r13-tt">👉 ตาคุณ</div>'
+            + '<div class="r13-row"><button type="button" class="r13-go' + (pv.take ? ' hit' : '') + '" id="r13-put" onclick="R13.put()">▸ วาง ' + (pv.take ? '💥 🪨' + pv.take : '→ ' + pv.total) + '</button>' + pass + '</div></div>';
     }
     function playHtml() {
         var R_ = R(), mine = g.phase === 'place' && R_.turn(g) === 0, tap = null;
@@ -158,7 +200,25 @@
         + '#r13Modal .r13-tour{min-height:400px}#r13Modal .r13-say{background:#fffbeb;border:1px solid #fcd34d;border-radius:14px;padding:10px 12px;font-weight:800;line-height:1.5;color:#78350f}#r13Modal .r13-say small{display:block;font-size:.72em;font-weight:600;color:#64748b}'
         + '#r13Modal .r13-tnav{display:flex;align-items:center;gap:8px;margin-top:auto}#r13Modal .r13-skip{background:none;border:0;color:#64748b;font-weight:800}'
         + '#r13Modal .r13-dots{flex:1;display:flex;gap:4px;justify-content:center}#r13Modal .r13-dots i{width:6px;height:6px;border-radius:9px;background:#fcd34d;display:block}#r13Modal .r13-dots i.on{width:16px;background:#b45309}'
-        + '#r13Modal .r13-tnav .r13-go{flex:none}';
+        + '#r13Modal .r13-tnav .r13-go{flex:none}'
+        // V101.390 🏛 Greek C
+        + '#r13Modal .modal-content{background:radial-gradient(120% 60% at 50% 0%,#fffdf7 0%,#f6f0e2 60%,#efe6d2 100%);border:1px solid #e3d5b5}'
+        + '#r13Modal .r13-top h3{font-family:Georgia,"Times New Roman",serif;font-weight:700;letter-spacing:.3px;color:#8a6a1f}'
+        + '#r13Modal .r13-go{background:linear-gradient(#f7dc8a,#e2b64c);color:#4a3507;border:1px solid #c9973a;box-shadow:inset 0 1px 0 #fff8,0 2px 0 #b8862f;min-height:48px;font-size:1.05em;white-space:nowrap}'
+        + '#r13Modal .r13-go.hit{background:linear-gradient(#d65a4a,#a8281e);color:#fff;border-color:#8f1f17;box-shadow:inset 0 1px 0 #fff5,0 2px 0 #7d1a13}'
+        + '#r13Modal .r13-go.alt{background:#fffaf0;color:#6b5320;border:2px solid #d9c38f;box-shadow:none}#r13Modal .r13-go:disabled{opacity:.45}'
+        + '#r13Modal .r13-card{height:48px;border-color:#d9c9a6;background:linear-gradient(#fffdf8,#f1e8d4);font-family:Georgia,serif;color:#4a3a28}'
+        + '#r13Modal .r13-chip{max-width:44px;height:44px;border-radius:14px}'
+        + '#r13Modal .r13-card.on,#r13Modal .r13-chip.on{border-color:#c9973a;background:#fff4d6;color:#8a5a00}'
+        + '#r13Modal .r13-c{background:#fffdf8aa;border:2px solid #eadfc6}#r13Modal .r13-c.warm{background:#fff1dc;border-color:#f0a44b}#r13Modal .r13-c.hot{background:#fde4df;border-color:#dc4a3c;animation:r13Shake .5s ease-in-out infinite}'
+        + '#r13Modal .r13-c svg{max-width:112px;overflow:visible}#r13Modal .r13-sum{font-family:Georgia,serif;font-weight:700}#r13Modal .r13-sum b{font-size:1.4em}'
+        + '#r13Modal .r13-left{font-size:.66em;font-weight:900;border-radius:999px;padding:1px 7px;opacity:.55;white-space:nowrap}#r13Modal .r13-left.w{background:#e07b1a;color:#fff;opacity:1}#r13Modal .r13-left.h{background:#c0352a;color:#fff;opacity:1}'
+        + '#r13Modal .r13-tt{font-family:Georgia,serif;color:#b45309;animation:r13Pop 1.6s ease-in-out infinite}#r13Modal .r13-turn{background:#fffaf0;border-color:#d9c38f}'
+        + '#r13Modal .r13-q,#r13Modal .r13o-row{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;scrollbar-width:none;padding-bottom:2px}#r13Modal .r13-q>*,#r13Modal .r13o-row>*{flex:none}#r13Modal .r13-q::-webkit-scrollbar,#r13Modal .r13o-row::-webkit-scrollbar{display:none}'
+        + '#r13Modal .r13-drop{animation:r13Drop .4s ease-in both}#r13Modal .r13-fall{transform-box:fill-box;transform-origin:center;animation:r13Fall .7s ease-in .15s both}'
+        + '@keyframes r13Drop{0%{transform:translateY(-26px);opacity:0}60%{opacity:1}100%{transform:none}}@keyframes r13Fall{to{transform:translate(var(--dx),70px) rotate(var(--r));opacity:0}}'
+        + '@keyframes r13Shake{25%{transform:translateX(-1.5px)}75%{transform:translateX(1.5px)}}@keyframes r13Pop{50%{transform:scale(1.04)}}'
+        + '@media (prefers-reduced-motion:reduce){#r13Modal .r13-c.hot,#r13Modal .r13-drop,#r13Modal .r13-tt{animation:none}#r13Modal .r13-fall{display:none}}';
     function root() {
         var m = document.getElementById('r13Modal');
         if (!m) {
