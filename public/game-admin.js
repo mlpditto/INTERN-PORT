@@ -8,7 +8,7 @@
 (function () {
     'use strict';
     var WEEK = 7 * 864e5, last = 0, plays = [], pick = null, view = 'time', per = 'week', all = null, allAt = 0;
-    var GAMES = [['bw', '⚫', 'ไพ่เงา'], ['count', '🧊', 'นับไว'], ['cereal', '🥣', 'Cereal'], ['wolf', '🐺', 'หมาป่า'], ['secret', '🔢', 'เลขลับ'], ['secretOn', '🔢🌐', 'เลขลับ หลายคน']];
+    var GAMES = [['bw', '⚫', 'ไพ่เงา'], ['count', '🧊', 'นับไว'], ['cereal', '🥣', 'Cereal'], ['wolf', '🐺', 'หมาป่า'], ['secret', '🔢', 'เลขลับ'], ['secretOn', '🔢🌐', 'เลขลับ หลายคน'], ['rock13', '🪨', 'แบกหิน']];
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function is(p, g) { return window.GameTopRank ? GameTopRank.is(p, g) : p.game === g; }   // V102.708 🔢🌐 its own chip
     function avg(a) { return a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : 0; }
@@ -54,7 +54,7 @@
         var have = GAMES.filter(function (g) { return src.some(function (p) { return is(p, g[0]); }); });
         if (!have.length) return '';
         if (!pick || !have.some(function (g) { return g[0] === pick; })) pick = have[0][0];
-        var rs = rows(plays, pick), unit = pick === 'count' ? 'ข้อ' : pick === 'bw' ? 'ตา' : pick === 'secret' ? '🎫' : 'วัน';
+        var rs = rows(plays, pick), unit = pick === 'count' ? 'ข้อ' : pick === 'bw' ? 'ตา' : pick === 'secret' ? '🎫' : pick === 'rock13' ? 'รอบ' : 'วัน';
         var top = '<div class="gt-chips" role="group" aria-label="View">' + chip(view === 'time', "gameAdmin.view('time')", '⏱ เวลา') + chip(view === 'rank', "gameAdmin.view('rank')", '🏆 อันดับ')
             + (view === 'rank' ? '<span style="width:8px"></span>' + chip(per === 'week', "gameAdmin.per('week')", 'สัปดาห์นี้') + chip(per === 'all', "gameAdmin.per('all')", 'ตลอดกาล') : '') + '</div>';
         var games = '<div class="gt-chips" role="group" aria-label="Game">' + have.map(function (g) {
