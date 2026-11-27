@@ -8,14 +8,14 @@
 const MAX = 100, TICKETS = 6, SEATS = 6, RIGHT = 3, WRONG = -1;
 const TURN_MS = 60 * 60 * 1000, LIVE_MS = 60 * 1000;
 const isPrime = (n) => { if (n < 2) return false; for (let d = 2; d * d <= n; d++) if (n % d === 0) return false; return true; };
-// the same menu as public/secret.js (scripts/secret-multi-qa.cjs checks both answer alike)
+// the same menu as public/secret.js (scripts/secret-multi-qa.cjs checks both answer alike); V101.387 the asked line is English, as the chips
 const QS = {
-    gt: { need: 1, test: (n, a) => n > a, txt: (a) => 'มากกว่า ' + a + ' ?' },
-    even: { need: 0, test: (n) => n % 2 === 0, txt: () => 'เลขคู่ ?' },
-    div3: { need: 0, test: (n) => n % 3 === 0, txt: () => 'หาร 3 ลงตัว ?' },
-    prime: { need: 0, test: isPrime, txt: () => 'จำนวนเฉพาะ ?' },
-    unit: { need: 1, test: (n, a) => n % 10 === a, txt: (a) => 'หลักหน่วยคือ ' + a + ' ?' },
-    range: { need: 2, test: (n, a, b) => n >= Math.min(a, b) && n <= Math.max(a, b), txt: (a, b) => 'อยู่ใน ' + Math.min(a, b) + '–' + Math.max(a, b) + ' ?' }
+    gt: { need: 1, test: (n, a) => n > a, txt: (a) => '> ' + a + '?' },
+    even: { need: 0, test: (n) => n % 2 === 0, txt: () => 'Even?' },
+    div3: { need: 0, test: (n) => n % 3 === 0, txt: () => '÷3?' },
+    prime: { need: 0, test: isPrime, txt: () => 'Prime?' },
+    unit: { need: 1, test: (n, a) => n % 10 === a, txt: (a) => 'Ends in ' + a + '?' },
+    range: { need: 2, test: (n, a, b) => n >= Math.min(a, b) && n <= Math.max(a, b), txt: (a, b) => 'In ' + Math.min(a, b) + '–' + Math.max(a, b) + '?' }
 };
 function code(rand) { let s = ''; for (let i = 0; i < 4; i++) s += Math.floor(rand() * 10); return s; }
 
