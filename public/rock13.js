@@ -7,7 +7,7 @@
     'use strict';
     var NAME = 'Carry 13', R = function () { return window.Rock13Rules; };
     var COL = { r: '#dc2626', g: '#16a34a', b: '#2563eb' }, CHIP = { r: '🔴', g: '🟢', b: '🔵', w: '🌈' };
-    var g = null, id = null, cfg = { n: 5, rounds: 14 }, pick = { card: null, chip: null }, news = '', timer = null, rng = Math.random, SPEED = 650;
+    var g = null, id = null, multi = false, wasMine = false, cfg = { n: 5, rounds: 14 }, pick = { card: null, chip: null }, news = '', timer = null, rng = Math.random, SPEED = 650;
     function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
     function put(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
     try { var c = JSON.parse(get('r13Cfg') || '{}'); if (c.n >= 3 && c.n <= 7) cfg.n = c.n; if (c.rounds === 7) cfg.rounds = 7; } catch (e) { }
@@ -31,11 +31,11 @@
             + '<path d="M43 ' + legY + 'l-' + knee + ' 11l' + (knee - 4) + ' 11M57 ' + legY + 'l' + knee + ' 11l-' + (knee - 4) + ' 11" stroke="#334155" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         return s;
     }
-    function stands(tap) {
+    function stands(tap, fn) {
         return '<div class="r13-st">' + R().ST.map(function (st) {
             var a = g.stands[st], sum = R().sum(a), cl = sum >= 11 ? ' hot' : sum >= 8 ? ' warm' : '', on = tap && tap[st];
             var inner = carrier(st, a) + '<div class="r13-sum"><b style="color:' + COL[st] + '">' + sum + '</b><small>/13 · ' + a.length + '🪨</small></div>' + (on ? '<div class="r13-tap">' + on + '</div>' : '');
-            return tap ? '<button type="button" class="r13-c' + cl + ' pick" id="r13-st-' + st + '" onclick="R13.put(\'' + st + '\')" aria-label="Carrier ' + st + '">' + inner + '</button>'
+            return tap ? '<button type="button" class="r13-c' + cl + ' pick" id="r13-st-' + st + '" onclick="' + (fn || 'R13.put') + '(\'' + st + '\')" aria-label="Carrier ' + st + '">' + inner + '</button>'
                 : '<div class="r13-c' + cl + '" id="r13-st-' + st + '">' + inner + '</div>';
         }).join('') + '</div>';
     }
@@ -84,10 +84,14 @@
     var HQ = '<button type="button" class="r13-x" id="r13-help" onclick="R13.tour()" aria-label="How to play" title="วิธีเล่น">❓</button>';
     function top(extra) { return '<div class="r13-top"><h3>🪨 ' + NAME + '</h3>' + (extra || '') + SND() + HQ + X + '</div>'; }
     function lobbyHtml() {
-        return '<div class="r13">' + top() + (window.GameTop ? GameTop.line('rock13') : '')
+        // V101.389 🤖 Practice │ 🌐 With friends (rock13-online.js, rooms through roomAct)
+        var mode = window.R13Online ? '<div class="r13-rail" role="group" aria-label="Mode">' + [[0, '🤖 Practice'], [1, '🌐 With friends']].map(function (k) { var on = !!k[0] === multi; return '<button type="button" id="r13-mode-' + k[0] + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" onclick="R13.online(' + k[0] + ')">' + k[1] + '</button>'; }).join('') + '</div>' : '';
+        var rounds = '<div class="r13-rail" role="group" aria-label="Rounds">' + [7, 14].map(function (n) { return '<button type="button" id="r13-r' + n + '" class="' + (cfg.rounds === n ? 'on' : '') + '" aria-pressed="' + (cfg.rounds === n) + '" onclick="R13.set(\'rounds\',' + n + ')">' + n + (multi ? ' rounds' : ' รอบ') + '</button>'; }).join('') + '</div>';
+        if (multi && window.R13Online) return '<div class="r13">' + top() + (window.GameTop ? GameTop.line('rock13') : '') + mode + rounds + R13Online.lobbyHtml() + '</div>';
+        return '<div class="r13">' + top() + (window.GameTop ? GameTop.line('rock13') : '') + mode
             + '<div class="r13-note">🔴🟢🔵 ห้ามแบกถึง 13 · 🪨 น้อยสุดชนะ</div>'
             + '<div class="r13-rail" role="group" aria-label="Players">' + [3, 4, 5, 6, 7].map(function (n) { return '<button type="button" id="r13-n' + n + '" class="' + (cfg.n === n ? 'on' : '') + '" aria-pressed="' + (cfg.n === n) + '" onclick="R13.set(\'n\',' + n + ')">👥 ' + n + '</button>'; }).join('') + '</div>'
-            + '<div class="r13-rail" role="group" aria-label="Rounds">' + [7, 14].map(function (n) { return '<button type="button" id="r13-r' + n + '" class="' + (cfg.rounds === n ? 'on' : '') + '" aria-pressed="' + (cfg.rounds === n) + '" onclick="R13.set(\'rounds\',' + n + ')">' + n + ' รอบ</button>'; }).join('') + '</div>'
+            + rounds
             + '<div class="r13-note">คุณ + 🤖 ' + (cfg.n - 1) + '</div>'
             + '<button type="button" class="r13-go" id="r13-start" onclick="R13.start()">▸ เริ่ม</button></div>';
     }
@@ -167,10 +171,13 @@
         return m;
     }
     function render() {
-        var m = root(); document.getElementById('r13-body').innerHTML = tour >= 0 ? tourHtml() : !g ? lobbyHtml() : g.phase === 'end' ? endHtml() : playHtml(); m.style.display = 'flex';
-        var mine = !!g && tour < 0 && (g.phase === 'submit' || (g.phase === 'place' && R().turn(g) === 0));
+        var m = root(), on = tour < 0 && !!window.R13Online && R13Online.active();
+        document.getElementById('r13-body').innerHTML = tour >= 0 ? tourHtml() : on ? R13Online.html() : !g ? lobbyHtml() : g.phase === 'end' ? endHtml() : playHtml(); m.style.display = 'flex';
+        var mine = on ? R13Online.mine() : !!g && tour < 0 && (g.phase === 'submit' || (g.phase === 'place' && R().turn(g) === 0));
+        if (on && mine && !wasMine) S('turn');   // online: a chime when it comes to me
+        wasMine = mine;
         if (window.R13Sound) R13Sound.music(mine);   // the soft loop only on your turn
-        if (g && tour < 0 && window.GameLog) {
+        if (!on && g && tour < 0 && window.GameLog) {
             var end = g.phase === 'end';
             GameLog.see('rock13', { id: id, n: g.round, done: end, mode: 'bot', win: end ? (R().ranking(g)[0] === 0 ? 'w' : 'l') : null, score: String(g.players[0].pen), res: [] });
         }
@@ -227,8 +234,11 @@
         },
         pass: function () { if (g && R().pass(g, 0)) { news = '⏭ คุณ Pass · วางท้าย'; S('pass'); render(); run(); } },
         sound: function () { if (window.R13Sound) R13Sound.toggle(); render(); },
-        close: function () { clearTimeout(timer); timer = null; hush(); if (window.R13Sound) R13Sound.music(false); tour = -1; var m = document.getElementById('r13Modal'); if (m) m.style.display = 'none'; },
+        online: function (v) { multi = !!v; g = null; news = ''; if (!multi && window.R13Online) R13Online.close(); render(); },   // V101.389 🤖 │ 🌐
+        close: function () { if (window.R13Online) R13Online.close(); clearTimeout(timer); timer = null; hush(); if (window.R13Sound) R13Sound.music(false); tour = -1; var m = document.getElementById('r13Modal'); if (m) m.style.display = 'none'; },
         // for scripts/rock13-qa.cjs
+        _render: function () { render(); }, _cfg: function () { return cfg; },
+        _stands: function (G, tap, fn) { var keep = g; g = G; try { return stands(tap, fn); } finally { g = keep; } },   // the carriers for rock13-online.js
         _g: function () { return g; }, _rng: function (f) { rng = f; }, _speed: function (ms) { SPEED = ms; }
     };
     window.rock13Open = function () { R13.open(); };

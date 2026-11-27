@@ -45,7 +45,7 @@ async function handle(request, deps) {
     const authUid = request.auth.uid, d = request.data || {}, now = deps.now;
     const fail = (c, msg) => { throw new HttpsError('failed-precondition', msg, { code: c }); };
     const bad = (msg) => { throw new HttpsError('invalid-argument', msg); };
-    if (d.game !== 'bw' && d.game !== 'secret') bad('game');
+    if (d.game !== 'bw' && d.game !== 'secret' && d.game !== 'rock13') bad('game');
 
     async function me() {   // the LINE identity behind the anonymous Firebase user (as cerealAct / askNika)
         const link = await db.collection('user_auth_links').doc(authUid).get();
@@ -57,6 +57,7 @@ async function handle(request, deps) {
         return { uid, authUid, name: String(x.nickName || x.firstName || x.displayName || 'Intern').slice(0, 20), pic: /^https:\/\//.test(x.pictureUrl || '') ? String(x.pictureUrl).slice(0, 500) : '' };
     }
     if (d.game === 'secret') return require('./room-secret.js').handle(request, deps, me);   // V101.380 🔢 เลขลับ หลายคน
+    if (d.game === 'rock13') return require('./room-rock13.js').handle(request, deps, me);   // V101.389 🪨 Carry 13 online
     const rooms = db.collection('rooms');
 
     if (d.action === 'create') {
