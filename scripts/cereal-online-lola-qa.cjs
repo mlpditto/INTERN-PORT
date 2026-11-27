@@ -52,7 +52,7 @@ async function open(browser, authUid) {
         const wr = () => { window.__writes++; return Promise.resolve(); };
         db.collection = (name) => ({
             where: (f, op, uid) => ({ onSnapshot: (cb) => poll(() => window.__mine(uid), (s) => cb({ docs: JSON.parse(s).map(x => ({ id: x.__id, data: () => { const y = Object.assign({}, x); delete y.__id; return y; } })) })) }),
-            doc: (id) => ({ onSnapshot: (cb) => poll(() => window.__doc(name + '/' + id), (s) => { const v = JSON.parse(s); cb({ id, exists: !!v, data: () => v }); }), set: wr, update: wr, get: () => Promise.resolve({ exists: false, data: () => ({}) }) }),
+            doc: (id) => ({ onSnapshot: (cb) => poll(() => window.__doc(name + '/' + id), (s) => { const v = JSON.parse(s); cb({ id, exists: !!v, data: () => v }); }), set: name === 'user_auth_links' ? () => Promise.resolve() : wr, update: wr, get: () => Promise.resolve({ exists: false, data: () => ({}) }) }),
             add: wr
         });
     });
@@ -121,7 +121,7 @@ store.set('user_auth_links/authL', { effectiveUserId: 'Ulola' }); store.set('use
         assert.equal(await D.page.evaluate(() => (document.querySelector('#cerealModal .ck-cell[data-id="13"] .tk') || {}).textContent), '🐕');
         await D.page.click('#ck-end');
         await until(K.page, () => !!document.querySelector('#cerealModal .ck.killer #ck-path, #cerealModal .ck.killer .ck-board'), null, 'day 2 killer');
-        assert.equal(await D.page.evaluate(() => window.__writes) + await L.page.evaluate(() => window.__writes) + await K.page.evaluate(() => window.__writes), 0, 'no page wrote Firestore');
+        assert.equal(await D.page.evaluate(() => window.__writes) + await L.page.evaluate(() => window.__writes) + await K.page.evaluate(() => window.__writes), 0, 'no page wrote Firestore (but its own user_auth_links)');
         for (const P of [K, L, D]) assert.deepEqual(P.errors, []);
         console.log('cereal-online-lola-qa: OK — ＋ สร้างห้อง with 🐕 3 คน + pair, a three-seat room that starts on the third join, killer → Lola → detective through the real referee, Lola\'s sniff answer only on her phone (the detective sees "ดมช่อง 8" only), six cards, no client writes');
     } finally { await browser.close(); }

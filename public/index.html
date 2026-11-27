@@ -3,7 +3,7 @@
 
 <head>
     <script src="quiz-revision.js?v=V100.07"></script>
-    <title>Internship Portfolio (V101.382)</title>
+    <title>Internship Portfolio (V101.383)</title>
     <script>document.addEventListener('touchstart', function () {}, { passive: true }); /* V101.337: lets iOS show :active on tap */</script>
     <link rel="stylesheet" href="nika-ask.css?v=V101.308">
     <link rel="stylesheet" href="daily-canvas.css?v=V101.266">
@@ -8414,10 +8414,22 @@
                     providerId: authUser.isAnonymous ? "anonymous" : ((authUser.providerData && authUser.providerData[0] && authUser.providerData[0].providerId) || "firebase"),
                     lastSeenAt: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
+                window.__linkedAuthUid = authUser.uid;
             } catch (err) {
                 console.warn("user_auth_links upsert failed:", err);
             }
         }
+        // V101.383 (owner 2026-11-27: a phone in LINE could not join a room, "เปิดแอปจาก LINE ก่อน"): when the anonymous sign-in
+        // fails at boot (weak mobile network) and succeeds later, the new sign-in has no user_auth_links doc, so roomAct / cerealAct
+        // cannot tell who it is. The online games call this before every server call: it links the CURRENT sign-in to this LINE user
+        // once (same fields as at boot). window.ensureAuthLink → a Promise, never rejects.
+        window.ensureAuthLink = function () {
+            try {
+                const u = window.firebase && firebase.auth && firebase.auth().currentUser;
+                if (!u || typeof userId !== 'string' || !userId || window.__linkedAuthUid === u.uid) return Promise.resolve();
+                return upsertUserAuthLink(u, userId, userProfile, userProfile && userProfile.userId).catch(() => {});
+            } catch (_) { return Promise.resolve(); }
+        };
 
         // V95.51: liff.init can transiently fail ("Failed to fetch") on flaky mobile
         // networks, especially some Android builds. Retry a few times with backoff
@@ -28552,7 +28564,7 @@ async function archiveDoneCard(cardId) {
 <script src="cereal-sound.js?v=V101.333"></script>
 <script src="cereal.js?v=V101.375" defer></script>
 <script src="cereal-tutorial.js?v=V101.348" defer></script>
-<script src="cereal-online.js?v=V101.364" defer></script>
+<script src="cereal-online.js?v=V101.383" defer></script>
 <script src="wolf-rules.js?v=V101.353"></script>
 <script src="wolf-ai.js?v=V101.358"></script>
 <script src="wolf-sound.js?v=V101.357"></script>
@@ -28561,9 +28573,9 @@ async function archiveDoneCard(cardId) {
 <script src="count.js?v=V101.375" defer></script>
 <script src="shadow-sound.js?v=V101.369" defer></script>
 <script src="shadow.js?v=V101.379" defer></script>
-<script src="shadow-online.js?v=V101.379" defer></script>
+<script src="shadow-online.js?v=V101.383" defer></script>
 <script src="secret.js?v=V101.381" defer></script>
-<script src="secret-online.js?v=V101.380" defer></script>
+<script src="secret-online.js?v=V101.383" defer></script>
 <script src="rock13-rules.js?v=V101.382" defer></script>
 <script src="rock13-sound.js?v=V101.382" defer></script>
 <script src="rock13.js?v=V101.382" defer></script>
