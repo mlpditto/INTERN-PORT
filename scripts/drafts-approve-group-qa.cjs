@@ -1,4 +1,4 @@
-// V102.706 (owner pick A, mockup-drafts-approve-group/lean-ABC.png): Drug Codex pending drafts — "✓ n" on an import / articles group head.
+// V102.710 (owner pick A, mockup-drafts-approve-group/lean-ABC.png): Drug Codex pending drafts — "✓ n" on an import / articles group head.
 // The REAL admin.html in Chromium (network stubbed, sample data, dcaPublishDraft stubbed — nothing written):
 // · n = the group's drafts ≥ 80 %; shown only when n ≥ 2 and never on 🙋 Interns (their points prompt stays one by one);
 // · tap 1 arms it in place ("✓ n ยืนยัน" + ↩, the rows it skips dim, nothing published); ↩ disarms;
