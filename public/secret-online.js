@@ -160,7 +160,7 @@
             body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: big, size: 'xxl', weight: 'bold', align: 'center' }, { type: 'text', text: 'Everyone has a secret 1–100 · guess it', size: 'xs', color: '#6b7280', align: 'center' }] },
             footer: { type: 'box', layout: 'vertical', contents: [{ type: 'button', style: 'primary', color: '#0d9488', height: 'sm', action: { type: 'uri', label: button, uri: uri } }] } } };
         var text = alt + '\n' + uri;
-        var viaLine = window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker') ? Promise.resolve(liff.shareTargetPicker([card])).then(function (x) { return x ? 'sent' : 'closed'; }, function () { return null; }) : Promise.resolve(null);
+        var viaLine = window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker') && (!liff.isLoggedIn || liff.isLoggedIn()) ? Promise.resolve(liff.shareTargetPicker([card])).then(function (x) { return x ? 'sent' : 'closed'; }, function () { return null; }) : Promise.resolve(null);
         return viaLine.then(function (x) {
             if (x === 'sent' || x === 'closed') return x === 'sent';
             if (navigator.share) return navigator.share({ text: text }).then(function () { return true; }, function () { return false; });

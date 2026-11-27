@@ -200,7 +200,7 @@
         share: function () {
             if (!g || !g.end) return;
             var text = '🔢 Secret number · got ' + g.n + ' with ' + used() + ' 🎫 (' + HELP[help][0] + ' ' + HELP[help][1] + ')\nhttps://liff.line.me/' + (typeof USER_LIFF_ID !== 'undefined' ? USER_LIFF_ID : '');
-            try { if (window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')) return liff.shareTargetPicker([{ type: 'text', text: text }]); } catch (e) { }
+            try { if (window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker') && (!liff.isLoggedIn || liff.isLoggedIn())) return liff.shareTargetPicker([{ type: 'text', text: text }]); } catch (e) { }
             try { window.open('https://line.me/R/share?text=' + encodeURIComponent(text), '_blank', 'noopener'); } catch (e) { }
             return text;
         },
