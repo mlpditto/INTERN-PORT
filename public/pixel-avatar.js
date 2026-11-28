@@ -53,6 +53,13 @@
     // ---- mine: users.pixel; made for you (🎲) the first time a lobby asks --------------------------------------------------------
     function doc() { return window.myUserDoc || null; }
     function mine() { var d = doc(); return d && ok(d.pixel) ? d.pixel : ''; }
+    /** V101.399 (owner pick A, mockup-wolf-me-seat/) your name in the games: users.nickName → firstName → displayName → the sheet's own (pxName) → You */
+    function nameOf() { var d = doc(), n = d && (d.nickName || d.firstName || d.displayName); if (!n) { try { n = localStorage.getItem('pxName'); } catch (e) { } } return n || 'You'; }
+    function saveName(n) {
+        var d = doc(); if (d) d.nickName = n;
+        try { localStorage.setItem('pxName', n); } catch (e) { }
+        try { if (typeof userId === 'string' && userId && typeof db !== 'undefined' && !(typeof isPreview !== 'undefined' && isPreview)) db.collection('users').doc(userId).update({ nickName: n }).catch(function (e) { console.warn('Name not saved:', e && e.message); }); } catch (e) { }
+    }
     function save(code) {
         var d = doc(); if (d) d.pixel = code;
         try { localStorage.setItem('pxMine', code); } catch (e) { }
@@ -66,24 +73,25 @@
     }
     /** D: the row in a game lobby — your face, your name, ✏️; the first time: "🎲 Your pixel is ready" */
     function lobbyRow() {
-        var m = ensure(), nm = (doc() && (doc().nickName || doc().firstName || doc().displayName)) || 'You', was = fresh; fresh = false;
+        var m = ensure(), nm = nameOf(), was = fresh; fresh = false;
         return '<div class="pxa-row' + (was ? ' new' : '') + '" id="pxa-row">' + face(m, 52, '') + '<div class="pxa-who"><b>' + (was ? '🎲 Your pixel is ready' : esc(nm)) + '</b><small>' + (was ? 'keep it or ✏️ make your own' : 'your face in the games') + '</small></div>'
             + '<button type="button" class="pxa-edit" id="pxa-edit" onclick="PixelAvatar.edit()" aria-label="Edit my pixel">✏️</button></div>';
     }
     /** V101.397 the face alone, 32 px, for a lobby's title row (Carry 13 first): tap = ✏️, the name in the tooltip; readyLine() right after it says "🎲 Your pixel is ready" once */
     function faceBtn() {
-        var m = ensure(), nm = (doc() && (doc().nickName || doc().firstName || doc().displayName)) || 'You';
+        var m = ensure(), nm = nameOf();
         return '<button type="button" class="pxa-fb" id="pxa-face" onclick="PixelAvatar.edit()" title="✏️ ' + esc(nm) + '" aria-label="Edit my pixel">' + face(m, 32, '') + '</button>';
     }
     function readyLine() { var was = fresh; fresh = false; return was ? '<div class="pxa-ready" id="pxa-ready">🎲 Your pixel is ready · ✏️ make your own</div>' : ''; }
     function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
     // ---- A: the builder, one sheet, a rail per part ------------------------------------------------------------------------------
-    var draft = null, after = null;
+    var draft = null, after = null, nameDraft = '';
     var RAILS = [['Skin', 0, SKIN], ['Hair', 1], ['Hair colour', 2, HAIRC], ['Eyes', 3], ['Outfit', 4], ['Outfit colour', 5, OUTC], ['Extra', 6]];
     function sheet() {
         return '<div class="pxa-sh"><div class="pxa-top"><h3>🧑‍🎨 My pixel</h3><button type="button" class="pxa-x" onclick="PixelAvatar.close()" aria-label="Close">✕</button></div>'
             + '<div class="pxa-prev" id="pxa-prev">' + svg(draft, 120) + '</div>'
+            + '<div class="pxa-nm"><label class="pxa-nl" for="pxa-name">Name</label><input id="pxa-name" class="pxa-in" maxlength="12" autocomplete="off" value="' + esc(nameDraft) + '" aria-label="Name"></div>'   // V101.399 one sheet: face + name
             + RAILS.map(function (r) {
                 var k = r[1], cur = +draft[k], items = '';
                 for (var i = 0; i < N[k]; i++) {
@@ -100,6 +108,7 @@
         + '.pxa-who{flex:1;min-width:0;display:flex;flex-direction:column}.pxa-who b{font-size:.95em;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pxa-who small{font-size:.75em;color:#64748b;font-weight:700}'
         + '.pxa-edit{background:#f5f3ff!important;border:1px solid #ddd6fe!important;border-radius:12px!important;min-width:44px;min-height:44px!important;font-size:1.1em;padding:0!important;margin:0!important;box-shadow:none!important;width:auto!important;cursor:pointer}'
         + '.pxa-fb{background:none!important;border:0!important;padding:0!important;margin:0!important;min-height:0!important;width:auto!important;box-shadow:none!important;line-height:0;border-radius:50%;cursor:pointer}.pxa-ready{font-size:.78em;font-weight:800;color:#7c3aed;text-align:center}'
+        + '.pxa-nm{display:flex;gap:8px;align-items:center;margin-top:2px}.pxa-nl{font-size:.7em;font-weight:900;color:#64748b}.pxa-in{flex:1;min-width:0;border:1px solid #ddd6fe!important;border-radius:10px!important;padding:7px 10px!important;font:inherit;font-weight:800;font-size:.95em;color:#0f172a;background:#fff;margin:0!important;width:auto!important;min-height:0!important;box-shadow:none!important}'
         + '#pxModal{z-index:10050}#pxModal .modal-content{max-width:400px;padding:12px;border-radius:20px;max-height:92dvh;overflow:auto}'
         + '#pxModal button{font-family:inherit;width:auto;min-height:0;margin:0;box-shadow:none;cursor:pointer}'
         + '.pxa-sh{display:flex;flex-direction:column;gap:4px;color:#0f172a;text-align:left}.pxa-top{display:flex;align-items:center}.pxa-top h3{flex:1;margin:0;font-size:1.05em;color:#4c1d95}.pxa-x{background:none;border:0;font-size:1.15em;color:#94a3b8;min-width:36px;min-height:36px}'
@@ -119,19 +128,21 @@
         }
         return m;
     }
-    function render() { var m = root(), keep = {}; m.querySelectorAll('.pxa-rail').forEach(function (r) { keep[r.getAttribute('data-k')] = r.scrollLeft; }); document.getElementById('pxa-body').innerHTML = sheet(); m.querySelectorAll('.pxa-rail').forEach(function (r) { r.scrollLeft = keep[r.getAttribute('data-k')] || 0; }); m.style.display = 'flex'; }
+    function render() { var m = root(), keep = {}, inp = document.getElementById('pxa-name'); if (inp) nameDraft = inp.value; m.querySelectorAll('.pxa-rail').forEach(function (r) { keep[r.getAttribute('data-k')] = r.scrollLeft; }); document.getElementById('pxa-body').innerHTML = sheet(); m.querySelectorAll('.pxa-rail').forEach(function (r) { r.scrollLeft = keep[r.getAttribute('data-k')] || 0; }); m.style.display = 'flex'; }
     if (!document.getElementById('pxa-css')) { var st = document.createElement('style'); st.id = 'pxa-css'; st.textContent = CSS; (document.head || document.documentElement).appendChild(st); }
 
     window.PixelAvatar = {
-        svg: svg, face: face, ok: ok, random: random, mine: mine, lobbyRow: lobbyRow, faceBtn: faceBtn, readyLine: readyLine,
+        svg: svg, face: face, ok: ok, random: random, mine: mine, name: nameOf, lobbyRow: lobbyRow, faceBtn: faceBtn, readyLine: readyLine,
         /** ✏️ open the builder; `done` runs after 💾 (the game redraws its lobby) */
-        edit: function (done) { draft = ensure(); after = typeof done === 'function' ? done : null; render(); },
+        edit: function (done) { draft = ensure(); nameDraft = nameOf(); after = typeof done === 'function' ? done : null; render(); },
         set: function (k, i) { if (!draft || k < 0 || k > 6 || i < 0 || i >= N[k]) return; var c = draft.split(''); c[k] = i; draft = c.join(''); render(); },
         dice: function () { draft = random(); render(); },
         save: function () {
-            if (!ok(draft)) return; save(draft); PixelAvatar.close();
+            if (!ok(draft)) return; save(draft);
+            var inp = document.getElementById('pxa-name'), nv = inp ? inp.value.replace(/\s+/g, ' ').trim().slice(0, 12) : ''; if (nv && nv !== nameOf()) saveName(nv);   // V101.399 only when changed
+            PixelAvatar.close();
             var row = document.getElementById('pxa-row'); if (row) row.outerHTML = lobbyRow();
-            var fb = document.getElementById('pxa-face'); if (fb) fb.innerHTML = face(draft, 32, '');
+            var fb = document.getElementById('pxa-face'); if (fb) { fb.innerHTML = face(draft, 32, ''); fb.title = '✏️ ' + esc(nameOf()); }
             if (after) after(draft);
         },
         close: function () { var m = document.getElementById('pxModal'); if (m) m.style.display = 'none'; },

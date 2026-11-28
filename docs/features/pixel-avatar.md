@@ -40,6 +40,8 @@ The style is our own: 16 × 16 pixels, head and shoulders only, made for small r
 
 **Deploy:** `firebase deploy --only functions:roomAct,functions:gameTop`.
 
+**V101.399 Name** (owner pick A, mockup-wolf-me-seat/): the sheet has a Name field above the rails — `users.nickName` (falls back to firstName → displayName → `pxName` in localStorage → You), written only when changed; `PixelAvatar.name()` returns it and every lobby row / title-row tooltip uses it. 🐺 Werewolf: the lobby header carries `faceBtn` + `readyLine`, and seat 1 shows your pixel + this name (`face()` / `nm()` in wolf.js; the bots address you by it).
+
 ## QA
 
 `scripts/pixel-avatar-qa.cjs` checks:

@@ -61,7 +61,7 @@ const LIVE = ['night', 'day', 'vote', 'shot'];
 const QUIET = ' · ขอเงียบในกลุ่มจนจบเกมนะ 🤐';   // owner pick Q8: ask once, delete nothing
 const WARN_SEC = 60;   // ⏳ the warning goes out at the first tick with ≤ 60 s left (W1)
 const STEP_SEC = 30;   // C1: the ⏳ in the phase message is edited this often
-const BOT_NAMES = ['ต้น', 'ใบ', 'ฟ้า', 'นนท์', 'มุก', 'ภู', 'แพร', 'ก้อง', 'เจ'];   // the solo game's names, in order
+const BOT_NAMES = ['Tom', 'Ann', 'Ben', 'Jo', 'Max', 'May', 'Sam', 'Kim', 'Lee'];   // the solo game's names, in order (English, one syllable — owner 2026-11-28)
 const LEVELS = { 1: '🌆 หัวค่ำ', 2: '🌙 เที่ยงคืน', 3: '🌕 คืนเดือนเพ็ญ' };   // the solo lobby's night levels
 const isBotId = (id) => /^bot\d$/.test(String(id));
 const SHOT_SEC = 30;   // 🏹 the dead hunter's time to aim
