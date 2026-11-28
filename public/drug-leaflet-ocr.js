@@ -2,10 +2,13 @@
 // (PDF or a photo) with iApp OpenThai OCR (aiProxy provider "iapp_ocr", 0.15 IC a page). Code — not AI — finds the "ข้อบ่งใช้" heading and
 // copies its paragraph into the box (green), so the wording stays as registered. Under the box: where it came from · ↶ the old text · the whole
 // leaflet. Nothing is saved until 💾 Save Drug. A leaflet carries no patient data.
+// V102.714 (owner pick A, mockup-leaflet-fields/): one more link in that line — ✨ fill the n EMPTY fields from the leaflet (AI fill empty
+// fields with the leaflet as its only source). Filled fields turn green; ↶ takes them all back. Still nothing saved until 💾.
 (function () {
     'use strict';
     var MAX = 7 * 1024 * 1024;
     var S = { md: '', name: '', pages: 0, prev: null, filled: null, heading: '', state: '', msg: '' };
+    var F = { state: '', keys: [], asked: 0, before: null };   // the ✨ fill: '' | busy | done
     var IND = /^(ข้อบ่งใช้|ข้อบ่งชี้|สรรพคุณ|indications?)(?=$|[\s:：(])/i;   // no \b: Thai letters are not "word" characters
     var KNOWN = /^(ข้อบ่งใช้|ข้อบ่งชี้|สรรพคุณ|ขนาด|วิธีใช้|ข้อห้าม|คำเตือน|ข้อควรระวัง|อาการไม่พึงประสงค์|อาการข้างเคียง|ผลข้างเคียง|ผลไม่พึงประสงค์|ส่วนประกอบ|ตัวยาสำคัญ|การเก็บรักษา|ปฏิกิริยา|อันตรกิริยา|เภสัช|รูปแบบ|ลักษณะ|ขนาดบรรจุ|การใช้ในหญิง|การใช้ยาเกินขนาด|ยาเกินขนาด|เลขทะเบียน|ผู้ผลิต|indications?|dosage|posology|administration|contraindications?|warnings?|precautions?|adverse|undesirable|side effects?|composition|storage|interactions?|overdos|pregnancy|pharmacolog)/i;
 
@@ -48,6 +51,16 @@
             r.readAsDataURL(file);
         });
     }
+    function empties() { try { return typeof window.dcaEmptyFieldCount === 'function' ? window.dcaEmptyFieldCount() : 0; } catch (e) { return 0; } }
+    function fillBits() {
+        if (!S.md || S.state === 'busy') return '';
+        if (F.state === 'busy') return '<span>⏳ AI กำลังเติมจากเอกสาร…</span>';
+        if (F.state === 'done') return '<span title="Filled from the leaflet only — check each green field before 💾 Save Drug">✨ เติม ' + F.keys.length + '/' + F.asked + ' ช่องจากเอกสาร' +
+            (F.asked > F.keys.length ? ' (ไม่มีในเอกสาร ' + (F.asked - F.keys.length) + ')' : '') + ' · ตรวจก่อน 💾</span>' +
+            (F.keys.length ? '<button type="button" onclick="dcaOcrFillUndo()" title="Empty the fields the leaflet filled">↶ เอาออกทั้งหมด</button>' : '');
+        var n = empties();
+        return n ? '<button type="button" class="dca-ocr-go" onclick="dcaOcrFill()" title="AI fills only the empty fields, using this leaflet as its only source">✨ เติม ' + n + ' ช่องว่างจากเอกสาร</button>' : '';
+    }
     function paint() {
         var src = el('dca-ocr-src'), ta = el('dca-f-indicationThFda'); if (!src) return;
         src.className = 'dca-ocr-src lang-no-toggle' + (S.state === 'warn' ? ' warn' : '');
@@ -55,8 +68,8 @@
         var doc = S.md ? '<button type="button" onclick="dcaOcrDoc()" aria-expanded="' + !!el('dca-ocr-doc') + '">ดูทั้งเอกสาร ' + (el('dca-ocr-doc') ? '▴' : '▾') + '</button>' : '';
         if (S.state === 'busy') src.innerHTML = '<span>⏳ iApp กำลังอ่าน ' + esc(S.name) + '…</span>';
         else if (S.state === 'ok') src.innerHTML = '<span title="Copied by code from the leaflet\'s own heading — check it before 💾 Save Drug">📄 จาก ' + esc(S.name) + ' · หัวข้อ "' + esc(S.heading) + '"</span>' +
-            (S.prev !== null ? '<button type="button" onclick="dcaOcrUndo()" title="Put back what the box said before">↶ คืนค่าเดิม</button>' : '') + doc;
-        else src.innerHTML = '<span>' + esc(S.msg) + '</span>' + doc;
+            (S.prev !== null ? '<button type="button" onclick="dcaOcrUndo()" title="Put back what the box said before">↶ คืนค่าเดิม</button>' : '') + fillBits() + doc;
+        else src.innerHTML = '<span>' + esc(S.msg) + '</span>' + fillBits() + doc;
         src.hidden = false;
         if (ta) ta.classList.toggle('dca-ocr-ok', S.state === 'ok' && ta.value === S.filled);
     }
@@ -97,12 +110,39 @@
         else if (src && S.md) { d = document.createElement('div'); d.id = 'dca-ocr-doc'; d.className = 'dca-ocr-doc lang-no-toggle'; d.textContent = S.md; src.after(d); }
         paint();
     };
+    function greens(on) {
+        F.keys.forEach(function (k) { var f = el('dca-f-' + k); if (f) f.classList.toggle('dca-ocr-ok', !!on); });
+    }
+    window.dcaOcrFill = async function () {
+        if (!S.md || F.state === 'busy' || typeof window.dcaAiFillEmptyFields !== 'function') return;
+        F = { state: 'busy', keys: [], asked: 0, before: null }; paint();
+        var keep = S, r = null;
+        try { r = await window.dcaAiFillEmptyFields({ name: S.name, md: S.md }); }
+        finally {
+            // the fill re-opens the form (dcaFillForm → dcaOcrReset): this is still the same drug and the same leaflet
+            S = keep;
+            F = r && r.keys ? { state: 'done', keys: r.keys, asked: r.asked, before: r.before } : { state: '', keys: [], asked: 0, before: null };
+            greens(true); paint();
+        }
+    };
+    window.dcaOcrFillUndo = function () {
+        if (F.state !== 'done' || !F.before || typeof window.dcaFillForm !== 'function') return;
+        var keep = S, b = F.before;
+        greens(false);
+        window.dcaFillForm(b);
+        S = keep; F = { state: '', keys: [], asked: 0, before: null }; paint();
+    };
     window.dcaOcrReset = function () {
+        greens(false); F = { state: '', keys: [], asked: 0, before: null };
         S = { md: '', name: '', pages: 0, prev: null, filled: null, heading: '', state: '', msg: '' };
         var d = el('dca-ocr-doc'); if (d) d.remove();
         var ta = el('dca-f-indicationThFda'); if (ta) ta.classList.remove('dca-ocr-ok');
         paint();
     };
     // typing in the box: it is no longer the leaflet's wording, so the green goes (the source line stays)
-    document.addEventListener('input', function (e) { if (e.target && e.target.id === 'dca-f-indicationThFda' && S.state === 'ok') paint(); });
+    document.addEventListener('input', function (e) {
+        var t = e.target, id = t && t.id;
+        if (id === 'dca-f-indicationThFda' && S.state === 'ok') paint();
+        else if (id && id.indexOf('dca-f-') === 0 && F.state === 'done' && F.keys.indexOf(id.slice(6)) >= 0) t.classList.remove('dca-ocr-ok');   // edited = the admin's words now
+    });
 })();

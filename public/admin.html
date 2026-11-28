@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.713)</title>
+    <title>Nika Admin (V102.714)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -1923,7 +1923,7 @@
         .dca-ocr-wrap textarea { width:100%; padding-right:44px; box-sizing:border-box; }
         .dca-ocr-btn { position:absolute; right:8px; top:8px; width:30px; height:30px; min-height:0; margin:0; padding:0; border:1px solid #c4b5fd; border-radius:999px; background:#f5f3ff; color:#6d28d9; font-size:14px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
         .dca-ocr-btn:disabled { opacity:.7; cursor:wait; }
-        .dca-ocr-wrap textarea.dca-ocr-ok, .dca-ocr-wrap textarea.dca-ocr-ok:focus { border-color:#22c55e !important; background:#f0fdf4 !important; box-shadow:0 0 0 1px #22c55e; }
+        #dca-view-form .dca-ocr-ok, #dca-view-form .dca-ocr-ok:focus, .dca-ocr-wrap textarea.dca-ocr-ok, .dca-ocr-wrap textarea.dca-ocr-ok:focus { border-color:#22c55e !important; background:#f0fdf4 !important; box-shadow:0 0 0 1px #22c55e; }
         .dca-ocr-src { grid-column:2; margin-top:-4px; font-size:11.5px; color:#15803d; display:flex; flex-wrap:wrap; gap:4px 8px; align-items:center; }
         .dca-ocr-src.warn { color:#b45309; }
         .dca-ocr-src button { min-height:0; width:auto; margin:0; padding:0 2px; border:0; background:none; color:inherit; font:inherit; text-decoration:underline; cursor:pointer; }
@@ -9057,7 +9057,7 @@
 <script src="up-next.js?v=V102.650"></script>
 <script src="cereal-admin.js?v=V102.700"></script>
 <script src="game-top-rank.js?v=V102.711"></script>
-<script src="game-admin.js?v=V102.713"></script>
+<script src="game-admin.js?v=V102.714"></script>
 <script src="tester-admin.js?v=V102.711"></script>
 <script src="quiz-matrix.js?v=V102.503"></script>
 <script src="rank-quiz.js?v=V102.484"></script>
@@ -9086,7 +9086,7 @@
     <script src="jev-primer-repeats.js?v=V102.698"></script>
     <link rel="stylesheet" href="read-first-dedupe.css?v=V102.698">
     <script src="read-first-dedupe.js?v=V102.698"></script>
-    <script src="drug-leaflet-ocr.js?v=V102.712"></script>
+    <script src="drug-leaflet-ocr.js?v=V102.714"></script>
     <script src="quiz-watch-story.js?v=V102.697"></script>
     <script src="quiz-watch-tour.js?v=V102.686"></script>
     <link rel="stylesheet" href="case-card-multi.css?v=V102.583">
@@ -53323,8 +53323,22 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         // before saving. genericName stays manual: it's the required prompt anchor.
         const DCA_AI_FILL_SKIP = new Set(['genericName']);
 
-        async function dcaAiFillEmptyFields() {
-            const btn = document.getElementById('dca-form-ai-fill-btn');
+        // the keys still empty in a collected form (AI fill asks only for these)
+        function dcaEmptyFieldKeys(current) {
+            return DCA_FIELD_KEYS.filter(key => {
+                if (DCA_AI_FILL_SKIP.has(key)) return false;
+                const v = current[key];
+                if (DCA_ARRAY_FIELDS[key]) return !Array.isArray(v) || v.length === 0;
+                return !v || !String(v).trim();
+            });
+        }
+        window.dcaEmptyFieldCount = () => dcaEmptyFieldKeys(dcaCollectForm()).length;   // the ✨ line in drug-leaflet-ocr.js
+
+        // V102.714 (owner pick A, mockup-leaflet-fields/): leaflet = { name, md } from 📄 iApp OCR → the leaflet is the ONLY source,
+        // a field it does not cover stays empty. Returns { keys, asked, before } for the ✨ line (null when nothing ran).
+        async function dcaAiFillEmptyFields(leaflet) {
+            if (!(leaflet && leaflet.md)) leaflet = null;   // onclick passes nothing
+            const btn = leaflet ? null : document.getElementById('dca-form-ai-fill-btn');
             const errEl = document.getElementById('dca-form-error');
             if (typeof window.callUniversalAI !== 'function') {
                 if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'AI core not loaded yet — try again in a moment.'; }
@@ -53339,12 +53353,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             }
 
             // Identify empty fields. Array fields → empty array; string fields → empty/whitespace.
-            const emptyKeys = DCA_FIELD_KEYS.filter(key => {
-                if (DCA_AI_FILL_SKIP.has(key)) return false;
-                const v = current[key];
-                if (DCA_ARRAY_FIELDS[key]) return !Array.isArray(v) || v.length === 0;
-                return !v || !String(v).trim();
-            });
+            const emptyKeys = dcaEmptyFieldKeys(current);
 
             if (emptyKeys.length === 0) {
                 if (typeof showToast === 'function') showToast('All fields already filled — nothing for AI to add.');
@@ -53358,17 +53367,18 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
             if (btn) window.aiCapBusy(btn, 'Filling ' + emptyKeys.length + ' field' + (emptyKeys.length === 1 ? '' : 's') + '…');   // V102.475: flipping ⏳ + elapsed time
 
-            const prompt = dcaBuildAiFillPrompt(current, emptyKeys);
+            const prompt = dcaBuildAiFillPrompt(current, emptyKeys, leaflet);
+            const feature = leaflet ? 'drug_leaflet_fill' : 'drug_aifill';
 
             try {
-                const resp = await window.callUniversalAI(selectedModel, prompt, true, null, '', { feature: 'drug_aifill' });
+                const resp = await window.callUniversalAI(selectedModel, prompt, true, null, '', { feature });
                 const rawText = (resp && resp.text) ? resp.text : (typeof resp === 'string' ? resp : '');
                 if (!rawText) throw new Error('Empty response from AI');
 
                 let parsed = dcaParseAutoDraftResponse(rawText);
                 if (!parsed) {
                     // single silent retry (feedback_ai_json_diagnostic_pattern)
-                    const resp2 = await window.callUniversalAI(selectedModel, prompt, true, null, '', { feature: 'drug_aifill' });
+                    const resp2 = await window.callUniversalAI(selectedModel, prompt, true, null, '', { feature });
                     const rawText2 = (resp2 && resp2.text) ? resp2.text : (typeof resp2 === 'string' ? resp2 : '');
                     parsed = dcaParseAutoDraftResponse(rawText2);
                     if (!parsed) {
@@ -53386,6 +53396,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                 merged.aiReviewedAt = window.dcaAiTrail ? window.dcaAiTrail.state().reviewAt : 0;
                 merged.aiReviewedModels = window.dcaAiTrail ? window.dcaAiTrail.state().review : [];   // V102.390: the fill replaces the filler, not the checkers
                 let filledCount = 0;
+                const filledKeys = [];
                 // V94.50: track which Edu fields got new content so we only
                 // re-translate those — admin's existing i18n for already-filled
                 // fields is preserved.
@@ -53395,19 +53406,25 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
                     if (DCA_ARRAY_FIELDS[key]) {
                         if (Array.isArray(v) && v.length > 0) {
                             merged[key] = v.filter(Boolean);
-                            filledCount++;
+                            filledCount++; filledKeys.push(key);
                         }
                     } else {
                         const s = v == null ? '' : String(v).trim();
                         if (s) {
                             merged[key] = s;
-                            filledCount++;
+                            filledCount++; filledKeys.push(key);
                             if (DCA_EDU_I18N_FIELDS.includes(key)) eduFieldsFilled.push(key);
                         }
                     }
                 });
 
                 dcaFillForm(merged);
+
+                if (leaflet) {
+                    // the ✨ line says the count; translate now and wait, so ↶ never races a late translation into the old form
+                    if (eduFieldsFilled.length > 0) await dcaTranslateEducationI18n({ fields: eduFieldsFilled, silent: true }).catch(err => console.warn('[drug-codex] leaflet-fill Edu i18n translate failed:', err && err.message));
+                    return { keys: filledKeys, asked: emptyKeys.length, before: Object.assign({}, current, { _id: dcaState.editingId }) };
+                }
 
                 if (typeof showToast === 'function') {
                     const modelLabel = (resp && resp.model) ? resp.model : selectedModel;
@@ -53874,7 +53891,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             'references':       'array of source HINTS (NOT URLs) · 3-5 items · each names a verifiable source admin can search, e.g. "PubMed: <search terms>", "MIMS Thailand: <drug> monograph", "UpToDate: <topic>", "Drugs.com: <drug> page" · NO http(s) URLs · NO PMIDs · NO DOIs'
         };
 
-        function dcaBuildAiFillPrompt(seedData, emptyFieldKeys) {
+        function dcaBuildAiFillPrompt(seedData, emptyFieldKeys, leaflet) {
             // FORMAT CONTRACT leads (feedback_ai_prose_mode_recovery).
             // SEED block carries intern + admin-edited data so the model can stay consistent.
             // LANGUAGE RULE explicit (feedback_ai_prompt_language_neutral).
@@ -53937,6 +53954,16 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
             if (targetDrugContext) {
                 lines.push('');
                 lines.push('SUGGEST-EDIT CONTEXT: this draft proposes edits to an existing codex entry "' + targetDrugContext + '".');
+            }
+            if (leaflet) {
+                // V102.714: the registered leaflet (iApp OCR, Markdown) is the only source — no outside knowledge
+                lines.push('');
+                lines.push('SOURCE DOCUMENT — the drug leaflet / product information "' + String(leaflet.name || 'leaflet').slice(0, 80) + '" (OCR text, Thai and/or English, tables as HTML).');
+                lines.push('Fill a field ONLY from what this document says. If the document does not cover a field, return "" for it — do NOT use outside knowledge, do NOT guess.');
+                lines.push('Keep the document\'s doses, numbers and warnings exactly; you may translate them into the language the LANGUAGE RULE asks for.');
+                lines.push('<<<');
+                lines.push(String(leaflet.md).slice(0, 40000));
+                lines.push('>>>');
             }
 
             lines.push('');

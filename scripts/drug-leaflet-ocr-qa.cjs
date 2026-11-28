@@ -3,6 +3,8 @@
 // Checks: the heading finder on several leaflet styles · the 📄 sits inside the box · one proxy call with the file as base64 · the box is filled
 // and green, the source line names the file and offers ↶ and the whole leaflet · ↶ puts the old text back · 💾 Save Drug writes it · no heading
 // / a failed read / a file too big say so · another drug starts clean · no page errors.
+// V102.714 (owner pick A): ✨ fill the EMPTY fields from the leaflet — the leaflet is the prompt's only source, filled fields go green,
+// typing removes the green, ↶ empties them again, the 🇹🇭 box and the leaflet line stay.
 // The REAL admin.html in Chromium; Firestore and the proxy are stubbed.
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -92,6 +94,30 @@ const LEAFLET = [
         await page.setInputFiles('#dca-ocr-file', pdf); await page.waitForFunction(() => window.__calls.length === 2 && !document.getElementById('dca-ocr-btn').disabled);
         await page.fill('#dca-f-indicationThFda', 'แก้เองบางคำ');
         ok(!(await page.evaluate(() => document.getElementById('dca-f-indicationThFda').classList.contains('dca-ocr-ok'))), 'typing in the box → no longer the leaflet wording, the green goes');
+
+        console.log('✨ fill the empty fields from the leaflet');
+        const n0 = await page.evaluate(() => window.dcaEmptyFieldCount());
+        ok(n0 > 10 && new RegExp('✨ เติม ' + n0 + ' ช่องว่างจากเอกสาร').test(await page.textContent('#dca-ocr-src')), 'the line offers ✨ fill ' + n0 + ' empty fields');
+        await page.evaluate(() => {
+            window.__ai = [];
+            window.callUniversalAI = async (m, p, j, a, b, o) => { window.__ai.push({ p, o }); await new Promise(r => setTimeout(r, 80)); return { text: JSON.stringify({ dosing: 'ครั้งละ 1 เม็ด วันละ 3 ครั้ง', contraindication: '', mechanism: 'PAF antagonist; free-radical scavenger' }), model: 'gemini-x' }; };
+        });
+        await page.click('#dca-ocr-src button:has-text("✨")');
+        ok(/⏳ AI กำลังเติม/.test(await page.textContent('#dca-ocr-src')), 'busy while the AI reads');
+        await page.waitForFunction(() => /✨ เติม 2\//.test(document.getElementById('dca-ocr-src').textContent));
+        const ai = await page.evaluate(() => window.__ai);
+        ok(ai.length === 1 && ai[0].o.feature === 'drug_leaflet_fill', 'one AI call, feature drug_leaflet_fill');
+        ok(/SOURCE DOCUMENT/.test(ai[0].p) && /Tanakan-leaflet\.pdf/.test(ai[0].p) && /## ขนาดและวิธีใช้/.test(ai[0].p) && /do NOT use outside knowledge/.test(ai[0].p), 'the whole leaflet is in the prompt as the only source');
+        ok(!/"indicationThFda"/.test(ai[0].p) && !/"genericName"\s*,?\n/.test(ai[0].p.split('SUPPLIED SEED')[0]), 'the AI is never asked for the 🇹🇭 box or the name');
+        v = await page.evaluate(() => { const g = id => document.getElementById(id); return { dos: g('dca-f-dosing').value, dosG: g('dca-f-dosing').classList.contains('dca-ocr-ok'), mech: g('dca-f-mechanism').classList.contains('dca-ocr-ok'), ci: g('dca-f-contraindication').value, ciG: g('dca-f-contraindication').classList.contains('dca-ocr-ok'), th: g('dca-f-indicationThFda').value, src: g('dca-ocr-src').textContent }; });
+        ok(v.dos === 'ครั้งละ 1 เม็ด วันละ 3 ครั้ง' && v.dosG && v.mech && v.ci === '' && !v.ciG, 'what the leaflet had is filled and green; what it did not stays empty');
+        ok(v.th === 'แก้เองบางคำ' && /📄 จาก Tanakan-leaflet\.pdf/.test(v.src) && new RegExp('✨ เติม 2/' + n0 + ' ช่องจากเอกสาร \\(ไม่มีในเอกสาร ' + (n0 - 2) + '\\)').test(v.src) && /↶ เอาออกทั้งหมด/.test(v.src), 'the 🇹🇭 box and the leaflet line stay; the line says 2/' + n0 + ': ' + v.src);
+        await page.fill('#dca-f-dosing', 'แก้เอง');
+        ok(!(await page.evaluate(() => document.getElementById('dca-f-dosing').classList.contains('dca-ocr-ok'))), 'typing in a filled field → the green goes');
+        await page.click('#dca-ocr-src button:has-text("เอาออกทั้งหมด")');
+        v = await page.evaluate(() => { const g = id => document.getElementById(id); return { dos: g('dca-f-dosing').value, mech: g('dca-f-mechanism').value, green: document.querySelectorAll('#dca-view-form .dca-ocr-ok').length, th: g('dca-f-indicationThFda').value, src: g('dca-ocr-src').textContent }; });
+        ok(v.dos === '' && v.mech === '' && v.th === 'แก้เองบางคำ' && v.green === 0, '↶ empties what the leaflet filled; the 🇹🇭 box keeps its text');
+        ok(new RegExp('✨ เติม ' + n0 + ' ช่องว่างจากเอกสาร').test(v.src), '…and ✨ is offered again');
 
         console.log('when it cannot');
         await page.evaluate(() => { window.__reply = { markdown: '# ยาแก้ไอ\nเก็บที่อุณหภูมิห้อง', pages: 1 }; });
