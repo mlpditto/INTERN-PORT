@@ -16,14 +16,14 @@ File: `public/secret.js` (game, CSS and tour; `window.SN`, `window.secretOpen`).
   - ✏️ you cross out numbers yourself (✏️ ขีด / 🎯 ทาย)
   - 📏 only the live range is shown
   - 🧠 no help, just the answer log
-- The first open plays the tour (`snTourSeen`); ❓ replays it. 🔊/🔇 is kept as `snVoice`.
+- The first open shows the tour (`snTourSeen`); ❓ replays it. 🔊/🔇 is kept as `snVoice`. V101.395 (owner pick A, mock-secret-tour/): **one page** — the 5 rules as lines (English, the Thai line the voice reads under it), no Next / dots; the voice reads t1…t5 one after another and frames the line it is on; ▸ Start stays in sight when a short phone scrolls the lines. The scene pictures are gone (they had not been drawn since V101.385, which left a 400 px page mostly empty).
 - `game_plays`: game `secret`, mode `h<n>`, win `w`, score = 🎫 used. 🏆 Top 3 counts 🧠 games only, fewest 🎫 first (`game-top-rank.js`).
 - Rules: `game_plays.game` now allows `secret`, so the owner must run `firebase deploy --only firestore:rules`.
 
 ## QA
 
 - `scripts/secret-qa.cjs`:
-  - the 5th tile; the tour t1…t4 read aloud with 🔇 kept
+  - the 5th tile; the one-page tour: 5 lines, no paging, no scrolling at 390 × 844, t1…t5 read line after line with the line framed, 🔇 kept, ▸ Start in sight at 320 × 568
   - every question answers truthfully over 2000 random pairs, and the secret is never crossed out over 300 random games
   - 🟩 crosses out and a tap guesses; ✏️ crosses out only what you tap; 📏 shows the range; 🧠 shows the log only
   - a wrong guess costs 🎫 1; the best is kept per level; the log records mode h<n> and win w
