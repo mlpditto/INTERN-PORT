@@ -163,7 +163,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.equal(await p2.$$eval('#bw-reveal .bw-t.back', (e) => e.length), 0, 'a tap opens the rest');
   await p2.click('#bw-share'); await p2.waitForSelector('#bw-share.done');
   const clip = await p2.evaluate(() => ({ clip: window.__clip, sent: document.getElementById('bw-share').getAttribute('aria-label') + ' ' + document.getElementById('bw-share').textContent, sc: BW._g().sc }));
-  assert.equal(clip.sent, '📋 คัดลอกแล้ว ✓', 'V101.369: the 📤 button turns ✓ (no extra line)'); assert.match(clip.clip, /^⚫⚪ ไพ่เงา · (🏆 ชนะ|😞 แพ้|🤝 เสมอ) \d : \d vs 🤖 🥄🥄\nhttps:\/\/liff\.line\.me\/.*\?bw=1$/, '📤 outside LINE: the text + ?bw=1 link to the clipboard');
+  assert.equal(clip.sent, '📋 คัดลอกแล้ว ✓', 'V101.369: the 📤 button turns ✓ (no extra line)'); assert.match(clip.clip, /^⚫⚪ Shadow tiles · (🏆 ชนะ|😞 แพ้|🤝 เสมอ) \d : \d vs 🤖 🥄🥄\nhttps:\/\/liff\.line\.me\/.*\?bw=1$/, '📤 outside LINE: the text + ?bw=1 link to the clipboard');
   await p2.close();
 
   assert.deepEqual(errors, []);

@@ -226,7 +226,7 @@
     var RW = { win: '🏆 ชนะ', lose: '😞 แพ้', draw: '🤝 เสมอ' };
     function lobbyHtml() {
         var s = get();
-        return '<div class="bw"><div class="bw-top"><h3>⚫⚪ ไพ่เงา</h3><button type="button" class="bw-snd" id="bw-help" onclick="BW.tour()" aria-label="How to play" title="How to play" data-th-title="วิธีเล่น">❓</button>' + snd() + X + '</div>'
+        return '<div class="bw"><div class="bw-top"><h3 title="ไพ่เงา · 그림자 패">⚫⚪ Shadow tiles</h3><button type="button" class="bw-snd" id="bw-help" onclick="BW.tour()" aria-label="How to play" title="How to play" data-th-title="วิธีเล่น">❓</button>' + snd() + X + '</div>'
             + (window.GameTop ? GameTop.line('bw', true) : '') + (window.PixelAvatar ? PixelAvatar.lobbyRow() : '')   // V101.375 🏆 Top 3 (game-top.js) · V101.392 🧑‍🎨 my pixel + ✏️
             + '<div class="bw-rule">ไพ่ 0–8 คนละชุด · คู่ ⚫ คี่ ⚪<br>เห็นแค่สีของอีกฝั่ง · เลขสูงกว่าชนะตานั้น<br>9 ตา · ถึง 5 ก่อนชนะ</div>'
             + '<div class="bw-lvs bw-who" role="group" aria-label="Who">' + [['bot', '🤖 บอท'], ['two', '📱 2 คน'], ['online', '🌐 เพื่อน'], ['live', '🔢 ห้องสด']].filter(function (k) { return k[0] === 'bot' || k[0] === 'two' || window.BWOnline; }).map(function (k) { var on = k[0] === 'bot' ? !two && !net : k[0] === 'two' ? two : net === k[0]; return '<button type="button" id="bw-who-' + k[0] + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" onclick="BW.who(\'' + k[0] + '\')">' + k[1] + '</button>'; }).join('') + '</div>'
@@ -242,7 +242,7 @@
     }
     function botLeft() { var b = g.bot.filter(function (n) { return col(n) === 'b'; }).length - (g.botTile != null && col(g.botTile) === 'b' ? 1 : 0), w = g.bot.length - (g.botTile != null ? 1 : 0) - b; return '🤖 เหลือ ⚫ ' + b + ' · ⚪ ' + w; }
     function play2Html() {   // VV101.376 📱 2 คน
-        var L = g.last, a = side(), top = '<div class="bw-top"><h3>⚫⚪ ไพ่เงา</h3><span class="bw-pill">' + Math.min(9, g.hist.length + (L ? 0 : 1)) + '/9</span><span class="bw-pill sc" id="bw-score">' + nm('me') + ' ' + g.sc.me + ' : ' + g.sc.bot + ' ' + nm('bot') + '</span>' + snd() + X + '</div>';
+        var L = g.last, a = side(), top = '<div class="bw-top"><h3 title="ไพ่เงา · 그림자 패">⚫⚪ Shadow tiles</h3><span class="bw-pill">' + Math.min(9, g.hist.length + (L ? 0 : 1)) + '/9</span><span class="bw-pill sc" id="bw-score">' + nm('me') + ' ' + g.sc.me + ' : ' + g.sc.bot + ' ' + nm('bot') + '</span>' + snd() + X + '</div>';
         if (g.cover) return '<div class="bw bw-cover" id="bw-cover">' + top + '<div class="bw-cv">📱🔁</div><div class="bw-cvt" id="bw-cvt">ส่งเครื่องให้ ' + nm(a) + '</div>'
             + '<div class="bw-note">' + (g.lt != null ? nm(g.lead) + ' ลงแล้ว · ' + nm(a) + ' จะเห็นแค่ ' + CE[col(g.lt)] : g.hist.length ? 'ไพ่ของ ' + nm(other(a)) + ' ซ่อนแล้ว' : nm(a) + ' ลงก่อน') + '</div>'
             + '<button type="button" class="bw-go" id="bw-ready" onclick="BW.ready()">👆 ' + nm(a) + ' แตะเมื่อพร้อม</button></div>';
@@ -268,7 +268,7 @@
     }
     function playHtml() {
         if (g.two) return play2Html();
-        var L = g.last, h = '<div class="bw"><div class="bw-top"><h3>⚫⚪ ไพ่เงา</h3><span class="bw-pill">' + Math.min(9, g.hist.length + (L ? 0 : 1)) + '/9</span><span class="bw-pill sc" id="bw-score">คุณ ' + g.sc.me + ' : ' + g.sc.bot + ' 🤖</span>' + snd() + X + '</div>' + dots();
+        var L = g.last, h = '<div class="bw"><div class="bw-top"><h3 title="ไพ่เงา · 그림자 패">⚫⚪ Shadow tiles</h3><span class="bw-pill">' + Math.min(9, g.hist.length + (L ? 0 : 1)) + '/9</span><span class="bw-pill sc" id="bw-score">คุณ ' + g.sc.me + ' : ' + g.sc.bot + ' 🤖</span>' + snd() + X + '</div>' + dots();
         h += '<div class="bw-table" id="bw-table">';
         if (L) h += '<div class="bw-pair"><div>' + t(L.m, 'huge') + '<small>คุณ</small></div><div>' + back(L.bc, 'huge') + '<small>🤖</small></div></div><div class="bw-res ' + L.res + '" id="bw-res">' + RW[L.res] + '</div>';
         else if (g.lead === 'bot') h += back(col(g.botTile), 'huge') + '<div class="bw-note" id="bw-say">🤖 ลง ' + CE[col(g.botTile)] + ' · ตาคุณ</div>';
@@ -320,11 +320,11 @@
         share: function () {   // V101.366: a Flex card via shareTargetPicker → the OS share sheet → the clipboard (as Cereal)
             if (!g || !g.end) return;
             var r = g.sc.me > g.sc.bot ? 'win' : g.sc.me < g.sc.bot ? 'lose' : 'draw', head = (r === 'win' ? '🏆 ชนะ ' : r === 'lose' ? '😞 แพ้ ' : '🤝 เสมอ ') + g.sc.me + ' : ' + g.sc.bot;
-            var uri = 'https://liff.line.me/' + (typeof USER_LIFF_ID !== 'undefined' ? USER_LIFF_ID : '') + '?bw=1', alt = '⚫⚪ ไพ่เงา · ' + head + ' vs 🤖 ' + '🥄'.repeat(lvl);
+            var uri = 'https://liff.line.me/' + (typeof USER_LIFF_ID !== 'undefined' ? USER_LIFF_ID : '') + '?bw=1', alt = '⚫⚪ Shadow tiles · ' + head + ' vs 🤖 ' + '🥄'.repeat(lvl);
             var dots = g.hist.map(function (h) { return h.res === 'win' ? '🟢' : h.res === 'lose' ? '🔴' : '⚪'; }).join('');
             var card = { type: 'flex', altText: alt, contents: { type: 'bubble', size: 'kilo',
                 header: { type: 'box', layout: 'vertical', backgroundColor: '#14122b', paddingAll: '16px', contents: [
-                    { type: 'text', text: '⚫⚪ ไพ่เงา', color: '#c4b5fd', size: 'xs', weight: 'bold' }, { type: 'text', text: head, color: '#ffffff', size: 'xl', weight: 'bold' }] },
+                    { type: 'text', text: '⚫⚪ Shadow tiles', color: '#c4b5fd', size: 'xs', weight: 'bold' }, { type: 'text', text: head, color: '#ffffff', size: 'xl', weight: 'bold' }] },
                 body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: [{ type: 'text', text: 'vs 🤖 ' + '🥄'.repeat(lvl), size: 'sm', color: '#3c3c3c' }, { type: 'text', text: dots, size: 'sm', wrap: true }] },
                 footer: { type: 'box', layout: 'vertical', contents: [{ type: 'button', style: 'primary', color: '#6d28d9', height: 'sm', action: { type: 'uri', label: '⚫ เล่นบ้าง', uri: uri } }] } } };
             var text = alt + '\n' + uri, done = function (ok) { if (ok) { sent = '📤 ส่งแล้ว'; render(); } };

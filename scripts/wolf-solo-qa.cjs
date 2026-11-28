@@ -31,7 +31,7 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
 
   // the entry sits beside 🥣
   const entry = await page.$eval('#sch-wolf-btn', (b) => ({ txt: b.textContent, prev: b.previousElementSibling && b.previousElementSibling.id, on: b.getAttribute('onclick') }));
-  assert.deepEqual(entry, { txt: '🐺หมาป่า', prev: 'sch-cereal-btn', on: 'wolfOpen()' }, 'the 🐺 button is right after 🥣 (V101.368: in the games row, with its name)');
+  assert.deepEqual(entry, { txt: '🐺Wolf', prev: 'sch-cereal-btn', on: 'wolfOpen()' }, 'the 🐺 button is right after 🥣 (V101.368: in the games row, with its name)');
 
   // phone: 🐺 lives in Schedule, not the top rail; PC (≥ 768 px): 🐺 sits just left of 🥣 in the rail (🥣 stays next to 📅)
   const vis = (sel) => page.$eval(sel, (e) => getComputedStyle(e).display !== 'none');

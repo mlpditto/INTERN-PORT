@@ -30,7 +30,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
       noToggle: r.classList.contains('lang-no-toggle'), schGames: document.querySelectorAll('#sch-goals-box .sch-gb-fin').length, schKeeps: !!document.querySelector('#sch-goals-box #sch-fin-btn') };
   });
   const a = await row();
-  assert.deepEqual({ shown: a.shown, ids: a.ids, text: a.text, on: a.on }, { shown: 'grid', ids: ['sch-cereal-btn', 'sch-wolf-btn', 'sch-count-btn', 'sch-bw-btn', 'sch-sn-btn', 'sch-r13-btn'], text: ['🥣Cereal', '🐺หมาป่า', '🧊นับไว', '⚫ไพ่เงา', '🔢เลขลับ', '🪨Carry13'], on: ['cerealOpen()', 'wolfOpen()', 'countOpen()', 'bwOpen()', 'secretOpen()', 'rock13Open()'] }, 'phone: the games row, named, same ids + handlers');
+  assert.deepEqual({ shown: a.shown, ids: a.ids, text: a.text, on: a.on }, { shown: 'grid', ids: ['sch-cereal-btn', 'sch-wolf-btn', 'sch-count-btn', 'sch-bw-btn', 'sch-sn-btn', 'sch-r13-btn'], text: ['🥣Cereal', '🐺Wolf', '🧊Count', '⚫Shadow', '🔢Secret', '🪨Carry13'], on: ['cerealOpen()', 'wolfOpen()', 'countOpen()', 'bwOpen()', 'secretOpen()', 'rock13Open()'] }, 'phone: the games row, named, same ids + handlers');
   assert.ok(a.afterHistory && a.beforeFooter, 'under History, right above the version');
   assert.ok(a.oneLine && a.minH >= 44 && a.fits && a.noToggle, 'one line, ≥ 44 px, fits, Thai names shown ' + JSON.stringify(a));
   assert.equal(a.schGames, 1, 'the Schedule goals row keeps only 💰 (no game)'); assert.ok(a.schKeeps);
