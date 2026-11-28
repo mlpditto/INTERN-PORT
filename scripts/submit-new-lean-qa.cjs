@@ -378,6 +378,20 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
             caseFileDiscard(up); await new Promise(r => setTimeout(r, 10));
             o.rm = puts[puts.length - 1];
             firebase.storage = realStorage; ensureFirebaseAuthReady = realAuth;
+            // V101.391: a phone photo is shrunk to a JPEG (long side 2200) and goes up as .jpg
+            $('u-pdf-x').click();
+            const cv = document.createElement('canvas'); cv.width = 3000; cv.height = 1500; cv.getContext('2d').fillRect(0, 0, 50, 50);
+            const png = await new Promise(r => cv.toBlob(r, 'image/png'));
+            await pick(new File([png], 'IMG_0001.png', { type: 'image/png' })); await new Promise(r => setTimeout(r, 400));
+            o.photoPill = [$('u-pdf-blk').hidden, $('u-pdf-name').textContent, $('u-pdf-mb').textContent.slice(0, 2)];
+            puts.length = 0; let blob;
+            firebase.storage = () => ({ ref: p => ({ put: async (f, m) => { blob = f; puts.push([p, m.contentType]); } }) });
+            ensureFirebaseAuthReady = async () => ({ uid: 'u1' });
+            const up2 = await caseFileUpload();
+            const bm = await createImageBitmap(blob);
+            o.photo = [up2.path, puts[0][1], blob.type, bm.width, bm.height];
+            firebase.storage = realStorage; ensureFirebaseAuthReady = realAuth;
+            o.accept = $('u-pdf-input').accept;
             $('u-pdf-x').click();
             o.removed = [$('u-pdf-blk').hidden, $('u-pdf-btn').classList.contains('has'), await caseFileUpload(), $('u-pdf-idle').hidden];
             selectSubmissionType('work');
@@ -393,6 +407,10 @@ const hsl = c => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(c); return m ? (0
         assert.equal(foot.rm[0], 'rm', 'a failed send removes its upload');
         assert.deepEqual(foot.removed, [true, false, null, false], '× takes it back and the word returns');
         assert.ok(foot.workHidden, 'Case only');
+        assert.deepEqual(foot.photoPill, [false, 'IMG_0001.png', '📷'], 'a photo shows 📷 + size: ' + JSON.stringify(foot.photoPill));
+        assert.ok(/^case-files\/u1\/[a-z0-9-]+\.jpg$/.test(foot.photo[0]), 'photo path .jpg: ' + foot.photo[0]);
+        assert.deepEqual(foot.photo.slice(1), ['image/jpeg', 'image/jpeg', 2200, 1100], 'shrunk to a JPEG, long side 2200');
+        assert.equal(foot.accept, 'application/pdf,image/jpeg,image/png,image/webp');
         const help = await page.evaluate(() => {
             const b = document.getElementById('u-case-help'), r = b.getBoundingClientRect(), o = { size: [r.width, r.height], line: b.parentElement.scrollWidth <= b.parentElement.clientWidth + 1 && !!b.closest('#unified-submit-modal') };
             b.click();
