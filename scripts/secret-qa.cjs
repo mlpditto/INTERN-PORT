@@ -28,7 +28,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
   // the doorway: the 5th tile in the games row; the first open = the tour, read aloud
   const tiles = await page.$$eval('#u-games-row .u-game', (b) => b.map((x) => x.textContent.replace(/\s+/g, '')));
-  assert.equal(tiles.length, 6); assert.match(tiles[4], /🔢เลขลับ/);
+  assert.equal(tiles.length, 6); assert.match(tiles[4], /🔢Secret/);
   await page.click('#u-games-row .u-game:nth-child(5)');
   assert.ok(await page.isVisible('#sn-tour'), 'first open = the tour'); assert.deepEqual(await page.evaluate(() => window.__played), ['secret-voice/t1.mp3']);
   const tops = [];

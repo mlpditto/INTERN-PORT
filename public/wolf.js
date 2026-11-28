@@ -200,7 +200,7 @@
     function voteWords() { var v = g.lastVote; return !v ? '' : v.out ? '🗳 ' + esc(nm(v.out)) + ' ถูกโหวตออก ' + E[g.st.roles[v.out]] : '🗳 เสมอ · ไม่มีใครออก'; }
 
     function lobbyHtml() {
-        var c = W.defaultCounts(ui.n), was = ui.prevN ? W.defaultCounts(ui.prevN) : null, h = '<div class="ww ww-lobby">' + top('🐺 มนุษย์หมาป่า', pill('🤖<span class="tx"> เล่นกับบอท</span>', 'acc') + (window.WWTour ? '<button type="button" class="ww-pill ww-help" id="ww-help" onclick="WWTour.open()" title="วิธีเล่น">❓</button>' : ''), true) + (window.GameTop ? GameTop.line('wolf') : '');   // V101.375 🏆 Top 3
+        var c = W.defaultCounts(ui.n), was = ui.prevN ? W.defaultCounts(ui.prevN) : null, h = '<div class="ww ww-lobby">' + top('<span title="มนุษย์หมาป่า · 늑대인간">🐺 Werewolf</span>', pill('🤖<span class="tx"> เล่นกับบอท</span>', 'acc') + (window.WWTour ? '<button type="button" class="ww-pill ww-help" id="ww-help" onclick="WWTour.open()" title="วิธีเล่น">❓</button>' : ''), true) + (window.GameTop ? GameTop.line('wolf') : '');   // V101.375 🏆 Top 3
         // V101.387 (owner: "รองรับได้ถึง 10 player"): every table size the engine deals, like the Telegram room (was 5 / 7 / 9)
         h += '<div class="ww-row"><span class="ww-mini">👥 คน</span>' + [5, 6, 7, 8, 9, 10].map(function (n) { return '<button type="button" class="ww-chip' + (ui.n === n ? ' on' : '') + '" onclick="WW.set(\'n\',' + n + ')">' + n + '</button>'; }).join('') + '</div>';
         var rs = W.ROLES.filter(function (r) { return c[r]; }), tip = rs.indexOf(ui.tip) >= 0 ? ui.tip : null;

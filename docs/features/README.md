@@ -38,6 +38,7 @@ Walk the areas top to bottom for a broad regression: intern surfaces first, then
 - [tester-codes](tester-codes.md): 🧪 group tester codes / LINE link → a minimal account (device read with one ✓), admin 🧪 panel (V101.384 / V102.711).
 - [game-time](game-time.md): 🎮 seconds per round for all 4 games → admin Dashboard table per person (intern V101.370 / admin V102.704).
 - Games row (V101.368): on phones the 4 game doorways (🥣 🐺 🧊 ⚫) are one row of named cards under History, above the version (`#u-games-row`, `scripts/games-row-qa.cjs`); PC keeps the header rail.
+- Game names (V101.393 / admin V102.714): English everywhere — phone row short (Cereal · Wolf · Count · Shadow · Secret · Carry 13), PC 🎮 menu and popup titles full (Werewolf · Count Fast · Shadow tiles · Secret number), the ⚫⚪ LINE cards, the admin 🎮 chips. Hover (`title`) = a Thai line + a Korean line in every language state, so these buttons carry no `data-th-title` / `data-kr-title` (`scripts/game-names-qa.cjs`).
 - [content-creator](content-creator.md): The social-content division: intern post form, admin content board, separate CAFE points.
 - [guides](guides.md): Markdown guides served through guide.js with chip rails, feedback boxes and built PDFs.
 - [translations](translations.md): EN / TH / KO toggle, Translate Missing, stale quiz translations, the Korean gap ratchet.

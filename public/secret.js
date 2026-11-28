@@ -104,7 +104,7 @@
     var HQ = '<button type="button" class="sn-x" id="sn-help" onclick="SN.tour()" aria-label="How to play" title="How to play">❓</button>';
     function lobbyHtml() {
         var M = multi && window.SNOnline;   // V101.380
-        return '<div class="sn"><div class="sn-top"><h3>🔢 Secret number</h3>' + HQ + X + '</div>'
+        return '<div class="sn"><div class="sn-top"><h3 title="เลขลับ · 비밀 숫자">🔢 Secret number</h3>' + HQ + X + '</div>'
             + (window.GameTop ? GameTop.line(M ? 'secretOn' : 'secret') : '') + (window.PixelAvatar ? PixelAvatar.lobbyRow() : '')   // V101.392 🧑‍🎨 my pixel + ✏️
             + (window.SNOnline ? '<div class="sn-lvs" role="group" aria-label="Mode">' + [[0, '🤖 Practice'], [1, '🌐 Friends']].map(function (k) { var on = !!k[0] === !!multi; return '<button type="button" id="sn-mode-' + k[0] + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" onclick="SN.multi(' + k[0] + ')">' + k[1] + '</button>'; }).join('') + '</div>' : '')
             + (M ? SNOnline.lobbyHtml() + '</div>' : '<div class="sn-note">🤖 picks 1–100 · 🎫 1 a question · fewest wins</div>'

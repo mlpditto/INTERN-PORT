@@ -15,7 +15,7 @@ const ver = (/<title>Internship Portfolio \((V\d+\.\d+)\)<\/title>/.exec(idx) ||
 assert.ok(ver, 'title version');
 assert.ok(idx.includes('<link rel="stylesheet" href="cereal.css?v='), 'cereal.css is linked');
 assert.ok(/<script src="cereal-maps\.js\?v=V[\d.]+"><\/script>\n<script src="cereal-rules\.js\?v=V[\d.]+"><\/script>\n<script src="cereal-bot\.js\?v=V[\d.]+"><\/script>\n<script src="cereal-sound\.js\?v=V[\d.]+"><\/script>\n<script src="cereal\.js\?v=V[\d.]+" defer><\/script>/.test(idx), 'maps → rules → bot → sound → cereal (defer), adjacent');
-assert.ok(/id="sch-cereal-btn" class="u-game" onclick="cerealOpen\(\)"[^>]*data-th-title=/.test(idx), 'the 🥣 button (V101.368: in the games row under History) with a Thai title');
+assert.ok(/id="sch-cereal-btn" class="u-game" onclick="cerealOpen\(\)"[^>]*title="Cereal Killer · เกมนักสืบ 2 คน&#10;/.test(idx), 'the 🥣 button (V101.368: in the games row under History) with a Thai title (V101.393: in title itself, a Korean line after it)');
 assert.ok(idx.indexOf('id="u-games-row"') < idx.indexOf('id="sch-cereal-btn"') && idx.indexOf('id="sch-cereal-btn"') < idx.indexOf('id="intern-footer-line"'), '🥣 is in the games row above the version');
 assert.ok(!/db\.collection|firebase\.|fetch\(|httpsCallable/.test(js), 'cereal.js reads and writes nothing in Firestore');
 assert.ok(js.includes("'cereal_v1_'"), 'state key');

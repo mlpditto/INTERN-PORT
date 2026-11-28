@@ -137,7 +137,7 @@
     /** a Flex card via shareTargetPicker → the OS share sheet → the clipboard */
     function share(alt, title, big, button, uri) {
         var card = { type: 'flex', altText: alt, contents: { type: 'bubble', size: 'kilo',
-            header: { type: 'box', layout: 'vertical', backgroundColor: '#14122b', paddingAll: '16px', contents: [{ type: 'text', text: '⚫⚪ ไพ่เงา', color: '#c4b5fd', size: 'xs', weight: 'bold' }, { type: 'text', text: title, color: '#ffffff', size: 'lg', weight: 'bold', wrap: true }] },
+            header: { type: 'box', layout: 'vertical', backgroundColor: '#14122b', paddingAll: '16px', contents: [{ type: 'text', text: '⚫⚪ Shadow tiles', color: '#c4b5fd', size: 'xs', weight: 'bold' }, { type: 'text', text: title, color: '#ffffff', size: 'lg', weight: 'bold', wrap: true }] },
             body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: big, size: 'xxl', weight: 'bold', align: 'center' }, { type: 'text', text: '9 ตา · ถึง 5 ก่อนชนะ', size: 'xs', color: '#6b7280', align: 'center' }] },
             footer: { type: 'box', layout: 'vertical', contents: [{ type: 'button', style: 'primary', color: '#6d28d9', height: 'sm', action: { type: 'uri', label: button, uri: uri } }] } } };
         var text = alt + '\n' + uri;

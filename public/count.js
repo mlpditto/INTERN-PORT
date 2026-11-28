@@ -182,7 +182,7 @@
     function dots() { var h = '<div class="cg-dots" aria-label="Questions">'; for (var i = 0; i < Q; i++) h += '<i class="' + (i < g.res.length ? (g.res[i] ? 'ok' : 'no') : i === g.i && !g.done ? 'now' : '') + '"></i>'; return h + '</div>'; }
     function lobbyHtml() {
         var free = get('countFree') === 1, lv = lvNow();
-        return '<div class="cg"><div class="cg-top"><h3>🧊 นับไว</h3>' + q() + x() + '</div>'
+        return '<div class="cg"><div class="cg-top"><h3 title="นับไว · 빨리 세기">🧊 Count Fast</h3>' + q() + x() + '</div>'
             + (window.GameTop ? GameTop.line('count') : '')   // V101.375 🏆 Top 3 (game-top.js)
             + '<div class="cg-rail" role="group" aria-label="Timer"><button type="button" id="cg-timed" class="' + (free ? '' : 'on') + '" aria-pressed="' + !free + '" onclick="CG.free(0)">⏱ แข่งเวลา ' + SEC + ' วิ</button><button type="button" id="cg-free" class="' + (free ? 'on' : '') + '" aria-pressed="' + free + '" onclick="CG.free(1)">🧘 ไม่จับเวลา</button></div>'
             + '<div class="cg-rail" role="group" aria-label="Level">' + [1, 2, 3].map(function (n) { return '<button type="button" id="cg-lv' + n + '" class="' + (lv === n ? 'on' : '') + '" aria-pressed="' + (lv === n) + '" onclick="CG.lv(' + n + ')">' + '🥄'.repeat(n) + ' ' + LVN[n] + '</button>'; }).join('') + '</div>'   // V101.375

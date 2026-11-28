@@ -8,7 +8,7 @@
 (function () {
     'use strict';
     var WEEK = 7 * 864e5, last = 0, plays = [], pick = null, view = 'time', per = 'week', all = null, allAt = 0;
-    var GAMES = [['bw', '⚫', 'ไพ่เงา'], ['count', '🧊', 'นับไว'], ['cereal', '🥣', 'Cereal'], ['wolf', '🐺', 'หมาป่า'], ['secret', '🔢', 'เลขลับ'], ['secretOn', '🔢🌐', 'เลขลับ หลายคน'], ['rock13', '🪨', 'Carry 13']];
+    var GAMES = [['bw', '⚫', 'Shadow tiles', 'ไพ่เงา · 그림자 패'], ['count', '🧊', 'Count Fast', 'นับไว · 빨리 세기'], ['cereal', '🥣', 'Cereal'], ['wolf', '🐺', 'Werewolf', 'มนุษย์หมาป่า · 늑대인간'], ['secret', '🔢', 'Secret number', 'เลขลับ · 비밀 숫자'], ['secretOn', '🔢🌐', 'Secret number online', 'เลขลับ หลายคน · 비밀 숫자 온라인'], ['rock13', '🪨', 'Carry 13']];   // V102.714: English names; g[3] = the Thai · Korean name on hover
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function is(p, g) { return window.GameTopRank ? GameTopRank.is(p, g) : p.game === g; }   // V102.708 🔢🌐 its own chip
     function avg(a) { return a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : 0; }
@@ -58,7 +58,7 @@
         var top = '<div class="gt-chips" role="group" aria-label="View">' + chip(view === 'time', "gameAdmin.view('time')", '⏱ เวลา') + chip(view === 'rank', "gameAdmin.view('rank')", '🏆 อันดับ')
             + (view === 'rank' ? '<span style="width:8px"></span>' + chip(per === 'week', "gameAdmin.per('week')", 'สัปดาห์นี้') + chip(per === 'all', "gameAdmin.per('all')", 'ตลอดกาล') : '') + '</div>';
         var games = '<div class="gt-chips" role="group" aria-label="Game">' + have.map(function (g) {
-            return '<button type="button" class="gt-chip' + (g[0] === pick ? ' on' : '') + '" aria-pressed="' + (g[0] === pick) + '" onclick="gameAdmin.pick(\'' + g[0] + '\')">' + g[1] + ' ' + g[2] + '</button>';
+            return '<button type="button" class="gt-chip' + (g[0] === pick ? ' on' : '') + '" aria-pressed="' + (g[0] === pick) + '" onclick="gameAdmin.pick(\'' + g[0] + '\')"' + (g[3] ? ' title="' + g[3] + '"' : '') + '>' + g[1] + ' ' + g[2] + '</button>';
         }).join('') + '</div>';
         if (view === 'rank') return top + games + rankHtml(src);
         return top + games
