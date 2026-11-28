@@ -67,7 +67,7 @@ const TIPS = [
   await page.setViewportSize({ width: 1024, height: 800 });
   await page.click('#u-games-chip');
   r = await read('#u-games-menu button');
-  assert.deepEqual(r.map((x) => x.name), ['🥣 Cereal นักสืบ 2 คน', '🐺 Werewolf กับบอท', '🧊 Count Fast นับรูป', '⚫ Shadow tiles ดวลเลข', '🔢 Secret number ทายเลข', '🪨 Carry 13 ห้ามถึง 13'], 'PC menu: English names');
+  assert.deepEqual(r.map((x) => x.name), ['🥣 Cereal 2-player detective', '🐺 Werewolf vs bots', '🧊 Count Fast count shapes', '⚫ Shadow tiles number duel', '🔢 Secret number guess 1–100', '🪨 Carry 13 stay under 13'], 'PC menu: English names and English subtitles (V101.394)');
   assert.deepEqual(r.map((x) => x.tip), TIPS, 'PC menu: hover = a Thai line + a Korean line');
   assert.ok(r.every((x) => x.h <= 44 && x.h === r[0].h && !x.swap), 'PC menu: every row stays one line (40 px, 44 px on a touch screen) ' + JSON.stringify(r.map((x) => x.h)));
 

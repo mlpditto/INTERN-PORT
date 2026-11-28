@@ -42,7 +42,7 @@ const disp = (page, sel) => page.evaluate(s => getComputedStyle(document.querySe
         assert.ok(r.ar <= r.bl && r.bl - r.ar < 16 && Math.abs(r.ay - r.by) <= 1, 'directly left of 📅 on the same row: ' + JSON.stringify(r));
         assert.equal(await disp(pc.page, '#sch-cereal-btn'), 'none', 'PC: gone from the Schedule goals row (moved, not copied)');
         await pc.page.click('#u-games-chip');
-        assert.deepEqual(await pc.page.$$eval('#u-games-menu .btn-sm', (b) => b.map((x) => x.textContent.replace(/\s+/g, ''))), ['🥣Cerealนักสืบ2คน', '🐺Werewolfกับบอท', '🧊CountFastนับรูป', '⚫Shadowtilesดวลเลข', '🔢Secretnumberทายเลข', '🪨Carry13ห้ามถึง13'], 'the menu: 🥣 🐺 🧊 ⚫ 🔢 🪨 with names');
+        assert.deepEqual(await pc.page.$$eval('#u-games-menu .btn-sm', (b) => b.map((x) => x.textContent.replace(/\s+/g, ''))), ['🥣Cereal2-playerdetective', '🐺Werewolfvsbots', '🧊CountFastcountshapes', '⚫Shadowtilesnumberduel', '🔢Secretnumberguess1–100', '🪨Carry13stayunder13'], 'the menu: 🥣 🐺 🧊 ⚫ 🔢 🪨 with names');
         assert.equal(await pc.page.getAttribute('#u-games-chip', 'aria-expanded'), 'true');
         await pc.page.keyboard.press('Escape'); assert.equal(await pc.page.isVisible('#u-games-menu'), false, 'Esc closes it');
         await pc.page.click('#u-games-chip'); await pc.page.mouse.click(5, 700); assert.equal(await pc.page.isVisible('#u-games-menu'), false, 'a tap outside closes it');
