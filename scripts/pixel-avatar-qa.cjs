@@ -74,6 +74,23 @@ for (const f of ['functions/game-top-rank.js', 'public/game-top-rank.js']) {
   assert.deepEqual((await page.evaluate(() => window.__w)).slice(-1), [['update', 'users', 'U1', { pixel: want }]]);
   assert.equal(await page.evaluate((c) => { const d = document.createElement('div'); d.innerHTML = PixelAvatar.svg(c, 29); return document.querySelector('#pxa-face .pxa').innerHTML === d.innerHTML; }, want), true, 'the title-row face redraws');
 
+  // V101.399 (owner pick A, mockup-wolf-me-seat/): the sheet's Name field — starts with your name, keeps what you typed across rail taps,
+  // saved to users.nickName only when changed, the title-row tooltip follows; 🐺 lobby header = the face, 🐺 seat 1 = your pixel + your name
+  await page.click('#pxa-face'); assert.equal(await page.$eval('#pxa-name', (i) => i.value), 'Ditto', 'the Name field starts with your name');
+  assert.deepEqual(await page.$$eval('#pxModal .pxa-rl', (e) => e.length), 7, 'the Name row is not one of the rails');
+  await page.fill('#pxa-name', 'Dee'); await page.click('#pxModal .pxa-rail[data-k="0"] button:nth-child(' + (+want[0] + 1) + ')');
+  assert.equal(await page.$eval('#pxa-name', (i) => i.value), 'Dee', 'a rail tap keeps what you typed');
+  await page.click('#pxa-save');
+  assert.deepEqual([await page.evaluate(() => window.myUserDoc.nickName), (await page.evaluate(() => window.__w)).slice(-1)[0], await page.$eval('#pxa-face', (b) => b.title), await page.evaluate(() => PixelAvatar.name())], ['Dee', ['update', 'users', 'U1', { nickName: 'Dee' }], '✏️ Dee', 'Dee']);
+  await page.click('#pxa-face'); await page.click('#pxa-save');
+  assert.deepEqual((await page.evaluate(() => window.__w)).slice(-1)[0], ['update', 'users', 'U1', { pixel: want }], 'an unchanged name writes nothing');
+  await page.evaluate(() => { R13.close(); localStorage.setItem('wolfTourSeen', '1'); wolfOpen(); });
+  assert.ok(await page.$('#wolfModal .ww-top #pxa-face .pxa svg'), '🐺 lobby: the face on the title row');
+  await page.evaluate(() => { WW.start(); WW.night(); });
+  const me = await page.$eval('#wolfModal .ww-seat.me', (s) => ({ px: !!s.querySelector('.f .pxa svg'), name: [...s.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent.trim()).join('') }));
+  assert.deepEqual(me, { px: true, name: 'Dee' }, '🐺 seat 1 = your pixel + your name');
+  await page.evaluate(() => WW.close());
+
   // the row is in the other room games' lobbies too
   await page.evaluate(() => R13.close());
   for (const [open, modal] of [['secretOpen', 'snModal'], ['bwOpen', 'bwModal']]) {

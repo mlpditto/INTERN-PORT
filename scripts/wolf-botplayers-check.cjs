@@ -14,7 +14,7 @@ assert.equal(fs.readFileSync(path.join(root, 'functions', 'wolf-ai.js'), 'utf8')
 const B = require(path.join(root, 'functions', 'wolf-bot.js'));
 const W = require(path.join(root, 'functions', 'wolf-rules.js'));
 const AI = require(path.join(root, 'functions', 'wolf-ai.js'));
-assert.deepEqual(B.BOT_NAMES.slice(0, 3), ['ต้น', 'ใบ', 'ฟ้า']);
+assert.deepEqual(B.BOT_NAMES.slice(0, 3), ['Tom', 'Ann', 'Ben']);
 assert.equal(B.LEVELS[2], '🌙 เที่ยงคืน');
 
 // ---- tiny Firestore ------------------------------------------------------------------------------------------------------
@@ -103,7 +103,7 @@ async function runOut(code, from) {
   await press(1, 'bot:+:' + code); await press(1, 'bot:+:' + code); out = take();
   lob = lastEdit(out).body;
   assert.equal(lob.message_id, lobbyMsg, 'the same lobby message');
-  assert.match(lob.text, /👥 3\/10 · Pond, Mint, Beam\n🤖 2 · ต้น ใบ · 🌙 เที่ยงคืน\n✅ ครบแล้ว หัวห้องกด ▸ เริ่ม/);
+  assert.match(lob.text, /👥 3\/10 · Pond, Mint, Beam\n🤖 2 · Tom Ann · 🌙 เที่ยงคืน\n✅ ครบแล้ว หัวห้องกด ▸ เริ่ม/);
   assert.deepEqual(Object.keys(G(code).players).sort(), ['501', '502', '503', 'bot1', 'bot2']);
   assert.equal(G(code).players.bot2.seat, 5);
   // level cycles 🌙 → 🌕 → 🌆 → 🌙
@@ -111,12 +111,12 @@ async function runOut(code, from) {
   await press(1, 'lvl:' + code); assert.match(lastEdit(take()).body.text, /🌆 หัวค่ำ/);
   await press(1, 'lvl:' + code); assert.match(lastEdit(take()).body.text, /🌙 เที่ยงคืน/); assert.equal(G(code).level, 2);
   // −1 removes the last bot; +1 brings the next free name back
-  await press(1, 'bot:-:' + code); assert.match(lastEdit(take()).body.text, /🤖 1 · ต้น · /);
-  await press(1, 'bot:+:' + code); assert.match(lastEdit(take()).body.text, /🤖 2 · ต้น ใบ · /);
+  await press(1, 'bot:-:' + code); assert.match(lastEdit(take()).body.text, /🤖 1 · Tom · /);
+  await press(1, 'bot:+:' + code); assert.match(lastEdit(take()).body.text, /🤖 2 · Tom Ann · /);
   // 10 seats in all: 3 humans + 7 bots, the 8th bot is refused and ▸ เข้าร่วม goes away
   for (let i = 0; i < 5; i++) await press(1, 'bot:+:' + code);
   out = take(); lob = lastEdit(out).body;
-  assert.match(lob.text, /🤖 7 · ต้น ใบ ฟ้า นนท์ มุก ภู แพร · /);
+  assert.match(lob.text, /🤖 7 · Tom Ann Ben Jo Max May Sam · /);
   assert.ok(!lob.reply_markup.inline_keyboard[0].some((b) => b.url), 'no ▸ เข้าร่วม at 10 seats');
   await press(1, 'bot:+:' + code); assert.match(alert(take()), /เต็มแล้ว/);
   await dm(4, '/start ' + code); assert.match(take()[0].body.text, /เต็มแล้ว/, 'a human cannot join a full table either');

@@ -204,9 +204,9 @@ async function openRoom(host, chatId, n) {
   g = G(d);
   assert.equal(g.status, 'day', 'a bot hunter does not pause the game');
   const morning = group(out, Cc).find((x) => x.method === 'sendMessage').body.text;
-  const m = /🏹 ต้น 🤖 ยิง (.+?) 💀/.exec(morning);
+  const m = /🏹 Tom 🤖 ยิง (.+?) 💀/.exec(morning);
   assert.ok(m, 'the morning line carries the bot\'s shot: ' + morning);
-  assert.match(morning, /^☀️ เช้าวันที่ 1 · เมื่อคืน 💀 ต้น 🤖 ตาย/);
+  assert.match(morning, /^☀️ เช้าวันที่ 1 · เมื่อคืน 💀 Tom 🤖 ตาย/);
   const victim = Object.keys(g.players).find((id) => m[1] === g.players[id].name + (/^bot/.test(id) ? ' 🤖' : ''));
   assert.equal(store.get(SP(d)).alive[victim], false, 'the shot victim is dead');
   assert.notEqual(victim, 'bot1');

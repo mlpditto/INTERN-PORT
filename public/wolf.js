@@ -3,7 +3,9 @@
    speak as tags; you tap a seat, then 🤨 / 👍 / 🔮) → 🗳 vote (the bots' counts on the seats, you add yours or ⏭) → night …
    → reveal. Rules = wolf-rules.js (the same file the Telegram bot uses), the bots = wolf-ai.js; this file draws and stores.
    A player's role shows when they die. No timer (the bots answer at once). State = localStorage wolf_v1_<userId>; reads and
-   writes nothing in Firestore. Entry: the 🐺 button beside 🥣 on Schedule (wolfOpen). Handlers hang off window.WW. */
+   writes nothing in Firestore. Entry: the 🐺 button beside 🥣 on Schedule (wolfOpen). Handlers hang off window.WW.
+   V101.399 (owner pick A, mockup-wolf-me-seat/): seat 1 is you — your pixel face (PixelAvatar) and the name from the pixel sheet's
+   Name field (users.nickName); the lobby header carries the face (tap = ✏️). */
 (function () {
     'use strict';
     var W = window.WolfRules, AI = window.WolfAI;
@@ -42,7 +44,8 @@
     var rng = Math.random;
 
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-    function nm(id) { return g.names[id]; }
+    function nm(id) { return id === g.me && window.PixelAvatar && PixelAvatar.name ? PixelAvatar.name() : g.names[id]; }   // V101.399 your seat = your name (the pixel sheet's Name)
+    function face(id) { if (id === g.me && window.PixelAvatar) { var px = PixelAvatar.mine(); if (px) return PixelAvatar.face(px, 26, ''); } return g.faces[id]; }   // V101.399 your seat = your pixel
     function alive() { return g.ids.filter(function (id) { return g.st.alive[id]; }); }
     function myRole() { return g.st.roles[g.me]; }
     function meAlive() { return !!g.st.alive[g.me]; }
@@ -162,9 +165,9 @@
         if (g.phase === 'night') { var r = myRole(); if (r === 'witch' && !(g.st.witch.heal || g.st.witch.poison)) r = 'villager'; return 'night-' + r; }
         return g.phase === 'day' ? 'day' : g.phase === 'vote' ? 'vote' : null;
     }
-    function top(title, pills, noSound) {   // V101.357: 🔊 / 🔇 in the game screens (the lobby header has ❓ instead — one row at 320 px)
+    function top(title, pills, noSound, lead) {   // V101.357: 🔊 / 🔇 in the game screens (the lobby header has ❓ instead — one row at 320 px)
         var on = !window.WWSound || WWSound.on();
-        return '<div class="ww-top"><h3>' + title + '</h3>' + (pills || '') + (noSound ? '' : '<button type="button" class="ww-x" id="ww-snd" onclick="WW.snd()" aria-label="Sound" aria-pressed="' + on + '">' + (on ? '🔊' : '🔇') + '</button>')
+        return '<div class="ww-top">' + (lead || '') + '<h3>' + title + '</h3>' + (pills || '') + (noSound ? '' : '<button type="button" class="ww-x" id="ww-snd" onclick="WW.snd()" aria-label="Sound" aria-pressed="' + on + '">' + (on ? '🔊' : '🔇') + '</button>')
             + '<button type="button" class="ww-x"' + (noSound ? '' : ' style="margin-left:6px"') + ' onclick="WW.back()" aria-label="Close">✕</button></div>';
     }
     function pill(s, cls) { return '<span class="ww-pill' + (cls ? ' ' + cls : '') + '">' + s + '</span>'; }
@@ -192,7 +195,7 @@
             var cls = 'ww-seat' + (id === g.me ? ' me' : '') + (dead ? ' dead' : '') + (can ? ' pick' : '') + (opts.on === id ? ' on' : '');
             h += '<button type="button" class="' + cls + '" data-id="' + id + '"' + (can ? ' onclick="WW.tap(\'' + id + '\')"' : ' disabled') + '>'
                 + '<span class="n">' + (i + 1) + '</span>' + (opts.votes && opts.votes[id] ? '<span class="vc">' + opts.votes[id] + '</span>' : mark(id))
-                + '<span class="f">' + (dead ? '💀' : g.faces[id]) + '</span>' + esc(nm(id)) + (opts.tags === false && !dead ? '' : tagHtml(id)) + (opts.extra && !dead ? opts.extra(id) : '') + '</button>';
+                + '<span class="f">' + (dead ? '💀' : face(id)) + '</span>' + esc(nm(id)) + (opts.tags === false && !dead ? '' : tagHtml(id)) + (opts.extra && !dead ? opts.extra(id) : '') + '</button>';
         });
         return h + '</div>';
     }
@@ -200,7 +203,7 @@
     function voteWords() { var v = g.lastVote; return !v ? '' : v.out ? '🗳 ' + esc(nm(v.out)) + ' ถูกโหวตออก ' + E[g.st.roles[v.out]] : '🗳 เสมอ · ไม่มีใครออก'; }
 
     function lobbyHtml() {
-        var c = W.defaultCounts(ui.n), was = ui.prevN ? W.defaultCounts(ui.prevN) : null, h = '<div class="ww ww-lobby">' + top('<span title="มนุษย์หมาป่า · 늑대인간">🐺 Werewolf</span>', pill('🤖<span class="tx"> เล่นกับบอท</span>', 'acc') + (window.WWTour ? '<button type="button" class="ww-pill ww-help" id="ww-help" onclick="WWTour.open()" title="วิธีเล่น">❓</button>' : ''), true) + (window.GameTop ? GameTop.line('wolf') : '');   // V101.375 🏆 Top 3
+        var c = W.defaultCounts(ui.n), was = ui.prevN ? W.defaultCounts(ui.prevN) : null, h = '<div class="ww ww-lobby">' + top('<span title="มนุษย์หมาป่า · 늑대인간">🐺 Werewolf</span>', pill('🤖<span class="tx"> เล่นกับบอท</span>', 'acc') + (window.WWTour ? '<button type="button" class="ww-pill ww-help" id="ww-help" onclick="WWTour.open()" title="วิธีเล่น">❓</button>' : ''), true, window.PixelAvatar ? PixelAvatar.faceBtn() : '') + (window.PixelAvatar ? PixelAvatar.readyLine() : '') + (window.GameTop ? GameTop.line('wolf') : '');   // V101.375 🏆 Top 3 · V101.399 your pixel face on the title row (tap = ✏️, name inside)
         // V101.387 (owner: "รองรับได้ถึง 10 player"): every table size the engine deals, like the Telegram room (was 5 / 7 / 9)
         h += '<div class="ww-row"><span class="ww-mini">👥 คน</span>' + [5, 6, 7, 8, 9, 10].map(function (n) { return '<button type="button" class="ww-chip' + (ui.n === n ? ' on' : '') + '" onclick="WW.set(\'n\',' + n + ')">' + n + '</button>'; }).join('') + '</div>';
         var rs = W.ROLES.filter(function (r) { return c[r]; }), tip = rs.indexOf(ui.tip) >= 0 ? ui.tip : null;
