@@ -8,7 +8,7 @@ Owner picks:
 - rooms (PR 2): 3–7 people, 🤖 fill up to 4
 - screen A, the dark table (`mock-vault/vault-swap-mockups.png` in the agent workspace)
 
-Entry points: the 8th tile in the games row (🌙 Midnight) and 🌙 in the PC 🎮 menu. With 8 games the phone row became 2 rows of 4 (it was one line of 7) — **the owner has not picked this layout yet**.
+Entry points: the 8th tile in the games row (🌙 Midnight) and 🌙 in the PC 🎮 menu. With 8 games the phone row is 2 rows of 4 (it was one line of 7) — owner pick A, 2026-11-29 (options A 2 × 4 / B one line of 8 / C one line that scrolls, `shots-midnight/midnight-market-real.png` in the agent workspace).
 
 Files:
 - `public/midnight-rules.js` (`window.MidnightRules`, and node `require`): the rules, pure. The dice are one number in `g.rs`, so a seed always deals the same game and the future room referee can store a game and go on.
