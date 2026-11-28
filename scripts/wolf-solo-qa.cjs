@@ -73,6 +73,7 @@ const INDEX = pathToFileURL(path.resolve('public/index.html')).href;
   assert.deepEqual((await tiles()).map((t) => t[1]), ['🐺หมาป่า3', '🔮ผู้หยั่งรู้1', '🛡️การ์ด1', '🧪แม่มด1', '👤ชาวบ้าน4'], '10 players → 🐺 3, 👤 4');
   await page.evaluate(() => { WW.start(); WW.night(); });   // the role card, then the table
   assert.equal(await page.$$eval('#wolfModal .ww-seat', (s) => s.length), 10, '10 seats');
+  assert.deepEqual(await page.$$eval('#wolfModal .ww-seat', (s) => s.map((x) => [...x.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent.trim()).join('')).filter((n) => n !== 'คุณ' && !/^[A-Z][a-z]{1,2}$/.test(n))), [], 'V101.398: the bots carry English one-syllable names (Tom, Ann, Ben, Jo…)');
   assert.equal(await page.$eval('#wolfModal .ww-seats', (el) => new Set([...el.children].map((c) => c.offsetTop)).size), 3, '10 seats = 3 rows of the 4-column table');
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'no sideways scroll at 10 seats');
   await page.evaluate(() => WW.back());

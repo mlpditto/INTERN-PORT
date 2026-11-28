@@ -4,6 +4,7 @@
 // (night-<role> under the seats, day, vote) and "ข้ามคำใบ้" stops them all; 🔊 / 🔇 in the game header is remembered and the tour
 // shows the same; a whole game logs its cues in order (night first, vote, out / death / morning, win or lose last) and nothing
 // plays before the first tap; with 🔇 the cues still log (for this script) but Web Audio is never created.
+// V101.398 (owner pick A): 👆 under the seat it taps, dots are buttons, ‹ back, vote count low, morning line = practice reveals the role.
 // V101.361 (pick D, fixed height): the tour plays INSIDE the 🐺 popup (not fixed / full screen), the lobby hides under it and comes back
 // on close, ถัดไป ▸ stays in one place across scenes, the night scene darkens the popup; on a 927×960 PC screen the buttons sit inside
 // the popup right under the content (the old full-screen page left ~500 px of empty space); closing the popup mid-tour ends the tour.
@@ -41,10 +42,19 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   await page.evaluate(() => WWTour.go(0));
   const scenes = [];
   for (let i = 0; i < 6; i++) {
-    scenes.push(await page.evaluate(() => ({ t: document.querySelector('#wolfTour .wt-top h3').innerText, dark: document.getElementById('wolfTour').classList.contains('dark'), dot: [...document.querySelectorAll('#wolfTour .wt-dots i')].findIndex((d) => d.classList.contains('on')), say: document.getElementById('wt-say').innerText })));
+    scenes.push(await page.evaluate(() => ({ t: document.querySelector('#wolfTour .wt-top h3').innerText, dark: document.getElementById('wolfTour').classList.contains('dark'), dot: [...document.querySelectorAll('#wolfTour .wt-dots .wt-dot')].findIndex((d) => d.classList.contains('on')), say: document.getElementById('wt-say').innerText })));
     if (i < 5) await page.click('#wt-next');
   }
   assert.deepEqual(scenes.map((x) => x.dot), [0, 1, 2, 3, 4, 5], 'six scenes, the dot follows');
+  // V101.398 (owner pick A): the 👆 under the seat it taps (the name readable), dots you can tap, ‹ back from scene 2 on, the vote count in the lower corner, the morning line says practice reveals the role
+  const geo = (i) => page.evaluate((i) => { WWTour.go(i); const s = document.querySelector('#wolfTour .wt-seat.tap'), f = document.querySelector('#wolfTour .wt-fing'), seats = document.querySelector('#wolfTour .wt-seats'), vc = document.querySelector('#wolfTour .wt-seat.tap .vc'); const sr = s.getBoundingClientRect(), fr = f.getBoundingClientRect(), nx = seats.nextElementSibling.getBoundingClientRect(); return { under: fr.top >= sr.bottom - 8, x: Math.abs((fr.left + fr.right) / 2 - (sr.left + sr.right) / 2) < 14, clear: fr.bottom <= nx.top + 1, vc: vc ? vc.getBoundingClientRect().top > (sr.top + sr.bottom) / 2 : null }; }, i);
+  for (const i of [1, 3, 4]) assert.deepEqual(await geo(i), { under: true, x: true, clear: true, vc: i === 4 ? true : null }, 'scene ' + (i + 1) + ': 👆 under its seat, centred, not over the next block; the vote count low');
+  assert.match(scenes[2].say, /เป็น 🔮 \(ฝึกกับ 🤖\)[\s\S]*Practice shows the dead one’s role\./, 'the morning line says practice reveals the role');
+  await page.evaluate(() => WWTour.go(0)); assert.equal(await page.$('#wt-prev'), null, 'scene 1: no ‹');
+  await page.click('#wolfTour .wt-dots .wt-dot:nth-child(4)'); assert.equal(await page.$eval('#wolfTour .wt-top h3', (h) => h.innerText), '☀️ วัน 1', 'tap the 4th dot → scene 4');
+  assert.ok(await page.$eval('#wolfTour .wt-dots .wt-dot', (d) => d.getBoundingClientRect().height >= 28 && d.getBoundingClientRect().width >= 30), 'each dot is a 30 × 28 px target');
+  await page.click('#wt-prev'); assert.equal(await page.$eval('#wolfTour .wt-top h3', (h) => h.innerText), '☀️ เช้าวันที่ 1', '‹ goes back one scene');
+  await page.evaluate(() => WWTour.go(5)); assert.ok(await page.$('#wt-prev'), 'the last scene has ‹ too');
   for (let i = 0; i < 30 && !voice.includes('s6'); i++) await page.waitForTimeout(100);   // the last clip's request can land after the click on a slow runner
   assert.deepEqual([...new Set(voice)].sort(), ['s1', 's2', 's3', 's4', 's5', 's6'], 'each scene reads itself (wolf-voice/sN.mp3): ' + voice);
   assert.ok(require('fs').existsSync('public/wolf-voice/c-vote.mp3') && require('fs').existsSync('public/wolf-voice/c-night-villager.mp3'), 'all 13 clips are in the repo');
