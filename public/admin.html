@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nika Admin (V102.711)</title>
+    <title>Nika Admin (V102.712)</title>
     <link rel="stylesheet" href="ai-capsule.css?v=V102.475">
     <link rel="stylesheet" href="drug-toolbar.css?v=V102.486">
     <link rel="stylesheet" href="drug-form-ui.css?v=V102.135">
@@ -1918,6 +1918,16 @@
         /* V94.79: lookup trigger docked inside the input's right edge — saves the
            separate button row. Input gets right padding so text clears the button. */
         .dca-brand-input-wrap { position:relative; }
+        /* V102.712 (owner pick B): 📄 inside the 🇹🇭 box — read a leaflet; the filled box is green, the source line under it */
+        .dca-ocr-wrap { position:relative; min-width:0; }
+        .dca-ocr-wrap textarea { width:100%; padding-right:44px; box-sizing:border-box; }
+        .dca-ocr-btn { position:absolute; right:8px; top:8px; width:30px; height:30px; min-height:0; margin:0; padding:0; border:1px solid #c4b5fd; border-radius:999px; background:#f5f3ff; color:#6d28d9; font-size:14px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+        .dca-ocr-btn:disabled { opacity:.7; cursor:wait; }
+        .dca-ocr-wrap textarea.dca-ocr-ok, .dca-ocr-wrap textarea.dca-ocr-ok:focus { border-color:#22c55e !important; background:#f0fdf4 !important; box-shadow:0 0 0 1px #22c55e; }
+        .dca-ocr-src { grid-column:2; margin-top:-4px; font-size:11.5px; color:#15803d; display:flex; flex-wrap:wrap; gap:4px 8px; align-items:center; }
+        .dca-ocr-src.warn { color:#b45309; }
+        .dca-ocr-src button { min-height:0; width:auto; margin:0; padding:0 2px; border:0; background:none; color:inherit; font:inherit; text-decoration:underline; cursor:pointer; }
+        .dca-ocr-doc { grid-column:1/-1; max-height:240px; overflow:auto; white-space:pre-wrap; border:1px solid #c4b5fd; background:#faf5ff; border-radius:10px; padding:8px 10px; font-size:12.5px; line-height:1.55; color:#1e1b4b; }
         .dca-brand-input-wrap > input {
             width:100%; padding: 8px 88px 8px 12px; border: 1.5px solid #e2e8f0;
             border-radius: 8px; font-size: 0.9em; box-sizing: border-box; font-family: inherit;
@@ -9047,7 +9057,7 @@
 <script src="up-next.js?v=V102.650"></script>
 <script src="cereal-admin.js?v=V102.700"></script>
 <script src="game-top-rank.js?v=V102.711"></script>
-<script src="game-admin.js?v=V102.711"></script>
+<script src="game-admin.js?v=V102.712"></script>
 <script src="tester-admin.js?v=V102.711"></script>
 <script src="quiz-matrix.js?v=V102.503"></script>
 <script src="rank-quiz.js?v=V102.484"></script>
@@ -9076,6 +9086,7 @@
     <script src="jev-primer-repeats.js?v=V102.698"></script>
     <link rel="stylesheet" href="read-first-dedupe.css?v=V102.698">
     <script src="read-first-dedupe.js?v=V102.698"></script>
+    <script src="drug-leaflet-ocr.js?v=V102.712"></script>
     <script src="quiz-watch-story.js?v=V102.697"></script>
     <script src="quiz-watch-tour.js?v=V102.686"></script>
     <link rel="stylesheet" href="case-card-multi.css?v=V102.583">
@@ -17498,7 +17509,13 @@ document.addEventListener('DOMContentLoaded', applyAdminTheme);</script>
                             <textarea id="dca-f-indication" rows="3" placeholder="Approved clinical uses…"></textarea>
 
                             <label class="dc-cat-label dc-field-safe" for="dca-f-indicationThFda" title="Copy the wording from the Thai FDA registration / product information. Leave empty if you do not have it — AI does not fill this." data-th-title="คัดลอกจากทะเบียนหรือเอกสารกำกับยาของ อย. เว้นว่างถ้าไม่มี AI ไม่เติมช่องนี้" data-kr-title="태국 FDA 등록 문구를 그대로 옮겨 적으세요. 없으면 비워 두세요 — AI는 이 칸을 채우지 않습니다"><span class="dca-ico-lab" aria-label="Indication (Thai FDA)">🇹🇭</span></label>
+                            <!-- V102.712 (owner pick B, mockup-iapp-ocr-drug): 📄 in the box reads a leaflet (PDF / photo) with iApp OCR; the ข้อบ่งใช้ paragraph fills the box -->
+                            <div class="dca-ocr-wrap">
                             <textarea id="dca-f-indicationThFda" rows="2" placeholder="Indication (Thai FDA) — copy it from the registered leaflet…" data-th-placeholder="ข้อบ่งใช้ตามทะเบียน อย. — คัดลอกจากเอกสารกำกับยา…" data-kr-placeholder="태국 FDA 허가 적응증 — 첨부문서에서 복사…"></textarea>
+                            <button type="button" id="dca-ocr-btn" class="dca-ocr-btn lang-no-toggle" onclick="dcaOcrPick()" title="Read a drug leaflet (PDF or photo) with iApp OCR — the ข้อบ่งใช้ paragraph goes in this box. 0.15 IC a page" data-th-title="อ่านเอกสารกำกับยา (PDF หรือรูปถ่าย) ด้วย iApp OCR แล้วใส่หัวข้อข้อบ่งใช้ในช่องนี้ หน้าละ 0.15 IC" data-kr-title="iApp OCR로 첨부문서(PDF·사진)를 읽고 적응증 단락을 넣습니다. 페이지당 0.15 IC" aria-label="Read a leaflet">📄</button>
+                            <input type="file" id="dca-ocr-file" accept="application/pdf,image/jpeg,image/png,image/webp" hidden onchange="dcaOcrFile(this)">
+                            </div>
+                            <div id="dca-ocr-src" class="dca-ocr-src lang-no-toggle" hidden></div>
 
                             <label class="dc-cat-label dc-field-hard-no" for="dca-f-redFlags" title="Signs that mean refer now, one per line. Interns see them as 🚩 Refer now." data-th-title="อาการที่ต้องส่งต่อทันที บรรทัดละข้อ ผู้เรียนเห็นเป็นหัวข้อ 🚩 ส่งต่อทันที" data-kr-title="즉시 의뢰가 필요한 증상, 한 줄에 하나. 인턴에게는 🚩 즉시 의뢰로 보입니다"><span class="dca-ico-lab" aria-label="Red flags">🚩</span></label>
                             <textarea id="dca-f-redFlags" rows="3" placeholder="Red flags — refer now, one per line…" data-th-placeholder="ส่งต่อทันที บรรทัดละข้อ…" data-kr-placeholder="즉시 의뢰 — 한 줄에 하나…"></textarea>
@@ -50740,6 +50757,7 @@ ${buildAlabastaCaseSnapshot(caseItem)}`;
         }
 
         function dcaFillForm(data) {
+            if (typeof window.dcaOcrReset === 'function') window.dcaOcrReset();   // V102.712: another drug → no leaflet line from the last one
             // V95.65: bind once — editing any field inside a verified AI-drafted
             // section flips it back to unverified so the green ✓ never lies.
             if (!dcaState._verifyInputBound) {
