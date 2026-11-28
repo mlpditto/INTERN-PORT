@@ -19,7 +19,7 @@
     }
     function seatOf(g) { return !g || !g.players ? null : g.players.a && g.players.a.authUid === st.uid ? 'a' : g.players.b && g.players.b.authUid === st.uid ? 'b' : null; }
     function oth(s) { return s === 'a' ? 'b' : 'a'; }
-    function face(p, sz) { sz = sz || 22; return p && p.pic ? '<img class="bwo-av" style="width:' + sz + 'px;height:' + sz + 'px" src="' + esc(p.pic) + '" alt="" referrerpolicy="no-referrer">' : '<span class="bwo-av" style="width:' + sz + 'px;height:' + sz + 'px">' + esc(((p && p.name) || '?').slice(0, 1)) + '</span>'; }
+    function face(p, sz) { sz = sz || 22; if (p && p.px && window.PixelAvatar && PixelAvatar.ok(p.px)) return PixelAvatar.face(p.px, sz, 'bwo-av'); return p && p.pic ? '<img class="bwo-av" style="width:' + sz + 'px;height:' + sz + 'px" src="' + esc(p.pic) + '" alt="" referrerpolicy="no-referrer">' : '<span class="bwo-av" style="width:' + sz + 'px;height:' + sz + 'px">' + esc(((p && p.name) || '?').slice(0, 1)) + '</span>'; }
     function css() {
         if (document.getElementById('bwo-css')) return;
         var s = document.createElement('style'); s.id = 'bwo-css';

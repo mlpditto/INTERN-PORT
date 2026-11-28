@@ -105,7 +105,7 @@
     function lobbyHtml() {
         var M = multi && window.SNOnline;   // V101.380
         return '<div class="sn"><div class="sn-top"><h3>🔢 Secret number</h3>' + HQ + X + '</div>'
-            + (window.GameTop ? GameTop.line(M ? 'secretOn' : 'secret') : '')
+            + (window.GameTop ? GameTop.line(M ? 'secretOn' : 'secret') : '') + (window.PixelAvatar ? PixelAvatar.lobbyRow() : '')   // V101.391 🧑‍🎨 my pixel + ✏️
             + (window.SNOnline ? '<div class="sn-lvs" role="group" aria-label="Mode">' + [[0, '🤖 Practice'], [1, '🌐 Friends']].map(function (k) { var on = !!k[0] === !!multi; return '<button type="button" id="sn-mode-' + k[0] + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" onclick="SN.multi(' + k[0] + ')">' + k[1] + '</button>'; }).join('') + '</div>' : '')
             + (M ? SNOnline.lobbyHtml() + '</div>' : '<div class="sn-note">🤖 picks 1–100 · 🎫 1 a question · fewest wins</div>'
             + '<div class="sn-lvs" role="group" aria-label="Help">' + [1, 2, 3, 4].map(function (k) { var b = get('snBest_h' + k); return '<button type="button" id="sn-h' + k + '" class="' + (help === k ? 'on' : '') + '" aria-pressed="' + (help === k) + '" onclick="SN.help(' + k + ')">' + HELP[k][0] + ' ' + HELP[k][1] + (b ? ' · ' + b + '🎫' : '') + '</button>'; }).join('') + '</div>'

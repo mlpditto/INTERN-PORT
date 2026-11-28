@@ -54,7 +54,7 @@ async function handle(request, deps) {
         const u = await db.collection('users').doc(uid).get();
         if (!u.exists) throw new HttpsError('permission-denied', 'Open the app from LINE first');
         const x = u.data() || {};
-        return { uid, authUid, name: String(x.nickName || x.firstName || x.displayName || 'Intern').slice(0, 20), pic: /^https:\/\//.test(x.pictureUrl || '') ? String(x.pictureUrl).slice(0, 500) : '' };
+        return { uid, authUid, name: String(x.nickName || x.firstName || x.displayName || 'Intern').slice(0, 20), pic: /^https:\/\//.test(x.pictureUrl || '') ? String(x.pictureUrl).slice(0, 500) : '', px: /^\d{7}$/.test(x.pixel || '') ? x.pixel : '' };   // V101.391 🧑‍🎨 users.pixel
     }
     if (d.game === 'secret') return require('./room-secret.js').handle(request, deps, me);   // V101.380 🔢 เลขลับ หลายคน
     if (d.game === 'rock13') return require('./room-rock13.js').handle(request, deps, me);   // V101.389 🪨 Carry 13 online

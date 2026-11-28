@@ -129,8 +129,8 @@
         // V101.389 🤖 Practice │ 🌐 With friends (rock13-online.js, rooms through roomAct)
         var mode = window.R13Online ? '<div class="r13-rail" role="group" aria-label="Mode">' + [[0, '🤖 Practice'], [1, '🌐 With friends']].map(function (k) { var on = !!k[0] === multi; return '<button type="button" id="r13-mode-' + k[0] + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" onclick="R13.online(' + k[0] + ')">' + k[1] + '</button>'; }).join('') + '</div>' : '';
         var rounds = '<div class="r13-rail" role="group" aria-label="Rounds">' + [7, 14].map(function (n) { return '<button type="button" id="r13-r' + n + '" class="' + (cfg.rounds === n ? 'on' : '') + '" aria-pressed="' + (cfg.rounds === n) + '" onclick="R13.set(\'rounds\',' + n + ')">' + n + (multi ? ' rounds' : ' รอบ') + '</button>'; }).join('') + '</div>';
-        if (multi && window.R13Online) return '<div class="r13">' + top() + (window.GameTop ? GameTop.line('rock13') : '') + mode + rounds + R13Online.lobbyHtml() + '</div>';
-        return '<div class="r13">' + top() + (window.GameTop ? GameTop.line('rock13') : '') + mode
+        if (multi && window.R13Online) return '<div class="r13">' + top() + (window.GameTop ? GameTop.line('rock13') : '') + (window.PixelAvatar ? PixelAvatar.lobbyRow() : '') + mode + rounds + R13Online.lobbyHtml() + '</div>';
+        return '<div class="r13">' + top() + (window.GameTop ? GameTop.line('rock13') : '') + (window.PixelAvatar ? PixelAvatar.lobbyRow() : '') + mode
             + '<div class="r13-note">🔴🟢🔵 ห้ามแบกถึง 13 · 🪨 น้อยสุดชนะ</div>'
             + '<div class="r13-rail" role="group" aria-label="Players">' + [3, 4, 5, 6, 7].map(function (n) { return '<button type="button" id="r13-n' + n + '" class="' + (cfg.n === n ? 'on' : '') + '" aria-pressed="' + (cfg.n === n) + '" onclick="R13.set(\'n\',' + n + ')">👥 ' + n + '</button>'; }).join('') + '</div>'
             + rounds
