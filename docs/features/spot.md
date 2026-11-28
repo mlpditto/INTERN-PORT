@@ -59,6 +59,24 @@ Files:
 
 ⚠️ The look-alike pairs and the strengths are real drug data. A pharmacist should check `DRUGS` in `spot-scene.js` before the game is promoted.
 
+## 🌐 Friends — the room referee (functions only so far)
+
+Owner 2026-11-28: "เล่นกับเพื่อนพร้อมเดิมพัน" (plan PR 2). Picks: the room layout of `mock-spot-room/`; 2 players = winner 💎+2 · loser 0; no "found all" bonus in a room; after 📊 the host goes on or the room does in 30 s.
+
+- `functions/room-spot.js`, reached through `roomAct` with `game: 'spot'` (`functions/room-act.js`). Live rooms, 2–7 friends, no 🤖, 4-digit code, the host picks the 🥄 level and starts.
+- `functions/spot-scene.js` is a copy of `public/spot-scene.js`; `room-spot-check` fails when the two differ.
+- The referee makes the shelf. `rooms/{id}/secret/scene` (no client reads it) keeps the seed, the changed shelf, the list of changes, every bet and every answer. The room shows only what the step allows:
+  - 👀 look 60 s: the original shelf. ✓ Ready from everyone moves on early.
+  - 🎲 bet 10 s: who has bet, never the bet. A bet you cannot pay is refused; a missing bet is ×1.
+  - 🔍 find 90 s: the changed shelf only (the original is taken out), who has answered. A missing answer is no taps.
+  - 📊 show 30 s: the changes, everyone's bet, answer, points and 💎. The host's ▸ goes on at once.
+- My own bet and answer: `rooms/{id}/hand/{login}`.
+- 💎: everyone starts with 3. Points = (found − wrong, never below 0) × the bet. ×1.5 costs 💎1, ×2 costs 💎2 and 💎1 more past 2 wrong taps. Rank of the round (ties share a rank, 0 points earns nothing): rank 1 💎+2; with 3+ players rank 2 💎+1 and the lowest (rank 3 or lower) 💎−1. 💎 never goes below 0.
+- 3 rounds, a new shelf each. Final rank: most 💎, then most points. 🏳 leaving takes the seat out; one player left ends the game.
+- Each step has a clock; after it any player's `claim` moves the room on.
+- No rules change: `rooms`, `rooms/*/secret`, `rooms/*/hand` are the rules the other rooms use. **Deploy:** `firebase deploy --only functions:roomAct`.
+- ⚠️ A phone holds the original and later the changed shelf, so a script could compare them: this is a game among friends (plan §6), not a contest.
+
 ## QA
 
 - `scripts/spot-qa.cjs` checks:
@@ -67,3 +85,4 @@ Files:
   - the clock walks the rail by itself; unpaid bets are grey; taps toggle and stop at the cap; the reveal marks and names every change
   - `game_plays` spot `l2`; 320 px fits
 - `scripts/games-row-qa.cjs`, `rock13-qa.cjs`, `secret-qa.cjs`: the row has 7 tiles.
+- `scripts/room-spot-check.cjs` (node, in-memory Firestore): the scene copy matches; the rank 💎 table; create / join / start; what the room shows in each step and what stays secret; bets and answers validated and hidden; the scoring and 💎; host ▸ and the 30 s; the clocks and `claim`; 3 rounds to the final rank; 🏳; cancel.
