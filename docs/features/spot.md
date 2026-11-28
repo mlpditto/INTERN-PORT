@@ -17,7 +17,7 @@ Files:
   - It also holds the scoring and draws the SVG.
 - `public/spot.js` (`window.SP`, `window.spotOpen`): the screens, the clock, the CSS, the tour and the sound cues.
   - The cues are made in the phone, with no audio files.
-- Voice: `public/spot-voice/t1…t5.mp3` (Paxa foithong, 40 kbps mono).
+- Voice: `public/spot-voice/t1…t5.mp3` — Google Cloud Text-to-Speech, Gemini TTS `gemini-2.5-flash-tts`, voice **Kore** (the Thai voice of `clip-captions.js`), 40 kbps mono, 7–16 s each. Owner 2026-11-28: all five re-recorded in one voice when Paxa ran out of credits after t1–t3 (the other games' tours are Paxa foithong). What the voice says is the Thai line with signs and emoji written out (×1.5 → คูณหนึ่งจุดห้า, 💎 → เพชร).
 
 ## How it plays
 
