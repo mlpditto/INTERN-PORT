@@ -8,7 +8,7 @@
     var MED = ['🥇', '🥈', '🥉'];
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function fmt(game, v) { if (game === 'secret') return v + '🎫'; if (game !== 'count') return String(v); v = Math.round(v); return Math.floor(v / 60) + ':' + ('0' + (v % 60)).slice(-2); }
-    function av(p) { return p.pic ? '<img class="gtop-av" src="' + esc(p.pic) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '<span class="gtop-av">' + esc((p.name || '?').slice(0, 1)) + '</span>'; }
+    function av(p) { if (p.px && window.PixelAvatar && PixelAvatar.ok(p.px)) return PixelAvatar.face(p.px, 20, 'gtop-av'); return p.pic ? '<img class="gtop-av" src="' + esc(p.pic) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '<span class="gtop-av">' + esc((p.name || '?').slice(0, 1)) + '</span>'; }
     function css() {
         if (document.getElementById('gtop-css')) return;
         var s = document.createElement('style'); s.id = 'gtop-css';

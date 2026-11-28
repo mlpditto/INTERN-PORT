@@ -374,7 +374,7 @@ exports.gameTop = onCall({ timeoutSeconds: 30 }, async (request) => {
         const db = admin.firestore();
         const [ps, us] = await Promise.all([
             db.collection('game_plays').select('userId', 'game', 'win', 'score', 'sec', 'endedAt').get(),
-            db.collection('users').select('nickName', 'firstName', 'displayName', 'pictureUrl', 'isIgnored').get(),
+            db.collection('users').select('nickName', 'firstName', 'displayName', 'pictureUrl', 'pixel', 'isIgnored').get(),
         ]);
         const users = new Map(us.docs.map((d) => [d.id, d.data()]));
         const ranked = gt.rank(ps.docs.map((d) => d.data()), now, (id) => { const u = users.get(id); return !u || u.isIgnored === true; });
@@ -383,7 +383,7 @@ exports.gameTop = onCall({ timeoutSeconds: 30 }, async (request) => {
     const { ranked, users } = gameTopCache;
     const who = (id) => {
         const u = users.get(id) || {};
-        return { name: String(u.nickName || u.firstName || u.displayName || '…').trim().slice(0, 40), pic: /^https:\/\//.test(u.pictureUrl || '') ? String(u.pictureUrl).slice(0, 500) : '' };
+        return { name: String(u.nickName || u.firstName || u.displayName || '…').trim().slice(0, 40), pic: /^https:\/\//.test(u.pictureUrl || '') ? String(u.pictureUrl).slice(0, 500) : '', px: /^\d{7}$/.test(u.pixel || '') ? u.pixel : '' };   // V101.392 🧑‍🎨
     };
     return { week: ranked.week, games: gt.forIntern(ranked, String((request.data && request.data.userId) || ''), who) };
 });

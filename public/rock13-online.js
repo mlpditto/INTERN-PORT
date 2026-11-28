@@ -18,7 +18,7 @@
         return { 'no-room': 'No open room with that code', full: 'Room full (7)', started: 'Already started', 'not-your-turn': 'Not your turn', alone: 'Need 1 more player', early: 'They still have time', 'bad-pick': 'Pick a card and a chip', 'no-pass': 'You cannot pass now', 'bad-place': 'Tap a carrier' }[c]
             || (e && e.code === 'permission-denied' ? 'Open the app in LINE first' : 'Failed · try again');
     }
-    function face(p, sz) { sz = sz || 24; return p && p.pic ? '<img class="r13o-av" style="width:' + sz + 'px;height:' + sz + 'px" src="' + esc(p.pic) + '" alt="" referrerpolicy="no-referrer">' : '<span class="r13o-av" style="width:' + sz + 'px;height:' + sz + 'px">' + (p && p.bot ? '🤖' : esc(((p && p.name) || '?').slice(0, 1))) + '</span>'; }
+    function face(p, sz) { sz = sz || 24; if (p && p.px && window.PixelAvatar && PixelAvatar.ok(p.px)) return PixelAvatar.face(p.px, sz, 'r13o-av'); return p && p.pic ? '<img class="r13o-av" style="width:' + sz + 'px;height:' + sz + 'px" src="' + esc(p.pic) + '" alt="" referrerpolicy="no-referrer">' : '<span class="r13o-av" style="width:' + sz + 'px;height:' + sz + 'px">' + (p && p.bot ? '🤖' : esc(((p && p.name) || '?').slice(0, 1))) + '</span>'; }
     function name(g, u) { return u === st.uid ? 'You' : esc((g.players[u] || {}).name || '?'); }
     function css() {
         if (document.getElementById('r13o-css')) return;

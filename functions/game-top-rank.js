@@ -57,7 +57,7 @@
             ['week', 'all'].forEach(function (k) {
                 var list = ranked.boards[g][k], i = -1;
                 list.forEach(function (r, j) { if (i < 0 && r.userId === me) i = j; });
-                out[g][k] = { top: list.slice(0, 3).map(function (r) { var w = who(r.userId) || {}; return { v: r.v, name: w.name || '…', pic: w.pic || '' }; }),
+                out[g][k] = { top: list.slice(0, 3).map(function (r) { var w = who(r.userId) || {}; return { v: r.v, name: w.name || '…', pic: w.pic || '', px: w.px || '' }; }),
                     me: i < 0 ? null : { r: i + 1, v: list[i].v } };
             });
         });

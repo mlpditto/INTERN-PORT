@@ -44,7 +44,7 @@ assert.deepEqual(ro.boards.secretOn.week.map((x) => x.userId + x.v), ['d2', 'c1'
 assert.deepEqual(ro.boards.secret.week.map((x) => x.userId + x.v), ['b6', 'a7'], 'online games stay off the 🧠 board');
 assert.equal(R.board(SO, 'secret', null, true).find((x) => x.userId === 'a').n, 2, 'the 🧠 board counts practice games only');
 const mine = R.forIntern(r, 'c', (id) => ({ name: 'N' + id, pic: '' }));
-assert.deepEqual(mine.bw.week, { top: [{ v: 1, name: 'Nb', pic: '' }, { v: 1, name: 'Na', pic: '' }], me: null });
+assert.deepEqual(mine.bw.week, { top: [{ v: 1, name: 'Nb', pic: '', px: '' }, { v: 1, name: 'Na', pic: '', px: '' }], me: null });   // V101.392 🧑‍🎨 px rides along
 assert.deepEqual(R.forIntern(r, 'a', (id) => ({ name: id })).count.all.me, { r: 1, v: 50 });
 
 // ---- the intern page ----

@@ -227,7 +227,7 @@
     function lobbyHtml() {
         var s = get();
         return '<div class="bw"><div class="bw-top"><h3>⚫⚪ ไพ่เงา</h3><button type="button" class="bw-snd" id="bw-help" onclick="BW.tour()" aria-label="How to play" title="How to play" data-th-title="วิธีเล่น">❓</button>' + snd() + X + '</div>'
-            + (window.GameTop ? GameTop.line('bw', true) : '')   // V101.375 🏆 Top 3 (game-top.js)
+            + (window.GameTop ? GameTop.line('bw', true) : '') + (window.PixelAvatar ? PixelAvatar.lobbyRow() : '')   // V101.375 🏆 Top 3 (game-top.js) · V101.392 🧑‍🎨 my pixel + ✏️
             + '<div class="bw-rule">ไพ่ 0–8 คนละชุด · คู่ ⚫ คี่ ⚪<br>เห็นแค่สีของอีกฝั่ง · เลขสูงกว่าชนะตานั้น<br>9 ตา · ถึง 5 ก่อนชนะ</div>'
             + '<div class="bw-lvs bw-who" role="group" aria-label="Who">' + [['bot', '🤖 บอท'], ['two', '📱 2 คน'], ['online', '🌐 เพื่อน'], ['live', '🔢 ห้องสด']].filter(function (k) { return k[0] === 'bot' || k[0] === 'two' || window.BWOnline; }).map(function (k) { var on = k[0] === 'bot' ? !two && !net : k[0] === 'two' ? two : net === k[0]; return '<button type="button" id="bw-who-' + k[0] + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" onclick="BW.who(\'' + k[0] + '\')">' + k[1] + '</button>'; }).join('') + '</div>'
             + (net && window.BWOnline ? BWOnline.lobbyHtml(net === 'live') + '</div>' : '')
