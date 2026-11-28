@@ -212,17 +212,40 @@
         $('u-pdf-size').textContent = has ? (pdfFile.size / 1048576).toFixed(1) + ' MB' : '';
         $('u-pdf-idle').hidden = has;   // V101.261: attached = the button shows the size instead of the word
         $('u-pdf-mb').hidden = !has;
-        $('u-pdf-mb').textContent = has ? '📄 ' + $('u-pdf-size').textContent : '';
+        $('u-pdf-mb').textContent = has ? (pdfFile.type === 'image/jpeg' ? '📷 ' : '📄 ') + $('u-pdf-size').textContent : '';
     }
     function pdfRefuse(msg) { window.showToast(msg); }
+    // V101.391 (owner 2026-11-28): a PHOTO of the case note works too. It is shrunk here to a JPEG (long side ≤ 2200 px — iApp reads Thai
+    // print best from 1,000 px up) so a phone photo fits the 5 MB slot; the phone's file name stays here like a PDF's.
+    var PHOTO_SIDE = 2200;
+    function shrinkPhoto(f) {
+        return new Promise(function (ok, no) {
+            var img = new Image(), u = URL.createObjectURL(f);
+            img.onload = function () {
+                var k = Math.min(1, PHOTO_SIDE / Math.max(img.naturalWidth, img.naturalHeight)), cv = document.createElement('canvas');
+                cv.width = Math.round(img.naturalWidth * k); cv.height = Math.round(img.naturalHeight * k);
+                cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); URL.revokeObjectURL(u);
+                var q = 0.86, out = function (b) { if (!b) return no(new Error('no jpeg')); if (b.size >= PDF_MAX && q > 0.5) { q -= 0.12; return cv.toBlob(out, 'image/jpeg', q); } ok(b); };
+                cv.toBlob(out, 'image/jpeg', q);
+            };
+            img.onerror = function () { URL.revokeObjectURL(u); no(new Error('not an image')); };
+            img.src = u;
+        });
+    }
     function pdfPicked(input) {
         var f = input.files && input.files[0];
         input.value = '';
         if (!f) return;
+        if (/^image\//.test(f.type)) {
+            return shrinkPhoto(f).then(function (b) {
+                if (b.size >= PDF_MAX) return pdfRefuse('Photo must be under 5 MB · รูปต้องไม่เกิน 5 MB');
+                pdfFile = { blob: b, name: f.name, size: b.size, type: 'image/jpeg' }; pdfPaint();
+            }).catch(function () { pdfRefuse('Could not open this photo · เปิดรูปไม่ได้'); });
+        }
         if (f.size >= PDF_MAX) return pdfRefuse('PDF must be under 5 MB · ไฟล์ต้องไม่เกิน 5 MB');
         f.slice(0, 5).text().then(function (head) {
             if (head !== '%PDF-') return pdfRefuse('This file is not a PDF · ไฟล์นี้ไม่ใช่ PDF');
-            pdfFile = f; pdfPaint();
+            pdfFile = { blob: f, name: f.name, size: f.size, type: 'application/pdf' }; pdfPaint();
         }).catch(function () { pdfRefuse('Could not open this file · เปิดไฟล์ไม่ได้'); });
     }
     function pdfInit() {
@@ -235,8 +258,9 @@
         if (!pdfFile) return null;
         var user = await ensureFirebaseAuthReady(10000);
         if (!user) throw new Error('Firebase auth is required');
-        var path = 'case-files/' + user.uid + '/' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10) + '.pdf';
-        await firebase.storage().ref(path).put(pdfFile, { contentType: 'application/pdf' });
+        var photo = pdfFile.type === 'image/jpeg';
+        var path = 'case-files/' + user.uid + '/' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10) + (photo ? '.jpg' : '.pdf');
+        await firebase.storage().ref(path).put(pdfFile.blob, { contentType: pdfFile.type });
         return { path: path, size: pdfFile.size };
     };
     window.caseFileDiscard = function (file) {

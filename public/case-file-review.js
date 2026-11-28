@@ -5,7 +5,9 @@
 (function () {
     const STALE_MS = 5 * 60 * 1000;
     // V102.550: a retry can ask another reader. One press reads, and the file then goes to that vendor; the read after Send stays Gemini.
-    const READERS = { 'gemini-3.8-flash': 'Gemini', 'claude-opus-5-5': 'Opus 5.5', 'gpt-6-sol': 'Sol 6' }, OTHERS = [['claude-opus-5-5', 'Anthropic'], ['gpt-6-sol', 'OpenAI']];
+    // V102.713: the read after Send (and a plain "Try again") = iApp OCR → Gemini on the text; Gemini alone reads the page (handwriting)
+    const READERS = { 'iapp-gemini': 'iApp', 'gemini-3.8-flash': 'Gemini', 'claude-opus-5-5': 'Opus 5.5', 'gpt-6-sol': 'Sol 6' }, OTHERS = [['gemini-3.8-flash', 'Google'], ['claude-opus-5-5', 'Anthropic'], ['gpt-6-sol', 'OpenAI']];
+    const isPhoto = f => /\.(jpg|png|webp)$/.test((f && f.path) || '');
     const KIND = { hn: 'an HN', name: 'a patient name', id: 'an ID number', address: 'an address', phone: 'a phone number' };
     let stop = null, current = null, wide = false, url = '', boxId = 'case-file-box';
 
@@ -19,7 +21,7 @@
     const groupDocs = id => db.collection('cases').where('caseGroup.id', '==', id).get();
 
     const reader = read => (read && READERS[read.model]) || 'Gemini';
-    const others = cls => OTHERS.map(([m, who]) => '<button type="button" class="' + cls + '" data-a="retry" data-m="' + m + '" title="Read with ' + READERS[m] + '. The file goes to ' + who + '.">' + READERS[m] + '</button>').join('');
+    const others = cls => OTHERS.map(([m, who]) => '<button type="button" class="' + cls + '" data-a="retry" data-m="' + m + '" title="Read with ' + READERS[m] + '. The file goes to ' + who + '.' + (m === 'gemini-3.8-flash' ? ' Best for handwriting.' : '') + '">' + READERS[m] + '</button>').join('');
     // V102.550: the admin corrects each line and its heading here; Copy all puts the same lines under their headings.
     const HEADS = ['CC', 'HPI', 'PMH', 'U/D', 'MH', 'ALL', 'DRPs', 'Plan', 'Assessment'];
     const headOpts = label => [...new Set([...HEADS, 'Note', label])].map(h => '<option' + (h === label ? ' selected' : '') + '>' + esc(h) + '</option>').join('');
@@ -32,7 +34,7 @@
         }).filter(Boolean).join('\n\n');
     }
     function statusHtml(read) {
-        if (!read) return '<div class="crf-done"><span>Gemini has not read this file</span><div class="crf-acts"><button type="button" class="crf-btn" data-a="retry">Read now</button>' + others('crf-btn') + '</div></div>';
+        if (!read) return '<div class="crf-done"><span>Not read yet</span><div class="crf-acts"><button type="button" class="crf-btn" data-a="retry">Read now</button>' + others('crf-btn') + '</div></div>';
         if (read.status === 'reading' && Date.now() - ms(read.at) < STALE_MS) return '<div class="crf-done"><span><i class="crai-dot"></i>' + reader(read) + ' is reading…</span></div>';
         if (read.status !== 'done') return '<div class="crf-done bad"><span>' + reader(read) + ' could not read this file. You can still open it.</span><div class="crf-acts"><button type="button" class="crf-btn" data-a="retry">Try again</button>' + others('crf-btn') + '</div></div>';
         const n = (read.rows || []).filter(r => r.unsure).length;
@@ -52,7 +54,7 @@
     function compareHtml(c) {
         const read = c.caseFileRead, g = c.caseGroup;
         const rows = (read.rows || []).map((r, i) => '<tr class="' + (r.unsure ? 'low' : '') + '" data-i="' + i + '"><th><select class="crf-head" aria-label="Heading">' + headOpts(r.label) + '</select></th><td><textarea class="crf-line" rows="1" aria-label="' + esc(r.label) + ' text">' + esc(r.text) + '</textarea>' + (r.unsure ? '<em>Unsure · check the page</em>' : '') + '</td></tr>').join('');
-        const left = g ? '<div class="crf-page crf-pages" id="crf-pages"><div class="crf-of">Drawing the pages…</div></div>' : '<iframe class="crf-page" title="The intern\'s PDF" src="' + esc(url) + '"></iframe>';
+        const left = g ? '<div class="crf-page crf-pages" id="crf-pages"><div class="crf-of">Drawing the pages…</div></div>' : isPhoto(c.caseFile) ? '<div class="crf-page crf-pages"><img src="' + esc(url) + '" alt="The intern\'s photo" style="width:100%"></div>' : '<iframe class="crf-page" title="The intern\'s PDF" src="' + esc(url) + '"></iframe>';
         const where = g ? 'case ' + g.index + ' of ' + g.total + ' · ' + range(g).toLowerCase() : Number(read.pages || 1) + (read.pages > 1 ? ' pages' : ' page');
         return '<div class="crf-two">' + left + '<div class="crf-text"><div class="crf-tl"><span>Text read <button type="button" class="crf-btn" data-a="copy" title="Copy this case, sorted by heading">⧉ Copy all</button></span><span class="crf-of">' + reader(read) + ' · ' + where + '</span></div><table>' + rows + '</table><div class="crf-warn">⚠️ <span>Check each line against the page.</span></div></div></div>';
     }
@@ -80,7 +82,7 @@
         const f = c.caseFile, g = c.caseGroup, read = c.caseFileRead;
         if (g) return '<div class="crf-file"><span aria-hidden="true">📄</span><div class="crf-name"><b>Case ' + g.index + ' of ' + g.total + '</b><small>' + range(g) + ' of ' + Number(g.filePages || 0) + ' · from the intern</small></div>'
             + '<button type="button" class="crf-open" data-a="prev"' + (g.index > 1 ? '' : ' disabled') + '>Previous</button><button type="button" class="crf-open" data-a="next"' + (g.index < g.total ? '' : ' disabled') + '>Next</button></div>';
-        return '<div class="crf-file"><span aria-hidden="true">📄</span><div class="crf-name"><b>PDF</b><small>' + (read && read.pages ? Number(read.pages) + ' pages · ' : '') + mb(f.size) + ' · from the intern</small></div><button type="button" class="crf-open" data-a="open">Open</button></div>';
+        return '<div class="crf-file"><span aria-hidden="true">' + (isPhoto(f) ? '📷' : '📄') + '</span><div class="crf-name"><b>' + (isPhoto(f) ? 'Photo' : 'PDF') + '</b><small>' + (read && read.pages ? Number(read.pages) + ' pages · ' : '') + mb(f.size) + ' · from the intern</small></div><button type="button" class="crf-open" data-a="open">Open</button></div>';
     }
     function render() {
         const box = $(boxId), shell = box && box.closest('.case-score-modal-shell');
@@ -137,11 +139,11 @@
         else if (a === 'next') go(1);
         else if (a === 'fix') openFix(c);
         else if (a === 'retry') {
-            c.caseFileRead = { status: 'reading', model, at: { toMillis: () => Date.now() } }; render();
+            c.caseFileRead = { status: 'reading', model: model || 'iapp-gemini', at: { toMillis: () => Date.now() } }; render();   // no model named = the server's default, iApp
             adminApp.functions().httpsCallable('readCaseFile')({ caseDocId: c.id, retry: true, ...(model ? { model } : {}) }).catch(e => console.warn('readCaseFile', e));
         } else if (a === 'clear') await db.collection('cases').doc(c.id).update({ 'caseFileRead.identifiersCleared': true });
         else if (a === 'delete') {
-            if (!confirm('Delete this PDF? The case and its score stay.')) return;
+            if (!confirm('Delete this file? The case and its score stay.')) return;
             if (c.caseGroup) await removeWholeFile(c); else await removeFile(c.id, c.caseFile.path);
             c.caseFile = null; render();
             toast('File deleted', 'success');

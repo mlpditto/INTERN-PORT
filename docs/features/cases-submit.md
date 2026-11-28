@@ -9,7 +9,8 @@ Intern: the ＋ sunset tab on the right edge ▸ Submit New. Home ▸ My Cases.
 ## Scripts that drive it
 
 - `fab-edge-tab-qa` — the ＋ is a sunset tab on the right edge, above the Safari bar
-- `submit-new-lean-qa` — Submit New lean: chips, pinned Submit, one-row Case form
+- `submit-new-lean-qa` — Submit New lean: chips, pinned Submit, one-row Case form; 📄 takes a PDF or a phone photo (shrunk to a JPEG, long side 2200, uploaded as .jpg)
+- `case-file-review-qa` — the Case file read (V102.713): iApp OCR → Gemini on the text only (names / HN hidden), thin text or iApp down → Gemini reads the page; admin Review card, Compare, retry with iApp / Gemini / Opus / Sol
 - `case-kidney-qa` — 🫘 Kidney tile (V101.304): icons-only tiles (short word when open), Thai-CKD score (age · SBP · waist · DM +3), kit rules (criterion / ≥7 / 3–6 + modifier), strip result, saved as `kidney` only when touched
 - `submit-product-launcher-qa` — the Product launcher opens the in-modal Product pane
 - `submit-event-qa` — new invites start private (invite-ticket.js)

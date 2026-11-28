@@ -7,12 +7,15 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
 const load = Module._load;
 const sent = [];
-const reply = u => u.includes('anthropic') ? { content: [{ type: 'text', text: 'Here it is:\n' + ANSWER }], usage: { input_tokens: 3, output_tokens: 4 } }
+// V102.713: iApp OCR answers Markdown per page; __ocr sets what it says (or makes it fail) for the next read
+let __ocr = { markdown: '', pages: [{ page: 1, markdown: '**CC** ไอมา 3 วัน ผู้ป่วยนายสมชาย ใจดี HN 123456 · **PMH** เบาหวาน' }], iapp: { page: 1, char: 60 } };
+const reply = u => u.includes('iapp.co.th') ? (() => { if (__ocr instanceof Error) throw __ocr; return __ocr; })()
+    : u.includes('anthropic') ? { content: [{ type: 'text', text: 'Here it is:\n' + ANSWER }], usage: { input_tokens: 3, output_tokens: 4 } }
     : u.includes('openai') ? { output: [{ content: [{ type: 'output_text', text: ANSWER }] }], usage: { input_tokens: 3, output_tokens: 4, total_tokens: 7 } }
     : { candidates: [{ content: { parts: [{ text: ANSWER }] } }], usageMetadata: { totalTokenCount: 7 } };
 const ANSWER = '{"pages":1,"rows":[{"page":1,"label":"CC","text":"cough"}]}';
 Module._load = (id, ...a) => id === 'axios' ? { post: async (u, b, o) => { sent.push({ u, b, o }); return { data: reply(u) }; } } : load(id, ...a);
-const { allowedPath, parseRead, MAX_BYTES, validParts, partRead, applySplit, READERS, readPdf } = require('../functions/case-file-read.js');
+const { allowedPath, parseRead, MAX_BYTES, validParts, partRead, applySplit, READERS, readPdf, readFile, IAPP, MODEL, TYPES, TEXT_PROMPT } = require('../functions/case-file-read.js');
 Module._load = load;
 
 const admin = fs.readFileSync('public/admin.html', 'utf8').replace(/\r\n/g, '\n');
@@ -22,7 +25,9 @@ const js = fs.readFileSync('public/case-file-review.js', 'utf8');
 
 // the path comes from a field the intern wrote: only their own folder
 assert.equal(allowedPath('case-files/u1/a1_b-2.pdf', 'u1'), true);
-for (const p of ['case-files/u2/a.pdf', 'case-files/u1/../u2/a.pdf', 'case-files/u1/x/a.pdf', 'certificate-files/1/a.pdf', 'case-files/u1/a.png', '', null]) assert.equal(allowedPath(p, 'u1'), false, 'refused: ' + p);
+for (const p of ['case-files/u2/a.pdf', 'case-files/u1/../u2/a.pdf', 'case-files/u1/x/a.pdf', 'certificate-files/1/a.pdf', 'case-files/u1/a.gif', 'case-files/u1/a.jpeg', '', null]) assert.equal(allowedPath(p, 'u1'), false, 'refused: ' + p);
+for (const p of ['case-files/u1/k1-x.jpg', 'case-files/u1/k1.png', 'case-files/u1/k1.webp']) assert.equal(allowedPath(p, 'u1'), true, 'V102.713: a photo of the case note: ' + p);
+assert.deepEqual(Object.keys(TYPES), ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
 assert.equal(allowedPath('case-files//a.pdf', ''), false, 'no owner, no read');
 assert.equal(MAX_BYTES, 5 * 1024 * 1024);
 
@@ -57,9 +62,11 @@ assert.deepEqual(partRead({ rows: [{ page: 1 }, { page: 4 }], identifiers: [{ pa
 // rule + wiring
 const rule = /match \/case-files\/\{ownerUid\}\/\{fileName\} \{([\s\S]*?)\n    \}/.exec(rules);
 assert.ok(rule, 'storage rule');
-assert.ok(/allow read: if isAdmin\(\);/.test(rule[1]) && /auth\.uid == ownerUid/.test(rule[1]) && /5 \* 1024 \* 1024/.test(rule[1]) && /contentType == 'application\/pdf'/.test(rule[1]), 'admin reads; owner creates a PDF under 5 MB');
+assert.ok(/allow read: if isAdmin\(\);/.test(rule[1]) && /auth\.uid == ownerUid/.test(rule[1]) && /5 \* 1024 \* 1024/.test(rule[1]) && /contentType\.matches\('application\/pdf\|image\/\(jpeg\|png\|webp\)'\)/.test(rule[1]), 'admin reads; owner creates a PDF or photo under 5 MB');
 assert.ok(!/allow update/.test(rule[1]), 'no overwrite');
-assert.ok(/exports\.readCaseFile = onCall\(\{ secrets: \['GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY'\]/.test(fn), 'callable');
+assert.ok(/exports\.readCaseFile = onCall\(\{ secrets: \['GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'IAPP_API_KEY'\]/.test(fn), 'callable (V102.713: + the iApp key)');
+assert.ok(/!reader\.TYPES\[meta\.contentType\]/.test(fn) && /reader\.readFile\(buf, \{[^}]*iapp: process\.env\.IAPP_API_KEY \}, model, meta\.contentType\)/.test(fn), 'the stored type goes to the reader; a PDF or a photo only');
+assert.ok(/read = \{ \.\.\.rest, model: used \}/.test(fn), 'the card says who really read it (iApp, or Gemini when iApp gave too little)');
 assert.ok(/c\.authUid !== request\.auth\.uid/.test(fn) && /reader\.allowedPath\(file\.path, c\.authUid\)/.test(fn), 'own case, own folder');
 assert.ok(/callerAdmin && retry/.test(fn), 'only the admin reads twice');
 assert.ok(/<script src="case-file-review\.js\?v=V102\.\d+"><\/script>/.test(admin));
@@ -74,12 +81,40 @@ assert.ok(!/score|bonus/i.test(js.replace(/^\/\/.*$/gm, '').replace(/its score s
 
 // V102.550: each reader gets the PDF itself and comes back through the same parser; only the admin's retry can name one
 const readerCheck = async () => {
-    assert.deepEqual(Object.keys(READERS), ['gemini-3.8-flash', 'claude-opus-5-5', 'gpt-6-sol']);
-    for (const m of Object.keys(READERS)) assert.equal((await readPdf(Buffer.from('x'), { gemini: 'g', anthropic: 'a', openai: 'o' }, m)).read.rows[0].text, 'cough', m);
+    assert.deepEqual(Object.keys(READERS), ['iapp-gemini', 'gemini-3.8-flash', 'claude-opus-5-5', 'gpt-6-sol']);
+    for (const m of Object.keys(READERS).slice(1)) assert.equal((await readPdf(Buffer.from('x'), { gemini: 'g', anthropic: 'a', openai: 'o' }, m)).read.rows[0].text, 'cough', m);
     assert.ok(sent[0].u.includes('generativelanguage') && sent[1].u.includes('api.anthropic.com') && sent[2].u.includes('api.openai.com'));
     assert.equal(sent[1].b.messages[0].content[0].source.media_type, 'application/pdf');
     assert.ok(sent[2].b.input[0].content[0].file_data.startsWith('data:application/pdf;base64,'));
-    assert.ok(/callerAdmin && retry && reader\.READERS\[request\.data\.model\] \? request\.data\.model : reader\.MODEL/.test(fn), 'an intern always gets Gemini');
+    assert.ok(/callerAdmin && retry && reader\.READERS\[request\.data\.model\] \? request\.data\.model : reader\.IAPP/.test(fn), 'V102.713: the read after Send (and an intern) gets iApp → Gemini');
+    // V102.713: iApp reads the photo, Gemini gets only the TEXT (never the page) with the hide-the-identifiers rules
+    sent.length = 0;
+    let out = await readFile(Buffer.from('JPEGDATA'), { gemini: 'g', iapp: 'K-iapp' }, IAPP, 'image/jpeg');
+    assert.equal(sent.length, 2);
+    assert.equal(sent[0].u, 'https://api.iapp.co.th/v3/store/ocr/document/markdown');
+    const f = sent[0].b.get('file');
+    assert.deepEqual([sent[0].o.headers.apikey, f.type, f.name, Buffer.from(await f.arrayBuffer()).toString()], ['K-iapp', 'image/jpeg', 'case.jpg', 'JPEGDATA'], 'the photo goes to iApp as multipart file, the key in the header');
+    const g = sent[1].b.contents[0].parts;
+    assert.ok(sent[1].u.includes('generativelanguage') && !g.some(x => x.inlineData), 'Gemini gets no page, only text');
+    assert.ok(/=== page 1 ===\n\*\*CC\*\* ไอมา 3 วัน/.test(g[0].text) && g[1].text === TEXT_PROMPT, 'the OCR text by page + the text prompt');
+    assert.ok(/NEVER copy a patient name, HN, national ID number/.test(TEXT_PROMPT) && /\[hidden\]/.test(TEXT_PROMPT) && /OCR text/.test(TEXT_PROMPT) && !/This PDF is/.test(TEXT_PROMPT), 'the text prompt keeps every hiding rule');
+    assert.deepEqual([out.model, out.iappPages, out.read.rows[0].text], [IAPP, 1, 'cough'], 'the answer goes through the same parser; model = iApp');
+    // too little text (handwriting) → Gemini reads the page itself
+    __ocr = { markdown: '', pages: [{ page: 1, markdown: '  ' }, { page: 2, markdown: 'ก ข' }], iapp: { page: 2 } }; sent.length = 0;
+    out = await readFile(Buffer.from('%PDF'), { gemini: 'g', iapp: 'K' }, IAPP, 'application/pdf');
+    assert.deepEqual([sent.length, out.model, sent[1].b.contents[0].parts[0].inlineData.mimeType], [2, MODEL, 'application/pdf'], 'handwriting: iApp\'s thin text is dropped, Gemini reads the page');
+    // iApp down → Gemini reads the page; no iApp key → straight to Gemini
+    __ocr = Object.assign(new Error('503'), { response: { status: 503 } }); sent.length = 0;
+    out = await readFile(Buffer.from('x'), { gemini: 'g', iapp: 'K' }, IAPP, 'image/png');
+    assert.deepEqual([out.model, sent[1].b.contents[0].parts[0].inlineData.mimeType], [MODEL, 'image/png'], 'iApp failed → Gemini on the photo');
+    sent.length = 0; out = await readFile(Buffer.from('x'), { gemini: 'g' }, IAPP, 'application/pdf');
+    assert.deepEqual([sent.length, out.model], [1, MODEL], 'no iApp key → Gemini');
+    // a photo to the other readers goes as an image
+    sent.length = 0;
+    await readFile(Buffer.from('x'), { anthropic: 'a' }, 'claude-opus-5-5', 'image/webp');
+    await readFile(Buffer.from('x'), { openai: 'o' }, 'gpt-6-sol', 'image/jpeg');
+    assert.deepEqual([sent[0].b.messages[0].content[0].type, sent[0].b.messages[0].content[0].source.media_type], ['image', 'image/webp']);
+    assert.ok(sent[1].b.input[0].content[0].type === 'input_image' && sent[1].b.input[0].content[0].image_url.startsWith('data:image/jpeg;base64,'));
 };
 
 const applyCheck = async () => {
@@ -129,10 +164,10 @@ window.confirm = () => true; window.showToast = () => {};
 
             await start({ id: 'c1', caseFile: file });
             assert.match(await p.textContent(box), /1\.4 MB · from the intern/);
-            assert.match(await p.textContent(box), /has not read/, 'the read never started: the admin can start it');
+            assert.match(await p.textContent(box), /Not read yet/, 'the read never started: the admin can start it');
             await p.click(box + ' [data-a="retry"]');
             assert.deepEqual((await p.evaluate(() => window.calls)).pop(), ['readCaseFile', { caseDocId: 'c1', retry: true }]);
-            assert.match(await p.textContent(box), /Gemini is reading/);
+            assert.match(await p.textContent(box), /iApp is reading/, 'V102.713: a plain retry = the default reader, iApp');
 
             await p.evaluate(f => window.push({ caseFile: f, caseFileRead: { status: 'failed' } }), file);
             assert.match(await p.textContent(box), /could not read/);
@@ -184,7 +219,7 @@ window.confirm = () => true; window.showToast = () => {};
             assert.equal(await p.locator(box + ' [data-a="open"]').count(), 0, 'one card never opens the whole file');
             await p.evaluate(f => { window.caseFileReview.start({ id: 'c5', caseFile: f, caseFileRead: { status: 'done', pages: 6, unsplit: true, rows: [], identifiers: [] } }); }, file);
             assert.match(await p.textContent(box), /not split/);
-            assert.equal(await p.locator(box + ' .crf-flag [data-a="retry"]').count(), 3, 'Gemini, Opus 5.5 or Sol 6 can try again');
+            assert.equal(await p.locator(box + ' .crf-flag [data-a="retry"]').count(), 4, 'iApp (Try to split), Gemini, Opus 5.5 or Sol 6 can try again');
             await p.click(box + ' [data-a="fix"]');
             await p.waitForSelector('#crf-fix[open]');
             assert.equal(await p.textContent('#crf-fx-used'), '6 of 6 pages used');
