@@ -60,7 +60,7 @@ for (let i = 1; i <= 5; i++) assert.ok(fs.existsSync(path.resolve('public/spot-v
 
   // the doorway: the 7th tile; the first open = the tour, read aloud, rules only
   const tiles = await page.$$eval('#u-games-row .u-game', (b) => b.map((x) => x.textContent.replace(/\s+/g, '')));
-  assert.equal(tiles.length, 7); assert.match(tiles[6], /🪞Memory/);
+  assert.equal(tiles.length, 8); assert.match(tiles[6], /🪞Memory/);
   await page.click('#sch-spot-btn');
   assert.ok(await page.isVisible('#sp-tour'), 'first open = the tour');
   // one page: 5 lines (English, the Thai line the voice reads under it), ▸ Start, no paging, no scrolling at 390 × 844
