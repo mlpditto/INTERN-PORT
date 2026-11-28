@@ -2456,7 +2456,8 @@ exports.importCaseRead = onCall({ secrets: ['GEMINI_API_KEY'], timeoutSeconds: 1
     return { read: out.read };
 });
 
-exports.readCaseFile = onCall({ secrets: ['GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY'], timeoutSeconds: 300, memory: '512MiB' }, async (request) => {
+// V102.713: the read after Send = iApp OCR → Gemini on the text (names hidden); a case file may be a photo (JPEG / PNG / WebP)
+exports.readCaseFile = onCall({ secrets: ['GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'IAPP_API_KEY'], timeoutSeconds: 300, memory: '512MiB' }, async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
     const { caseDocId, retry } = request.data || {};
     if (!caseDocId || typeof caseDocId !== 'string') throw new HttpsError('invalid-argument', 'caseDocId required');
@@ -2471,19 +2472,21 @@ exports.readCaseFile = onCall({ secrets: ['GEMINI_API_KEY', 'ANTHROPIC_API_KEY',
     if (!reader.allowedPath(file.path, c.authUid)) return { skipped: true, reason: 'no-file' };
     if (c.caseFileRead && !(callerAdmin && retry)) return { skipped: true, reason: 'already-read' };
     const stamp = () => admin.firestore.FieldValue.serverTimestamp();
-    const model = callerAdmin && retry && reader.READERS[request.data.model] ? request.data.model : reader.MODEL;
+    const model = callerAdmin && retry && reader.READERS[request.data.model] ? request.data.model : reader.IAPP;
     await ref.update({ caseFileRead: { status: 'reading', model, at: stamp() } });
     try {
         const obj = admin.storage().bucket('intern-port-edfa7.firebasestorage.app').file(file.path);
         const [meta] = await obj.getMetadata();
-        if (Number(meta.size) > reader.MAX_BYTES || meta.contentType !== 'application/pdf') throw new Error('not a PDF under the limit');
+        if (Number(meta.size) > reader.MAX_BYTES || !reader.TYPES[meta.contentType]) throw new Error('not a PDF or photo under the limit');
         const [buf] = await obj.download();
-        const out = await reader.readPdf(buf, { gemini: process.env.GEMINI_API_KEY, anthropic: process.env.ANTHROPIC_API_KEY, openai: process.env.OPENAI_API_KEY }, model);
-        recordAiUsage(reader.READERS[model], model, out.tokens, callerAdmin, 'case_file_read', { inputTokens: out.inputTokens, outputTokens: out.outputTokens });
+        const out = await reader.readFile(buf, { gemini: process.env.GEMINI_API_KEY, anthropic: process.env.ANTHROPIC_API_KEY, openai: process.env.OPENAI_API_KEY, iapp: process.env.IAPP_API_KEY }, model, meta.contentType);
+        const used = out.model || model;   // iApp → Gemini, or Gemini on the page when iApp gave too little text
+        if (used === reader.IAPP) recordAiUsage('iapp_ocr', 'openthai-ocr-markdown', 0, callerAdmin, 'case_file_read', { pages: out.iappPages || 0 });
+        recordAiUsage(used === reader.IAPP ? 'gemini-aistudio' : reader.READERS[used], used === reader.IAPP ? reader.MODEL : used, out.tokens, callerAdmin, 'case_file_read', { inputTokens: out.inputTokens, outputTokens: out.outputTokens });
         if (!out.read) throw new Error('unusable answer');
-        const { parts, ...rest } = out.read, read = { ...rest, model };
+        const { parts, ...rest } = out.read, read = { ...rest, model: used };
         if (c.caseGroup) {   // a retry on one card of a split file: only its own pages
-            await ref.update({ caseFileRead: { status: 'done', model, at: stamp(), ...reader.partRead(read, c.caseGroup) } });
+            await ref.update({ caseFileRead: { status: 'done', model: used, at: stamp(), ...reader.partRead(read, c.caseGroup) } });
             return { ok: true, pages: read.pages };
         }
         if (parts.length) {
