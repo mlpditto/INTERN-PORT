@@ -6,6 +6,9 @@
    Voice: each scene / hint reads itself — public/wolf-voice/s1…s6.mp3 and c-<key>.mp3, made once with Paxa TTS (voice foithong, like
    🥣 Cereal; no call at play time, no personal data). Only with 🔊 on; 🔇 / close / the next card stop it. 🔊 / 🔇 = WWSound.
    Reads and writes nothing but localStorage wolfTourSeen / wolfCoachSeen / wolfTourAuto. window.WWTour.
+   V101.398 (owner pick A, mockup-wolf-tour-lean/): the 👆 sits under the seat it taps so the name stays readable, the dots are buttons
+   (tap one = that scene) and ‹ goes back from scene 2 on, the vote count sits in the seat's lower corner, the morning line says the
+   role shows in practice (ฝึกกับ 🤖; the Telegram rooms keep roles until the end); the seats carry the game's English names.
    V101.361 (owner pick D, fixed height — mockup-werewolf-tour-gap/D-all.png): the tour plays INSIDE the 🐺 popup (#wolfModal
    .modal-content, beside #ww-body which it hides), not as a full screen — no empty gap on a tall PC screen. The box keeps the height of
    the tallest scene, so ถัดไป ▸ stays in one place; a night scene turns the whole popup dark. */
@@ -30,7 +33,8 @@
         + '#wolfTour .wt-say{background:#fff;border:1px solid #ddd6fe;border-radius:14px;padding:10px 12px;font-size:.95em;font-weight:800;line-height:1.5;color:#1e293b}'
         + '#wolfTour.dark .wt-say{background:#312e81;border-color:#4338ca;color:#e0e7ff}'
         + '#wolfTour .wt-say small{display:block;font-size:.72em;font-weight:600;color:#94a3b8;margin-top:2px}#wolfTour.dark .wt-say small{color:#a5b4fc}'
-        + '#wolfTour .wt-dots{display:flex;gap:4px;justify-content:center}#wolfTour .wt-dots i{width:6px;height:6px;border-radius:50%;background:#cbd5e1}#wolfTour .wt-dots i.on{background:#7c3aed;width:16px;border-radius:9px}'
+        + '#wolfTour .wt-dots{display:flex;justify-content:center}#wolfTour .wt-dot{width:30px;height:28px;border:0;background:none;padding:0;display:inline-flex;align-items:center;justify-content:center}#wolfTour .wt-dot::before{content:"";width:7px;height:7px;border-radius:50%;background:#cbd5e1}#wolfTour .wt-dot.on::before{width:18px;border-radius:9px;background:#7c3aed}'
+        + '#wolfTour .wt-prev{margin-left:auto;font-size:18px}#wolfTour .wt-prev+.wt-next{margin-left:0}'
         + '#wolfTour .wt-nav{display:flex;gap:8px;align-items:center;margin-top:auto}'
         + '#wolfTour .wt-auto{font-size:.75em;font-weight:800;color:#6d28d9;border:1px solid #ddd6fe;border-radius:999px;padding:5px 11px;background:#fff}#wolfTour .wt-auto.on{background:#7c3aed;color:#fff;border-color:#7c3aed}'
         + '#wolfTour .wt-skip{font-size:.8em;color:#94a3b8;font-weight:700;border:0;background:none;padding:4px}'
@@ -40,11 +44,11 @@
         + '#wolfTour .wt-seat .f{font-size:1.8em;display:block;line-height:1.2}#wolfTour .wt-seat.me{border-color:#b45309;background:#fffbeb}#wolfTour .wt-seat.dead{opacity:.5}'
         + '#wolfTour .wt-seat .tag{display:block;margin-top:2px;font-size:.82em;border-radius:6px;padding:1px 2px;white-space:nowrap;overflow:hidden}'
         + '#wolfTour .tag.r{color:#b91c1c;background:#fee2e2}#wolfTour .tag.g{color:#047857;background:#dcfce7}#wolfTour .tag.v{color:#4338ca;background:#e0e7ff}#wolfTour .tag.o{color:#92400e;background:#fef3c7}'
-        + '#wolfTour .wt-seat .vc{position:absolute;top:2px;right:4px;background:#b91c1c;color:#fff;border-radius:999px;font-size:.8em;min-width:15px;height:15px;line-height:15px}'
+        + '#wolfTour .wt-seat .vc{position:absolute;bottom:3px;right:4px;background:#b91c1c;color:#fff;border-radius:999px;font-size:.8em;min-width:15px;height:15px;line-height:15px}'
         + '#wolfTour.dark .wt-seat{background:#312e81;border-color:#4338ca;color:#e0e7ff}#wolfTour.dark .wt-seat.pick{outline:2px dashed #a5b4fc;outline-offset:-2px}'
         + '#wolfTour .wt-seat.tap{animation:wt-tap 2.4s ease-in-out infinite}@keyframes wt-tap{0%,35%{box-shadow:none}45%,85%{box-shadow:0 0 0 3px #be123c inset}100%{box-shadow:none}}'
         + '#wolfTour.dark .wt-seat.tap{animation-name:wt-tapd}@keyframes wt-tapd{0%,35%{border-color:#4338ca}45%,85%{border-color:#fbbf24}100%{border-color:#4338ca}}'
-        + '#wolfTour .wt-fing{position:absolute;font-size:1.6em;pointer-events:none;animation:wt-f 2.4s ease-in-out infinite;filter:drop-shadow(0 2px 3px rgba(0,0,0,.3))}'
+        + '#wolfTour .wt-seats{margin-bottom:20px}#wolfTour .wt-fing{position:absolute;top:100%;margin-top:-6px;line-height:1;font-size:1.6em;pointer-events:none;animation:wt-f 2.4s ease-in-out infinite;filter:drop-shadow(0 2px 3px rgba(0,0,0,.3))}'
         + '@keyframes wt-f{0%,100%{transform:translate(0,0) scale(1)}40%{transform:translate(-4px,-6px) scale(.88)}55%{transform:translate(-4px,-6px) scale(.82)}}'
         + '#wolfTour .wt-cards{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}#wolfTour .wt-cards span{border-radius:11px;background:#fff;border:1px solid #e2e8f0;text-align:center;font-size:.72em;font-weight:800;padding:6px 0}#wolfTour .wt-cards span i{display:block;font-style:normal;font-size:1.7em}'
         + '#wolfTour .wt-side{display:flex;gap:6px}#wolfTour .wt-side div{flex:1;border-radius:12px;padding:9px;font-size:.8em;font-weight:800;text-align:center;line-height:1.4}#wolfTour .wt-side .v{background:#f0fdf4;color:#15803d}#wolfTour .wt-side .w{background:#fff1f2;color:#be123c}'
@@ -63,17 +67,17 @@
                 + '<div class="wt-side"><div class="v">🏘️ ฝั่งชาวบ้าน<br>ชนะเมื่อ 🐺 ออกครบ</div><div class="w">🐺 ฝั่งหมาป่า<br>ชนะเมื่อเท่ากับคนที่เหลือ</div></div>'; },
           say: 'ทุกคนได้บทลับ 1 ใบ · ไม่มีใครรู้บทคนอื่น', en: 'Everyone gets one secret role.' },
         { t: '🌙 คืน 1', dark: true, pill: '🐺 กัดใคร?', body: function () {
-            return '<div class="wt-seats">' + seat('🙂', 'คุณ') + seat('🦊', 'ต้น', { cls: 'pick tap' }) + seat('🐰', 'ใบ', { cls: 'pick' }) + seat('🐱', 'ฟ้า', { cls: 'pick' }) + '<span class="wt-fing" style="left:32%;top:40%">👆</span></div>'; },
+            return '<div class="wt-seats">' + seat('🙂', 'คุณ') + seat('🦊', 'Tom', { cls: 'pick tap' }) + seat('🐰', 'Ann', { cls: 'pick' }) + seat('🐱', 'Ben', { cls: 'pick' }) + '<span class="wt-fing" style="left:33%">👆</span></div>'; },
           say: '🐺 กัด · 🔮 ส่อง · 🛡️ คุ้มกัน · 🧪 ใช้ยา<br>ชาวบ้านหลับตา 😴', en: 'Each power picks a seat at night.' },
         { t: '☀️ เช้าวันที่ 1', body: function () {
-            return '<div class="wt-seats">' + seat('🙂', 'คุณ', { cls: 'me' }) + seat('💀', 'ต้น', { cls: 'dead', tag: ['o', '🔮 ผู้หยั่งรู้'] }) + seat('🐰', 'ใบ') + seat('🐱', 'ฟ้า') + '</div>'; },
-          say: 'เมื่อคืน 💀 ต้นถูกกัด · เป็น 🔮<br>ถ้า 🛡️ หรือ 💊 ช่วยทัน = คืนสงบ', en: 'Who died shows their role.' },
+            return '<div class="wt-seats">' + seat('🙂', 'คุณ', { cls: 'me' }) + seat('💀', 'Tom', { cls: 'dead', tag: ['o', '🔮 ผู้หยั่งรู้'] }) + seat('🐰', 'Ann') + seat('🐱', 'Ben') + '</div>'; },
+          say: 'เมื่อคืน 💀 Tom ถูกกัด · เป็น 🔮 (ฝึกกับ 🤖)<br>ถ้า 🛡️ หรือ 💊 ช่วยทัน = คืนสงบ', en: 'Practice shows the dead one’s role.' },
         { t: '☀️ วัน 1', body: function () {
-            return '<div class="wt-seats">' + seat('🙂', 'คุณ', { cls: 'me' }) + seat('🐰', 'ใบ', { tag: ['v', '🔮 ฟ้า 👤'] }) + seat('🐱', 'ฟ้า', { tag: ['g', '👍 ใบ'] }) + seat('🐻', 'นนท์', { cls: 'tap', tag: ['r', '🤨 ใบ'] }) + '<span class="wt-fing" style="left:82%;top:42%">👆</span></div>'
-                + '<div class="wt-chips"><span>🤨 สงสัย นนท์</span><span>👍 เชื่อ นนท์</span><span>🔮 อ้าง นนท์ 🐺</span></div>'; },
+            return '<div class="wt-seats">' + seat('🙂', 'คุณ', { cls: 'me' }) + seat('🐰', 'Ann', { tag: ['v', '🔮 Ben 👤'] }) + seat('🐱', 'Ben', { tag: ['g', '👍 Ann'] }) + seat('🐻', 'Jo', { cls: 'tap', tag: ['r', '🤨 Ann'] }) + '<span class="wt-fing" style="left:83%">👆</span></div>'
+                + '<div class="wt-chips"><span>🤨 สงสัย Jo</span><span>👍 เชื่อ Jo</span><span>🔮 อ้าง Jo 🐺</span></div>'; },
           say: '🤨 สงสัย · 👍 เชื่อ · 🔮 อ้างผลส่อง<br>หมาป่าโกหกได้นะ 🤥', en: 'Read the tags, say yours.' },
         { t: '🗳 โหวต', body: function () {
-            return '<div class="wt-seats">' + seat('🙂', 'คุณ', { cls: 'me' }) + seat('🐰', 'ใบ', { vc: 1 }) + seat('🐱', 'ฟ้า') + seat('🐻', 'นนท์', { cls: 'tap', vc: 2 }) + '<span class="wt-fing" style="left:82%;top:40%">👆</span></div>'; },
+            return '<div class="wt-seats">' + seat('🙂', 'คุณ', { cls: 'me' }) + seat('🐰', 'Ann', { vc: 1 }) + seat('🐱', 'Ben') + seat('🐻', 'Jo', { cls: 'tap', vc: 2 }) + '<span class="wt-fing" style="left:83%">👆</span></div>'; },
           say: 'มากสุดออก · ⏭ ข้ามได้<br>เสมอ = ไม่มีใครออก', en: 'Most votes leaves. A tie: nobody.' },
         { t: '📖 พร้อมแล้ว', body: function () { return ''; },
           say: '💡 ครั้งแรกลอง 👥 7 · 🌙 เที่ยงคืน<br>ฟัง 🔮 ให้ดี · หมาป่ามักกล่าวหาคนอื่นก่อน', en: 'Try 7 players, midnight bots. ❓ in the lobby replays this.' }
@@ -89,14 +93,15 @@
     function ensureCss() { if (document.getElementById('wolfTourCss')) return; var s = document.createElement('style'); s.id = 'wolfTourCss'; s.textContent = css; document.head.appendChild(s); }
     function paint(el) {
         var sc = SCENES[st.i], last = st.i === SCENES.length - 1, on = window.WWSound ? WWSound.on() : true;
+        var PREV = st.i ? '<button type="button" class="wt-ib wt-prev" id="wt-prev" onclick="WWTour.prev()" aria-label="Back">‹</button>' : '';   // V101.398 ‹ back, tappable dots
         el.className = 'lang-no-toggle' + (sc.dark ? ' dark' : '');
         if (el.parentNode && el.parentNode.classList) el.parentNode.classList.toggle('wt-dark', !!sc.dark);
         el.innerHTML = '<div class="wt"' + (st.h ? ' style="min-height:' + st.h + 'px"' : '') + '><div class="wt-top"><h3>' + sc.t + '</h3>' + (sc.pill ? '<span class="wt-pill">' + sc.pill + '</span>' : '') + '<span class="wt-pill">' + (st.i + 1) + '/' + SCENES.length + '</span>'
             + '<button type="button" class="wt-ib first" id="wt-snd" onclick="WWTour.sound()" aria-label="Sound">' + (on ? '🔊' : '🔇') + '</button><button type="button" class="wt-ib" onclick="WWTour.close()" aria-label="Close">✕</button></div>'
             + sc.body() + '<div class="wt-say" id="wt-say">' + sc.say + '<small>' + sc.en + '</small></div>'
-            + '<div class="wt-dots">' + SCENES.map(function (x, i) { return '<i' + (i === st.i ? ' class="on"' : '') + '></i>'; }).join('') + '</div>'
-            + '<div class="wt-nav">' + (last ? '<button type="button" class="wt-skip" onclick="WWTour.go(0)">↺ ดูใหม่</button><button type="button" class="wt-next" id="wt-next" onclick="WWTour.close()">▸ เริ่มเกม</button>'
-                : '<button type="button" class="wt-auto' + (auto() ? ' on' : '') + '" id="wt-auto" onclick="WWTour.auto()">▶ auto</button><button type="button" class="wt-skip" onclick="WWTour.close()">ข้าม</button><button type="button" class="wt-next" id="wt-next" onclick="WWTour.next()">ถัดไป ▸</button>')
+            + '<div class="wt-dots">' + SCENES.map(function (x, i) { return '<button type="button" class="wt-dot' + (i === st.i ? ' on' : '') + '" aria-label="' + (i + 1) + '/' + SCENES.length + '" aria-pressed="' + (i === st.i) + '" onclick="WWTour.go(' + i + ')"></button>'; }).join('') + '</div>'
+            + '<div class="wt-nav">' + (last ? '<button type="button" class="wt-skip" onclick="WWTour.go(0)">↺ ดูใหม่</button>' + PREV + '<button type="button" class="wt-next" id="wt-next" onclick="WWTour.close()">▸ เริ่มเกม</button>'
+                : '<button type="button" class="wt-auto' + (auto() ? ' on' : '') + '" id="wt-auto" onclick="WWTour.auto()">▶ auto</button><button type="button" class="wt-skip" onclick="WWTour.close()">ข้าม</button>' + PREV + '<button type="button" class="wt-next" id="wt-next" onclick="WWTour.next()">ถัดไป ▸</button>')
             + '</div></div>';
         return last;
     }
@@ -135,6 +140,7 @@
             el.style.display = 'none'; if (el.parentNode && el.parentNode.classList) el.parentNode.classList.remove('wt-on', 'wt-dark');
         },
         next: function () { if (st.i < SCENES.length - 1) { st.i++; draw(); } },
+        prev: function () { if (st.i > 0) { st.i--; draw(); } },
         go: function (i) { st.i = i; draw(); },
         auto: function () { set(AUTO, auto() ? 'off' : 'on'); draw(); },
         sound: function () { if (window.WWSound) WWSound.toggle(); draw(); },

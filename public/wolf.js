@@ -9,7 +9,7 @@
     var W = window.WolfRules, AI = window.WolfAI;
     if (!W || !AI) { console.warn('[wolf] wolf-rules.js / wolf-ai.js must load first'); return; }
 
-    var NAMES = ['ต้น', 'ใบ', 'ฟ้า', 'นนท์', 'มุก', 'ภู', 'แพร', 'ก้อง', 'เจ'];
+    var NAMES = ['Tom', 'Ann', 'Ben', 'Jo', 'Max', 'May', 'Sam', 'Kim', 'Lee'];   // V101.398 (owner 2026-11-28): English, one syllable; the Telegram bot keeps its own pool (functions/wolf-bot.js)
     var FACES = ['🦊', '🐰', '🐱', '🐻', '🐼', '🐯', '🐨', '🐸', '🐵'];
     var RNAME = { wolf: 'มนุษย์หมาป่า', seer: 'ผู้หยั่งรู้', guard: 'บอดี้การ์ด', witch: 'แม่มด', villager: 'ชาวบ้าน' };
     var RHOW = {
