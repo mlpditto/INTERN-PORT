@@ -1,4 +1,4 @@
-# 🧑‍🎨 My pixel · the intern's face in the games (V101.391)
+# 🧑‍🎨 My pixel · the intern's face in the games (V101.392)
 
 Owner 2026-11-28 asked: "อยากให้ user สร้าง pixel character ได้" (after seeing a pixel-people web game).
 

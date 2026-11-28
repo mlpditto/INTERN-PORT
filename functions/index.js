@@ -383,7 +383,7 @@ exports.gameTop = onCall({ timeoutSeconds: 30 }, async (request) => {
     const { ranked, users } = gameTopCache;
     const who = (id) => {
         const u = users.get(id) || {};
-        return { name: String(u.nickName || u.firstName || u.displayName || '…').trim().slice(0, 40), pic: /^https:\/\//.test(u.pictureUrl || '') ? String(u.pictureUrl).slice(0, 500) : '', px: /^\d{7}$/.test(u.pixel || '') ? u.pixel : '' };   // V101.391 🧑‍🎨
+        return { name: String(u.nickName || u.firstName || u.displayName || '…').trim().slice(0, 40), pic: /^https:\/\//.test(u.pictureUrl || '') ? String(u.pictureUrl).slice(0, 500) : '', px: /^\d{7}$/.test(u.pixel || '') ? u.pixel : '' };   // V101.392 🧑‍🎨
     };
     return { week: ranked.week, games: gt.forIntern(ranked, String((request.data && request.data.userId) || ''), who) };
 });

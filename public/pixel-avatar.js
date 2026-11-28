@@ -1,4 +1,4 @@
-/* V101.391 🧑‍🎨 My pixel — an intern's own pixel character, the face in the games (owner 2026-11-28 after seeing a pixel-people
+/* V101.392 🧑‍🎨 My pixel — an intern's own pixel character, the face in the games (owner 2026-11-28 after seeing a pixel-people
    web game: "อยากให้ user สร้าง pixel character ได้"; picks: where = the game faces, how = pick parts, layout D + A,
    mockup-pixel-avatar/builder.png). Our own 16×16 head + shoulders, drawn in code from 7 digits — skin · hair · hair colour · eyes ·
    outfit · outfit colour · extra — kept as users.pixel (no image file, no AI). D: each game lobby shows your face + ✏️; the first

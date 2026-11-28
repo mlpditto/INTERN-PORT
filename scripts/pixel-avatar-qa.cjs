@@ -1,4 +1,4 @@
-// V101.391 🧑‍🎨 My pixel (owner 2026-11-28, picks: the game faces · pick parts · layout D + A, mockup-pixel-avatar/) on the REAL
+// V101.392 🧑‍🎨 My pixel (owner 2026-11-28, picks: the game faces · pick parts · layout D + A, mockup-pixel-avatar/) on the REAL
 // index.html, 390×844. Proves: every code draws (crisp 16 × 16), bad codes draw nothing; the first lobby visit makes a 🎲 one and says
 // so, saved to users.pixel (update, never set) and kept on the phone; ✏️ opens one sheet with 7 rails, a tap changes the preview, 💾
 // saves and the lobby row redraws; the row is in the Carry 13, เลขลับ and ไพ่เงา lobbies; the room / Top 3 face helpers draw the pixel
