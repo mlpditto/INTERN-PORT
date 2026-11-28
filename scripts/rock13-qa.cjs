@@ -30,7 +30,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
   // the doorway: the 6th tile; the first open = the tour, read aloud
   const tiles = await page.$$eval('#u-games-row .u-game', (b) => b.map((x) => x.textContent.replace(/\s+/g, '')));
-  assert.equal(tiles.length, 7); assert.match(tiles[5], /🪨Carry13/);
+  assert.equal(tiles.length, 8); assert.match(tiles[5], /🪨Carry13/);
   await page.click('#u-games-row .u-game:nth-child(6)');
   assert.ok(await page.isVisible('#r13-tour'), 'first open = the tour'); assert.deepEqual(await page.evaluate(() => window.__played), ['rock13-voice/t1.mp3']);
   // V101.396 one page: 5 lines (English, the Thai line under it), the carriers picture under line 1 only, ▸ Start, no paging, no scrolling at 390 × 844
