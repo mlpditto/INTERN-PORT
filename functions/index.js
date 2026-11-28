@@ -1038,7 +1038,7 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
             };
             model = googleModelAliases[model] || model;
         }
-        if (!provider || (provider !== "cloud_tts" && provider !== "iapp_tts" && provider !== "paxa_tts" && provider !== "jev" && !prompt)) {
+        if (!provider || (provider !== "cloud_tts" && provider !== "iapp_tts" && provider !== "iapp_ocr" && provider !== "paxa_tts" && provider !== "jev" && !prompt)) {
             return res.status(400).json({ error: "Missing provider or prompt" });
         }
 
@@ -1111,6 +1111,28 @@ exports.callAIProxy = onRequest({ cors: true, secrets: ["ANTHROPIC_API_KEY", "OP
                 responseType: "arraybuffer", timeout: 60000
             });
             return res.json({ audioContent: Buffer.from(response.data).toString("base64"), mimeType: "audio/mpeg", model: "chinda-tts", provider: "iapp_tts", usage: { characters: t.length } });
+        }
+
+        // --- V102.712: iApp OpenThai OCR Markdown — the admin reads a drug leaflet (PDF or a photo) in the Drug Codex editor.
+        // Admin-only like every route but Typhoon; the key stays here (IAPP_API_KEY). A leaflet has no patient data. 0.15 IC per page.
+        // The file comes as base64 (≤ 7 MB) and goes on as multipart "file"; only the Markdown text comes back, nothing is stored.
+        if (provider === "iapp_ocr") {
+            const b64 = String(req.body.fileBase64 || ""), mime = String(req.body.mimeType || "");
+            const ext = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[mime];
+            if (!ext) return res.status(400).json({ error: "OCR reads a PDF, JPEG, PNG or WebP file" });
+            if (!b64 || b64.length > 9600000) return res.status(400).json({ error: "The file must be under 7 MB" });
+            if (!process.env.IAPP_API_KEY) return res.status(500).json({ error: "iApp key unavailable" });
+            const form = new FormData();
+            form.append("file", new Blob([Buffer.from(b64, "base64")], { type: mime }), "leaflet." + ext);
+            let r;
+            try {
+                r = await axios.post("https://api.iapp.co.th/v3/store/ocr/document/markdown", form, { headers: { apikey: process.env.IAPP_API_KEY }, timeout: 150000, maxBodyLength: Infinity, maxContentLength: Infinity });
+            } catch (e) {
+                const st = e.response && e.response.status, msg = { 413: "The file is over iApp's limit (50 MB / 100 pages)", 415: "iApp cannot read this file type", 422: "iApp could not read any page of this file", 401: "iApp key rejected", 503: "iApp is busy — try again in a minute" }[st];
+                return res.status(st && st < 500 ? 400 : 502).json({ error: msg || ("iApp OCR failed" + (st ? " (" + st + ")" : "")) });
+            }
+            const d = r.data || {}, pages = (d.iapp && Number(d.iapp.page)) || (Array.isArray(d.pages) ? d.pages.length : 0);
+            return res.json({ markdown: String(d.markdown || ""), pages, version: String(d.version || ""), model: "openthai-ocr-markdown", provider: "iapp_ocr", usage: { pages } });
         }
 
         // --- V102.674: Paxa Labs TTS — an optional third voice of the 🎬 Watch first story (admin-only like every route but Typhoon).
