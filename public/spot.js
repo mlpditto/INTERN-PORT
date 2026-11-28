@@ -6,11 +6,12 @@
    rules only, ONE page like 🔢 / 🪨 (5 lines, English first), read aloud in Thai line after line (spot-voice/t1…t5.mp3) — no
    tactics (owner: every game gets a voiced tutorial of the rules).
    game_plays: game 'spot', mode 'l1' | 'l2' | 'l3', score = the points, win 'w' when the points reach the number of changes.
+   V101.401 🤖 Practice │ 🌐 Friends: the rooms are spot-online.js (SPOnline), drawn inside this popup; mode 'live' there.
    window.SP, window.spotOpen. */
 (function () {
     'use strict';
     var NAME = 'Memory Fracture', S = function () { return window.SpotScene; };
-    var g = null, tour = -1, aud = null, tread = -1, tick = null, STEP = 1000, level = 1;
+    var g = null, tour = -1, aud = null, tread = -1, tick = null, STEP = 1000, level = 1, multi = false;
     function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
     function put(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
     var lv = +get('spotLevel'); if (lv >= 1 && lv <= 3) level = lv;
@@ -77,10 +78,14 @@
 
     // ---- screens ---------------------------------------------------------------------------------------------------------------
     function lobbyHtml() {
-        return '<div class="sp">' + top('🪞 ' + NAME)
+        // V101.401 🤖 Practice │ 🌐 Friends (spot-online.js, rooms through roomAct). With friends the 🥄 row is the host's pick for a new room.
+        var M = multi && window.SPOnline;
+        var mode = window.SPOnline ? '<div class="sp-mode" role="group" aria-label="Mode">' + [[0, '🤖 Practice'], [1, '🌐 Friends']].map(function (k) { var on = !!k[0] === multi; return '<button type="button" id="sp-mode-' + k[0] + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" onclick="SP.online(' + k[0] + ')">' + k[1] + '</button>'; }).join('') + '</div>' : '';
+        var lv = '<div class="sp-lv' + (M ? ' row' : '') + '" role="group" aria-label="Level">' + [1, 2, 3].map(function (n) { var L = S().LEVELS[n], what = L.items + ' items · ' + L.diffs + ' changes'; return '<button type="button" id="sp-lv' + n + '" class="' + (level === n ? 'on' : '') + '" aria-pressed="' + (level === n) + '" title="' + what + '" aria-label="Level ' + n + ' · ' + what + '" onclick="SP.level(' + n + ')">' + '🥄'.repeat(n) + (M ? '' : '<small>' + what + '</small>') + '</button>'; }).join('') + '</div>';
+        if (M) return '<div class="sp">' + top('🪞 ' + NAME) + mode + lv + SPOnline.lobbyHtml() + '</div>';
+        return '<div class="sp">' + top('🪞 ' + NAME) + mode
             + '<div class="sp-note" title="👀 จำชั้นยา → 🔍 หาช่องที่เปลี่ยน · 3 รอบ&#10;👀 선반을 기억하고 → 🔍 바뀐 칸 찾기 · 3라운드">👀 remember → 🔍 spot the changes · 3 rounds</div>'
-            + '<div class="sp-lv" role="group" aria-label="Level">' + [1, 2, 3].map(function (n) { var L = S().LEVELS[n]; return '<button type="button" id="sp-lv' + n + '" class="' + (level === n ? 'on' : '') + '" aria-pressed="' + (level === n) + '" onclick="SP.level(' + n + ')">' + '🥄'.repeat(n) + '<small>' + L.items + ' items · ' + L.diffs + ' changes</small></button>'; }).join('') + '</div>'
-            + '<button type="button" class="sp-go" id="sp-start" onclick="SP.start()">▸ Start</button></div>';
+            + lv + '<button type="button" class="sp-go" id="sp-start" onclick="SP.start()">▸ Start</button></div>';
     }
     function playHtml() {
         var c = cur(), head = top('🪞 Round ' + g.round + '/' + S().ROUNDS, '<span class="sp-pill" id="sp-gem">💎 ' + g.gem + '</span>'), h = '<div class="sp">' + head;
@@ -129,6 +134,8 @@
         + '#spModal .sp-note{font-size:.82em;color:#64748b;text-align:center;font-weight:700}'
         + '#spModal .sp-lv{display:flex;flex-direction:column;gap:6px}#spModal .sp-lv button{display:flex;align-items:center;justify-content:space-between;border:2px solid #e2e8f0;border-radius:14px;padding:10px 14px;background:#fff;font-size:1.1em;min-height:52px}'
         + '#spModal .sp-lv small{font-size:.72em;color:#64748b;font-weight:800}#spModal .sp-lv .on{border-color:#7c3aed;background:#f5f3ff}'
+        + '#spModal .sp-lv.row{flex-direction:row}#spModal .sp-lv.row button{flex:1;justify-content:center;min-height:44px;padding:8px 4px}'
+        + '#spModal .sp-mode{display:flex;gap:6px;justify-content:center}#spModal .sp-mode button{border:1px solid #ddd6fe;border-radius:999px;padding:6px 12px;font-size:.85em;font-weight:800;color:#5b21b6;background:#f5f3ff}#spModal .sp-mode .on{background:#7c3aed;color:#fff;border-color:#7c3aed}'
         + '#spModal .sp-big{font-size:1.8em;font-weight:900;color:#4c1d95;text-align:center}#spModal .sp-big small{font-size:.5em;color:#64748b;margin-left:6px}'
         + '#spModal .sp-rounds{display:flex;flex-direction:column;gap:4px}#spModal .sp-rounds div{display:flex;gap:8px;align-items:center;padding:7px 10px;border-radius:12px;background:#f8fafc;font-size:.9em}#spModal .sp-rounds span{flex:1}'
         + '#spModal .sp-rules{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}#spModal .sp-rule{display:flex;gap:10px;align-items:center;text-align:left;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:12px;padding:5px 10px}'
@@ -149,9 +156,9 @@
     }
     function render() {
         var m = root();
-        document.getElementById('sp-body').innerHTML = tour >= 0 ? tourHtml() : !g ? lobbyHtml() : g.phase === 'end' ? endHtml() : playHtml();
+        document.getElementById('sp-body').innerHTML = tour >= 0 ? tourHtml() : window.SPOnline && SPOnline.active() ? SPOnline.html() : !g ? lobbyHtml() : g.phase === 'end' ? endHtml() : playHtml();
         m.style.display = 'flex';
-        if (g && tour < 0 && window.GameLog) {
+        if (g && tour < 0 && window.GameLog && !(window.SPOnline && SPOnline.active())) {
             var end = g.phase === 'end', done = g.rounds.filter(function (c) { return c.res; });
             GameLog.see('spot', { id: g.id, n: done.length, done: end, mode: 'l' + g.level, win: end ? (g.pts >= target() ? 'w' : 'l') : null, score: fmt(g.pts), res: done.map(function (c) { return c.res.n + '/' + c.sc.diffs.length; }) });
         }
@@ -185,6 +192,7 @@
         sound: function () { put('spotSound', sndOn() ? 'off' : 'on'); var b = document.getElementById('sp-snd'); if (b) { b.textContent = sndOn() ? '🔊' : '🔇'; b.setAttribute('aria-pressed', sndOn()); } },
         level: function (n) { if (n >= 1 && n <= 3) { level = n; put('spotLevel', String(n)); render(); } },
         lobby: function () { stop(); g = null; render(); },
+        online: function (v) { stop(); multi = !!v; g = null; if (!multi && window.SPOnline) SPOnline.close(); render(); },   // V101.401 🤖 │ 🌐
         start: function () { stop(); g = { id: Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), level: level, round: 1, gem: 3, pts: 0, rounds: [] }; cue('go'); newRound(); },
         ready: function () { if (g && g.phase === 'look') toBet(); },
         bet: function (b) { if (!g || g.phase !== 'bet' || !(b in S().BETS) || S().BETS[b] > g.gem) return; cur().bet = +b; cue('go'); phase('find', S().FIND); },
@@ -201,9 +209,10 @@
             cue(c.res.n ? 'ok' : 'no'); phase('show', 0);
         },
         next: function () { if (!g || g.phase !== 'show') return; if (g.round < S().ROUNDS) { g.round++; newRound(); } else phase('end', 0); },
-        close: function () { stop(); hush(); tour = -1; var m = document.getElementById('spModal'); if (m) m.style.display = 'none'; },
+        close: function () { stop(); hush(); tour = -1; if (window.SPOnline) SPOnline.close(); var m = document.getElementById('spModal'); if (m) m.style.display = 'none'; },
         // for scripts/spot-qa.cjs
-        _g: function () { return g; }, _step: function (ms) { STEP = ms; }, _render: function () { render(); }
+        _g: function () { return g; }, _step: function (ms) { STEP = ms; }, _render: function () { render(); },
+        _ui: { rail: rail, cue: cue, level: function () { return level; } }   // for spot-online.js
     };
     window.spotOpen = function () { SP.open(); };
 })();

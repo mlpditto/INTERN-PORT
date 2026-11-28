@@ -59,7 +59,7 @@ Files:
 
 ⚠️ The look-alike pairs and the strengths are real drug data. A pharmacist should check `DRUGS` in `spot-scene.js` before the game is promoted.
 
-## 🌐 Friends — the room referee (functions only so far)
+## 🌐 Friends — rooms (referee + screens, V101.401)
 
 Owner 2026-11-28: "เล่นกับเพื่อนพร้อมเดิมพัน" (plan PR 2). Picks: the room layout of `mock-spot-room/`; 2 players = winner 💎+2 · loser 0; no "found all" bonus in a room; after 📊 the host goes on or the room does in 30 s.
 
@@ -75,6 +75,11 @@ Owner 2026-11-28: "เล่นกับเพื่อนพร้อมเด�
 - 3 rounds, a new shelf each. Final rank: most 💎, then most points. 🏳 leaving takes the seat out; one player left ends the game.
 - Each step has a clock; after it any player's `claim` moves the room on.
 - No rules change: `rooms`, `rooms/*/secret`, `rooms/*/hand` are the rules the other rooms use. **Deploy:** `firebase deploy --only functions:roomAct`.
+- **Screens:** `public/spot-online.js` (`window.SPOnline`), drawn inside the popup. Lobby: 🤖 Practice │ 🌐 Friends; with friends the 🥄 row is short (the level is the host's pick for a new room), ＋ New room · ⚡ live, join by code, my rooms. Room: the code, the seats, 📤 Invite (`?spot=<code>`, LINE share → share sheet → clipboard), ▸ Start for the host.
+- In a game every phone walks the rail 👀 → 🎲 → 🔍 → 📊 on the room's clock, with one row of faces under it: a green ring + ✓ = Ready / has sent, 💎 under each name, 🏳 greyed when someone left. My bet shows only to me ("🔒 ×2 is in"); after ✓ Done "🔒 Sent · waiting for n". 📊: my marks on the shelf, the round's ranking (✅ ❌ × bet = points, 💎 ±), every change named; ▸ Round n only for the host, the others read "⏳ Round n comes next". The end: 🏆 and the final ranking (⭐ points, 💎).
+- When the 🔍 time ends my taps are sent by themselves; a waiting phone calls `claim` 1.5 s (+0.7 s a seat) after any step's time.
+- The shelf is smaller in a room (`100dvh − 296px`): the faces row and 🏳 take about 100 px. 360 × 640 with 🥄🥄🥄 fits without scrolling.
+- `game_plays`: game `spot`, mode `live`, win `w` for the first of the final rank.
 - ⚠️ A phone holds the original and later the changed shelf, so a script could compare them: this is a game among friends (plan §6), not a contest.
 
 ## QA
@@ -85,4 +90,5 @@ Owner 2026-11-28: "เล่นกับเพื่อนพร้อมเด�
   - the clock walks the rail by itself; unpaid bets are grey; taps toggle and stop at the cap; the reveal marks and names every change
   - `game_plays` spot `l2`; 320 px fits
 - `scripts/games-row-qa.cjs`, `rock13-qa.cjs`, `secret-qa.cjs`: the row has 7 tiles.
+- `scripts/spot-online-qa.cjs`: three phones on the real page through the real referee — the rail and the 🥄 row, room code, 📤 `?spot=`, join by code and by deep link, host starts; 👀 the same shelf, ✓ faces, all Ready moves on; 🎲 my bet only on my phone; 🔍 taps toggle / cap, 🔒 Sent; 📊 the same ranking everywhere, my marks, host ▸; the clock alone moves the room on and late taps go by themselves; 3 rounds → the same winner, logged `live`; 🏳; 360 × 640 🥄🥄🥄 fits; 320 px. `SPOT_SHOTS=<dir>` saves proof pictures.
 - `scripts/room-spot-check.cjs` (node, in-memory Firestore): the scene copy matches; the rank 💎 table; create / join / start; what the room shows in each step and what stays secret; bets and answers validated and hidden; the scoring and 💎; host ▸ and the 30 s; the clocks and `claim`; 3 rounds to the final rank; 🏳; cancel.
