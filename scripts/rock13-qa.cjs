@@ -1,6 +1,6 @@
 // V101.382 🪨 Carry 13 · ฝึกกับ 🤖 (owner 2026-11-27, docs/MIND-GAMES-PLAN.md §8, pick A3 mockup-rock13/) on the REAL index.html,
 // 390×844. Proves: the 6th tile opens it; the first open shows the ONE-page tour of the rules (V101.396, owner pick B: 5 lines, the carriers picture under line 1, no Next, no empty block) read aloud line after line (t1…t5, the line being read framed), ❓ replays, 🔊/🔇 kept;
-// the lobby rails 👥 3–7 and 7 │ 14 รอบ are remembered; a round: ▸ ส่ง waits for a card + a chip, used ones grey out, the bots
+// the lobby (V101.397 pick A: face on the title row, one EN rules line, 👥 3–7 + 🔁 7 │ 14 in one rail, ▸ Start) is remembered; a round: ▸ ส่ง waits for a card + a chip, used ones grey out, the bots
 // place in the queue's order, at your turn ▸ วาง shows what it does (💥 when it takes stones), ⏭ Pass shows only when allowed,
 // 🌈 asks you to tap a carrier; the carriers hold cube stones; a full 7-round game ends with a ranking where everyone's 🪨 matches
 // the rules; game_plays game 'rock13' mode 'bot' with win and score; 320 px fits.
@@ -57,7 +57,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   // the lobby rails
   await page.click('#r13-n4'); await page.click('#r13-r7');
   assert.deepEqual(JSON.parse(await page.evaluate(() => localStorage.getItem('r13Cfg'))), { n: 4, rounds: 7 });
-  assert.match(await page.textContent('#r13Modal'), /คุณ \+ 🤖 3/);
+  // V101.397 lean lobby (owner pick A): face on the title row, one EN rules line, 👥 + 🔁 chips in one rail with each emoji once, no "คุณ + 🤖 n", ▸ Start
+  const lobby = await page.$eval('#r13Modal .r13', (r) => ({ face: !!r.querySelector('.r13-top #pxa-face .pxa svg'), row: !!r.querySelector('#pxa-row'), note: r.querySelector('.r13-note').textContent, lbl: [...r.querySelectorAll('.r13-one .r13-lbl')].map((x) => x.textContent), n4: r.querySelector('#r13-n4').title, r7: r.querySelector('#r13-r7').title + '|' + r.querySelector('#r13-r7').textContent, start: r.querySelector('#r13-start').textContent, mode: [...r.querySelectorAll('[aria-label="Mode"] button')].map((b) => b.textContent), txt: r.textContent }));
+  assert.deepEqual([lobby.face, lobby.row, lobby.note, lobby.lbl, lobby.n4, lobby.r7, lobby.start, lobby.mode], [true, false, '🔴🟢🔵 never reach 13 · 🪨 fewest wins', ['👥', '🔁'], 'You + 🤖 3', '7 rounds|7', '▸ Start', ['🤖 Practice', '🌐 Friends']], JSON.stringify(lobby));
+  assert.ok(!/คุณ \+|your face|รอบ|เริ่ม/.test(lobby.txt), 'each number once, EN only: ' + lobby.txt);
 
   // play: seeded bots, no waiting
   await page.evaluate(() => { let s = 11; R13._rng(() => ((s = (s * 16807) % 2147483647) / 2147483647)); R13._speed(5); });

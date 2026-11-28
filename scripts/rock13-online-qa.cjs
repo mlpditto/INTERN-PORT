@@ -1,6 +1,6 @@
 // V101.389 🪨 Carry 13 online on the REAL index.html — three phones (three logins) playing through the REAL referee (functions/room-act.js
 // → room-rock13.js runs here in node on a small in-memory Firestore; the pages reach it through exposeFunction and their listeners poll
-// it). Proves: the 🤖 Practice │ 🌐 With friends rail; the host opens a room (7 rounds, ⚡ 60 s), 📤 hands over ?r13=<code>, two friends
+// it). Proves: the 🤖 Practice │ 🌐 Friends rail (V101.397); the host opens a room (7 rounds, ⚡ 60 s), 📤 hands over ?r13=<code>, two friends
 // join by the code, only the host starts; layout B: in the secret pick a ring round every face still picking, my pick shows only on my
 // phone ("🔒 You sent"), the others see ✓; then the faces in placing order with chip + card, ONE ring round the one placing, "👉 Your
 // turn" pulses there and "<name>'s turn" + 👋 Nudge (?r13=1) everywhere else; English apart from names; 🌈 taps a carrier; played to
@@ -66,7 +66,7 @@ const full = (rk) => { const r = store.get(rk), G = clone(r.g); if (G.phase === 
 
   // the mode rail, a room with 7 rounds
   await A.evaluate(() => { rock13Open(); });
-  assert.deepEqual(await A.$$eval('#r13Modal [aria-label="Mode"] button', (b) => b.map((x) => x.textContent + (x.classList.contains('on') ? '*' : ''))), ['🤖 Practice*', '🌐 With friends']);
+  assert.deepEqual(await A.$$eval('#r13Modal [aria-label="Mode"] button', (b) => b.map((x) => x.textContent + (x.classList.contains('on') ? '*' : ''))), ['🤖 Practice*', '🌐 Friends']);
   assert.ok(await A.$('#r13-start'), 'practice is still there');
   await A.click('#r13-mode-1'); await until(A, () => !!document.getElementById('r13o-new'));
   assert.equal(await A.$('#r13-start'), null);

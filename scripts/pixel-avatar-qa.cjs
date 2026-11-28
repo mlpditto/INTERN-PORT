@@ -45,16 +45,17 @@ for (const f of ['functions/game-top-rank.js', 'public/game-top-rank.js']) {
 
   // D: the first lobby visit makes one for you
   await page.click('#sch-r13-btn');
-  const row = await page.$eval('#pxa-row', (r) => ({ cls: r.className, t: r.innerText.replace(/\s+/g, ' '), px: !!r.querySelector('.pxa svg') }));
-  assert.deepEqual([row.cls, row.px], ['pxa-row new', true]); assert.match(row.t, /🎲 Your pixel is ready/);
+  // V101.397: Carry 13 shows the face alone on its title row (faceBtn) and the ready line once (readyLine); the other lobbies keep the row
+  const row = await page.$eval('#r13Modal .r13', (r) => ({ face: !!r.querySelector('.r13-top #pxa-face .pxa svg'), ready: (r.querySelector('#pxa-ready') || {}).textContent, row: !!r.querySelector('#pxa-row') }));
+  assert.deepEqual(row, { face: true, ready: '🎲 Your pixel is ready · ✏️ make your own', row: false });
   const first = await page.evaluate(() => window.myUserDoc.pixel);
   assert.ok(/^\d{7}$/.test(first)); assert.deepEqual(await page.evaluate(() => window.__w), [['update', 'users', 'U1', { pixel: first }]], 'saved with update, never set');
   assert.equal(await page.evaluate(() => localStorage.getItem('pxMine')), first);
   await page.evaluate(() => R13.lobby());
-  assert.match(await page.$eval('#pxa-row', (r) => r.className + '|' + r.innerText), /^pxa-row\|Ditto/, 'second time: your name, no "ready"');
+  assert.deepEqual(await page.$eval('#r13Modal .r13', (r) => [!!r.querySelector('#pxa-ready'), r.querySelector('#pxa-face').title]), [false, '✏️ Ditto'], 'second time: no "ready", your name in the tooltip');
 
   // A: ✏️ → one sheet, 7 rails; a tap changes the preview; 💾 saves and the row redraws
-  await page.click('#pxa-edit');
+  await page.click('#pxa-face');
   assert.equal(await page.$eval('#pxModal', (m) => getComputedStyle(m).display), 'flex');
   assert.deepEqual(await page.$$eval('#pxModal .pxa-rl', (e) => e.map((x) => x.textContent)), ['Skin', 'Hair', 'Hair colour', 'Eyes', 'Outfit', 'Outfit colour', 'Extra']);
   assert.ok(await page.$eval('#pxModal', (m) => +getComputedStyle(m).zIndex > +getComputedStyle(document.getElementById('r13Modal')).zIndex), 'over the game');
@@ -71,7 +72,7 @@ for (const f of ['functions/game-top-rank.js', 'public/game-top-rank.js']) {
   assert.equal(await page.$eval('#pxModal', (m) => getComputedStyle(m).display), 'none');
   assert.equal(await page.evaluate(() => window.myUserDoc.pixel), want);
   assert.deepEqual((await page.evaluate(() => window.__w)).slice(-1), [['update', 'users', 'U1', { pixel: want }]]);
-  assert.equal(await page.evaluate((c) => { const d = document.createElement('div'); d.innerHTML = PixelAvatar.svg(c, 48); return document.querySelector('#pxa-row .pxa').innerHTML === d.innerHTML; }, want), true, 'the lobby row redraws');
+  assert.equal(await page.evaluate((c) => { const d = document.createElement('div'); d.innerHTML = PixelAvatar.svg(c, 29); return document.querySelector('#pxa-face .pxa').innerHTML === d.innerHTML; }, want), true, 'the title-row face redraws');
 
   // the row is in the other room games' lobbies too
   await page.evaluate(() => R13.close());

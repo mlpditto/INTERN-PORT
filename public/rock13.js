@@ -2,7 +2,8 @@
    carriers holding a board with the stones as numbered cubes, mockup-rock13/rock13-A3.png). You + 2–6 🤖, 7 or 14 rounds. Rules in
    rock13-rules.js. Each round: pick a card + a chip → ▸ ส่ง → everyone places in order (the queue bar); at your turn ▸ วาง or ⏭ Pass,
    🌈 taps a carrier. A ❓ tour of the rules only, read aloud in Thai (rock13-voice/t1…t5.mp3) — no tactics (owner: "ไม่เผยเทคนิค").
-   game_plays: game 'rock13', mode 'bot', win 'w' when you rank first, score = your 🪨. window.R13, window.rock13Open. */
+   game_plays: game 'rock13', mode 'bot', win 'w' when you rank first, score = your 🪨. window.R13, window.rock13Open.
+   V101.397 lean lobby (owner pick A): face on the title row, one EN rules line, 👥 + 🔁 chips in one rail, ▸ Start. */
 (function () {
     'use strict';
     var NAME = 'Carry 13', R = function () { return window.Rock13Rules; };
@@ -131,18 +132,19 @@
     var X = '<button type="button" class="r13-x" onclick="R13.close()" aria-label="Close">✕</button>';
     function SND() { var o = !window.R13Sound || R13Sound.on(); return '<button type="button" class="r13-x" id="r13-snd" onclick="R13.sound()" aria-label="Sound" aria-pressed="' + o + '">' + (o ? '🔊' : '🔇') + '</button>'; }
     var HQ = '<button type="button" class="r13-x" id="r13-help" onclick="R13.tour()" aria-label="How to play" title="วิธีเล่น">❓</button>';
-    function top(extra) { return '<div class="r13-top"><h3>🪨 ' + NAME + '</h3>' + (extra || '') + SND() + HQ + X + '</div>'; }
+    function top(extra, lead) { return '<div class="r13-top">' + (lead || '') + '<h3>🪨 ' + NAME + '</h3>' + (extra || '') + SND() + HQ + X + '</div>'; }
     function lobbyHtml() {
-        // V101.389 🤖 Practice │ 🌐 With friends (rock13-online.js, rooms through roomAct)
-        var mode = window.R13Online ? '<div class="r13-rail" role="group" aria-label="Mode">' + [[0, '🤖 Practice'], [1, '🌐 With friends']].map(function (k) { var on = !!k[0] === multi; return '<button type="button" id="r13-mode-' + k[0] + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" onclick="R13.online(' + k[0] + ')">' + k[1] + '</button>'; }).join('') + '</div>' : '';
-        var rounds = '<div class="r13-rail" role="group" aria-label="Rounds">' + [7, 14].map(function (n) { return '<button type="button" id="r13-r' + n + '" class="' + (cfg.rounds === n ? 'on' : '') + '" aria-pressed="' + (cfg.rounds === n) + '" onclick="R13.set(\'rounds\',' + n + ')">' + n + (multi ? ' rounds' : ' รอบ') + '</button>'; }).join('') + '</div>';
-        if (multi && window.R13Online) return '<div class="r13">' + top() + (window.GameTop ? GameTop.line('rock13') : '') + (window.PixelAvatar ? PixelAvatar.lobbyRow() : '') + mode + rounds + R13Online.lobbyHtml() + '</div>';
-        return '<div class="r13">' + top() + (window.GameTop ? GameTop.line('rock13') : '') + (window.PixelAvatar ? PixelAvatar.lobbyRow() : '') + mode
-            + '<div class="r13-note">🔴🟢🔵 ห้ามแบกถึง 13 · 🪨 น้อยสุดชนะ</div>'
-            + '<div class="r13-rail" role="group" aria-label="Players">' + [3, 4, 5, 6, 7].map(function (n) { return '<button type="button" id="r13-n' + n + '" class="' + (cfg.n === n ? 'on' : '') + '" aria-pressed="' + (cfg.n === n) + '" onclick="R13.set(\'n\',' + n + ')">👥 ' + n + '</button>'; }).join('') + '</div>'
-            + rounds
-            + '<div class="r13-note">คุณ + 🤖 ' + (cfg.n - 1) + '</div>'
-            + '<button type="button" class="r13-go" id="r13-start" onclick="R13.start()">▸ เริ่ม</button></div>';
+        // V101.397 lean lobby (owner pick A, mockup-rock13-lobby-lean/): your face on the title row (tap = ✏️), one EN rules line,
+        // 👥 and 🔁 chips in one rail with each emoji once, no "คุณ + 🤖 n" (the 👥 chip's title says it), ▸ Start. V101.389: 🤖 │ 🌐.
+        var PA = window.PixelAvatar;
+        var mode = window.R13Online ? '<div class="r13-rail" role="group" aria-label="Mode">' + [[0, '🤖 Practice'], [1, '🌐 Friends']].map(function (k) { var on = !!k[0] === multi; return '<button type="button" id="r13-mode-' + k[0] + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" onclick="R13.online(' + k[0] + ')">' + k[1] + '</button>'; }).join('') + '</div>' : '';
+        var rounds = '<span class="r13-grp" role="group" aria-label="Rounds"><span class="r13-lbl" title="Rounds">🔁</span>' + [7, 14].map(function (n) { return '<button type="button" id="r13-r' + n + '" class="' + (cfg.rounds === n ? 'on' : '') + '" aria-pressed="' + (cfg.rounds === n) + '" title="' + n + ' rounds" onclick="R13.set(\'rounds\',' + n + ')">' + n + '</button>'; }).join('') + '</span>';
+        var players = '<span class="r13-grp" role="group" aria-label="Players"><span class="r13-lbl" title="Players">👥</span>' + [3, 4, 5, 6, 7].map(function (n) { return '<button type="button" id="r13-n' + n + '" class="' + (cfg.n === n ? 'on' : '') + '" aria-pressed="' + (cfg.n === n) + '" title="You + 🤖 ' + (n - 1) + '" onclick="R13.set(\'n\',' + n + ')">' + n + '</button>'; }).join('') + '</span>';
+        var head = top(null, PA ? PA.faceBtn() : '') + (PA ? PA.readyLine() : '') + (window.GameTop ? GameTop.line('rock13') : '') + mode;
+        if (multi && window.R13Online) return '<div class="r13">' + head + '<div class="r13-rail">' + rounds + '</div>' + R13Online.lobbyHtml() + '</div>';
+        return '<div class="r13">' + head + '<div class="r13-note">🔴🟢🔵 never reach 13 · 🪨 fewest wins</div>'
+            + '<div class="r13-rail r13-one">' + players + rounds + '</div>'
+            + '<button type="button" class="r13-go" id="r13-start" onclick="R13.start()">▸ Start</button></div>';
     }
     function handHtml() {
         var p = g.players[0], chips = [];
@@ -192,6 +194,7 @@
         + '#r13Modal .r13-rail .on{background:#b45309;border-color:#b45309;color:#fff}'
         + '#r13Modal .r13-go{background:#b45309;color:#fff;border:0;border-radius:14px;padding:11px 16px;font-weight:900;font-size:1em;flex:1}#r13Modal .r13-go.alt{background:#fff;color:#78350f;border:2px solid #b45309}#r13Modal .r13-go:disabled{opacity:.45}'
         + '#r13Modal .r13-note{font-size:.8em;color:#64748b;text-align:center;font-weight:700}'
+        + '#r13Modal .r13-lbl{align-self:center;padding:0 2px}#r13Modal .r13-grp{display:inline-flex;gap:6px;align-items:center}#r13Modal .r13-one{gap:6px 14px}#r13Modal .r13-one button{padding:6px 10px}'
         + '#r13Modal .r13-pl{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}#r13Modal .r13-pl span{font-size:.72em;font-weight:800;padding:3px 7px;border-radius:999px;background:#f1f5f9}#r13Modal .r13-pl .me{background:#fef3c7;color:#92400e}'
         + '#r13Modal .r13-st{display:flex;gap:6px;align-items:flex-end}#r13Modal .r13-c{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;border-radius:14px;padding:4px 2px;text-align:center;background:#f8fafc;border:2px solid transparent;color:inherit;font:inherit}'
         + '#r13Modal .r13-c.warm{background:#fff7ed}#r13Modal .r13-c.hot{background:#fff1f2}#r13Modal .r13-c.pick{border:2px dashed #b45309}'

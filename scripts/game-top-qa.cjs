@@ -2,7 +2,7 @@
 // Proves: functions/ and public/ game-top-rank.js are the same file; the ranking (Monday 00:00 Bangkok week, wins for 🥣 🐺 ⚫⚪,
 // 🧊 = best seconds of a 5/5 game, a tie to who got there first, an ignored user never ranks, forIntern = top 3 + my place); on the
 // REAL index.html (390×844 touch phone) each of the 4 lobbies shows one 🏆 line from the gameTop callable — three faces with 🥇🥈🥉
-// and the value + "คุณ #n" — a tap opens the board (สัปดาห์นี้ │ ตลอดกาล), a second tap folds it; an empty week says so; a failing
+// and the value + "คุณ #n" — a tap opens the board (สัปดาห์นี้ │ ตลอดกาล), a second tap folds it; an empty week hides the line (V101.397); a failing
 // call shows nothing; a finished game makes the next lobby ask again; 320 px fits. Admin: game-admin.js ⏱ เวลา │ 🏆 อันดับ lists
 // every player best first (0 wins too), ตลอดกาล reads all game_plays.
 const assert = require('node:assert/strict');
@@ -76,10 +76,12 @@ const DATA = {
   await page.evaluate(() => { BW.close(); window.__fail = false; GameTop._set(null); GameTop.played(); });
 
   const games = [['bw', 'bwOpen', 'BW.close()', '🏆 🥇 12🥈 9🥉 7คุณ #5'], ['count', 'countOpen', 'CG.close()', '🏆 🥇 0:41🥈 0:55🥉 1:02คุณ #4'],
-    ['cereal', 'cerealOpen', "document.getElementById('cerealModal').style.display='none'", '🏆 🥇 6🥈 5🥉 3คุณ #2'], ['wolf', 'wolfOpen', "document.getElementById('wolfModal').style.display='none'", '🏆 สัปดาห์นี้ยังว่าง · ชนะก่อนได้ 🥇']];
+    ['cereal', 'cerealOpen', "document.getElementById('cerealModal').style.display='none'", '🏆 🥇 6🥈 5🥉 3คุณ #2'], ['wolf', 'wolfOpen', "document.getElementById('wolfModal').style.display='none'", '']];   // V101.397: an empty week hides the line
   for (const [g, open, close, want] of games) {
     await page.evaluate((f) => window[f](), open);
-    await page.waitForFunction((g) => { const e = document.querySelector('[data-gtop="' + g + '"]'); return e && e.textContent.trim(); }, g, { timeout: 3000 });
+    await page.waitForFunction((g) => !!document.querySelector('[data-gtop="' + g + '"]'), g, { timeout: 3000 });
+    if (!want) { assert.equal(await page.$eval('[data-gtop="' + g + '"]', (e) => e.textContent + '|' + getComputedStyle(e).display), '|none', g + ': an empty week shows nothing (V101.397)'); await page.evaluate(close); continue; }
+    await page.waitForFunction((g) => document.querySelector('[data-gtop="' + g + '"]').textContent.trim(), g, { timeout: 3000 });
     assert.equal((await line(g)).replace(/ /g, ''), want.replace(/ /g, ''), g + ' line');
     const box = await page.$eval('[data-gtop="' + g + '"]', (e) => { const m = e.closest('.modal'); const c = m.querySelector('h3').getBoundingClientRect(), b = e.getBoundingClientRect(); return { below: b.top >= c.bottom - 1, h: b.height }; });
     assert.ok(box.below && box.h < 40, g + ': one line under the title ' + JSON.stringify(box));

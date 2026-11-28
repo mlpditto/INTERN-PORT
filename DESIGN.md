@@ -77,6 +77,7 @@ How screens in this project are designed. Read it before any UI work. `CLAUDE.md
 | 🦴 | Lola's ability used last turn / the dog bowl | 📓 | the killer's notebook — only the killer's screen shows it |
 | ☕ | a café: the detective's +1 step | 🚇 🚆 | subway S · train T |
 | 🛡️ | arrests left | 🥄 | map difficulty for the killer (1–4) |
+| 🔁 | rounds in a game lobby (the chips beside it are the counts) | 👥 n | players at the table, you included (the chip's title says You + 🤖 n−1) |
 
 ## 6. AI model picker
 *Why: 19 models plus trials. One style lets the admin find a model the same way on every screen.*

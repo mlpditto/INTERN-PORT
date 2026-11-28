@@ -70,6 +70,12 @@
         return '<div class="pxa-row' + (was ? ' new' : '') + '" id="pxa-row">' + face(m, 52, '') + '<div class="pxa-who"><b>' + (was ? '🎲 Your pixel is ready' : esc(nm)) + '</b><small>' + (was ? 'keep it or ✏️ make your own' : 'your face in the games') + '</small></div>'
             + '<button type="button" class="pxa-edit" id="pxa-edit" onclick="PixelAvatar.edit()" aria-label="Edit my pixel">✏️</button></div>';
     }
+    /** V101.397 the face alone, 32 px, for a lobby's title row (Carry 13 first): tap = ✏️, the name in the tooltip; readyLine() right after it says "🎲 Your pixel is ready" once */
+    function faceBtn() {
+        var m = ensure(), nm = (doc() && (doc().nickName || doc().firstName || doc().displayName)) || 'You';
+        return '<button type="button" class="pxa-fb" id="pxa-face" onclick="PixelAvatar.edit()" title="✏️ ' + esc(nm) + '" aria-label="Edit my pixel">' + face(m, 32, '') + '</button>';
+    }
+    function readyLine() { var was = fresh; fresh = false; return was ? '<div class="pxa-ready" id="pxa-ready">🎲 Your pixel is ready · ✏️ make your own</div>' : ''; }
     function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
     // ---- A: the builder, one sheet, a rail per part ------------------------------------------------------------------------------
@@ -93,6 +99,7 @@
         + '.pxa-row{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:14px;padding:8px 10px;background:#fff;text-align:left}.pxa-row.new{border-color:#7c3aed;background:#f5f3ff}'
         + '.pxa-who{flex:1;min-width:0;display:flex;flex-direction:column}.pxa-who b{font-size:.95em;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pxa-who small{font-size:.75em;color:#64748b;font-weight:700}'
         + '.pxa-edit{background:#f5f3ff!important;border:1px solid #ddd6fe!important;border-radius:12px!important;min-width:44px;min-height:44px!important;font-size:1.1em;padding:0!important;margin:0!important;box-shadow:none!important;width:auto!important;cursor:pointer}'
+        + '.pxa-fb{background:none!important;border:0!important;padding:0!important;margin:0!important;min-height:0!important;width:auto!important;box-shadow:none!important;line-height:0;border-radius:50%;cursor:pointer}.pxa-ready{font-size:.78em;font-weight:800;color:#7c3aed;text-align:center}'
         + '#pxModal{z-index:10050}#pxModal .modal-content{max-width:400px;padding:12px;border-radius:20px;max-height:92dvh;overflow:auto}'
         + '#pxModal button{font-family:inherit;width:auto;min-height:0;margin:0;box-shadow:none;cursor:pointer}'
         + '.pxa-sh{display:flex;flex-direction:column;gap:4px;color:#0f172a;text-align:left}.pxa-top{display:flex;align-items:center}.pxa-top h3{flex:1;margin:0;font-size:1.05em;color:#4c1d95}.pxa-x{background:none;border:0;font-size:1.15em;color:#94a3b8;min-width:36px;min-height:36px}'
@@ -116,7 +123,7 @@
     if (!document.getElementById('pxa-css')) { var st = document.createElement('style'); st.id = 'pxa-css'; st.textContent = CSS; (document.head || document.documentElement).appendChild(st); }
 
     window.PixelAvatar = {
-        svg: svg, face: face, ok: ok, random: random, mine: mine, lobbyRow: lobbyRow,
+        svg: svg, face: face, ok: ok, random: random, mine: mine, lobbyRow: lobbyRow, faceBtn: faceBtn, readyLine: readyLine,
         /** ✏️ open the builder; `done` runs after 💾 (the game redraws its lobby) */
         edit: function (done) { draft = ensure(); after = typeof done === 'function' ? done : null; render(); },
         set: function (k, i) { if (!draft || k < 0 || k > 6 || i < 0 || i >= N[k]) return; var c = draft.split(''); c[k] = i; draft = c.join(''); render(); },
@@ -124,6 +131,7 @@
         save: function () {
             if (!ok(draft)) return; save(draft); PixelAvatar.close();
             var row = document.getElementById('pxa-row'); if (row) row.outerHTML = lobbyRow();
+            var fb = document.getElementById('pxa-face'); if (fb) fb.innerHTML = face(draft, 32, '');
             if (after) after(draft);
         },
         close: function () { var m = document.getElementById('pxModal'); if (m) m.style.display = 'none'; },
