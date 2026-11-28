@@ -1,5 +1,6 @@
 // V101.378 🔢 เลขลับ · โหมดฝึก 🤖 (owner 2026-11-26, docs/MIND-GAMES-PLAN.md §3, mockup-secret-number/) on the REAL index.html, 390×844.
-// Proves: the 5th tile in the games row opens it; the first open plays a 4-scene tour read aloud (t1…t4), ❓ replays, 🔊/🔇 kept;
+// Proves: the 5th tile in the games row opens it; the first open shows the ONE-page tour (V101.395, owner pick A: 5 lines, no Next, no
+// empty block) read aloud line after line (t1…t5, the line being read framed), ▸ Start → lobby, ❓ replays, 🔊/🔇 kept;
 // every menu question answers truthfully over 2000 random (number, question) pairs; the live set never drops the secret; 🟩 crosses
 // out what the answers rule out and a tap on a live number guesses; ✏️ crosses only what you tap (✏️ ขีด) and 🎯 guesses; 📏 shows the
 // live range; 🧠 shows the log only; a wrong guess costs 🎫 1 and is marked; the end shows 🎫 / wrong / time, keeps a best per help
@@ -16,7 +17,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
   await page.addInitScript(() => {
     for (const k of ['internGuideSeen', 'journalTourSeen', 'cerealTourSeen', 'wolfTourSeen', 'countTourSeen', 'bwTourSeen']) localStorage.setItem(k, '1'); localStorage.setItem('wolfCoachSeen', 'all');
-    window.__played = []; window.Audio = function (src) { this.src = src; this.paused = true; };
+    window.__played = []; window.Audio = function (src) { this.src = src; this.paused = true; window.__aud = this; };
     window.Audio.prototype.play = function () { this.paused = false; window.__played.push(this.src); return Promise.resolve(); };
     window.Audio.prototype.pause = function () { if (!this.paused) window.__played.push('stop'); this.paused = true; };
     window.firebase = { auth: () => ({ currentUser: { uid: 'u1' }, onAuthStateChanged: () => () => {}, signInAnonymously: () => Promise.resolve() }), functions: () => ({ httpsCallable: () => () => Promise.reject(new Error('off')) }), firestore: Object.assign(() => ({}), { FieldValue: { serverTimestamp: () => 0 } }) };
@@ -31,15 +32,25 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.equal(tiles.length, 6); assert.match(tiles[4], /🔢Secret/);
   await page.click('#u-games-row .u-game:nth-child(5)');
   assert.ok(await page.isVisible('#sn-tour'), 'first open = the tour'); assert.deepEqual(await page.evaluate(() => window.__played), ['secret-voice/t1.mp3']);
-  const tops = [];
-  for (let i = 0; i < 5; i++) { tops.push(await page.$eval('#sn-tnext', (b) => Math.round(b.getBoundingClientRect().top))); await page.click('#sn-tnext'); }
-  assert.equal(new Set(tops).size, 1, 'ถัดไป ▸ stays put ' + tops);
-  assert.deepEqual(await page.evaluate(() => window.__played), ['secret-voice/t1.mp3', 'stop', 'secret-voice/t2.mp3', 'stop', 'secret-voice/t3.mp3', 'stop', 'secret-voice/t4.mp3', 'stop', 'secret-voice/t5.mp3', 'stop']);
+  // V101.395 one page: 5 lines, ▸ Start, nothing to page through, no scrolling at 390 × 844; the voice walks the lines
+  const one = () => page.evaluate(() => { const c = document.querySelector('#snModal .modal-content'), r = c.getBoundingClientRect(), rs = [...document.querySelectorAll('#sn-tour .sn-rule')]; return { rules: rs.length, now: rs.findIndex((x) => x.classList.contains('now')), paging: !!document.querySelector('#sn-tour .sn-dots, #sn-tour .sn-skip, #sn-tour .sn-pill'), start: document.getElementById('sn-tnext').textContent, fits: r.top >= 0 && r.bottom <= innerHeight && c.scrollHeight <= c.clientHeight + 1, h: Math.round(r.height), gap: Math.round(document.getElementById('sn-tnext').getBoundingClientRect().top - rs[rs.length - 1].getBoundingClientRect().bottom), th: rs[0].querySelector('small').textContent, en: rs[0].querySelector('b').textContent }; });
+  let t = await one();
+  assert.deepEqual({ rules: t.rules, now: t.now, paging: t.paging, start: t.start, fits: t.fits }, { rules: 5, now: 0, paging: false, start: '▸ Start', fits: true }, 'one page: 5 lines, line 1 framed while it is read, ▸ Start, no scrolling ' + JSON.stringify(t));
+  assert.ok(t.gap >= 0 && t.gap <= 16 && t.h < 560, 'no empty block: ▸ Start sits right under line 5 ' + JSON.stringify(t));
+  assert.equal(t.en, 'The bot keeps a number from 1 to 100.'); assert.equal(t.th, '🤖 คิดเลขลับไว้ 1 ตัว · ตั้งแต่ 1 ถึง 100');
+  for (let i = 1; i < 5; i++) { await page.evaluate(() => { window.__aud.paused = true; window.__aud.onended(); }); assert.equal((await one()).now, i, 'the end of line ' + i + ' starts line ' + (i + 1)); }
+  await page.evaluate(() => { window.__aud.paused = true; window.__aud.onended(); });
+  assert.equal((await one()).now, -1, 'after line 5 no line is framed');
+  assert.deepEqual(await page.evaluate(() => window.__played), ['secret-voice/t1.mp3', 'secret-voice/t2.mp3', 'secret-voice/t3.mp3', 'secret-voice/t4.mp3', 'secret-voice/t5.mp3'], 't1…t5 once each, in order');
+  await page.click('#sn-tnext');
   assert.ok(await page.isVisible('#sn-start'), '▸ Start → lobby'); assert.equal(await page.evaluate(() => localStorage.getItem('snTourSeen')), '1');
-  await page.click('#sn-help'); await page.click('#sn-voice');
-  assert.equal(await page.evaluate(() => localStorage.getItem('snVoice')), 'off'); await page.evaluate(() => { window.__played = []; });
-  await page.click('#sn-tnext'); assert.deepEqual(await page.evaluate(() => window.__played), [], '🔇 kept: silent');
-  await page.click('.sn-skip');
+  await page.click('#sn-help'); assert.equal((await one()).now, 0, '❓ replays from line 1'); await page.click('#sn-voice');
+  assert.equal(await page.evaluate(() => localStorage.getItem('snVoice')), 'off'); assert.equal((await one()).now, -1, '🔇: no line framed');
+  assert.deepEqual(await page.evaluate(() => window.__played.slice(5)), ['secret-voice/t1.mp3', 'stop'], '🔇 stops the clip'); await page.evaluate(() => { window.__played = []; });
+  await page.click('#sn-tnext'); await page.click('#sn-help'); assert.deepEqual(await page.evaluate(() => window.__played), [], '🔇 kept: silent'); assert.equal((await one()).now, -1);
+  await page.setViewportSize({ width: 320, height: 568 });
+  assert.ok(await page.evaluate(() => { const b = document.getElementById('sn-tnext').getBoundingClientRect(), c = document.querySelector('#snModal .modal-content').getBoundingClientRect(); return b.top >= c.top && b.bottom <= c.bottom + 1 && b.bottom <= innerHeight && document.documentElement.scrollWidth <= innerWidth; }), '320 × 568: the lines scroll, ▸ Start stays in sight');
+  await page.setViewportSize({ width: 390, height: 844 }); await page.click('#sn-tnext');
   for (const f of [1, 2, 3, 4, 5]) { const b = fs.statSync('public/secret-voice/t' + f + '.mp3').size; assert.ok(b > 20000 && b < 100000, 't' + f + ' ' + b); }
 
   // truth table: every question over 2000 random pairs, checked against plain arithmetic
@@ -110,5 +121,5 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.ok(await fits(), 'lobby 320'); await page.evaluate(() => { SN.help(1); SN.start(); SN.pick('range'); }); assert.ok(await fits(), 'board + two boxes 320');
   assert.deepEqual(errors, []);
   await browser.close();
-  console.log('secret-qa: OK — 5th games tile, tour t1…t4 read aloud (🔇 kept), every question true over 2000 pairs, the secret never crossed out, 🟩 auto-cross + tap guess, ✏️ own crosses, 📏 range, 🧠 log only, wrong guess 🎫 +1, best per level, log h<n> w, 320 px');
+  console.log('secret-qa: OK — 5th games tile, one-page tour, t1…t5 read line after line (🔇 kept), ▸ Start in sight at 320 × 568, every question true over 2000 pairs, the secret never crossed out, 🟩 auto-cross + tap guess, ✏️ own crosses, 📏 range, 🧠 log only, wrong guess 🎫 +1, best per level, log h<n> w, 320 px');
 })().catch((e) => { console.error(e); process.exit(1); });

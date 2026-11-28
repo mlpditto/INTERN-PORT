@@ -38,28 +38,35 @@
     }
     function S(k) { if (window.BWSound && BWSound.on && BWSound.on() && BWSound.play) { try { BWSound.play(k); } catch (e) { } } }
 
-    // ---- ❓ the tour: 4 scenes, each read aloud (public/secret-voice/t1…t4.mp3, Paxa foithong, made once) ----------------------------
-    var tour = -1, aud = null;
+    // ---- ❓ the tour: ONE page (V101.395, owner pick A, mock-secret-tour/): the 5 rules as lines, read aloud one after another
+    //      (public/secret-voice/t1…t5.mp3, Paxa foithong, made once); the line being read is framed -----------------------------------
+    var tour = -1, aud = null, tread = -1;
     function seen() { try { return !!localStorage.getItem('snTourSeen'); } catch (e) { return true; } }
     function vOn() { try { return localStorage.getItem('snVoice') !== 'off'; } catch (e) { return true; } }
-    function hush() { if (aud) { try { aud.pause(); } catch (e) { } aud = null; } }
-    function say(i) { hush(); if (!vOn()) return; try { aud = new Audio('secret-voice/t' + (i + 1) + '.mp3'); var p = aud.play(); if (p && p.catch) p.catch(function () { /* needs a tap first */ }); } catch (e) { aud = null; } }
-    var TOUR = [
-        ['🤖 คิดเลขลับไว้ 1 ตัว<br>ตั้งแต่ 1 ถึง 100', 'The bot keeps a number from 1 to 100.', function () { return '<div class="sn-big">🤖 💭 <b>?</b></div>'; }],
-        ['แตะคำถาม เช่น “มากกว่า 50 ?”<br>🤖 ตอบจริงเสมอ · ใช้ 🎫 1 ใบ', 'Ask from the menu — always a true answer, 1 🎫.', function () { return '<div class="sn-log"><div><span>มากกว่า 50 ?</span><b class="no">✗ ไม่</b></div><div><span>เลขคู่ ?</span><b class="yes">✓ ใช่</b></div></div>'; }],
-        ['ตารางขีดเลขที่ตัดทิ้งได้ให้<br>แตะเลขที่เหลือ = ทาย · ผิดเสีย 🎫 1', 'The board crosses out; tap a number to guess.', function () { var h = ''; for (var n = 1; n <= 30; n++) h += '<span class="' + (n % 2 || n < 20 ? 'out' : '') + '">' + n + '</span>'; return '<div class="sn-grid sm">' + h + '</div>'; }],
-        ['ใช้ 🎫 น้อยสุด = เก่งสุด<br>อยากยากขึ้น: ✏️ ขีดเอง · 📏 · 🧠', 'Fewest 🎫 wins · harder: cross out yourself, or no help.', function () { return '<div class="sn-lvs">' + [1, 2, 3, 4].map(function (k) { return '<span class="' + (k === 1 ? 'on' : '') + '">' + HELP[k][0] + ' ' + HELP[k][1] + '</span>'; }).join('') + '</div>'; }],
+    function hush() { if (aud) { aud.onended = null; try { aud.pause(); } catch (e) { } aud = null; } tread = -1; }
+    function mark(i) { tread = i; var r = document.querySelectorAll('#sn-tour .sn-rule'); for (var k = 0; k < r.length; k++) r[k].classList.toggle('now', k === i); }
+    function say(i) {   // reads line i, then the next one, to the end
+        hush(); if (!vOn()) return mark(-1);
+        try {
+            var a = aud = new Audio('secret-voice/t' + (i + 1) + '.mp3'); mark(i);
+            a.onended = function () { if (aud !== a) return; aud = null; if (tour >= 0 && i < TOUR.length - 1) say(i + 1); else mark(-1); };
+            var p = a.play(); if (p && p.catch) p.catch(function () { if (aud === a) { aud = null; mark(-1); } /* needs a tap first */ });
+        } catch (e) { aud = null; mark(-1); }
+    }
+    var TOUR = [   // [Thai line (what the voice reads), English line]
+        ['🤖 คิดเลขลับไว้ 1 ตัว · ตั้งแต่ 1 ถึง 100', 'The bot keeps a number from 1 to 100.'],
+        ['แตะคำถาม เช่น “มากกว่า 50 ?” · 🤖 ตอบจริงเสมอ · ใช้ 🎫 1 ใบ', 'Ask from the menu — always a true answer, 1 🎫.'],
+        ['ตารางขีดเลขที่ตัดทิ้งได้ให้ · แตะเลขที่เหลือ = ทาย · ผิดเสีย 🎫 1', 'The board crosses out; tap a number to guess.'],
+        ['ใช้ 🎫 น้อยสุด = เก่งสุด · อยากยากขึ้น: ✏️ ขีดเอง · 📏 · 🧠', 'Fewest 🎫 wins · harder: cross out yourself, or no help.'],
         // V101.380 🌐 หลายคน (secret-online.js)
-        ['🌐 เล่นกับเพื่อน: ทุกคนมีเลขลับ<br>ตาคุณถาม 1 คน 1 ข้อ · คำตอบเห็นคนเดียว<br>ทายถูก ⭐ +3 · เพื่อนออก', 'With friends: ask one, only you see the answer; a right guess ⭐ +3.', function () { return '<div class="sn-lvs"><span>🧑‍⚕️ 🎫 6</span><span class="on">👩‍⚕️ ?</span><span>🧑 🎫 5 · ⭐ 3</span></div>'; }]
+        ['🌐 เล่นกับเพื่อน: ทุกคนมีเลขลับ · ตาคุณถาม 1 คน 1 ข้อ · คำตอบเห็นคนเดียว · ทายถูก ⭐ +3 · เพื่อนออก', 'With friends: ask one, only you see the answer; a right guess ⭐ +3.']
     ];
     function tourHtml() {
-        var s = TOUR[tour];
-        return '<div class="sn sn-tour" id="sn-tour"><div class="sn-top"><h3>❓ How to play</h3><span class="sn-pill">' + (tour + 1) + '/' + TOUR.length + '</span>'
+        return '<div class="sn sn-tour" id="sn-tour"><div class="sn-top"><h3>❓ How to play</h3>'
             + '<button type="button" class="sn-x" id="sn-voice" onclick="SN.voice()" aria-label="Sound" aria-pressed="' + vOn() + '">' + (vOn() ? '🔊' : '🔇') + '</button>'
             + '<button type="button" class="sn-x" onclick="SN.tourEnd()" aria-label="Close the tour">✕</button></div>'
-            + '<div class="sn-say" id="sn-tcap">' + s[1] + '<small>' + s[0] + '</small></div>'   // V101.385 English first; the small Thai line is what the voice reads + s[2]()
-            + '<div class="sn-tnav"><button type="button" class="sn-skip" onclick="SN.tourEnd()">Skip</button><div class="sn-dots">' + TOUR.map(function (x, n) { return n; }).map(function (n) { return '<i class="' + (n === tour ? 'on' : '') + '"></i>'; }).join('') + '</div>'
-            + '<button type="button" class="sn-go" id="sn-tnext" onclick="SN.tourNext()">' + (tour === TOUR.length - 1 ? '▸ Start' : 'Next ▸') + '</button></div></div>';
+            + '<ol class="sn-rules" id="sn-tcap">' + TOUR.map(function (s, i) { return '<li class="sn-rule' + (i === tread ? ' now' : '') + '"><i aria-hidden="true">' + (i + 1) + '</i><div><b>' + s[1] + '</b><small>' + s[0] + '</small></div></li>'; }).join('') + '</ol>'   // V101.385 English first; the small Thai line is what the voice reads
+            + '<button type="button" class="sn-go" id="sn-tnext" onclick="SN.tourEnd()">▸ Start</button></div>';
     }
 
     // ---- drawing -----------------------------------------------------------------------------------------------------------------
@@ -85,9 +92,9 @@
         + '#snModal .sn-bar{position:relative;height:30px;border-radius:10px;background:#e2e8f0;overflow:hidden}#snModal .sn-bar i{position:absolute;top:0;bottom:0;background:#5eead4}#snModal .sn-bar b{position:absolute;top:6px;font-size:.75em;color:#134e4a}'
         + '#snModal .sn-note{font-size:.78em;color:#64748b;text-align:center}#snModal .sn-toast{font-size:.85em;font-weight:800;color:#b45309;text-align:center}'
         + '#snModal .sn-big{font-size:2.6em;font-weight:900;color:#0f766e;text-align:center}'
-        + '#snModal .sn-tour{min-height:400px}#snModal .sn-say{background:#f0fdfa;border:1px solid #99f6e4;border-radius:14px;padding:10px 12px;font-weight:800;line-height:1.5;color:#134e4a}#snModal .sn-say small{display:block;font-size:.72em;font-weight:600;color:#64748b}'
-        + '#snModal .sn-tnav{display:flex;align-items:center;gap:8px;margin-top:auto}#snModal .sn-skip{background:none;border:0;color:#64748b;font-weight:800}'
-        + '#snModal .sn-dots{flex:1;display:flex;gap:4px;justify-content:center}#snModal .sn-dots i{width:6px;height:6px;border-radius:9px;background:#99f6e4;display:block}#snModal .sn-dots i.on{width:16px;background:#0d9488}'
+        + '#snModal .sn-rules{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}#snModal .sn-rule{display:flex;gap:10px;align-items:center;text-align:left;background:#f0fdfa;border:1px solid #99f6e4;border-radius:12px;padding:5px 10px}'
+        + '#snModal .sn-rule>i{flex:none;width:24px;height:24px;border-radius:50%;background:#0d9488;color:#fff;font-style:normal;font-weight:900;font-size:.8em;line-height:24px;text-align:center}#snModal .sn-rule.now{border-color:#0d9488;box-shadow:0 0 0 2px #99f6e4}'
+        + '#snModal .sn-rule b{display:block;font-weight:700;font-size:.86em;line-height:1.3;color:#134e4a}#snModal .sn-rule small{display:block;font-size:.72em;font-weight:600;line-height:1.35;color:#64748b}#snModal .sn-tour .sn-go{position:sticky;bottom:0;box-shadow:0 -6px 0 #fff,0 14px 0 #fff}'   /* ▸ Start stays in sight when a short phone scrolls the lines */
         + '#snModal .sn-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}#snModal .sn-stats div{background:#f0fdfa;border-radius:14px;padding:10px 4px;font-weight:900;font-size:1.2em}#snModal .sn-stats small{display:block;font-size:.6em;color:#0f766e}';
     function root() {
         var m = document.getElementById('snModal');
@@ -176,9 +183,8 @@
     window.SN = {
         open: function () { g = null; toast = null; if (!seen()) return SN.tour(); render(); },
         tour: function () { tour = 0; render(); say(0); },
-        tourNext: function () { if (tour < 0) return; if (tour < TOUR.length - 1) { tour++; render(); say(tour); } else SN.tourEnd(); },
         tourEnd: function () { hush(); tour = -1; try { localStorage.setItem('snTourSeen', '1'); } catch (e) { } render(); },
-        voice: function () { try { localStorage.setItem('snVoice', vOn() ? 'off' : 'on'); } catch (e) { } if (vOn() && tour >= 0) say(tour); else hush(); render(); },
+        voice: function () { try { localStorage.setItem('snVoice', vOn() ? 'off' : 'on'); } catch (e) { } if (vOn() && tour >= 0) say(0); else hush(); render(); },
         help: function (k) { help = HELP[k] ? k : 1; render(); },
         multi: function (v) { multi = !!v; g = null; render(); },   // V101.380 🤖 │ 🌐
         _render: function () { var m = document.getElementById('snModal'); if (m && m.style.display === 'flex') render(); },
