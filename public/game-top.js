@@ -16,7 +16,7 @@
             + '.gtop.dk{color:#e9d5ff}.gtop-l{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:center}'
             + '.gtop-c{display:inline-flex;align-items:center;gap:2px;padding:2px 6px 2px 2px;border-radius:999px;background:#f1f5f9}.gtop.dk .gtop-c{background:#1d1a3d}'
             + '.gtop-av{width:20px;height:20px;border-radius:50%;object-fit:cover;background:#e2e8f0;color:#475569;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex:none}'
-            + '.gtop-me{color:#7c3aed}.gtop.dk .gtop-me{color:#a78bfa}.gtop-e{opacity:.7;font-weight:700}'
+            + '.gtop-me{color:#7c3aed}.gtop.dk .gtop-me{color:#a78bfa}.gtop-e{opacity:.7;font-weight:700}.gtop:empty{display:none}'
             + '.gtop-b{display:flex;flex-direction:column;gap:5px;border:1px solid #e2e8f0;border-radius:14px;padding:8px}.gtop.dk .gtop-b{border-color:#3f3a74}'
             + '.gtop-rail{display:flex;gap:6px;justify-content:center}.gtop-rail button{font:inherit;font-size:12px;width:auto;min-height:0;margin:0;padding:4px 12px;border-radius:999px;border:1px solid #e2e8f0;background:none;color:inherit;box-shadow:none}'
             + '.gtop.dk .gtop-rail button{border-color:#3f3a74}.gtop-rail button.on{background:#7c3aed;border-color:#7c3aed;color:#fff}.gtop.dk .gtop-rail button.on{background:#a78bfa;border-color:#a78bfa;color:#1a1733}'
@@ -37,7 +37,7 @@
         var b = data && data[game] && data[game][per]; if (!b) return '';
         var unit = game === 'count' || game === 'secret' ? '' : ' ชนะ', me = b.me ? '<span class="gtop-me">คุณ #' + b.me.r + '</span>' : '';
         if (!open[game]) {
-            if (!b.top.length) return '<div class="gtop-l">🏆 <span class="gtop-e">' + (per === 'week' ? 'สัปดาห์นี้' : '') + 'ยังว่าง · ชนะก่อนได้ 🥇</span></div>';
+            if (!b.top.length) return '';   // V101.397 an empty week shows nothing (DESIGN 2.2: hide the empty); .gtop:empty is display:none
             return '<div class="gtop-l">🏆 ' + b.top.map(function (p, i) { return '<span class="gtop-c">' + av(p) + MED[i] + fmt(game, p.v) + '</span>'; }).join('') + me + '</div>';
         }
         return '<div class="gtop-b"><div class="gtop-rail" role="group" aria-label="Period">' + [['week', 'สัปดาห์นี้'], ['all', 'ตลอดกาล']].map(function (k) {
