@@ -1,4 +1,4 @@
-# 🪞 Memory Fracture · practice (V101.391)
+# 🪞 Memory Fracture · practice (V101.400)
 
 Owner 2026-11-28. Game 5 in `docs/MEMORY-SPOT-PLAN.md` (OneDrive copy, untracked). It borrows a game-show idea (remember a picture, then spot the differences) but uses our own name and look.
 
@@ -50,7 +50,9 @@ Files:
   - With ×2, more than 2 wrong taps costs 💎1 more.
   - Finding every change with no wrong tap gives 💎1 back.
 - **End:** after 3 rounds the screen shows ⭐ points against 🎯 (the number of changes), plus one line per round. 🏆 shows when ⭐ ≥ 🎯.
-- **Tour:** 5 scenes of the rules only, read aloud. It shows on the first open (`spotTourSeen`); 🔊/🔇 is kept as `spotVoice`, and the sound cues as `spotSound`.
+- **Tour:** the rules only, on ONE page like 🔢 and 🪨 (5 lines, English first, the Thai line the voice reads under each; no Next / dots); the voice reads t1…t5 one after another and frames the line it is on; ▸ Start stays in sight on a short phone. It shows on the first open (`spotTourSeen`); 🔊/🔇 is kept as `spotVoice`, and the sound cues as `spotSound`.
+- **Fit:** the popup may use the whole phone height (`100dvh − 16px`, other popups stop at 80dvh) and the shelf shrinks to what is left, so 👀 🎲 🔍 never scroll — checked at 360 × 640 on 🥄🥄🥄.
+- **Lobby:** one English line (`👀 remember → 🔍 spot the changes · 3 rounds`, Thai + Korean in its `title`), the 3 levels, ▸ Start.
 - **`game_plays`:** game `spot`, mode `l1` | `l2` | `l3`. `score` = the points, `res` = found/changes for each round, `win` = `w` when ⭐ ≥ 🎯.
   - No 🏆 board yet; that is PR 3 in the plan.
   - Rules: `game_plays.game` now allows `spot`. Deploy with `firebase deploy --only firestore:rules`.
@@ -61,7 +63,7 @@ Files:
 
 - `scripts/spot-qa.cjs` checks:
   - the changes are real (3 levels × 300 seeds); 🔤 only turns into its partner; scoring and 💎
-  - the 7th tile; the tour t1…t5 (the files exist) teaches rules only; the level is kept
+  - the 7th tile; the one-page tour: 5 lines, no paging, no scrolling at 390 × 844, t1…t5 (the files exist) read line after line with the line framed, rules only, 🔇 kept, ▸ Start in sight at 320 × 568; the English lobby line; the level is kept; 360 × 640 🥄🥄🥄: the timed steps fit without scrolling
   - the clock walks the rail by itself; unpaid bets are grey; taps toggle and stop at the cap; the reveal marks and names every change
   - `game_plays` spot `l2`; 320 px fits
 - `scripts/games-row-qa.cjs`, `rock13-qa.cjs`, `secret-qa.cjs`: the row has 7 tiles.

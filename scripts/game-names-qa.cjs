@@ -1,5 +1,5 @@
 // V101.393 (owner 2026-11-28: "ปรับชื่อเกมเป็นภาษาอังกฤษ แล้ว hover เป็นภาษาไทย กับ เกาหลี") on the REAL index.html.
-// The game names show in English — phone row (short): Cereal · Wolf · Count · Shadow · Secret · Carry 13; PC 🎮 menu (full): Werewolf ·
+// The game names show in English — phone row (short): Cereal · Wolf · Count · Shadow · Secret · Carry 13 · Memory; PC 🎮 menu (full): Werewolf ·
 // Count Fast · Shadow tiles · Secret number; the popup titles the same. Hover (title) = a Thai line + a Korean line, whatever the
 // language button says (no data-th-title / data-kr-title on them, so lang-toggle.js does not rewrite it). All six names fit 320 px.
 const assert = require('node:assert/strict');
@@ -14,6 +14,7 @@ const TIPS = [
   'ไพ่เงา · ดวลเลขลับกับบอท\n그림자 패 · 봇과 숫자 대결',
   'เลขลับ · ทายเลขของบอท 1–100\n비밀 숫자 · 봇의 1–100 맞히기',
   'Carry 13 · ห้ามแบกถึง 13\n돌 나르기 13 · 13을 넘기지 마세요',
+  'Memory Fracture · จำชั้นยา หาจุดที่เปลี่ยน\nMemory Fracture · 선반을 기억하고 바뀐 곳 찾기',
 ];
 
 (async () => {
@@ -36,9 +37,9 @@ const TIPS = [
 
   // phone row: short English names, Thai + Korean on hover
   let r = await read('#u-games-row button');
-  assert.deepEqual(r.map((x) => x.name), ['🥣 Cereal', '🐺 Wolf', '🧊 Count', '⚫ Shadow', '🔢 Secret', '🪨 Carry 13'], 'phone row: English names');
+  assert.deepEqual(r.map((x) => x.name), ['🥣 Cereal', '🐺 Wolf', '🧊 Count', '⚫ Shadow', '🔢 Secret', '🪨 Carry 13', '🪞 Memory'], 'phone row: English names');
   assert.deepEqual(r.map((x) => x.tip), TIPS, 'phone row: hover = a Thai line + a Korean line');
-  assert.deepEqual(r.map((x) => x.aria), ['Cereal Killer game', 'Werewolf game', 'Count Fast game', 'Shadow tiles game', 'Secret number game', 'Carry 13 game'], 'the English name stays for screen readers');
+  assert.deepEqual(r.map((x) => x.aria), ['Cereal Killer game', 'Werewolf game', 'Count Fast game', 'Shadow tiles game', 'Secret number game', 'Carry 13 game', 'Memory Fracture game'], 'the English name stays for screen readers');
   assert.ok(r.every((x) => !x.swap), 'no data-th-title / data-kr-title: the language button cannot rewrite the hover');
   for (const w of [390, 360, 320]) {
     await page.setViewportSize({ width: w, height: 800 });
@@ -51,7 +52,7 @@ const TIPS = [
     await page.evaluate(() => window.cycleLang());
     r = await read('#u-games-row button');
     assert.deepEqual(r.map((x) => x.tip), TIPS, 'language state ' + (i + 1) + ': the hover is the same');
-    assert.deepEqual(r.map((x) => x.name), ['🥣 Cereal', '🐺 Wolf', '🧊 Count', '⚫ Shadow', '🔢 Secret', '🪨 Carry 13']);
+    assert.deepEqual(r.map((x) => x.name), ['🥣 Cereal', '🐺 Wolf', '🧊 Count', '⚫ Shadow', '🔢 Secret', '🪨 Carry 13', '🪞 Memory']);
   }
   await page.evaluate(() => window.cycleLang());   // back to EN
 
@@ -67,11 +68,11 @@ const TIPS = [
   await page.setViewportSize({ width: 1024, height: 800 });
   await page.click('#u-games-chip');
   r = await read('#u-games-menu button');
-  assert.deepEqual(r.map((x) => x.name), ['🥣 Cereal 2-player detective', '🐺 Werewolf vs bots', '🧊 Count Fast count shapes', '⚫ Shadow tiles number duel', '🔢 Secret number guess 1–100', '🪨 Carry 13 stay under 13'], 'PC menu: English names and English subtitles (V101.394)');
+  assert.deepEqual(r.map((x) => x.name), ['🥣 Cereal 2-player detective', '🐺 Werewolf vs bots', '🧊 Count Fast count shapes', '⚫ Shadow tiles number duel', '🔢 Secret number guess 1–100', '🪨 Carry 13 stay under 13', '🪞 Memory Fracture spot changes'], 'PC menu: English names and English subtitles (V101.394)');
   assert.deepEqual(r.map((x) => x.tip), TIPS, 'PC menu: hover = a Thai line + a Korean line');
   assert.ok(r.every((x) => x.h <= 44 && x.h === r[0].h && !x.swap), 'PC menu: every row stays one line (40 px, 44 px on a touch screen) ' + JSON.stringify(r.map((x) => x.h)));
 
   assert.deepEqual(errors, []);
   await browser.close();
-  console.log('game-names-qa: OK — phone row Cereal · Wolf · Count · Shadow · Secret · Carry 13 (none cut at 320 px); PC menu Werewolf · Count Fast · Shadow tiles · Secret number on one line each; popup titles in English; hover = Thai + Korean in every language state');
+  console.log('game-names-qa: OK — phone row Cereal · Wolf · Count · Shadow · Secret · Carry 13 · Memory (none cut at 320 px); PC menu Werewolf · Count Fast · Shadow tiles · Secret number on one line each; popup titles in English; hover = Thai + Korean in every language state');
 })().catch((e) => { console.error(e); process.exit(1); });

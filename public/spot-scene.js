@@ -1,4 +1,4 @@
-/* V101.391 🪞 Memory Fracture · the shelf and its differences (owner 2026-11-28, game 5 of docs/MEMORY-SPOT-PLAN.md; picks: pharmacy
+/* V101.400 🪞 Memory Fracture · the shelf and its differences (owner 2026-11-28, game 5 of docs/MEMORY-SPOT-PLAN.md; picks: pharmacy
    scenes first, real drug names, 💎 bets from the start, 60 s look / 90 s find / 3 rounds, layout C = the steps rail). Pure: a seed + a
    level make the same shelf and the same changes on any phone (and later in the room referee). A shelf is a grid of slots; a slot is
    empty or one drug: bottle or box, its colour, the name and strength on the label, 1 or 2 of it. The changes (each slot changes at
