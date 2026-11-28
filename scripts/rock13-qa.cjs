@@ -1,5 +1,5 @@
 // V101.382 🪨 Carry 13 · ฝึกกับ 🤖 (owner 2026-11-27, docs/MIND-GAMES-PLAN.md §8, pick A3 mockup-rock13/) on the REAL index.html,
-// 390×844. Proves: the 6th tile opens it; the first open plays a 5-scene tour of the rules read aloud (t1…t5), ❓ replays, 🔊/🔇 kept;
+// 390×844. Proves: the 6th tile opens it; the first open shows the ONE-page tour of the rules (V101.396, owner pick B: 5 lines, the carriers picture under line 1, no Next, no empty block) read aloud line after line (t1…t5, the line being read framed), ❓ replays, 🔊/🔇 kept;
 // the lobby rails 👥 3–7 and 7 │ 14 รอบ are remembered; a round: ▸ ส่ง waits for a card + a chip, used ones grey out, the bots
 // place in the queue's order, at your turn ▸ วาง shows what it does (💥 when it takes stones), ⏭ Pass shows only when allowed,
 // 🌈 asks you to tap a carrier; the carriers hold cube stones; a full 7-round game ends with a ranking where everyone's 🪨 matches
@@ -15,7 +15,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
   await page.addInitScript(() => {
     for (const k of ['internGuideSeen', 'journalTourSeen', 'cerealTourSeen', 'wolfTourSeen', 'countTourSeen', 'bwTourSeen', 'snTourSeen']) localStorage.setItem(k, '1'); localStorage.setItem('wolfCoachSeen', 'all');
-    window.__played = []; window.Audio = function (src) { this.src = src; this.paused = true; };
+    window.__played = []; window.Audio = function (src) { this.src = src; this.paused = true; window.__aud = this; };
     window.Audio.prototype.play = function () { this.paused = false; window.__played.push(this.src); return Promise.resolve(); };
     window.Audio.prototype.pause = function () { if (!this.paused) window.__played.push('stop'); this.paused = true; };
     window.firebase = { auth: () => ({ currentUser: { uid: 'u1' }, onAuthStateChanged: () => () => {}, signInAnonymously: () => Promise.resolve() }), functions: () => ({ httpsCallable: () => () => Promise.reject(new Error('off')) }), firestore: Object.assign(() => ({}), { FieldValue: { serverTimestamp: () => 0 } }) };
@@ -33,13 +33,25 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.equal(tiles.length, 6); assert.match(tiles[5], /🪨Carry13/);
   await page.click('#u-games-row .u-game:nth-child(6)');
   assert.ok(await page.isVisible('#r13-tour'), 'first open = the tour'); assert.deepEqual(await page.evaluate(() => window.__played), ['rock13-voice/t1.mp3']);
-  const caps = [];
-  for (let i = 0; i < 5; i++) { caps.push(await page.textContent('#r13-tcap')); await page.click('#r13-tnext'); }
-  assert.ok(!caps.join(' ').match(/เคล็ด|กับดัก|ควร|เก็บไว้/), 'the tour teaches rules only, no tactics');
-  assert.deepEqual(await page.evaluate(() => window.__played), ['rock13-voice/t1.mp3', 'stop', 'rock13-voice/t2.mp3', 'stop', 'rock13-voice/t3.mp3', 'stop', 'rock13-voice/t4.mp3', 'stop', 'rock13-voice/t5.mp3', 'stop']);
+  // V101.396 one page: 5 lines (English, the Thai line under it), the carriers picture under line 1 only, ▸ Start, no paging, no scrolling at 390 × 844
+  const one = () => page.evaluate(() => { const c = document.querySelector('#r13Modal .modal-content'), r = c.getBoundingClientRect(), rs = [...document.querySelectorAll('#r13-tour .r13-rule')]; return { rules: rs.length, now: rs.findIndex((x) => x.classList.contains('now')), paging: !!document.querySelector('#r13-tour .r13-dots, #r13-tour .r13-skip, #r13-tour .r13-pill'), start: document.getElementById('r13-tnext').textContent, head: document.querySelector('#r13-tour h3').textContent, fits: r.top >= 0 && r.bottom <= innerHeight && c.scrollHeight <= c.clientHeight + 1, h: Math.round(r.height), gap: Math.round(document.getElementById('r13-tnext').getBoundingClientRect().top - rs[rs.length - 1].getBoundingClientRect().bottom), pics: rs.map((x) => x.querySelectorAll('.r13-pic .r13-c').length), sums: [...rs[0].querySelectorAll('.r13-sum')].map((x) => x.textContent), sumLines: [...rs[0].querySelectorAll('.r13-sum')].map((x) => Math.round(x.getBoundingClientRect().height / parseFloat(getComputedStyle(x.querySelector('b')).fontSize))), en: rs.map((x) => x.querySelector(':scope > div > b').textContent), th: rs[0].querySelector(':scope > div > small').textContent }; });
+  let t = await one();
+  assert.deepEqual({ rules: t.rules, now: t.now, paging: t.paging, start: t.start, head: t.head, fits: t.fits }, { rules: 5, now: 0, paging: false, start: '▸ Start', head: '❓ How to play', fits: true }, 'one page: 5 lines, line 1 framed while it is read, English head + ▸ Start, no scrolling ' + JSON.stringify(t));
+  assert.ok(t.gap >= 0 && t.gap <= 16 && t.h < 660, 'no empty block: ▸ Start sits right under line 5 ' + JSON.stringify({ gap: t.gap, h: t.h }));
+  assert.deepEqual(t.pics, [3, 0, 0, 0, 0], 'the 3 carriers under line 1 only'); assert.deepEqual(t.sums, ['8/13', '11/13', '2/13']); assert.ok(t.sumLines.every((n) => n <= 1), 'each weight stays on one line ' + t.sumLines);
+  assert.equal(t.en[0], '3 carriers — never let one reach 13.'); assert.equal(t.th, 'คน 3 คนแบกกระดานหิน 🔴🟢🔵 · ห้ามให้ใครแบกถึง 13');
+  assert.ok(!(await page.textContent('#r13-tcap')).match(/เคล็ด|กับดัก|ควร|เก็บไว้/), 'the tour teaches rules only, no tactics');
+  for (let i = 1; i < 5; i++) { await page.evaluate(() => { window.__aud.paused = true; window.__aud.onended(); }); assert.equal((await one()).now, i, 'the end of line ' + i + ' starts line ' + (i + 1)); }
+  await page.evaluate(() => { window.__aud.paused = true; window.__aud.onended(); }); assert.equal((await one()).now, -1, 'after line 5 no line is framed');
+  assert.deepEqual(await page.evaluate(() => window.__played), ['rock13-voice/t1.mp3', 'rock13-voice/t2.mp3', 'rock13-voice/t3.mp3', 'rock13-voice/t4.mp3', 'rock13-voice/t5.mp3'], 't1…t5 once each, in order');
+  await page.click('#r13-tnext');
   assert.ok(await page.isVisible('#r13-start')); assert.equal(await page.evaluate(() => localStorage.getItem('r13TourSeen')), '1');
-  await page.click('#r13-help'); await page.click('#r13-voice'); assert.equal(await page.evaluate(() => localStorage.getItem('r13Voice')), 'off');
-  await page.evaluate(() => { window.__played = []; }); await page.click('#r13-tnext'); assert.deepEqual(await page.evaluate(() => window.__played), [], '🔇 stays quiet');
+  await page.click('#r13-help'); assert.equal((await one()).now, 0, '❓ replays from line 1'); await page.click('#r13-voice'); assert.equal(await page.evaluate(() => localStorage.getItem('r13Voice')), 'off'); assert.equal((await one()).now, -1, '🔇: no line framed');
+  assert.deepEqual(await page.evaluate(() => window.__played.slice(5)), ['rock13-voice/t1.mp3', 'stop'], '🔇 stops the clip');
+  await page.evaluate(() => { window.__played = []; }); await page.click('#r13-tnext'); await page.click('#r13-help'); assert.deepEqual(await page.evaluate(() => window.__played), [], '🔇 stays quiet');
+  await page.setViewportSize({ width: 320, height: 568 });
+  assert.ok(await page.evaluate(() => { const b = document.getElementById('r13-tnext').getBoundingClientRect(), c = document.querySelector('#r13Modal .modal-content').getBoundingClientRect(); return b.top >= c.top && b.bottom <= c.bottom + 1 && b.bottom <= innerHeight && document.documentElement.scrollWidth <= innerWidth; }), '320 × 568: the lines scroll, ▸ Start stays in sight');
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => R13.tourEnd());
 
   // the lobby rails
@@ -120,5 +132,5 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.ok(await page.$eval('#u-games-row', (r) => [...r.children].every((b) => b.getBoundingClientRect().right <= r.getBoundingClientRect().right + 1)), 'the 6 tiles fit 320 px');
   assert.deepEqual(errors, []);
   await browser.close();
-  console.log('rock13-qa: OK — 6th tile; 5-scene rules tour read aloud (no tactics), ❓ + 🔇 kept; 👥 3–7 + 7│14 remembered; ▸ ส่ง needs card + chip; bots place in queue order; ▸ วาง says the new weight / 💥; ⏭ only when allowed; 🌈 taps a carrier; 7 rounds to a ranking; logged rock13 bot; the A2 loop only on your turn, cues put/fall/pass/turn/end, 🔇 kept; 320 px');
+  console.log('rock13-qa: OK — 6th tile; one-page rules tour (5 lines + the carriers picture, no tactics) read line after line, ❓ + 🔇 kept, ▸ Start in sight at 320 × 568; 👥 3–7 + 7│14 remembered; ▸ ส่ง needs card + chip; bots place in queue order; ▸ วาง says the new weight / 💥; ⏭ only when allowed; 🌈 taps a carrier; 7 rounds to a ranking; logged rock13 bot; the A2 loop only on your turn, cues put/fall/pass/turn/end, 🔇 kept; 320 px');
 })().catch((e) => { console.error(e); process.exit(1); });

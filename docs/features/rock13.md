@@ -24,7 +24,7 @@ Files:
 - **Reaching 13 or more:** you take every stone that was already there, at 🪨 1 each (a 0 counts too). Your stone stays on the board. The last one to take stones gets 👑 for the next round.
 - **Winning:** fewest 🪨 wins. On a tie, whoever took stones longer ago ranks higher.
 - **Sound** (`public/rock13-sound.js`, owner pick A2): a 13 s music-box loop in a minor key over a soft heartbeat, built in the phone with no file so it loops with no seam. It fades in only on your turn (picking, or placing). Cues: a stone down, stones falling 💥, ⏭, your turn, the end. 🔊/🔇 in the header, kept as `r13Sound`.
-- **Lobby:** 👥 3–7 and 7 │ 14 รอบ, kept as `r13Cfg`. The tour shows on the first open (`r13TourSeen`); 🔊/🔇 is kept as `r13Voice`.
+- **Lobby:** 👥 3–7 and 7 │ 14 รอบ, kept as `r13Cfg`. The tour shows on the first open (`r13TourSeen`); 🔊/🔇 is kept as `r13Voice`. V101.396 (owner pick B, mock-carry13-tour/): **one page**, English first — the 5 rules as lines (the Thai line the voice reads under each), the 3 carriers picture under line 1 only, no Next / dots / Skip; the voice reads t1…t5 one after another and frames the line it is on; ▸ Start stays in sight when a short phone scrolls the lines (was 5 pages of 430 px, pages 2 · 3 · 5 half empty).
 - **`game_plays`:** game `rock13`, mode `bot`, win `w` when you rank first, score = your 🪨. 🏆 counts wins.
 - **Rules:** `game_plays.game` now allows `rock13`. Deploy with `firebase deploy --only firestore:rules,functions:gameTop`.
 
@@ -56,7 +56,7 @@ Owner picks 2026-11-28: carrier look **C + animation** (mockup-rock13-carrier/),
   - placing order, ⏭, 🌈, taking stones at 13, 👑, ranking
   - 2000 bot-only games, 3–7 players, all legal to the end
 - `scripts/rock13-qa.cjs` (real page, 390 px):
-  - the 6th tile and the tour (rules only, voice)
+  - the 6th tile and the one-page tour: rules only, 5 lines + the carriers picture, no paging, no scrolling at 390 × 844, t1…t5 read line after line with the line framed, 🔇 kept, ▸ Start in sight at 320 × 568
   - the lobby rails
   - a full 7-round game with ⏭, 🌈 and 💥
   - the log entry, and a 320 px fit
