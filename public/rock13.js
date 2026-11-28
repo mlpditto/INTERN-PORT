@@ -97,27 +97,34 @@
         }).join('<i>→</i>') + '</div>';
     }
 
-    // ---- ❓ the tour: the rules only, never the tactics; 5 scenes read aloud -------------------------------------------------
-    var tour = -1, aud = null;
+    // ---- ❓ the tour: the rules only, never the tactics. ONE page (V101.396, owner pick B, mock-carry13-tour/): the 5 rules as
+    //      lines, the carriers picture under line 1, read aloud one after another (t1…t5); the line being read is framed --------
+    var tour = -1, aud = null, tread = -1;
     function vOn() { return get('r13Voice') !== 'off'; }
-    function hush() { if (aud) { try { aud.pause(); } catch (e) { } aud = null; } }
-    function say(i) { hush(); if (!vOn()) return; try { aud = new Audio('rock13-voice/t' + (i + 1) + '.mp3'); var p = aud.play(); if (p && p.catch) p.catch(function () { }); } catch (e) { aud = null; } }
+    function hush() { if (aud) { aud.onended = null; try { aud.pause(); } catch (e) { } aud = null; } tread = -1; }
+    function mark(i) { tread = i; var r = document.querySelectorAll('#r13-tour .r13-rule'); for (var k = 0; k < r.length; k++) r[k].classList.toggle('now', k === i); }
+    function say(i) {   // reads line i, then the next one, to the end
+        hush(); if (!vOn()) return mark(-1);
+        try {
+            var a = aud = new Audio('rock13-voice/t' + (i + 1) + '.mp3'); mark(i);
+            a.onended = function () { if (aud !== a) return; aud = null; if (tour >= 0 && i < TOUR.length - 1) say(i + 1); else mark(-1); };
+            var p = a.play(); if (p && p.catch) p.catch(function () { if (aud === a) { aud = null; mark(-1); } });
+        } catch (e) { aud = null; mark(-1); }
+    }
     function mini(st, a) { return '<div class="r13-c">' + carrier(st, a) + '<div class="r13-sum"><b style="color:' + COL[st] + '">' + R().sum(a) + '</b><small>/13</small></div></div>'; }
-    var TOUR = [
-        ['คน 3 คนแบกกระดานหิน 🔴🟢🔵<br>ห้ามให้ใครแบกถึง 13', '3 carriers — never let one reach 13.', function () { return '<div class="r13-st">' + mini('r', [5, 3]) + mini('g', [6, 4, 1]) + mini('b', [2]) + '</div>'; }],
-        ['ทุกรอบเลือกการ์ด 1 ใบ + ชิป 1 อัน<br>ทุกคนเลือกลับพร้อมกัน · ใช้ได้ครั้งเดียว', 'Pick a card and a chip, in secret, each once.', function () { return '<div class="r13-hand">' + [0, 1, 2, 3, 4, 5, 6].map(function (n) { return '<span class="r13-card' + (n === 4 ? ' on' : '') + '">' + n + '</span>'; }).join('') + '</div><div class="r13-hand">' + ['r', 'r', 'g', 'g', 'b', 'b', 'w'].map(function (c, i) { return '<span class="r13-chip' + (i === 2 ? ' on' : '') + '">' + CHIP[c] + '</span>'; }).join('') + '</div>'; }],
-        ['เปิดแล้ววางทีละคน: 🌈 ก่อน<br>แล้วเลขมากก่อน · เท่ากันเริ่มจาก 👑<br>🌈 เลือกคนแบกเองตอนถึงตา', 'Rainbow first, then the higher card; a tie starts at the crown.', function () { return '<div class="r13-q"><span>🌈 0 มายด์</span><i>→</i><span>🔴 6 ภูมิ</span><i>→</i><span>🟢 4 คุณ</span><i>→</i><span>🔵 4 ต้นข้าว</span></div>'; }],
-        ['วางแล้วถึง 13 = หินเก่าหล่นมาหาคุณ<br>ก้อนละ 🪨 1 (0 ก็นับ) · ก้อนของคุณอยู่ต่อ', 'Reach 13 and you take every old stone; yours stays.', function () { return '<div class="r13-st">' + mini('g', [6, 4, 2]) + '<div class="r13-big">+ 3 = 15 💥<br>🪨 +3</div>' + mini('g', [3]) + '</div>'; }],
-        ['ถึงตาแล้วกด ⏭ Pass ได้รอบละครั้ง<br>ไปวางท้าย (คน Pass ก่อนวางหลังสุด)<br>🪨 น้อยสุดชนะ · 14 รอบ แจกใหม่หลังรอบ 7', 'Pass once a round to place last · fewest stones wins.', function () { return '<div class="r13-q"><span class="done">🔴 6 ภูมิ ✓</span><i>→</i><span class="now">⏭ 🟢 4 คุณ</span></div>'; }]
+    var TOUR = [   // [Thai line (what the voice reads), English line, picture under the line (line 1 only)]
+        ['คน 3 คนแบกกระดานหิน 🔴🟢🔵 · ห้ามให้ใครแบกถึง 13', '3 carriers — never let one reach 13.', function () { return '<div class="r13-st">' + mini('r', [5, 3]) + mini('g', [6, 4, 1]) + mini('b', [2]) + '</div>'; }],
+        ['ทุกรอบเลือกการ์ด 1 ใบ + ชิป 1 อัน · ทุกคนเลือกลับพร้อมกัน · ใช้ได้ครั้งเดียว', 'Pick a card and a chip, in secret, each once.'],
+        ['เปิดแล้ววางทีละคน: 🌈 ก่อน · แล้วเลขมากก่อน · เท่ากันเริ่มจาก 👑 · 🌈 เลือกคนแบกเองตอนถึงตา', 'Rainbow first, then the higher card; a tie starts at the crown.'],
+        ['วางแล้วถึง 13 = หินเก่าหล่นมาหาคุณ · ก้อนละ 🪨 1 (0 ก็นับ) · ก้อนของคุณอยู่ต่อ', 'Reach 13 and you take every old stone; yours stays.'],
+        ['ถึงตาแล้วกด ⏭ Pass ได้รอบละครั้ง · ไปวางท้าย (คน Pass ก่อนวางหลังสุด) · 🪨 น้อยสุดชนะ · 14 รอบ แจกใหม่หลังรอบ 7', 'Pass once a round to place last · fewest stones wins.']
     ];
     function tourHtml() {
-        var s = TOUR[tour];
-        return '<div class="r13 r13-tour" id="r13-tour"><div class="r13-top"><h3>❓ วิธีเล่น</h3><span class="r13-pill">' + (tour + 1) + '/' + TOUR.length + '</span>'
+        return '<div class="r13 r13-tour" id="r13-tour"><div class="r13-top"><h3>❓ How to play</h3>'
             + '<button type="button" class="r13-x" id="r13-voice" onclick="R13.voice()" aria-label="Sound" aria-pressed="' + vOn() + '">' + (vOn() ? '🔊' : '🔇') + '</button>'
             + '<button type="button" class="r13-x" onclick="R13.tourEnd()" aria-label="Close the tour">✕</button></div>'
-            + '<div class="r13-say" id="r13-tcap">' + s[0] + '<small>' + s[1] + '</small></div>' + s[2]()
-            + '<div class="r13-tnav"><button type="button" class="r13-skip" onclick="R13.tourEnd()">ข้าม</button><div class="r13-dots">' + TOUR.map(function (x, n) { return '<i class="' + (n === tour ? 'on' : '') + '"></i>'; }).join('') + '</div>'
-            + '<button type="button" class="r13-go" id="r13-tnext" onclick="R13.tourNext()">' + (tour === TOUR.length - 1 ? '▸ เริ่ม' : 'ถัดไป ▸') + '</button></div></div>';
+            + '<ol class="r13-rules" id="r13-tcap">' + TOUR.map(function (s, i) { return '<li class="r13-rule' + (i === tread ? ' now' : '') + '"><i aria-hidden="true">' + (i + 1) + '</i><div><b>' + s[1] + '</b><small>' + s[0] + '</small>' + (s[2] ? '<div class="r13-pic" aria-hidden="true">' + s[2]() + '</div>' : '') + '</div></li>'; }).join('') + '</ol>'   // English first; the small Thai line is what the voice reads
+            + '<button type="button" class="r13-go" id="r13-tnext" onclick="R13.tourEnd()">▸ Start</button></div>';
     }
 
     // ---- screens --------------------------------------------------------------------------------------------------------------
@@ -197,10 +204,10 @@
         + '#r13Modal .r13-news{font-size:.85em;font-weight:900;text-align:center;color:#b91c1c}'
         + '#r13Modal .r13-big{font-size:1.4em;font-weight:900;color:#78350f;text-align:center;align-self:center}'
         + '#r13Modal .r13-rank{display:flex;flex-direction:column;gap:4px}#r13Modal .r13-rank div{display:flex;gap:8px;align-items:center;padding:6px 10px;border-radius:12px;background:#f8fafc;font-size:.9em}#r13Modal .r13-rank span{flex:1}#r13Modal .r13-rank .me{background:#fef3c7}'
-        + '#r13Modal .r13-tour{min-height:400px}#r13Modal .r13-say{background:#fffbeb;border:1px solid #fcd34d;border-radius:14px;padding:10px 12px;font-weight:800;line-height:1.5;color:#78350f}#r13Modal .r13-say small{display:block;font-size:.72em;font-weight:600;color:#64748b}'
-        + '#r13Modal .r13-tnav{display:flex;align-items:center;gap:8px;margin-top:auto}#r13Modal .r13-skip{background:none;border:0;color:#64748b;font-weight:800}'
-        + '#r13Modal .r13-dots{flex:1;display:flex;gap:4px;justify-content:center}#r13Modal .r13-dots i{width:6px;height:6px;border-radius:9px;background:#fcd34d;display:block}#r13Modal .r13-dots i.on{width:16px;background:#b45309}'
-        + '#r13Modal .r13-tnav .r13-go{flex:none}'
+        + '#r13Modal .r13-rules{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}#r13Modal .r13-rule{display:flex;gap:10px;align-items:center;text-align:left;background:#fffbeb;border:1px solid #fcd34d;border-radius:12px;padding:5px 10px}'
+        + '#r13Modal .r13-rule>i{flex:none;width:24px;height:24px;border-radius:50%;background:#b45309;color:#fff;font-style:normal;font-family:Arial,sans-serif;font-weight:900;font-size:.8em;line-height:24px;text-align:center}#r13Modal .r13-rule.now{border-color:#b45309;box-shadow:0 0 0 2px #fcd34d}'
+        + '#r13Modal .r13-rule>div{min-width:0;flex:1}#r13Modal .r13-rule>div>b{display:block;font-weight:700;font-size:.86em;line-height:1.3;color:#78350f}#r13Modal .r13-rule>div>small{display:block;font-size:.72em;font-weight:600;line-height:1.35;color:#64748b}'
+        + '#r13Modal .r13-pic{margin-top:4px;zoom:.5}#r13Modal .r13-tour .r13-go{position:sticky;bottom:0;box-shadow:inset 0 1px 0 #fff8,0 2px 0 #b8862f,0 -6px 0 #f3ecdb,0 16px 0 #efe6d2}'   /* ▸ Start stays in sight when a short phone scrolls the lines */
         // V101.390 🏛 Greek C
         + '#r13Modal .modal-content{background:radial-gradient(120% 60% at 50% 0%,#fffdf7 0%,#f6f0e2 60%,#efe6d2 100%);border:1px solid #e3d5b5}'
         + '#r13Modal .r13-top h3{font-family:Georgia,"Times New Roman",serif;font-weight:700;letter-spacing:.3px;color:#8a6a1f}'
@@ -267,9 +274,8 @@
     window.R13 = {
         open: function () { g = null; news = ''; if (!get('r13TourSeen')) return R13.tour(); render(); },
         tour: function () { tour = 0; render(); say(0); },
-        tourNext: function () { if (tour < 0) return; if (tour < TOUR.length - 1) { tour++; render(); say(tour); } else R13.tourEnd(); },
         tourEnd: function () { hush(); tour = -1; put('r13TourSeen', '1'); render(); },
-        voice: function () { put('r13Voice', vOn() ? 'off' : 'on'); if (vOn() && tour >= 0) say(tour); else hush(); render(); },
+        voice: function () { put('r13Voice', vOn() ? 'off' : 'on'); if (vOn() && tour >= 0) say(0); else hush(); render(); },
         set: function (k, v) { if (k === 'n' && v >= 3 && v <= 7) cfg.n = v; if (k === 'rounds') cfg.rounds = v === 7 ? 7 : 14; put('r13Cfg', JSON.stringify(cfg)); render(); },
         lobby: function () { clearTimeout(timer); g = null; news = ''; render(); },
         start: function () {
